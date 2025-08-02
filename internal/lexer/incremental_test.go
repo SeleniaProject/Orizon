@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestSpanAccuracy tests accuracy of span information
@@ -256,4 +257,211 @@ func generateRealisticSource(lines int) string {
 	builder.WriteString("}\n")
 
 	return builder.String()
+}
+
+// ===== Phase 1.1.2: Incremental Lexical Analysis Tests =====
+
+// TestIncrementalLexer_BasicFunctionality tests the core incremental lexing capabilities
+func TestIncrementalLexer_BasicFunctionality(t *testing.T) {
+	lexer := NewIncrementalLexer()
+
+	// Test case 1: Initial lexing
+	content1 := []byte("func main() { print(\"hello\") }")
+	tokens1, err := lexer.LexIncremental("test.oriz", content1, nil)
+	if err != nil {
+		t.Fatalf("Initial lexing failed: %v", err)
+	}
+
+	if len(tokens1) == 0 {
+		t.Error("Expected tokens from initial lexing")
+	}
+
+	// Verify cache was created
+	stats := lexer.GetStats()
+	if stats.FilesAnalyzed != 1 {
+		t.Errorf("Expected 1 file analyzed, got %d", stats.FilesAnalyzed)
+	}
+
+	// Test case 2: No changes - should hit cache
+	tokens2, err := lexer.LexIncremental("test.oriz", content1, nil)
+	if err != nil {
+		t.Fatalf("Cache retrieval failed: %v", err)
+	}
+
+	if len(tokens2) != len(tokens1) {
+		t.Errorf("Cache retrieval returned different token count: expected %d, got %d", len(tokens1), len(tokens2))
+	}
+
+	// Verify cache hit
+	stats = lexer.GetStats()
+	if stats.CacheHits != 1 {
+		t.Errorf("Expected 1 cache hit, got %d", stats.CacheHits)
+	}
+}
+
+// TestIncrementalLexer_SimpleChanges tests basic incremental updates
+func TestIncrementalLexer_SimpleChanges(t *testing.T) {
+	lexer := NewIncrementalLexer()
+
+	// Initial content
+	content1 := []byte("func main() { print(\"hello\") }")
+	tokens1, err := lexer.LexIncremental("test.oriz", content1, nil)
+	if err != nil {
+		t.Fatalf("Initial lexing failed: %v", err)
+	}
+
+	t.Logf("Initial tokens: %d", len(tokens1))
+	for i, token := range tokens1 {
+		t.Logf("Token %d: %s = %q", i, token.Type, token.Literal)
+	}
+
+	// Modified content (change string literal)
+	content2 := []byte("func main() { print(\"world\") }")
+	changes := []Change{
+		{
+			Start:   20, // Position of "hello"
+			End:     25,
+			OldText: "hello",
+			NewText: "world",
+			Type:    ChangeReplaceBlock,
+		},
+	}
+
+	tokens2, err := lexer.LexIncremental("test.oriz", content2, changes)
+	if err != nil {
+		t.Fatalf("Incremental lexing failed: %v", err)
+	}
+
+	t.Logf("Updated tokens: %d", len(tokens2))
+	for i, token := range tokens2 {
+		t.Logf("Token %d: %s = %q", i, token.Type, token.Literal)
+	}
+
+	// Should have same number of tokens
+	if len(tokens2) != len(tokens1) {
+		t.Errorf("Token count changed unexpectedly: expected %d, got %d", len(tokens1), len(tokens2))
+	}
+
+	// Find the string token and verify it changed
+	var foundStringToken bool
+	for _, token := range tokens2 {
+		if token.Type == TokenString && strings.Contains(token.Literal, "world") {
+			foundStringToken = true
+			break
+		}
+	}
+
+	if !foundStringToken {
+		t.Error("Expected to find updated string token with 'world'")
+	}
+} // TestIncrementalLexer_PerformanceMetrics tests performance monitoring
+func TestIncrementalLexer_PerformanceMetrics(t *testing.T) {
+	lexer := NewIncrementalLexer()
+
+	// Large content for performance testing
+	var contentBuilder strings.Builder
+	for i := 0; i < 1000; i++ {
+		contentBuilder.WriteString(fmt.Sprintf("func test%d() { print(\"line %d\") }\n", i, i))
+	}
+	content := []byte(contentBuilder.String())
+
+	start := time.Now()
+	tokens, err := lexer.LexIncremental("large.oriz", content, nil)
+	duration := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("Failed to lex large content: %v", err)
+	}
+
+	if len(tokens) == 0 {
+		t.Error("Expected tokens from large content")
+	}
+
+	// Check performance stats
+	stats := lexer.GetStats()
+	if stats.TotalLexingTime == 0 {
+		t.Error("Expected non-zero lexing time in stats")
+	}
+
+	if stats.CharactersProcessed == 0 {
+		t.Error("Expected non-zero characters processed in stats")
+	}
+
+	t.Logf("Lexed %d characters in %v (%.2f chars/ms)",
+		len(content), duration, float64(len(content))/float64(duration.Nanoseconds()/1000000))
+
+	// Test cache hit performance
+	start = time.Now()
+	tokens2, err := lexer.LexIncremental("large.oriz", content, nil)
+	cacheHitDuration := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("Failed to retrieve from cache: %v", err)
+	}
+
+	if len(tokens2) != len(tokens) {
+		t.Error("Cache retrieval returned different token count")
+	}
+
+	// Cache hit should be significantly faster
+	if cacheHitDuration > duration/10 {
+		t.Logf("Warning: Cache hit took %v, original lexing took %v (ratio: %.2fx)",
+			cacheHitDuration, duration, float64(duration)/float64(cacheHitDuration))
+	}
+
+	t.Logf("Cache hit: %v (%.2fx speedup)", cacheHitDuration, float64(duration)/float64(cacheHitDuration))
+}
+
+// BenchmarkIncrementalLexer_CacheHit benchmarks cache hit performance
+func BenchmarkIncrementalLexer_CacheHit(b *testing.B) {
+	lexer := NewIncrementalLexer()
+	content := []byte("func main() { print(\"hello world\") }")
+
+	// Prime the cache
+	_, err := lexer.LexIncremental("test.oriz", content, nil)
+	if err != nil {
+		b.Fatalf("Failed to prime cache: %v", err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := lexer.LexIncremental("test.oriz", content, nil)
+		if err != nil {
+			b.Fatalf("Cache hit failed: %v", err)
+		}
+	}
+}
+
+// BenchmarkIncrementalLexer_SmallChange benchmarks incremental updates
+func BenchmarkIncrementalLexer_SmallChange(b *testing.B) {
+	lexer := NewIncrementalLexer()
+	baseContent := []byte("func main() { print(\"hello\") }")
+
+	// Prime the cache
+	_, err := lexer.LexIncremental("test.oriz", baseContent, nil)
+	if err != nil {
+		b.Fatalf("Failed to prime cache: %v", err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Alternate between two versions
+		var content []byte
+		var changes []Change
+
+		if i%2 == 0 {
+			content = []byte("func main() { print(\"world\") }")
+			changes = []Change{{Start: 20, End: 25, OldText: "hello", NewText: "world", Type: ChangeReplaceBlock}}
+		} else {
+			content = baseContent
+			changes = []Change{{Start: 20, End: 25, OldText: "world", NewText: "hello", Type: ChangeReplaceBlock}}
+		}
+
+		_, err := lexer.LexIncremental("test.oriz", content, changes)
+		if err != nil {
+			b.Fatalf("Incremental update failed: %v", err)
+		}
+	}
 }
