@@ -295,6 +295,25 @@ func (a *AssignmentExpression) Accept(visitor Visitor) interface{} {
 }
 func (a *AssignmentExpression) expressionNode() {}
 
+// TernaryExpression represents ternary conditional expressions (condition ? true_expr : false_expr)
+type TernaryExpression struct {
+	Span      Span
+	Condition Expression
+	TrueExpr  Expression
+	FalseExpr Expression
+}
+
+func (t *TernaryExpression) GetSpan() Span { return t.Span }
+func (t *TernaryExpression) String() string {
+	return fmt.Sprintf("(%s ? %s : %s)", t.Condition, t.TrueExpr, t.FalseExpr)
+}
+func (t *TernaryExpression) Accept(visitor Visitor) interface{} {
+	return visitor.VisitTernaryExpression(t)
+}
+func (t *TernaryExpression) expressionNode() {}
+
+// ====== Types ======
+
 // ====== Types ======
 
 // BasicType represents primitive types
@@ -358,6 +377,7 @@ type Visitor interface {
 	VisitUnaryExpression(*UnaryExpression) interface{}
 	VisitCallExpression(*CallExpression) interface{}
 	VisitAssignmentExpression(*AssignmentExpression) interface{}
+	VisitTernaryExpression(*TernaryExpression) interface{}
 	VisitBasicType(*BasicType) interface{}
 	VisitOperator(*Operator) interface{}
 }

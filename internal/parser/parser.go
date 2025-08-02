@@ -31,6 +31,48 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("Parse error at %s: %s", e.Position.String(), e.Message)
 }
 
+// NewParser creates a ne// parseInfixExpression parses infix expressions with extended operator support
+func (p *Parser) parseInfixExpression(left Expression) Expression {
+	switch p.current.Type {
+	// Arithmetic operators
+	case lexer.TokenPlus, lexer.TokenMinus, lexer.TokenMul, lexer.TokenDiv, lexer.TokenMod:
+		return p.parseBinaryExpression(left)
+	// Power operator (right associative)
+	case lexer.TokenPower:
+		return p.parsePowerExpression(left)
+	// Comparison operators
+	case lexer.TokenEq, lexer.TokenNe, lexer.TokenLt, lexer.TokenLe, lexer.TokenGt, lexer.TokenGe:
+		return p.parseBinaryExpression(left)
+	// Logical operators
+	case lexer.TokenAnd, lexer.TokenOr:
+		return p.parseBinaryExpression(left)
+	// Bitwise operators
+	case lexer.TokenBitAnd, lexer.TokenBitOr, lexer.TokenBitXor, lexer.TokenShl, lexer.TokenShr:
+		return p.parseBinaryExpression(left)
+	// Assignment operators
+	case lexer.TokenAssign:
+		return p.parseAssignmentExpression(left)
+	case lexer.TokenPlusAssign, lexer.TokenMinusAssign, lexer.TokenMulAssign,
+		lexer.TokenDivAssign, lexer.TokenModAssign:
+		return p.parseCompoundAssignmentExpression(left)
+	case lexer.TokenBitAndAssign, lexer.TokenBitOrAssign, lexer.TokenBitXorAssign,
+		lexer.TokenShlAssign, lexer.TokenShrAssign:
+		return p.parseCompoundAssignmentExpression(left)
+	// Call and access operators
+	case lexer.TokenLParen:
+		return p.parseCallExpression(left)
+	case lexer.TokenLBracket:
+		return p.parseIndexExpression(left)
+	case lexer.TokenDot:
+		return p.parseMemberExpression(left)
+	// Ternary conditional operator
+	case lexer.TokenQuestion:
+		return p.parseTernaryExpression(left)
+	default:
+		return nil
+	}
+}
+
 // NewParser creates a new parser instance
 func NewParser(l *lexer.Lexer, filename string) *Parser {
 	p := &Parser{
@@ -491,31 +533,106 @@ func (p *Parser) parseExpressionStatement() *ExpressionStatement {
 
 // ====== Expression Parsing (Pratt Parser) ======
 
-// Precedence levels for operators
+// Precedence levels for operators - Complete precedence hierarchy
 type Precedence int
 
 const (
 	_ Precedence = iota
 	LOWEST
-	EQUALS      // ==
-	LESSGREATER // > or <
-	SUM         // +
-	PRODUCT     // *
-	PREFIX      // -X or !X
-	CALL        // myFunction(X)
+	TERNARY     // ? :
+	ASSIGN      // = += -= *= /= %= &= |= ^= <<= >>=
+	LOGICAL_OR  // ||
+	LOGICAL_AND // &&
+	BITWISE_OR  // |
+	BITWISE_XOR // ^
+	BITWISE_AND // &
+	EQUALS      // == !=
+	LESSGREATER // < <= > >=
+	SHIFT       // << >>
+	SUM         // + -
+	PRODUCT     // * / %
+	POWER       // ** (right associative)
+	PREFIX      // -X !X ~X
+	POSTFIX     // X++ X-- X!
+	CALL        // myFunction(X) X[Y] X.Y
 )
 
-// precedences maps token types to their precedence
+// precedences maps token types to their precedence levels
+// Following C-style operator precedence with some modern language improvements
 var precedences = map[lexer.TokenType]Precedence{
-	lexer.TokenEq:     EQUALS,
-	lexer.TokenNe:     EQUALS,
-	lexer.TokenLt:     LESSGREATER,
-	lexer.TokenGt:     LESSGREATER,
-	lexer.TokenPlus:   SUM,
-	lexer.TokenMinus:  SUM,
-	lexer.TokenDiv:    PRODUCT,
-	lexer.TokenMul:    PRODUCT,
-	lexer.TokenLParen: CALL,
+	// Assignment operators (right associative)
+	lexer.TokenAssign:       ASSIGN,
+	lexer.TokenPlusAssign:   ASSIGN,
+	lexer.TokenMinusAssign:  ASSIGN,
+	lexer.TokenMulAssign:    ASSIGN,
+	lexer.TokenDivAssign:    ASSIGN,
+	lexer.TokenModAssign:    ASSIGN,
+	lexer.TokenBitAndAssign: ASSIGN,
+	lexer.TokenBitOrAssign:  ASSIGN,
+	lexer.TokenBitXorAssign: ASSIGN,
+	lexer.TokenShlAssign:    ASSIGN,
+	lexer.TokenShrAssign:    ASSIGN,
+
+	// Ternary conditional (right associative)
+	lexer.TokenQuestion: TERNARY,
+
+	// Logical operators
+	lexer.TokenOr:  LOGICAL_OR,
+	lexer.TokenAnd: LOGICAL_AND,
+
+	// Bitwise operators
+	lexer.TokenBitOr:  BITWISE_OR,
+	lexer.TokenBitXor: BITWISE_XOR,
+	lexer.TokenBitAnd: BITWISE_AND,
+
+	// Equality and relational operators
+	lexer.TokenEq: EQUALS,
+	lexer.TokenNe: EQUALS,
+	lexer.TokenLt: LESSGREATER,
+	lexer.TokenLe: LESSGREATER,
+	lexer.TokenGt: LESSGREATER,
+	lexer.TokenGe: LESSGREATER,
+
+	// Shift operators
+	lexer.TokenShl: SHIFT,
+	lexer.TokenShr: SHIFT,
+
+	// Additive operators
+	lexer.TokenPlus:  SUM,
+	lexer.TokenMinus: SUM,
+
+	// Multiplicative operators
+	lexer.TokenMul: PRODUCT,
+	lexer.TokenDiv: PRODUCT,
+	lexer.TokenMod: PRODUCT,
+
+	// Power operator (right associative)
+	lexer.TokenPower: POWER,
+
+	// Call and access operators
+	lexer.TokenLParen:   CALL,
+	lexer.TokenLBracket: CALL,
+	lexer.TokenDot:      CALL,
+}
+
+// operatorAssociativity maps precedence levels to their associativity
+var operatorAssociativity = map[Precedence]Associativity{
+	TERNARY:     RightAssociative,
+	ASSIGN:      RightAssociative,
+	LOGICAL_OR:  LeftAssociative,
+	LOGICAL_AND: LeftAssociative,
+	BITWISE_OR:  LeftAssociative,
+	BITWISE_XOR: LeftAssociative,
+	BITWISE_AND: LeftAssociative,
+	EQUALS:      LeftAssociative,
+	LESSGREATER: LeftAssociative,
+	SHIFT:       LeftAssociative,
+	SUM:         LeftAssociative,
+	PRODUCT:     LeftAssociative,
+	POWER:       RightAssociative, // Important: 2^3^4 = 2^(3^4)
+	PREFIX:      RightAssociative,
+	POSTFIX:     LeftAssociative,
+	CALL:        LeftAssociative,
 }
 
 // peekPrecedence returns the precedence of the peek token
@@ -534,7 +651,7 @@ func (p *Parser) currentPrecedence() Precedence {
 	return LOWEST
 }
 
-// parseExpression parses expressions using Pratt parsing
+// parseExpression parses expressions using enhanced Pratt parsing with associativity
 func (p *Parser) parseExpression(precedence Precedence) Expression {
 	// Parse prefix expression
 	left := p.parsePrefixExpression()
@@ -542,8 +659,8 @@ func (p *Parser) parseExpression(precedence Precedence) Expression {
 		return nil
 	}
 
-	// Parse infix expressions
-	for !p.peekTokenIs(lexer.TokenSemicolon) && precedence < p.peekPrecedence() {
+	// Parse infix expressions with associativity consideration
+	for !p.peekTokenIs(lexer.TokenSemicolon) && p.shouldContinueParsing(precedence) {
 		p.nextToken()
 		left = p.parseInfixExpression(left)
 		if left == nil {
@@ -554,7 +671,40 @@ func (p *Parser) parseExpression(precedence Precedence) Expression {
 	return left
 }
 
-// parsePrefixExpression parses prefix expressions
+// shouldContinueParsing determines if parsing should continue based on precedence and associativity
+func (p *Parser) shouldContinueParsing(precedence Precedence) bool {
+	peekPrec := p.peekPrecedence()
+
+	// If peek precedence is lower, don't continue
+	if precedence > peekPrec {
+		return false
+	}
+
+	// If precedences are equal, check associativity
+	if precedence == peekPrec {
+		assoc, exists := operatorAssociativity[peekPrec]
+		if !exists {
+			return precedence < peekPrec // Default to left associative
+		}
+
+		switch assoc {
+		case LeftAssociative:
+			return false // Stop for left associative
+		case RightAssociative:
+			return true // Continue for right associative
+		case NonAssociative:
+			// Non-associative operators like comparison chains
+			p.addError(TokenToPosition(p.peek),
+				"non-associative operator cannot be chained",
+				"expression parsing")
+			return false
+		}
+	}
+
+	return precedence < peekPrec
+}
+
+// parsePrefixExpression parses prefix expressions with extended operator support
 func (p *Parser) parsePrefixExpression() Expression {
 	switch p.current.Type {
 	case lexer.TokenIdentifier:
@@ -567,7 +717,8 @@ func (p *Parser) parsePrefixExpression() Expression {
 		return p.parseStringLiteral()
 	case lexer.TokenBool:
 		return p.parseBooleanLiteral()
-	case lexer.TokenMinus, lexer.TokenNot:
+	// Unary prefix operators
+	case lexer.TokenMinus, lexer.TokenNot, lexer.TokenBitNot:
 		return p.parseUnaryExpression()
 	case lexer.TokenLParen:
 		return p.parseGroupedExpression()
@@ -575,21 +726,6 @@ func (p *Parser) parsePrefixExpression() Expression {
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("no prefix parse function for %s", p.current.Type.String()),
 			"expression parsing")
-		return nil
-	}
-}
-
-// parseInfixExpression parses infix expressions
-func (p *Parser) parseInfixExpression(left Expression) Expression {
-	switch p.current.Type {
-	case lexer.TokenPlus, lexer.TokenMinus, lexer.TokenDiv, lexer.TokenMul,
-		lexer.TokenEq, lexer.TokenNe, lexer.TokenLt, lexer.TokenGt:
-		return p.parseBinaryExpression(left)
-	case lexer.TokenLParen:
-		return p.parseCallExpression(left)
-	case lexer.TokenAssign:
-		return p.parseAssignmentExpression(left)
-	default:
 		return nil
 	}
 }
@@ -733,7 +869,7 @@ func (p *Parser) parseAssignmentExpression(left Expression) Expression {
 	operator := NewOperator(TokenToSpan(p.current), p.current.Literal, 0, RightAssociative, AssignmentOp)
 
 	p.nextToken()
-	right := p.parseExpression(LOWEST)
+	right := p.parseExpression(ASSIGN) // Right associative
 
 	endPos := TokenToPosition(p.current)
 	span := SpanBetween(startPos, endPos)
@@ -743,5 +879,118 @@ func (p *Parser) parseAssignmentExpression(left Expression) Expression {
 		Left:     left,
 		Operator: operator,
 		Right:    right,
+	}
+}
+
+// parsePowerExpression parses power expressions (right associative)
+func (p *Parser) parsePowerExpression(left Expression) Expression {
+	startPos := left.GetSpan().Start
+	operator := NewOperator(TokenToSpan(p.current), p.current.Literal,
+		int(p.currentPrecedence()), RightAssociative, BinaryOp)
+
+	precedence := p.currentPrecedence()
+	p.nextToken()
+	// Right associative: use same precedence - 1 to parse right operand
+	right := p.parseExpression(precedence - 1)
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &BinaryExpression{
+		Span:     span,
+		Left:     left,
+		Operator: operator,
+		Right:    right,
+	}
+}
+
+// parseCompoundAssignmentExpression parses compound assignment expressions (+=, -=, etc.)
+func (p *Parser) parseCompoundAssignmentExpression(left Expression) Expression {
+	startPos := left.GetSpan().Start
+	operator := NewOperator(TokenToSpan(p.current), p.current.Literal, 0, RightAssociative, AssignmentOp)
+
+	p.nextToken()
+	right := p.parseExpression(ASSIGN) // Right associative
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &AssignmentExpression{
+		Span:     span,
+		Left:     left,
+		Operator: operator,
+		Right:    right,
+	}
+}
+
+// parseIndexExpression parses array/slice index expressions
+func (p *Parser) parseIndexExpression(left Expression) Expression {
+	startPos := left.GetSpan().Start
+
+	p.nextToken() // consume [
+	index := p.parseExpression(LOWEST)
+
+	if !p.expectPeek(lexer.TokenRBracket) {
+		return nil
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	// Create a specialized index expression using CallExpression structure
+	return &CallExpression{
+		Span:      span,
+		Function:  left,
+		Arguments: []Expression{index},
+	}
+}
+
+// parseMemberExpression parses member access expressions (obj.field)
+func (p *Parser) parseMemberExpression(left Expression) Expression {
+	startPos := left.GetSpan().Start
+
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+
+	member := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	// Create a specialized member expression using BinaryExpression structure
+	operator := NewOperator(Span{Start: startPos, End: endPos}, ".",
+		int(CALL), LeftAssociative, BinaryOp)
+
+	return &BinaryExpression{
+		Span:     span,
+		Left:     left,
+		Operator: operator,
+		Right:    member,
+	}
+}
+
+// parseTernaryExpression parses ternary conditional expressions (condition ? true_expr : false_expr)
+func (p *Parser) parseTernaryExpression(left Expression) Expression {
+	startPos := left.GetSpan().Start
+
+	p.nextToken() // consume ?
+	trueExpr := p.parseExpression(LOWEST)
+
+	if !p.expectPeek(lexer.TokenColon) {
+		return nil
+	}
+
+	p.nextToken()                               // consume :
+	falseExpr := p.parseExpression(TERNARY - 1) // Right associative
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	// Create ternary expression using specialized AST node
+	return &TernaryExpression{
+		Span:      span,
+		Condition: left,
+		TrueExpr:  trueExpr,
+		FalseExpr: falseExpr,
 	}
 }

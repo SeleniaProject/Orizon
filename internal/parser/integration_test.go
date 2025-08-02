@@ -43,7 +43,7 @@ func TestParserIntegration(t *testing.T) {
 			}
 
 			t.Logf("Successfully parsed %s with %d declarations", file, len(program.Declarations))
-			
+
 			// Test pretty printing
 			output := PrettyPrint(program)
 			if output == "" {
