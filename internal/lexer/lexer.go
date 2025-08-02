@@ -330,6 +330,14 @@ type Lexer struct {
 	tokenCache   []CacheEntry  // cached tokens from previous parse
 	changeRegion *ChangeRegion // region that has been modified
 	cacheValid   bool          // whether cache is currently valid
+
+	// Error recovery system (Phase 1.1.3)
+	errorRecovery *ErrorRecovery // error recovery system
+	errors        []any          // accumulated lexical errors (LexicalError)
+
+	// Temporary state for error handling
+	stringTerminated   bool // whether last string was properly terminated
+	hasIdentifierError bool // whether identifier had invalid characters
 }
 
 // New creates a new lexer instance for complete parsing
@@ -404,6 +412,7 @@ func (l *Lexer) skipWhitespace() {
 // readIdentifier reads identifier or Unicode identifier - 修正版
 func (l *Lexer) readIdentifier() string {
 	position := l.position
+	l.hasIdentifierError = false // Reset error flag
 
 	// 最初の文字を処理
 	if isLetter(l.ch) || l.ch == '_' {
@@ -437,6 +446,16 @@ func (l *Lexer) readIdentifier() string {
 				break
 			}
 		} else {
+			// Check for invalid characters that might be typos in identifiers
+			if l.ch == '-' || l.ch == '@' || l.ch == '#' || l.ch == '$' {
+				if l.errorRecovery != nil {
+					err := l.CreateInvalidCharacterError(rune(l.ch))
+					l.addError(err)
+					l.hasIdentifierError = true
+				}
+				l.readChar() // Skip the invalid character
+				continue
+			}
 			break
 		}
 	}
@@ -446,23 +465,91 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
+	hasDecimal := false
+
+	// Read digits
 	for isDigit(l.ch) {
 		l.readChar()
 	}
-	return l.input[position:l.position]
+
+	// Handle decimal point
+	if l.ch == '.' && isDigit(l.peekChar()) {
+		hasDecimal = true
+		l.readChar() // consume '.'
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	}
+
+	literal := l.input[position:l.position]
+
+	// Check for malformed number (letters after digits)
+	if isLetter(l.ch) || l.ch == '_' {
+		// Malformed number - read the invalid part too
+		invalidStart := l.position
+		for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
+			l.readChar()
+		}
+
+		if l.errorRecovery != nil {
+			invalidPart := l.input[invalidStart:l.position]
+			fullLiteral := literal + invalidPart
+			err := l.CreateMalformedNumberError(fullLiteral)
+			l.addError(err)
+		}
+
+		return l.input[position:l.position] // Return the full invalid literal
+	}
+
+	// Check for multiple decimal points
+	remaining := l.input[l.position:]
+	if hasDecimal && containsSubstring(remaining, ".") {
+		// Look ahead for another decimal point
+		nextDot := -1
+		for i, r := range remaining {
+			if r == '.' {
+				nextDot = i
+				break
+			}
+			if !isDigit(byte(r)) {
+				break
+			}
+		}
+
+		if nextDot >= 0 {
+			if l.errorRecovery != nil {
+				malformedLiteral := l.input[position : l.position+nextDot+1]
+				err := l.CreateMalformedNumberError(malformedLiteral)
+				l.addError(err)
+			}
+		}
+	}
+
+	return literal
 }
 
 func (l *Lexer) readString() string {
 	position := l.position + 1 // 開始の引用符をスキップ
+	terminated := false
+
 	for {
 		l.readChar()
-		if l.ch == '"' || l.ch == 0 {
+		if l.ch == '"' {
+			terminated = true
+			break
+		}
+		if l.ch == 0 {
+			// Unterminated string
 			break
 		}
 		if l.ch == '\\' {
 			l.readChar() // エスケープ文字をスキップ
 		}
 	}
+
+	// Store termination status for NextToken to use
+	l.stringTerminated = terminated
+
 	return l.input[position:l.position]
 }
 
@@ -709,7 +796,13 @@ func (l *Lexer) NextToken() Token {
 		tok = l.newTokenFromChar(TokenBackslash, l.ch)
 	case '"':
 		stringLiteral := l.readString()
-		tok = l.newTokenFromPosition(TokenString, stringLiteral, startPos)
+		// Check if string was properly terminated
+		if !l.stringTerminated {
+			// Unterminated string - return error token (error will be created by RecoverableNextToken)
+			tok = l.newTokenFromPosition(TokenError, "unterminated string literal", startPos)
+		} else {
+			tok = l.newTokenFromPosition(TokenString, stringLiteral, startPos)
+		}
 	case '\'':
 		charLiteral := l.readChar2()
 		tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
@@ -720,17 +813,35 @@ func (l *Lexer) NextToken() Token {
 	default:
 		if isLetter(l.ch) || l.ch == '_' {
 			identLiteral := l.readIdentifier()
-			tok = l.newTokenFromPosition(lookupIdent(identLiteral), identLiteral, startPos)
+			if l.hasIdentifierError {
+				// Return error token for identifier with invalid characters
+				tok = l.newTokenFromPosition(TokenError, "invalid character in identifier", startPos)
+			} else {
+				tok = l.newTokenFromPosition(lookupIdent(identLiteral), identLiteral, startPos)
+			}
 			return tok
 		} else if isDigit(l.ch) {
 			numberLiteral := l.readNumber()
+			// Check if there were errors during number parsing
+			if l.errorRecovery != nil && len(l.errors) > 0 {
+				// Check if the last error was a malformed number
+				if lastError, ok := l.errors[len(l.errors)-1].(*LexicalError); ok && lastError.Type == CategoryMalformedNumber {
+					tok = l.newTokenFromPosition(TokenError, numberLiteral, startPos)
+					return tok
+				}
+			}
 			tok = l.newTokenFromPosition(TokenInteger, numberLiteral, startPos)
 			return tok
 		} else if l.ch >= 0x80 { // Unicode文字
 			r, size := utf8.DecodeRuneInString(l.input[l.position:])
 			if size > 0 && (unicode.IsLetter(r) || unicode.IsSymbol(r)) {
 				identLiteral := l.readIdentifier()
-				tok = l.newTokenFromPosition(lookupIdent(identLiteral), identLiteral, startPos)
+				if l.hasIdentifierError {
+					// Return error token for identifier with invalid characters
+					tok = l.newTokenFromPosition(TokenError, "invalid character in identifier", startPos)
+				} else {
+					tok = l.newTokenFromPosition(lookupIdent(identLiteral), identLiteral, startPos)
+				}
 				return tok
 			} else {
 				tok = l.newTokenFromChar(TokenError, l.ch)
