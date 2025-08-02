@@ -1,0 +1,38 @@
+// Orizon Programming Language - 型システムサンプル
+// 依存型による配列境界の静的保証
+
+// 安全な配列アクセス（境界チェック不要）
+func safe_access<T, N: usize>(arr: [T; N], index: usize where index < N) -> T {
+    arr[index]  // コンパイル時に境界安全性が保証される
+}
+
+// 非空リストの型レベル保証
+struct NonEmptyList<T, N: usize where N > 0> {
+    data: [T; N],
+}
+
+impl<T, N: usize where N > 0> NonEmptyList<T, N> {
+    func head(self) -> T {
+        self.data[0]  // 常に安全 - 空でないことが型で保証
+    }
+    
+    func tail(self) -> [T; N-1] where N > 1 {
+        // コンパイル時に N > 1 であることを確認
+        self.data[1..N]
+    }
+}
+
+func main() {
+    let numbers: [i32; 5] = [1, 2, 3, 4, 5];
+    
+    // 静的に安全なアクセス
+    let first = safe_access(numbers, 0);  // OK
+    let third = safe_access(numbers, 2);  // OK
+    // let invalid = safe_access(numbers, 10);  // コンパイルエラー
+    
+    print("First: {}, Third: {}", first, third);
+    
+    // 非空リストの使用
+    let non_empty = NonEmptyList { data: [10, 20, 30] };
+    print("Head: {}", non_empty.head());
+}

@@ -1,0 +1,127 @@
+// Orizon Programming Language - アクターモデル並行処理
+// Erlang/Elixirを超える軽量プロセスシステム
+
+// カウンタアクター
+actor Counter {
+    var value: i32 = 0;
+    
+    // メッセージハンドラ
+    func increment() -> i32 {
+        value += 1;
+        return value;
+    }
+    
+    func decrement() -> i32 {
+        value -= 1;
+        return value;
+    }
+    
+    func get() -> i32 {
+        return value;
+    }
+}
+
+// バンクアカウントアクター（状態管理の例）
+actor BankAccount {
+    var balance: f64;
+    var account_id: string;
+    
+    func new(id: string, initial_balance: f64) -> Self {
+        BankAccount {
+            balance: initial_balance,
+            account_id: id,
+        }
+    }
+    
+    func deposit(amount: f64) -> Result<f64, string> {
+        if amount <= 0.0 {
+            return Err("Amount must be positive");
+        }
+        balance += amount;
+        return Ok(balance);
+    }
+    
+    func withdraw(amount: f64) -> Result<f64, string> {
+        if amount <= 0.0 {
+            return Err("Amount must be positive");
+        }
+        if amount > balance {
+            return Err("Insufficient funds");
+        }
+        balance -= amount;
+        return Ok(balance);
+    }
+    
+    func get_balance() -> f64 {
+        return balance;
+    }
+}
+
+// ワーカープールパターン
+actor WorkerPool<T, R> {
+    var workers: [Actor<Worker<T, R>>];
+    var queue: Queue<T>;
+    
+    func new(worker_count: usize) -> Self {
+        let workers = for i in 0..worker_count {
+            spawn Worker::new()
+        };
+        
+        WorkerPool {
+            workers: workers,
+            queue: Queue::new(),
+        }
+    }
+    
+    func submit(task: T) -> Future<R> {
+        queue.push(task);
+        // 利用可能なワーカーに作業を分散
+        distribute_work()
+    }
+    
+    func distribute_work() -> Future<R> {
+        if let Some(task) = queue.pop() {
+            let available_worker = find_available_worker();
+            available_worker.process(task)
+        }
+    }
+}
+
+func main() {
+    // カウンタアクターの使用
+    let counter = spawn Counter();
+    
+    // 1000個の並行タスクを実行
+    let tasks = for i in 0..1000 {
+        spawn async {
+            counter.increment().await
+        }
+    };
+    
+    // すべてのタスクの完了を待機
+    let results = await_all(tasks);
+    let final_count = counter.get().await;
+    
+    print("Final count: {}", final_count);  // 確実に1000
+    
+    // 銀行アカウントの例
+    let account = spawn BankAccount::new("ACC001", 1000.0);
+    
+    // 並行して複数の取引を実行
+    let deposit_task = spawn async {
+        account.deposit(500.0).await
+    };
+    
+    let withdraw_task = spawn async {
+        account.withdraw(200.0).await
+    };
+    
+    // 取引結果を取得
+    match await_all([deposit_task, withdraw_task]) {
+        [Ok(balance1), Ok(balance2)] => {
+            print("Transactions completed. Final balance: {}", 
+                  account.get_balance().await);
+        },
+        _ => print("Some transactions failed"),
+    }
+}

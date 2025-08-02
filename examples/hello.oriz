@@ -1,0 +1,7 @@
+// Orizon Programming Language - Hello World
+// Phase 0.2.1: 基本構文のサンプル
+
+func main() {
+    print("Hello, Orizon! 🌟")
+    print("The future of systems programming")
+}
