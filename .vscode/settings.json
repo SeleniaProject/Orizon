@@ -1,0 +1,37 @@
+{
+    "go.gopath": "",
+    "go.goroot": "",
+    "go.toolsManagement.autoUpdate": true,
+    "go.useLanguageServer": true,
+    "go.lintOnSave": "package",
+    "go.formatTool": "goimports",
+    "go.lintTool": "golangci-lint",
+    "go.buildOnSave": "package",
+    "go.testFlags": [
+        "-v"
+    ],
+    "go.coverOnSave": false,
+    "go.coverOnSingleTest": true,
+    "rust-analyzer.check.command": "cargo",
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.diagnostics.enable": true,
+    "files.associations": {
+        "*.oriz": "orizon",
+        "*.orizon": "orizon"
+    },
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "files.exclude": {
+        "**/target": true,
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true
+    },
+    "search.exclude": {
+        "**/target": true,
+        "**/node_modules": true
+    }
+}

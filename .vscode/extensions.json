@@ -1,0 +1,15 @@
+{
+    "recommendations": [
+        "golang.go",
+        "rust-lang.rust-analyzer",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-python.python",
+        "ms-vscode.cmake-tools",
+        "vadimcn.vscode-lldb",
+        "formulahendry.code-runner",
+        "eamodio.gitlens",
+        "github.copilot",
+        "ms-vscode.hexeditor"
+    ]
+}

@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Orizon Compiler Debug (Go)",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/orizon-compiler",
+            "args": ["--help"],
+            "env": {
+                "CGO_ENABLED": "0"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Orizon LSP Debug",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/orizon-lsp",
+            "args": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Orizon Tests",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}",
+            "env": {
+                "CGO_ENABLED": "0"
+            },
+            "args": [
+                "-test.v"
+            ]
+        }
+    ]
+}
