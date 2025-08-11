@@ -45,6 +45,8 @@ type ActorSystem struct {
 	cancel         context.CancelFunc    // Cancel function
 	rootSupervisor *Supervisor           // Root supervisor
 	mutex          sync.RWMutex          // Synchronization
+    // Remote enables distributed actor messaging integration when attached.
+    Remote        interface{ Send(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}) error } // minimal interface to avoid import cycle in runtime package
 }
 
 // Actor represents an individual actor
@@ -966,6 +968,31 @@ func (as *ActorSystem) SendMessage(senderID, receiverID ActorID, messageType Mes
 	}
 
 	return as.deliverMessage(message)
+}
+
+// SendToName delivers a message to an actor by its registered name. If a Remote is attached and
+// the name is qualified as node:name (e.g., "nodeA:svc"), it will attempt remote delivery.
+func (as *ActorSystem) SendToName(senderID ActorID, qualifiedName string, messageType MessageType, payload interface{}) error {
+    if !as.running { return fmt.Errorf("actor system is not running") }
+    // Remote qualified route: node:name
+    if idx := indexByte(qualifiedName, ':'); idx > 0 && idx < len(qualifiedName)-1 && as.Remote != nil {
+        node := qualifiedName[:idx]
+        name := qualifiedName[idx+1:]
+        return as.Remote.Send(node, name, uint32(messageType), payload)
+    }
+    // Local lookup
+    if id, ok := as.registry.Lookup(qualifiedName); ok {
+        return as.SendMessage(senderID, id, messageType, payload)
+    }
+    return fmt.Errorf("actor not found: %s", qualifiedName)
+}
+
+// indexByte is a tiny helper to avoid extra import for strings.IndexByte in this file context.
+func indexByte(s string, c byte) int {
+    for i := 0; i < len(s); i++ {
+        if s[i] == c { return i }
+    }
+    return -1
 }
 
 // Actor operations
