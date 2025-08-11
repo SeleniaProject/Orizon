@@ -586,14 +586,16 @@
 - **依存関係**: 3.3.1
 - **ビルド状態**: `go test ./...` 成功
 
-#### 3.3.3 チャンネル通信
-- [ ] **目的**: Go風のチャンネルベース通信
+#### 3.3.3 チャンネル通信 ✅ 完了
+- [x] **目的**: Go風のチャンネルベース通信
 - **成果物**:
-  - [ ] 型安全チャンネル
-  - [ ] Select文実装
-  - [ ] バッファリング戦略
+  - [x] 型安全チャンネル: `internal/runtime/channels/channel.go`（Send/TrySend/Recv/TryRecv/Close）
+  - [x] Select相当: `SelectRecv(ctx, ...*Channel[T])` で複数チャネル待機（簡易RBポーリング＋バックオフ）
+  - [x] バッファリング戦略: `New[T](capacity)` によるバッファ/アンバッファ
+- **テスト**:
+  - `internal/runtime/channels/channel_test.go` 基本動作・複数待機の検証
 - **依存関係**: 3.3.2
-- **推定工数**: 中（18日）
+- **ビルド状態**: `go test ./...` 成功
 
 ### 3.4 I/Oシステム
 
