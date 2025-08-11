@@ -314,6 +314,29 @@ func TestActorContext_Timers(t *testing.T) {
     }
 }
 
+func TestDispatcher_RouteToTarget(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    tb1 := &testBehavior{received: make(chan Message, 1), name: "r1"}
+    tb2 := &testBehavior{received: make(chan Message, 1), name: "r2"}
+    a1, _ := system.CreateActor("r1", UserActor, tb1, DefaultActorConfig)
+    a2, _ := system.CreateActor("r2", UserActor, tb2, DefaultActorConfig)
+
+    system.dispatcher.AddRoute(100, DispatchRule{Target: a2.ID, Priority: 0})
+
+    // send with receiver=a1, but route by type to a2
+    if err := system.SendMessage(a1.ID, a1.ID, 100, "route"); err != nil { t.Fatalf("send failed: %v", err) }
+
+    select {
+    case <-tb2.received:
+        // ok, routed
+    case <-time.After(time.Second):
+        t.Fatal("route did not deliver to target")
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {

@@ -1111,19 +1111,26 @@ func (m *Mailbox) Clear() {
 
 // deliverMessage delivers a message to its destination
 func (as *ActorSystem) deliverMessage(msg Message) error {
-	as.mutex.RLock()
-	receiver, exists := as.actors[msg.Receiver]
-	as.mutex.RUnlock()
-
-	if !exists {
-		return as.sendToDeadLetters(msg)
-	}
-
-	// Interceptors
+    // Interceptors / transformers and routing
 	as.dispatcher.mutex.RLock()
 	interceptors := append([]MessageInterceptor(nil), as.dispatcher.interceptors...)
 	transformers := append([]MessageTransformer(nil), as.dispatcher.transformers...)
+    routes := append([]DispatchRule(nil), as.dispatcher.routes[msg.Type]...)
 	as.dispatcher.mutex.RUnlock()
+
+    // Apply simple routing if configured
+    if len(routes) > 0 {
+        // Pick first route (simple strategy)
+        msg.Receiver = routes[0].Target
+    }
+
+    as.mutex.RLock()
+    receiver, exists := as.actors[msg.Receiver]
+    as.mutex.RUnlock()
+
+    if !exists {
+        return as.sendToDeadLetters(msg)
+    }
 
 	// Apply interceptors
 	for _, ic := range interceptors {
