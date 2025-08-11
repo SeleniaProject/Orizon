@@ -543,14 +543,24 @@
 - **依存関係**: 3.2.2
 - **テスト**: `internal/runtime/actor_system_test.go`（再起動上限停止、Termination通知）
 
-#### 3.2.4 分散アクター
-- [ ] **目的**: ネットワーク越しの透明なアクター通信
+#### 3.2.4 分散アクター ✅ 完了
+- [x] **目的**: ネットワーク越しの透明なアクター通信
 - **成果物**:
-  - [ ] 分散メッセージング
-  - [ ] ノード発見機構
-  - [ ] ネットワーク耐障害性
+  - [x] 分散メッセージング: `internal/runtime/remote`（Transport/Codec/RemoteSystem）
+  - [x] ノード発見機構: `StaticDiscovery` によるノード名→アドレス解決、起動時登録/停止時解除
+  - [x] ネットワーク耐障害性: 送信リトライ（指数バックオフ・ディスカバリ再解決）
+  - [x] 名前宛て配送: `ActorSystem.SendToName` で `node:name` を解釈しローカル/リモート自動切替
+- **実装内容**:
+  - `internal/runtime/remote/transport.go`: `Envelope`/`Transport`/`Codec` 定義
+  - `internal/runtime/remote/inmemory.go`: インメモリTransport
+  - `internal/runtime/remote/jsoncodec.go`: JSONコーデック（`[]byte`対称シリアライズ）
+  - `internal/runtime/remote/discovery.go`: `StaticDiscovery` 実装
+  - `internal/runtime/remote/system.go`: `RemoteSystem`（受信→ローカル配送、送信リトライ、ディスカバリ統合）
+  - `internal/runtime/actor_system.go`: `LookupActorID` 公開API、`Remote`最小統合、`SendToName` 追加
+- **テスト**:
+  - `internal/runtime/remote/system_test.go`: 名前宛送信、ディスカバリ経由、遅延参加ノードに対するリトライ成功
 - **依存関係**: 3.2.3
-- **推定工数**: 大（30日）
+- **ビルド状態**: `go test ./...` 成功
 
 ### 3.3 並行性プリミティブ
 
