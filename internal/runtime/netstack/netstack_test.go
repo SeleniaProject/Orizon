@@ -89,7 +89,12 @@ func TestTLS_Wrap(t *testing.T) {
     tln := TLSServer(ln, srvCfg)
     go func(){
         c, _ := tln.Accept()
-        if c != nil { _ = c.Close() }
+        if c != nil {
+            if tc, ok := c.(*tls.Conn); ok {
+                _ = tc.Handshake()
+            }
+            _ = c.Close()
+        }
     }()
     c, err := TLSDial("tcp", ln.Addr().String(), cliCfg)
     if err != nil { t.Fatal(err) }
