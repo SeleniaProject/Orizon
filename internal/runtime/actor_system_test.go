@@ -181,6 +181,44 @@ func TestSupervisor_Restart_OnFailure(t *testing.T) {
     }
 }
 
+// behavior that always fails to test restart limits
+type failAlways struct{ count int }
+func (f *failAlways) Receive(ctx *ActorContext, msg Message) error { f.count++; return fmt.Errorf("boom") }
+func (f *failAlways) PreStart(*ActorContext) error { return nil }
+func (f *failAlways) PostStop(*ActorContext) error { return nil }
+func (f *failAlways) PreRestart(*ActorContext, error, *Message) error { return nil }
+func (f *failAlways) PostRestart(*ActorContext, error) error { return nil }
+func (f *failAlways) GetBehaviorName() string { return "failAlways" }
+
+func TestSupervisor_RestartLimits_StopAfterMaxRetries(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    // Configure root supervisor restart window
+    system.rootSupervisor.MaxRetries = 2
+    system.rootSupervisor.RetryPeriod = time.Millisecond * 200
+
+    fb := &failAlways{}
+    a, _ := system.CreateActor("lim", UserActor, fb, DefaultActorConfig)
+
+    // Send multiple failing messages beyond limit
+    _ = system.SendMessage(0, a.ID, 1, "x")
+    _ = system.SendMessage(0, a.ID, 1, "y")
+    _ = system.SendMessage(0, a.ID, 1, "z")
+
+    // Allow time for processing and potential stops
+    time.Sleep(time.Millisecond * 600)
+
+    // Actor should be stopped after exceeding retries
+    system.mutex.RLock()
+    got := system.actors[a.ID]
+    system.mutex.RUnlock()
+    if got != nil && got.State != ActorStopped {
+        t.Fatalf("expected actor stopped after max retries, got state=%v", got.State)
+    }
+}
+
 func TestSupervisor_OneForAll(t *testing.T) {
     system, _ := NewActorSystem(DefaultActorSystemConfig)
     _ = system.Start()

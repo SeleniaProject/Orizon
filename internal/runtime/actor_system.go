@@ -113,7 +113,9 @@ type Supervisor struct {
 	Config      SupervisorConfig     // Configuration
 	Parent      *Supervisor          // Parent supervisor
 	CreateTime  time.Time            // Creation time
-	mutex       sync.RWMutex         // Synchronization
+    mutex       sync.RWMutex         // Synchronization
+    // restartTrack keeps per-child restart timestamps to enforce MaxRetries/RetryPeriod.
+    restartTrack map[ActorID][]time.Time
 }
 
 // Actor registry for name resolution and discovery
@@ -754,7 +756,7 @@ func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 func NewSupervisor(name string, supervisorType SupervisorType, config SupervisorConfig) (*Supervisor, error) {
 	supervisorID := SupervisorID(atomic.AddUint64(&globalSupervisorID, 1))
 
-	supervisor := &Supervisor{
+    supervisor := &Supervisor{
 		ID:          supervisorID,
 		Name:        name,
 		Type:        supervisorType,
@@ -765,7 +767,8 @@ func NewSupervisor(name string, supervisorType SupervisorType, config Supervisor
 		RetryPeriod: config.RetryPeriod,
 		Escalations: make([]EscalationRule, 0),
 		Config:      config,
-		CreateTime:  time.Now(),
+        CreateTime:  time.Now(),
+        restartTrack: make(map[ActorID][]time.Time),
 	}
 
 	// Initialize monitor if enabled
@@ -920,8 +923,11 @@ func (a *Actor) ProcessMessage(msg Message) error {
 	// Update context
 	a.Context.Sender = msg.Sender
 
-	// Process message
-	err := a.Behavior.Receive(a.Context, msg)
+    // Update heartbeat before processing
+    a.LastHeartbeat = time.Now()
+
+    // Process message
+    err := a.Behavior.Receive(a.Context, msg)
 
 	// Update statistics
 	a.Statistics.MessagesReceived++
@@ -973,14 +979,21 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 
 	switch sup.Strategy {
 	case RestartStrategy:
-		// Apply restart according to supervisor type
+        // Apply restart according to supervisor type with restart limits
 		switch sup.Type {
 		case OneForOne:
-			_ = failed.Restart(reason)
+            if !as.canRestart(sup, failed) {
+                _ = as.stopActor(failed)
+                return
+            }
+            if d := failed.Config.RestartDelay; d > 0 { time.Sleep(d) }
+            _ = failed.Restart(reason)
 		case OneForAll:
 			// Restart all children
 			for _, child := range sup.Children {
-				_ = child.Restart(reason)
+                if !as.canRestart(sup, child) { _ = as.stopActor(child); continue }
+                if d := child.Config.RestartDelay; d > 0 { time.Sleep(d) }
+                _ = child.Restart(reason)
 			}
 		case RestForOne:
 			// Restart failed and all children created after it
@@ -994,14 +1007,22 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 			if idx >= 0 {
 				for i := idx; i < len(sup.childOrder); i++ {
 					if c := sup.Children[sup.childOrder[i]]; c != nil {
-						_ = c.Restart(reason)
+                        if !as.canRestart(sup, c) { _ = as.stopActor(c); continue }
+                        if d := c.Config.RestartDelay; d > 0 { time.Sleep(d) }
+                        _ = c.Restart(reason)
 					}
 				}
 			} else {
-				_ = failed.Restart(reason)
+                if !as.canRestart(sup, failed) { _ = as.stopActor(failed) } else {
+                    if d := failed.Config.RestartDelay; d > 0 { time.Sleep(d) }
+                    _ = failed.Restart(reason)
+                }
 			}
 		default:
-			_ = failed.Restart(reason)
+            if !as.canRestart(sup, failed) { _ = as.stopActor(failed) } else {
+                if d := failed.Config.RestartDelay; d > 0 { time.Sleep(d) }
+                _ = failed.Restart(reason)
+            }
 		}
 	case StopStrategy:
 		// Stop according to supervisor type
@@ -1037,14 +1058,42 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 		return
 	case EscalateStrategy:
 		// Bubble up to parent supervisor
-		if failed.Parent != nil {
-			as.handleFailure(failed.Parent, reason)
+        if failed.Supervisor != nil && failed.Supervisor.Parent != nil {
+            // escalate towards parent supervisor (simple propagation)
+            // Note: this simplified escalation reuses the same failed actor context.
+            as.handleFailure(failed, fmt.Errorf("escalated: %v", reason))
 		} else {
 			_ = failed.Restart(reason)
 		}
 	default:
 		_ = failed.Restart(reason)
 	}
+}
+
+// canRestart checks supervisor's restart policy window for a child and records the attempt.
+func (as *ActorSystem) canRestart(sup *Supervisor, child *Actor) bool {
+    sup.mutex.Lock()
+    defer sup.mutex.Unlock()
+    if sup.MaxRetries == 0 || sup.RetryPeriod <= 0 {
+        return true
+    }
+    hist := sup.restartTrack[child.ID]
+    now := time.Now()
+    cutoff := now.Add(-sup.RetryPeriod)
+    filtered := hist[:0]
+    for _, t := range hist {
+        if t.After(cutoff) {
+            filtered = append(filtered, t)
+        }
+    }
+    hist = filtered
+    if uint32(len(hist)) >= sup.MaxRetries {
+        sup.restartTrack[child.ID] = hist
+        return false
+    }
+    hist = append(hist, now)
+    sup.restartTrack[child.ID] = hist
+    return true
 }
 
 // Mailbox operations
