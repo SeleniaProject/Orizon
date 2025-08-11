@@ -127,25 +127,14 @@ func (rs *RemoteSystem) sendWithRetry(target string, env Envelope) error {
 // SendWithRetry sends with simple exponential backoff retry when transport or resolution fails.
 // attempts <= 1 means single try; baseDelay defines the initial sleep duration.
 func (rs *RemoteSystem) SendWithRetry(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}, attempts int, baseDelayMs int) error {
-    if attempts < 1 { attempts = 1 }
-    delay := baseDelayMs
-    var lastErr error
-    for i := 0; i < attempts; i++ {
-        if err := rs.Send(remoteAddrOrNode, receiverName, msgType, payload); err == nil {
-            return nil
-        } else {
-            lastErr = err
-        }
-        if i < attempts-1 {
-            // exponential backoff with cap
-            if delay <= 0 { delay = 10 }
-            if delay > 2000 { delay = 2000 }
-            // simple jitter-less sleep
-            time.Sleep(time.Duration(delay) * time.Millisecond)
-            if delay < 2000 { delay = delay * 2 }
-        }
-    }
-    return lastErr
+    // Temporarily override retry config for this call
+    prevAttempts, prevInit, prevMax := rs.RetryMaxAttempts, rs.RetryInitialMs, rs.RetryMaxBackoffMs
+    if attempts > 0 { rs.RetryMaxAttempts = attempts }
+    if baseDelayMs > 0 { rs.RetryInitialMs = baseDelayMs }
+    err := rs.Send(remoteAddrOrNode, receiverName, msgType, payload)
+    // restore
+    rs.RetryMaxAttempts, rs.RetryInitialMs, rs.RetryMaxBackoffMs = prevAttempts, prevInit, prevMax
+    return err
 }
 
 // receive handles an incoming envelope and dispatches to a local actor by name.
