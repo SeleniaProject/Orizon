@@ -20,7 +20,8 @@ type TVar[T any] struct {
 func NewTVar[T any](v T) *TVar[T] {
     tv := &TVar[T]{}
     tv.val.Store(v)
-    atomic.StoreUint64(&tv.ver, 1)
+    // Version must start as even (unlocked). Even numbers indicate no writer holds the lock.
+    atomic.StoreUint64(&tv.ver, 0)
     return tv
 }
 
