@@ -31,14 +31,14 @@ type ActorSystem struct {
 	registry    *ActorRegistry               // Actor registry
 	scheduler   *ActorScheduler              // Actor scheduler
 	dispatcher  *MessageDispatcher           // Message dispatcher
-    // Group management uses registry.groups (name -> groupID) and ActorSystem.groups (id -> group)
-	config      ActorSystemConfig            // System configuration
-	statistics  ActorSystemStatistics        // System statistics
-	running     bool                         // System running
-	ctx         context.Context              // System context
-	cancel      context.CancelFunc           // Cancel function
-    rootSupervisor *Supervisor               // Root supervisor
-	mutex       sync.RWMutex                 // Synchronization
+	// Group management uses registry.groups (name -> groupID) and ActorSystem.groups (id -> group)
+	config         ActorSystemConfig     // System configuration
+	statistics     ActorSystemStatistics // System statistics
+	running        bool                  // System running
+	ctx            context.Context       // System context
+	cancel         context.CancelFunc    // Cancel function
+	rootSupervisor *Supervisor           // Root supervisor
+	mutex          sync.RWMutex          // Synchronization
 }
 
 // Actor represents an individual actor
@@ -63,19 +63,19 @@ type Actor struct {
 
 // Mailbox for message storage and delivery
 type Mailbox struct {
-	ID             MailboxID             // Mailbox identifier
-	Owner          ActorID               // Owning actor
-	Type           MailboxType           // Mailbox type
-	Capacity       uint32                // Maximum capacity
-	Messages       []Message             // Stored messages
-	PriorityQueue  *MessagePriorityQueue // Priority queue
-	DeadLetters    []Message             // Dead letter queue
-	Filters        []MessageFilter       // Message filters
-	Statistics     MailboxStatistics     // Mailbox statistics
-	OverflowPolicy MailboxOverflowPolicy // Overflow handling
-	LastActivity   time.Time             // Last activity
-    BackPressureWait time.Duration       // Maximum wait time when applying back pressure
-	mutex          sync.RWMutex          // Mailbox synchronization
+	ID               MailboxID             // Mailbox identifier
+	Owner            ActorID               // Owning actor
+	Type             MailboxType           // Mailbox type
+	Capacity         uint32                // Maximum capacity
+	Messages         []Message             // Stored messages
+	PriorityQueue    *MessagePriorityQueue // Priority queue
+	DeadLetters      []Message             // Dead letter queue
+	Filters          []MessageFilter       // Message filters
+	Statistics       MailboxStatistics     // Mailbox statistics
+	OverflowPolicy   MailboxOverflowPolicy // Overflow handling
+	LastActivity     time.Time             // Last activity
+	BackPressureWait time.Duration         // Maximum wait time when applying back pressure
+	mutex            sync.RWMutex          // Mailbox synchronization
 }
 
 // Message represents communication between actors
@@ -103,7 +103,7 @@ type Supervisor struct {
 	Type        SupervisorType       // Supervisor type
 	Strategy    SupervisionStrategy  // Supervision strategy
 	Children    map[ActorID]*Actor   // Supervised actors
-    childOrder  []ActorID            // Children creation order
+	childOrder  []ActorID            // Children creation order
 	MaxRetries  uint32               // Maximum retries
 	RetryPeriod time.Duration        // Retry period
 	Escalations []EscalationRule     // Escalation rules
@@ -139,8 +139,9 @@ type ActorScheduler struct {
 	ctx        context.Context               // Context
 	// process is a callback invoked by workers to process one scheduled actor.
 	// The callback must be set by the owning ActorSystem.
-	process func(ActorID)
-	mutex   sync.RWMutex // Synchronization
+	process         func(ActorID)
+	resolvePriority func(ActorID) ActorPriority
+	mutex           sync.RWMutex // Synchronization
 }
 
 // Message dispatcher for routing
@@ -526,6 +527,7 @@ type (
 		ID       string
 		Interval time.Duration
 		Callback func()
+		timer    *time.Timer
 	}
 )
 
@@ -590,7 +592,7 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 
 	// Initialize registry
 	system.registry = NewActorRegistry()
-    system.groups = make(map[ActorGroupID]*ActorGroup)
+	system.groups = make(map[ActorGroupID]*ActorGroup)
 
 	// Initialize scheduler
 	schedulerConfig := SchedulerConfig{
@@ -611,15 +613,15 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 			return
 		}
 		// Drain one message if available and process
-        if msg, ok := actor.Mailbox.Dequeue(); ok {
-            if err := actor.ProcessMessage(msg); err != nil {
-                // Delegate to supervisor strategy
-                system.handleFailure(actor, err)
-            }
-        }
+		if msg, ok := actor.Mailbox.Dequeue(); ok {
+			if err := actor.ProcessMessage(msg); err != nil {
+				// Delegate to supervisor strategy
+				system.handleFailure(actor, err)
+			}
+		}
 	}
 
-    // Initialize dispatcher
+	// Initialize dispatcher
 	dispatcherConfig := DispatcherConfig{
 		BufferSize:           1000,
 		EnableRouting:        true,
@@ -628,13 +630,22 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		EnableSerialization:  false,
 		DefaultTimeout:       time.Second * 30,
 	}
-    system.dispatcher = NewMessageDispatcher(dispatcherConfig)
+	system.dispatcher = NewMessageDispatcher(dispatcherConfig)
 
-    // Initialize root supervisor (OneForOne)
-    root, err := NewSupervisor("root", OneForOne, DefaultSupervisorConfig)
-    if err == nil {
-        system.rootSupervisor = root
-    }
+	// Initialize root supervisor (OneForOne)
+	root, err := NewSupervisor("root", OneForOne, DefaultSupervisorConfig)
+	if err == nil {
+		system.rootSupervisor = root
+	}
+	system.scheduler.resolvePriority = func(aid ActorID) ActorPriority {
+		system.mutex.RLock()
+		act := system.actors[aid]
+		system.mutex.RUnlock()
+		if act == nil {
+			return NormalActorPriority
+		}
+		return act.Config.Priority
+	}
 
 	return system, nil
 }
@@ -684,16 +695,16 @@ func NewActor(name string, actorType ActorType, behavior ActorBehavior, config A
 func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 	mailboxID := MailboxID(atomic.AddUint64(&globalMailboxID, 1))
 
-    mailbox := &Mailbox{
-		ID:             mailboxID,
-		Type:           mailboxType,
-		Capacity:       capacity,
-		Messages:       make([]Message, 0, capacity),
-		DeadLetters:    make([]Message, 0),
-		Filters:        make([]MessageFilter, 0),
-		OverflowPolicy: DropOldest,
-		LastActivity:   time.Now(),
-        BackPressureWait: time.Millisecond * 100,
+	mailbox := &Mailbox{
+		ID:               mailboxID,
+		Type:             mailboxType,
+		Capacity:         capacity,
+		Messages:         make([]Message, 0, capacity),
+		DeadLetters:      make([]Message, 0),
+		Filters:          make([]MessageFilter, 0),
+		OverflowPolicy:   DropOldest,
+		LastActivity:     time.Now(),
+		BackPressureWait: time.Millisecond * 100,
 	}
 
 	// Initialize priority queue for priority mailboxes
@@ -708,13 +719,13 @@ func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 func NewSupervisor(name string, supervisorType SupervisorType, config SupervisorConfig) (*Supervisor, error) {
 	supervisorID := SupervisorID(atomic.AddUint64(&globalSupervisorID, 1))
 
-    supervisor := &Supervisor{
+	supervisor := &Supervisor{
 		ID:          supervisorID,
 		Name:        name,
 		Type:        supervisorType,
 		Strategy:    config.Strategy,
-        Children:    make(map[ActorID]*Actor),
-        childOrder:  make([]ActorID, 0),
+		Children:    make(map[ActorID]*Actor),
+		childOrder:  make([]ActorID, 0),
 		MaxRetries:  config.MaxRetries,
 		RetryPeriod: config.RetryPeriod,
 		Escalations: make([]EscalationRule, 0),
@@ -801,16 +812,16 @@ func (as *ActorSystem) CreateActor(name string, actorType ActorType, behavior Ac
 		return nil, err
 	}
 
-    as.mutex.Lock()
-    as.actors[actor.ID] = actor
-    as.mailboxes[actor.Mailbox.ID] = actor.Mailbox
-    // Attach to root supervisor by default
-    if as.rootSupervisor != nil {
-        actor.Supervisor = as.rootSupervisor
-        as.rootSupervisor.Children[actor.ID] = actor
-        as.rootSupervisor.childOrder = append(as.rootSupervisor.childOrder, actor.ID)
-    }
-    as.mutex.Unlock()
+	as.mutex.Lock()
+	as.actors[actor.ID] = actor
+	as.mailboxes[actor.Mailbox.ID] = actor.Mailbox
+	// Attach to root supervisor by default
+	if as.rootSupervisor != nil {
+		actor.Supervisor = as.rootSupervisor
+		as.rootSupervisor.Children[actor.ID] = actor
+		as.rootSupervisor.childOrder = append(as.rootSupervisor.childOrder, actor.ID)
+	}
+	as.mutex.Unlock()
 
 	// Register actor
 	if err := as.registry.Register(name, actor.ID); err != nil {
@@ -904,7 +915,7 @@ func (a *Actor) Restart(reason error) error {
 		return fmt.Errorf("PreRestart failed: %v", err)
 	}
 
-    // Do not clear mailbox to preserve pending messages across restarts.
+	// Do not clear mailbox to preserve pending messages across restarts.
 
 	// Call PostRestart
 	if err := a.Behavior.PostRestart(a.Context, reason); err != nil {
@@ -919,80 +930,86 @@ func (a *Actor) Restart(reason error) error {
 
 // handleFailure applies supervisor strategy for a failed actor
 func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
-    sup := failed.Supervisor
-    if sup == nil {
-        _ = failed.Restart(reason)
-        return
-    }
+	sup := failed.Supervisor
+	if sup == nil {
+		_ = failed.Restart(reason)
+		return
+	}
 
-    switch sup.Strategy {
-    case RestartStrategy:
-        // Apply restart according to supervisor type
-        switch sup.Type {
-        case OneForOne:
-            _ = failed.Restart(reason)
-        case OneForAll:
-            // Restart all children
-            for _, child := range sup.Children {
-                _ = child.Restart(reason)
-            }
-        case RestForOne:
-            // Restart failed and all children created after it
-            idx := -1
-            for i, id := range sup.childOrder {
-                if id == failed.ID { idx = i; break }
-            }
-            if idx >= 0 {
-                for i := idx; i < len(sup.childOrder); i++ {
-                    if c := sup.Children[sup.childOrder[i]]; c != nil {
-                        _ = c.Restart(reason)
-                    }
-                }
-            } else {
-                _ = failed.Restart(reason)
-            }
-        default:
-            _ = failed.Restart(reason)
-        }
-    case StopStrategy:
-        // Stop according to supervisor type
-        switch sup.Type {
-        case OneForOne:
-            _ = as.stopActor(failed)
-        case OneForAll:
-            for _, child := range sup.Children {
-                _ = as.stopActor(child)
-            }
-        case RestForOne:
-            idx := -1
-            for i, id := range sup.childOrder {
-                if id == failed.ID { idx = i; break }
-            }
-            if idx >= 0 {
-                for i := idx; i < len(sup.childOrder); i++ {
-                    if c := sup.Children[sup.childOrder[i]]; c != nil {
-                        _ = as.stopActor(c)
-                    }
-                }
-            } else {
-                _ = as.stopActor(failed)
-            }
-        default:
-            _ = as.stopActor(failed)
-        }
-    case ResumeStrategy:
-        // No action; actor continues
-        return
-    case EscalateStrategy:
-        // Bubble up to parent supervisor
-        if failed.Parent != nil {
-            as.handleFailure(failed.Parent, reason)
-        } else {
-            _ = failed.Restart(reason)
-        }
-    default:
-        _ = failed.Restart(reason)
-    }
+	switch sup.Strategy {
+	case RestartStrategy:
+		// Apply restart according to supervisor type
+		switch sup.Type {
+		case OneForOne:
+			_ = failed.Restart(reason)
+		case OneForAll:
+			// Restart all children
+			for _, child := range sup.Children {
+				_ = child.Restart(reason)
+			}
+		case RestForOne:
+			// Restart failed and all children created after it
+			idx := -1
+			for i, id := range sup.childOrder {
+				if id == failed.ID {
+					idx = i
+					break
+				}
+			}
+			if idx >= 0 {
+				for i := idx; i < len(sup.childOrder); i++ {
+					if c := sup.Children[sup.childOrder[i]]; c != nil {
+						_ = c.Restart(reason)
+					}
+				}
+			} else {
+				_ = failed.Restart(reason)
+			}
+		default:
+			_ = failed.Restart(reason)
+		}
+	case StopStrategy:
+		// Stop according to supervisor type
+		switch sup.Type {
+		case OneForOne:
+			_ = as.stopActor(failed)
+		case OneForAll:
+			for _, child := range sup.Children {
+				_ = as.stopActor(child)
+			}
+		case RestForOne:
+			idx := -1
+			for i, id := range sup.childOrder {
+				if id == failed.ID {
+					idx = i
+					break
+				}
+			}
+			if idx >= 0 {
+				for i := idx; i < len(sup.childOrder); i++ {
+					if c := sup.Children[sup.childOrder[i]]; c != nil {
+						_ = as.stopActor(c)
+					}
+				}
+			} else {
+				_ = as.stopActor(failed)
+			}
+		default:
+			_ = as.stopActor(failed)
+		}
+	case ResumeStrategy:
+		// No action; actor continues
+		return
+	case EscalateStrategy:
+		// Bubble up to parent supervisor
+		if failed.Parent != nil {
+			as.handleFailure(failed.Parent, reason)
+		} else {
+			_ = failed.Restart(reason)
+		}
+	default:
+		_ = failed.Restart(reason)
+	}
 }
 
 // Mailbox operations
@@ -1078,29 +1095,29 @@ func (as *ActorSystem) deliverMessage(msg Message) error {
 		return as.sendToDeadLetters(msg)
 	}
 
-    // Interceptors
-    as.dispatcher.mutex.RLock()
-    interceptors := append([]MessageInterceptor(nil), as.dispatcher.interceptors...)
-    transformers := append([]MessageTransformer(nil), as.dispatcher.transformers...)
-    as.dispatcher.mutex.RUnlock()
+	// Interceptors
+	as.dispatcher.mutex.RLock()
+	interceptors := append([]MessageInterceptor(nil), as.dispatcher.interceptors...)
+	transformers := append([]MessageTransformer(nil), as.dispatcher.transformers...)
+	as.dispatcher.mutex.RUnlock()
 
-    // Apply interceptors
-    for _, ic := range interceptors {
-        m2, err := ic.Intercept(msg)
-        if err != nil {
-            return fmt.Errorf("interception failed: %w", err)
-        }
-        msg = m2
-    }
+	// Apply interceptors
+	for _, ic := range interceptors {
+		m2, err := ic.Intercept(msg)
+		if err != nil {
+			return fmt.Errorf("interception failed: %w", err)
+		}
+		msg = m2
+	}
 
-    // Apply transformers
-    for _, tf := range transformers {
-        m2, err := tf.Transform(msg)
-        if err != nil {
-            return fmt.Errorf("transform failed: %w", err)
-        }
-        msg = m2
-    }
+	// Apply transformers
+	for _, tf := range transformers {
+		m2, err := tf.Transform(msg)
+		if err != nil {
+			return fmt.Errorf("transform failed: %w", err)
+		}
+		msg = m2
+	}
 
 	if err := receiver.Mailbox.Enqueue(msg); err != nil {
 		return as.sendToDeadLetters(msg)
@@ -1142,18 +1159,18 @@ func (m *Mailbox) handleOverflow(msg Message) error {
 			m.Messages = append(m.Messages, msg)
 		}
 	case BackPressure:
-        // Apply timed back pressure: wait for room up to BackPressureWait
-        deadline := time.Now().Add(m.BackPressureWait)
-        for time.Now().Before(deadline) {
-            if uint32(len(m.Messages)) < m.Capacity {
-                m.Messages = append(m.Messages, msg)
-                return nil
-            }
-            m.mutex.Unlock()
-            time.Sleep(time.Millisecond * 5)
-            m.mutex.Lock()
-        }
-        return fmt.Errorf("mailbox back pressure timeout")
+		// Apply timed back pressure: wait for room up to BackPressureWait
+		deadline := time.Now().Add(m.BackPressureWait)
+		for time.Now().Before(deadline) {
+			if uint32(len(m.Messages)) < m.Capacity {
+				m.Messages = append(m.Messages, msg)
+				return nil
+			}
+			m.mutex.Unlock()
+			time.Sleep(time.Millisecond * 5)
+			m.mutex.Lock()
+		}
+		return fmt.Errorf("mailbox back pressure timeout")
 	case DeadLetter:
 		m.DeadLetters = append(m.DeadLetters, msg)
 	}
@@ -1222,6 +1239,7 @@ func (as *ActorSystem) runHeartbeatMonitor() {
 			return
 		case <-ticker.C:
 			as.checkHeartbeats()
+			// Emit warning alerts via dispatcher interceptors if needed (placeholder for future)
 		}
 	}
 }
@@ -1264,7 +1282,8 @@ func (as *ActorSystem) performGC() {
 
 // handleDeadActor handles a potentially dead actor
 func (as *ActorSystem) handleDeadActor(actor *Actor) {
-	// Implementation would restart or escalate based on supervision strategy
+	// Restart or escalate based on supervision strategy
+	as.handleFailure(actor, fmt.Errorf("heartbeat timeout"))
 }
 
 // Statistics and monitoring
@@ -1291,55 +1310,55 @@ func NewActorRegistry() *ActorRegistry {
 
 // CreateGroup creates a new actor group and registers it by name
 func (as *ActorSystem) CreateGroup(name string, groupType ActorGroupType, cfg GroupConfig) (*ActorGroup, error) {
-    as.mutex.Lock()
-    defer as.mutex.Unlock()
+	as.mutex.Lock()
+	defer as.mutex.Unlock()
 
-    gid := ActorGroupID(atomic.AddUint64(&globalGroupID, 1))
-    grp := &ActorGroup{
-        ID:       gid,
-        Name:     name,
-        Type:     groupType,
-        Members:  make(map[ActorID]*Actor),
-        Statistics: GroupStatistics{},
-        Config:   cfg,
-        CreateTime: time.Now(),
-    }
-    as.groups[gid] = grp
-    as.registry.groups[name] = gid
-    return grp, nil
+	gid := ActorGroupID(atomic.AddUint64(&globalGroupID, 1))
+	grp := &ActorGroup{
+		ID:         gid,
+		Name:       name,
+		Type:       groupType,
+		Members:    make(map[ActorID]*Actor),
+		Statistics: GroupStatistics{},
+		Config:     cfg,
+		CreateTime: time.Now(),
+	}
+	as.groups[gid] = grp
+	as.registry.groups[name] = gid
+	return grp, nil
 }
 
 // AddToGroup adds an actor to an existing group
 func (as *ActorSystem) AddToGroup(groupID ActorGroupID, actorID ActorID) error {
-    as.mutex.Lock()
-    defer as.mutex.Unlock()
+	as.mutex.Lock()
+	defer as.mutex.Unlock()
 
-    grp, ok := as.groups[groupID]
-    if !ok {
-        return fmt.Errorf("group not found")
-    }
-    act, ok := as.actors[actorID]
-    if !ok {
-        return fmt.Errorf("actor not found")
-    }
-    grp.Members[actorID] = act
-    return nil
+	grp, ok := as.groups[groupID]
+	if !ok {
+		return fmt.Errorf("group not found")
+	}
+	act, ok := as.actors[actorID]
+	if !ok {
+		return fmt.Errorf("actor not found")
+	}
+	grp.Members[actorID] = act
+	return nil
 }
 
 // Broadcast sends a message to all members of the group
 func (as *ActorSystem) Broadcast(groupID ActorGroupID, messageType MessageType, payload interface{}) error {
-    as.mutex.RLock()
-    grp, ok := as.groups[groupID]
-    as.mutex.RUnlock()
-    if !ok {
-        return fmt.Errorf("group not found")
-    }
-    for id := range grp.Members {
-        if err := as.SendMessage(0, id, messageType, payload); err != nil {
-            return err
-        }
-    }
-    return nil
+	as.mutex.RLock()
+	grp, ok := as.groups[groupID]
+	as.mutex.RUnlock()
+	if !ok {
+		return fmt.Errorf("group not found")
+	}
+	for id := range grp.Members {
+		if err := as.SendMessage(0, id, messageType, payload); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func NewActorScheduler(config SchedulerConfig) *ActorScheduler {
