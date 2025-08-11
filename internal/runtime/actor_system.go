@@ -531,6 +531,28 @@ type (
 	}
 )
 
+// StartTimer starts or restarts a named timer on the actor context.
+func (ctx *ActorContext) StartTimer(id string, interval time.Duration, cb func()) {
+    if ctx.Timers == nil {
+        ctx.Timers = make(map[string]*ActorTimer)
+    }
+    // Stop existing
+    if t, ok := ctx.Timers[id]; ok && t != nil && t.timer != nil {
+        t.timer.Stop()
+    }
+    timer := time.AfterFunc(interval, cb)
+    ctx.Timers[id] = &ActorTimer{ID: id, Interval: interval, Callback: cb, timer: timer}
+}
+
+// StopTimer stops and removes a named timer.
+func (ctx *ActorContext) StopTimer(id string) {
+    if ctx.Timers == nil { return }
+    if t, ok := ctx.Timers[id]; ok && t != nil && t.timer != nil {
+        t.timer.Stop()
+    }
+    delete(ctx.Timers, id)
+}
+
 // Default configurations
 var DefaultActorSystemConfig = ActorSystemConfig{
 	MaxActors:          10000,

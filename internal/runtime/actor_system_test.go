@@ -285,6 +285,35 @@ func TestGroup_Broadcast(t *testing.T) {
     }
 }
 
+func TestActorContext_Timers(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    tb := &testBehavior{received: make(chan Message, 1), name: "timer"}
+    actor, _ := system.CreateActor("timer", UserActor, tb, DefaultActorConfig)
+
+    fired := make(chan struct{}, 1)
+    actor.Context.StartTimer("once", time.Millisecond*10, func(){ fired <- struct{}{} })
+
+    select {
+    case <-fired:
+        // ok
+    case <-time.After(time.Second):
+        t.Fatal("timer did not fire")
+    }
+
+    // Restart timer then stop it before firing
+    actor.Context.StartTimer("stop", time.Millisecond*50, func(){ fired <- struct{}{} })
+    actor.Context.StopTimer("stop")
+    select {
+    case <-fired:
+        t.Fatal("stopped timer should not fire")
+    case <-time.After(time.Millisecond*80):
+        // ok
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {
