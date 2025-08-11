@@ -1,7 +1,6 @@
 package netstack
 
 import (
-    "context"
     "crypto/tls"
     "net"
     "net/http"
@@ -55,8 +54,8 @@ func (s *HTTP3Server) Stop() error {
 
 // HTTP3Client returns an http.Client using HTTP/3 round tripper with given TLS config.
 func HTTP3Client(tlsCfg *tls.Config, timeout time.Duration) *http.Client {
-    rt := &http3.RoundTripper{TLSClientConfig: tlsCfg}
-    return &http.Client{Transport: rt, Timeout: timeout}
+    tr := &http3.Transport{TLSClientConfig: tlsCfg}
+    return &http.Client{Transport: tr, Timeout: timeout}
 }
 
 // WithInsecureMinTLS12 returns a tls.Config with InsecureSkipVerify for local tests.
@@ -66,7 +65,7 @@ func WithInsecureMinTLS12() *tls.Config {
 
 // ShutdownHTTP3 gracefully closes the RoundTripper if applicable.
 func ShutdownHTTP3(c *http.Client) {
-    if rt, ok := c.Transport.(*http3.RoundTripper); ok { _ = rt.Close() }
+    if tr, ok := c.Transport.(*http3.Transport); ok { _ = tr.Close() }
 }
 
 
