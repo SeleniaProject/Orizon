@@ -253,6 +253,38 @@ func TestMailbox_BackPressure(t *testing.T) {
     }
 }
 
+func TestGroup_Broadcast(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    g, err := system.CreateGroup("g", StaticGroup, GroupConfig{})
+    if err != nil { t.Fatalf("create group failed: %v", err) }
+
+    tb1 := &testBehavior{received: make(chan Message, 1), name: "g1"}
+    tb2 := &testBehavior{received: make(chan Message, 1), name: "g2"}
+    a1, _ := system.CreateActor("g1", UserActor, tb1, DefaultActorConfig)
+    a2, _ := system.CreateActor("g2", UserActor, tb2, DefaultActorConfig)
+    if err := system.AddToGroup(g.ID, a1.ID); err != nil { t.Fatalf("add1: %v", err) }
+    if err := system.AddToGroup(g.ID, a2.ID); err != nil { t.Fatalf("add2: %v", err) }
+
+    if err := system.Broadcast(g.ID, 1, "B"); err != nil { t.Fatalf("broadcast: %v", err) }
+
+    // Expect both to receive
+    received := 0
+    timeout := time.After(time.Second)
+    for received < 2 {
+        select {
+        case <-tb1.received:
+            received++
+        case <-tb2.received:
+            received++
+        case <-timeout:
+            t.Fatal("broadcast timed out")
+        }
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {

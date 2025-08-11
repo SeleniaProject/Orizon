@@ -31,6 +31,7 @@ type ActorSystem struct {
 	registry    *ActorRegistry               // Actor registry
 	scheduler   *ActorScheduler              // Actor scheduler
 	dispatcher  *MessageDispatcher           // Message dispatcher
+    // Group management uses registry.groups (name -> groupID) and ActorSystem.groups (id -> group)
 	config      ActorSystemConfig            // System configuration
 	statistics  ActorSystemStatistics        // System statistics
 	running     bool                         // System running
@@ -589,6 +590,7 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 
 	// Initialize registry
 	system.registry = NewActorRegistry()
+    system.groups = make(map[ActorGroupID]*ActorGroup)
 
 	// Initialize scheduler
 	schedulerConfig := SchedulerConfig{
@@ -1283,6 +1285,61 @@ func NewActorRegistry() *ActorRegistry {
 		cache:     make(map[string]ActorID),
 		enabled:   true,
 	}
+}
+
+// Group operations
+
+// CreateGroup creates a new actor group and registers it by name
+func (as *ActorSystem) CreateGroup(name string, groupType ActorGroupType, cfg GroupConfig) (*ActorGroup, error) {
+    as.mutex.Lock()
+    defer as.mutex.Unlock()
+
+    gid := ActorGroupID(atomic.AddUint64(&globalGroupID, 1))
+    grp := &ActorGroup{
+        ID:       gid,
+        Name:     name,
+        Type:     groupType,
+        Members:  make(map[ActorID]*Actor),
+        Statistics: GroupStatistics{},
+        Config:   cfg,
+        CreateTime: time.Now(),
+    }
+    as.groups[gid] = grp
+    as.registry.groups[name] = gid
+    return grp, nil
+}
+
+// AddToGroup adds an actor to an existing group
+func (as *ActorSystem) AddToGroup(groupID ActorGroupID, actorID ActorID) error {
+    as.mutex.Lock()
+    defer as.mutex.Unlock()
+
+    grp, ok := as.groups[groupID]
+    if !ok {
+        return fmt.Errorf("group not found")
+    }
+    act, ok := as.actors[actorID]
+    if !ok {
+        return fmt.Errorf("actor not found")
+    }
+    grp.Members[actorID] = act
+    return nil
+}
+
+// Broadcast sends a message to all members of the group
+func (as *ActorSystem) Broadcast(groupID ActorGroupID, messageType MessageType, payload interface{}) error {
+    as.mutex.RLock()
+    grp, ok := as.groups[groupID]
+    as.mutex.RUnlock()
+    if !ok {
+        return fmt.Errorf("group not found")
+    }
+    for id := range grp.Members {
+        if err := as.SendMessage(0, id, messageType, payload); err != nil {
+            return err
+        }
+    }
+    return nil
 }
 
 func NewActorScheduler(config SchedulerConfig) *ActorScheduler {
