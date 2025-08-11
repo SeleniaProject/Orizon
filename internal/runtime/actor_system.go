@@ -922,12 +922,63 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
     }
 
     switch sup.Strategy {
-    case RestartStrategy: // OneForOne semantics for simplicity
-        _ = failed.Restart(reason)
+    case RestartStrategy:
+        // Apply restart according to supervisor type
+        switch sup.Type {
+        case OneForOne:
+            _ = failed.Restart(reason)
+        case OneForAll:
+            // Restart all children
+            for _, child := range sup.Children {
+                _ = child.Restart(reason)
+            }
+        case RestForOne:
+            // Restart failed and all children created after it
+            idx := -1
+            for i, id := range sup.childOrder {
+                if id == failed.ID { idx = i; break }
+            }
+            if idx >= 0 {
+                for i := idx; i < len(sup.childOrder); i++ {
+                    if c := sup.Children[sup.childOrder[i]]; c != nil {
+                        _ = c.Restart(reason)
+                    }
+                }
+            } else {
+                _ = failed.Restart(reason)
+            }
+        default:
+            _ = failed.Restart(reason)
+        }
     case StopStrategy:
-        _ = as.stopActor(failed)
+        // Stop according to supervisor type
+        switch sup.Type {
+        case OneForOne:
+            _ = as.stopActor(failed)
+        case OneForAll:
+            for _, child := range sup.Children {
+                _ = as.stopActor(child)
+            }
+        case RestForOne:
+            idx := -1
+            for i, id := range sup.childOrder {
+                if id == failed.ID { idx = i; break }
+            }
+            if idx >= 0 {
+                for i := idx; i < len(sup.childOrder); i++ {
+                    if c := sup.Children[sup.childOrder[i]]; c != nil {
+                        _ = as.stopActor(c)
+                    }
+                }
+            } else {
+                _ = as.stopActor(failed)
+            }
+        default:
+            _ = as.stopActor(failed)
+        }
     case ResumeStrategy:
-        // No action
+        // No action; actor continues
+        return
     case EscalateStrategy:
         // Bubble up to parent supervisor
         if failed.Parent != nil {

@@ -181,6 +181,58 @@ func TestSupervisor_Restart_OnFailure(t *testing.T) {
     }
 }
 
+func TestSupervisor_OneForAll(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    // Configure root as OneForAll + Restart
+    system.rootSupervisor.Strategy = RestartStrategy
+    system.rootSupervisor.Type = OneForAll
+
+    tb1 := &testBehavior{received: make(chan Message, 2), name: "a", failOnce: true}
+    tb2 := &testBehavior{received: make(chan Message, 2), name: "b"}
+    a, _ := system.CreateActor("a", UserActor, tb1, DefaultActorConfig)
+    b, _ := system.CreateActor("b", UserActor, tb2, DefaultActorConfig)
+
+    _ = system.SendMessage(0, a.ID, 1, "x") // will fail and trigger restart for all
+    _ = system.SendMessage(0, a.ID, 1, "y")
+    _ = system.SendMessage(0, b.ID, 1, "z")
+
+    // We only assert no panic and that at least one message is processed after restarts
+    select {
+    case <-tb1.received:
+    case <-time.After(1500 * time.Millisecond):
+        t.Fatal("one-for-all did not recover")
+    }
+}
+
+func TestSupervisor_RestForOne(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    // Configure root as RestForOne + Restart
+    system.rootSupervisor.Strategy = RestartStrategy
+    system.rootSupervisor.Type = RestForOne
+
+    tb1 := &testBehavior{received: make(chan Message, 2), name: "a"}
+    tb2 := &testBehavior{received: make(chan Message, 2), name: "b", failOnce: true}
+    tb3 := &testBehavior{received: make(chan Message, 2), name: "c"}
+    _, _ = system.CreateActor("a", UserActor, tb1, DefaultActorConfig)
+    b, _ := system.CreateActor("b", UserActor, tb2, DefaultActorConfig)
+    _, _ = system.CreateActor("c", UserActor, tb3, DefaultActorConfig)
+
+    _ = system.SendMessage(0, b.ID, 1, "x") // b fails; b and c should restart
+    _ = system.SendMessage(0, b.ID, 1, "y")
+
+    select {
+    case <-tb2.received:
+    case <-time.After(1500 * time.Millisecond):
+      t.Fatal("rest-for-one did not recover")
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {
