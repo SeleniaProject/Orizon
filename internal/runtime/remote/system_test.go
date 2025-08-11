@@ -21,14 +21,10 @@ func (e *echoBehavior) GetBehaviorName() string { return "echo" }
 // adapter implements LocalDispatcher and NameResolver for wiring.
 type adapter struct{ sys *rt.ActorSystem }
 func (a adapter) SendMessage(sid uint64, rid uint64, mt uint32, p interface{}) error { return a.sys.SendMessage(rt.ActorID(sid), rt.ActorID(rid), rt.MessageType(mt), p) }
-func (a adapter) LookupActorID(name string) (uint64, bool) {
-    // use registry
-    id, ok := a.sys.registry.Lookup(name)
-    return uint64(id), ok
-}
+func (a adapter) LookupActorID(name string) (uint64, bool) { id, ok := a.sys.LookupActorID(name); return uint64(id), ok }
 
 type regAdapter struct{ sys *rt.ActorSystem }
-func (r regAdapter) Lookup(name string) (uint64, bool) { id, ok := r.sys.registry.Lookup(name); return uint64(id), ok }
+func (r regAdapter) Lookup(name string) (uint64, bool) { id, ok := r.sys.LookupActorID(name); return uint64(id), ok }
 
 func TestRemote_InMemory_SendByName(t *testing.T) {
     // local node A

@@ -1523,6 +1523,12 @@ func NewActorRegistry() *ActorRegistry {
 	}
 }
 
+// LookupActorID returns the actor ID for a registered name.
+func (as *ActorSystem) LookupActorID(name string) (ActorID, bool) {
+    if as == nil || as.registry == nil { return 0, false }
+    return as.registry.Lookup(name)
+}
+
 // Group operations
 
 // CreateGroup creates a new actor group and registers it by name
