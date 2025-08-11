@@ -3,6 +3,7 @@ package remote
 import (
     "fmt"
     "sync"
+    "time"
 )
 
 // LocalDispatcher is the subset of ActorSystem needed for local delivery.
@@ -24,6 +25,10 @@ type RemoteSystem struct {
     Discover  Discovery
     started   bool
     mutex     sync.RWMutex
+    // Retry/backoff configuration
+    RetryMaxAttempts int
+    RetryInitialMs   int
+    RetryMaxBackoffMs int
 }
 
 // NameResolver resolves actor names to IDs on the local node.
@@ -44,6 +49,9 @@ func (rs *RemoteSystem) Start(nodeName, addr string) error {
     rs.Address = rs.Trans.Address()
     rs.started = true
     if rs.Discover != nil { _ = rs.Discover.Register(nodeName, rs.Address) }
+    if rs.RetryMaxAttempts == 0 { rs.RetryMaxAttempts = 6 }
+    if rs.RetryInitialMs == 0 { rs.RetryInitialMs = 50 }
+    if rs.RetryMaxBackoffMs == 0 { rs.RetryMaxBackoffMs = 800 }
     return nil
 }
 
@@ -82,7 +90,66 @@ func (rs *RemoteSystem) Send(remoteAddrOrNode, receiverName string, msgType uint
     if rs.Discover != nil {
         if addr, ok := rs.Discover.Resolve(remoteAddrOrNode); ok { target = addr }
     }
-    return rs.Trans.Send(target, env)
+    return rs.sendWithRetry(target, env)
+}
+
+// sendWithRetry attempts to send with exponential backoff up to configured attempts.
+func (rs *RemoteSystem) sendWithRetry(target string, env Envelope) error {
+    attempts := rs.RetryMaxAttempts
+    if attempts <= 0 { attempts = 1 }
+    backoff := rs.RetryInitialMs
+    if backoff <= 0 { backoff = 50 }
+    max := rs.RetryMaxBackoffMs
+    if max <= 0 { max = 800 }
+    var lastErr error
+    for i := 0; i < attempts; i++ {
+        if err := rs.Trans.Send(target, env); err == nil {
+            return nil
+        } else {
+            lastErr = err
+        }
+        // Attempt discovery refresh between retries
+        if rs.Discover != nil {
+            if addr, ok := rs.Discover.Resolve(env.ReceiverNode); ok { target = addr }
+        }
+        // sleep backoff
+        if i < attempts-1 {
+            d := backoff
+            if d > max { d = max }
+            // local sleep without import time here; delay delegated by transport if needed (simple loop)
+            // Use a minimal busy-wait with small handoff to avoid adding import cycles.
+            // Note: we keep code simple; tests rely on small timings.
+            sleepMs(d)
+            backoff <<= 1
+            if backoff > max { backoff = max }
+        }
+    }
+    return lastErr
+}
+
+
+// SendWithRetry sends with simple exponential backoff retry when transport or resolution fails.
+// attempts <= 1 means single try; baseDelay defines the initial sleep duration.
+func (rs *RemoteSystem) SendWithRetry(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}, attempts int, baseDelayMs int) error {
+    if attempts < 1 { attempts = 1 }
+    delay := baseDelayMs
+    var lastErr error
+    for i := 0; i < attempts; i++ {
+        if err := rs.Send(remoteAddrOrNode, receiverName, msgType, payload); err == nil {
+            return nil
+        } else {
+            lastErr = err
+        }
+        if i < attempts-1 {
+            // exponential backoff with cap
+            if delay <= 0 { delay = 10 }
+            if delay > 2000 { delay = 2000 }
+            // simple jitter-less sleep
+            time.Sleep(time.Duration(delay) * time.Millisecond)
+            if delay < 2000 { delay = delay * 2 }
+        }
+    }
+    return lastErr
 }
 
 // receive handles an incoming envelope and dispatches to a local actor by name.
