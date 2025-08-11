@@ -109,6 +109,49 @@ func TestActorSystem_AutoDispatch(t *testing.T) {
     }
 }
 
+// Simple interceptor/transformer for testing dispatcher pipeline
+type interceptOnce struct{ called *bool }
+func (i interceptOnce) Intercept(msg Message) (Message, error) { *i.called = true; return msg, nil }
+
+type transformTag struct{ key string }
+func (t transformTag) Transform(msg Message) (Message, error) {
+    if msg.Headers == nil { msg.Headers = map[string]interface{}{} }
+    msg.Headers[t.key] = true
+    return msg, nil
+}
+
+func (t transformTag) GetTransformerName() string { return "transformTag" }
+
+func (i interceptOnce) GetInterceptorName() string { return "interceptOnce" }
+
+func TestDispatcher_Interception_Transformation(t *testing.T) {
+    system, err := NewActorSystem(DefaultActorSystemConfig)
+    if err != nil { t.Fatalf("failed to create actor system: %v", err) }
+    if err := system.Start(); err != nil { t.Fatalf("failed to start: %v", err) }
+    defer system.Stop()
+
+    tb := &testBehavior{received: make(chan Message, 1), name: "pipe"}
+    actor, err := system.CreateActor("pipe", UserActor, tb, DefaultActorConfig)
+    if err != nil { t.Fatalf("failed to create actor: %v", err) }
+
+    // Install interceptor and transformer
+    called := false
+    system.dispatcher.mutex.Lock()
+    system.dispatcher.interceptors = append(system.dispatcher.interceptors, interceptOnce{called: &called})
+    system.dispatcher.transformers = append(system.dispatcher.transformers, transformTag{key: "tagged"})
+    system.dispatcher.mutex.Unlock()
+
+    if err := system.SendMessage(0, actor.ID, 1, "x"); err != nil { t.Fatalf("send failed: %v", err) }
+
+    select {
+    case got := <-tb.received:
+        if !called { t.Error("interceptor not called") }
+        if got.Headers["tagged"] != true { t.Error("transformer did not tag header") }
+    case <-time.After(time.Second):
+        t.Fatal("did not receive message via pipeline")
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {

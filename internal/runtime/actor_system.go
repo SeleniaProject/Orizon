@@ -36,6 +36,7 @@ type ActorSystem struct {
 	running     bool                         // System running
 	ctx         context.Context              // System context
 	cancel      context.CancelFunc           // Cancel function
+    rootSupervisor *Supervisor               // Root supervisor
 	mutex       sync.RWMutex                 // Synchronization
 }
 
@@ -133,10 +134,10 @@ type ActorScheduler struct {
 	statistics SchedulerStatistics           // Statistics
 	running    bool                          // Scheduler running
 	ctx        context.Context               // Context
-    // process is a callback invoked by workers to process one scheduled actor.
-    // The callback must be set by the owning ActorSystem.
-    process    func(ActorID)
-	mutex      sync.RWMutex                  // Synchronization
+	// process is a callback invoked by workers to process one scheduled actor.
+	// The callback must be set by the owning ActorSystem.
+	process func(ActorID)
+	mutex   sync.RWMutex // Synchronization
 }
 
 // Message dispatcher for routing
@@ -587,7 +588,7 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 	// Initialize registry
 	system.registry = NewActorRegistry()
 
-    // Initialize scheduler
+	// Initialize scheduler
 	schedulerConfig := SchedulerConfig{
 		WorkerCount:          4,
 		Strategy:             FairScheduling,
@@ -596,22 +597,25 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		WorkStealingEnabled:  true,
 		LoadBalancingEnabled: true,
 	}
-    system.scheduler = NewActorScheduler(schedulerConfig)
-    // Wire scheduler worker callback to process actor mailboxes
-    system.scheduler.process = func(aid ActorID) {
-        system.mutex.RLock()
-        actor := system.actors[aid]
-        system.mutex.RUnlock()
-        if actor == nil {
-            return
-        }
-        // Drain one message if available and process
-        if msg, ok := actor.Mailbox.Dequeue(); ok {
-            _ = actor.ProcessMessage(msg)
-        }
-    }
+	system.scheduler = NewActorScheduler(schedulerConfig)
+	// Wire scheduler worker callback to process actor mailboxes
+	system.scheduler.process = func(aid ActorID) {
+		system.mutex.RLock()
+		actor := system.actors[aid]
+		system.mutex.RUnlock()
+		if actor == nil {
+			return
+		}
+		// Drain one message if available and process
+		if msg, ok := actor.Mailbox.Dequeue(); ok {
+			if err := actor.ProcessMessage(msg); err != nil {
+				// Simple supervision: restart on failure
+				_ = actor.Restart(err)
+			}
+		}
+	}
 
-	// Initialize dispatcher
+    // Initialize dispatcher
 	dispatcherConfig := DispatcherConfig{
 		BufferSize:           1000,
 		EnableRouting:        true,
@@ -620,7 +624,13 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		EnableSerialization:  false,
 		DefaultTimeout:       time.Second * 30,
 	}
-	system.dispatcher = NewMessageDispatcher(dispatcherConfig)
+    system.dispatcher = NewMessageDispatcher(dispatcherConfig)
+
+    // Initialize root supervisor (OneForOne)
+    root, err := NewSupervisor("root", OneForOne, DefaultSupervisorConfig)
+    if err == nil {
+        system.rootSupervisor = root
+    }
 
 	return system, nil
 }
@@ -785,10 +795,15 @@ func (as *ActorSystem) CreateActor(name string, actorType ActorType, behavior Ac
 		return nil, err
 	}
 
-	as.mutex.Lock()
-	as.actors[actor.ID] = actor
-	as.mailboxes[actor.Mailbox.ID] = actor.Mailbox
-	as.mutex.Unlock()
+    as.mutex.Lock()
+    as.actors[actor.ID] = actor
+    as.mailboxes[actor.Mailbox.ID] = actor.Mailbox
+    // Attach to root supervisor by default
+    if as.rootSupervisor != nil {
+        actor.Supervisor = as.rootSupervisor
+        as.rootSupervisor.Children[actor.ID] = actor
+    }
+    as.mutex.Unlock()
 
 	// Register actor
 	if err := as.registry.Register(name, actor.ID); err != nil {
@@ -980,6 +995,30 @@ func (as *ActorSystem) deliverMessage(msg Message) error {
 	if !exists {
 		return as.sendToDeadLetters(msg)
 	}
+
+    // Interceptors
+    as.dispatcher.mutex.RLock()
+    interceptors := append([]MessageInterceptor(nil), as.dispatcher.interceptors...)
+    transformers := append([]MessageTransformer(nil), as.dispatcher.transformers...)
+    as.dispatcher.mutex.RUnlock()
+
+    // Apply interceptors
+    for _, ic := range interceptors {
+        m2, err := ic.Intercept(msg)
+        if err != nil {
+            return fmt.Errorf("interception failed: %w", err)
+        }
+        msg = m2
+    }
+
+    // Apply transformers
+    for _, tf := range transformers {
+        m2, err := tf.Transform(msg)
+        if err != nil {
+            return fmt.Errorf("transform failed: %w", err)
+        }
+        msg = m2
+    }
 
 	if err := receiver.Mailbox.Enqueue(msg); err != nil {
 		return as.sendToDeadLetters(msg)
@@ -1267,12 +1306,12 @@ func (as *ActorScheduler) Schedule(actorID ActorID) {
 func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
 	for worker.Running {
 		select {
-        case actorID := <-worker.Queue:
-            // Process actor task
-            as.statistics.TasksCompleted++
-            if as.process != nil {
-                as.process(actorID)
-            }
+		case actorID := <-worker.Queue:
+			// Process actor task
+			as.statistics.TasksCompleted++
+			if as.process != nil {
+				as.process(actorID)
+			}
 		case <-as.ctx.Done():
 			return
 		}

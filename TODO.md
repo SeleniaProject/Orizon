@@ -501,6 +501,9 @@
  - **現状**:
    - アクター基盤: `internal/runtime/actor_system.go` （アクター・メールボックス・レジストリ・スケジューラ・ディスパッチャ・スーパーバイザの骨子、心拍/GCループ）
   - スケジューラ: ワーカーからアクターIDを受け取り、メールボックスからメッセージを1件自動ディスパッチ（`Actor.ProcessMessage`呼び出し）
+  - 監督戦略（簡易）: `Behavior.Receive`失敗時に対象アクターを`Restart`（非スタッシング時はメールボックスクリア）
+  - ルート監督: システム起動時に`root`スーパーバイザを生成し、新規アクターを配下に接続（OneForOne）
+  - メッセージパイプライン: `MessageDispatcher`にInterceptor/Transformerを組み込み、送信前に適用
   - テスト: `internal/runtime/actor_system_test.go`（ライフサイクル、手動・自動ディスパッチ、優先度キュー、レジストリ）
   - ビルド状態: `go test ./internal/runtime -run "ActorSystem|Mailbox|Registry|AutoDispatch" -v` 成功
 
