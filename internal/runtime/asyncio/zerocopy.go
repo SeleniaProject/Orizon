@@ -4,7 +4,6 @@ import (
     "context"
     "io"
     "net"
-    "os"
     "time"
 )
 
@@ -33,15 +32,7 @@ func CopyConnToConn(ctx context.Context, dst net.Conn, src net.Conn) (int64, err
 
 // CopyFileToConn streams file content to a connection. Platforms that support
 // zero-copy sendfile may be used under the hood by io.Copy.
-func CopyFileToConn(ctx context.Context, dst net.Conn, src *os.File) (int64, error) {
-    if deadline, ok := ctx.Deadline(); ok {
-        _ = dst.SetWriteDeadline(deadline)
-    }
-    n, err := io.Copy(dst, src)
-    if ctx != nil {
-        _ = dst.SetWriteDeadline(time.Time{})
-    }
-    return n, err
-}
+// Platform-specific optimized CopyFileToConn is provided per-OS. See
+// zerocopy_unix_file.go and zerocopy_generic_file.go for implementations.
 
 
