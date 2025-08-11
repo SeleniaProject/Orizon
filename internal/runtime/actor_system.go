@@ -913,7 +913,8 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
     if opts.BackoffInitial <= 0 { opts.BackoffInitial = time.Millisecond * 5 }
     if opts.BackoffMax <= 0 { opts.BackoffMax = time.Millisecond * 100 }
     backoff := opts.BackoffInitial
-    handler := func(ev asyncio.Event) {
+    var handler func(ev asyncio.Event)
+    handler = func(ev asyncio.Event) {
 		var mt MessageType
 		switch ev.Type {
 		case asyncio.Readable:
