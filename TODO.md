@@ -604,33 +604,38 @@
 - **成果物**:
   - [x] `internal/runtime/asyncio/async_io.go`: I/Oランタイム基盤（`Poller`インターフェース、`Event`/`EventType`、`Handler`、`Start`/`Stop`/`Register`/`Deregister`）
   - [x] デフォルト実装: ゴルーチン駆動ポーラ（移植性重視のベースライン）
-  - [x] テスト: `internal/runtime/asyncio/async_io_test.go`（TCPエコーでReadable/Writable通知の検証）
-  - [ ] epoll/kqueue/IOCP抽象化（OS別ポーラ実装: Linux/Windows/BSD）
-  - [ ] ゼロコピーI/O（Linux: `sendfile`/`splice`、Windows: `TransmitFile`、macOS: `sendfile`）
+  - [x] OS別ポーラの土台: `NewOSPoller()` ファクトリ導入
+  - [x] Linux: `epoll` ベース実装（`internal/runtime/asyncio/epoll_poller_linux.go`）
+  - [x] BSD/macOS: `kqueue` 実装（`internal/runtime/asyncio/kqueue_poller_bsd.go`）
+  - [ ] Windows: `IOCP` 実装（現状は互換ポーラ委譲: `internal/runtime/asyncio/iocp_poller_windows.go`）
+  - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
+  - [ ] 真のゼロコピーI/O経路（Linux: `sendfile`/`splice`、Windows: `TransmitFile`、macOS: `sendfile`）
   - [ ] バッファプール・再利用戦略（GC圧力低減）
   - [ ] アクターシステム統合（I/Oイベント→メールボックス投入・バックプレッシャ整合）
 - **依存関係**: 3.3.3
 - **推定工数**: 大（28日）
 - **現状**:
-  - ポータブルな`Poller`抽象と、ゴルーチン駆動の既定実装を追加済み。軽量ポーリングでReadable/Writable通知を提供
-  - エンドツーエンドでのTCPエコーテストがグリーン（`go test ./...` 全体成功）
-  - 次段としてOS固有ポーラ（epoll/kqueue/IOCP）およびゼロコピーI/Fを追加し、ランタイム（アクター）と密結合予定
+  - `epoll`/`kqueue` 実装とファクトリ導入によりOS最適ポーラを選択可能。Windowsは今後IOCP実装予定
+  - ゼロコピーI/Oはヘルパーを追加済み。OS固有の真のゼロコピー経路は次段で対応
+  - `go test ./...` は緑を維持
 
-#### 3.4.2 ファイルシステム抽象化
-- [ ] **目的**: 仮想ファイルシステム実装
+#### 3.4.2 ファイルシステム抽象化 ✅ 完了
+- [x] **目的**: 仮想ファイルシステム実装
 - **成果物**:
-  - [ ] VFS実装
-  - [ ] パス操作ライブラリ
-  - [ ] ファイル監視機能
+  - [x] VFS: `internal/runtime/vfs`（`FileSystem`/`File` 抽象、`OSFS`/`MemFS` 実装）
+  - [x] パス操作ユーティリティ（`Join`/`Clean`）
+  - [x] 監視: ポータブルなポーリングWatcher（`SimpleWatcher`）
+  - [x] テスト: OSFS/MemFS/Watcher の基本動作検証
 - **依存関係**: 3.4.1
 - **推定工数**: 大（22日）
 
 #### 3.4.3 ネットワークスタック
 - [ ] **目的**: HTTP/3, QUIC対応ネットワーク層
 - **成果物**:
-  - [ ] TCP/UDP抽象化
+  - [x] TCP/UDP抽象化: `internal/runtime/netstack`（`TCPServer`/`DialTCP`、`UDPEndpoint`）
+  - [x] TLSラッパ: `TLSDial`/`TLSServer`（自己署名証明書でのローカル疎通テスト含む）
   - [ ] HTTP/3実装
-  - [ ] TLS 1.3サポート
+  - [ ] TLS 1.3サポート（明示設定・検証）
 - **依存関係**: 3.4.2
 - **推定工数**: 大（35日）
 
