@@ -609,16 +609,18 @@
   - [x] BSD/macOS: `kqueue` 実装（`internal/runtime/asyncio/kqueue_poller_bsd.go`）
   - [ ] Windows: `IOCP` 実装（現状は互換ポーラ委譲: `internal/runtime/asyncio/iocp_poller_windows.go`）
   - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
-  - [ ] 真のゼロコピーI/O経路（Linux: `sendfile`/`splice`、Windows: `TransmitFile`、macOS: `sendfile`）
+  - [x] 真のゼロコピーI/O経路（Linux: `sendfile` による file→socket 転送を実装）
+  - [ ] 真のゼロコピーI/O経路（Windows: `TransmitFile`、macOS: `sendfile`、Linux: `splice` 拡張）
   - [x] バッファプール・再利用戦略（GC圧力低減）
-  - [ ] アクターシステム統合（I/Oイベント→メールボックス投入・バックプレッシャ整合）
+  - [x] アクターシステム統合（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent`配送）
+  - [ ] バックプレッシャ整合の高度化（優先度制御・水位ベースの自動レジストラ抑制）
 - **依存関係**: 3.3.3
 - **推定工数**: 大（28日）
 - **現状**:
   - `epoll`/`kqueue` 実装とファクトリ導入によりOS最適ポーラを選択可能。Windowsは今後IOCP実装予定
   - ゼロコピーI/Oはヘルパー（`internal/runtime/asyncio/zerocopy.go`）を追加済み。OS固有の真のゼロコピー経路は次段で対応
   - バッファプール（`internal/runtime/asyncio/buffer_pool.go`）を追加し、I/Oバッファの再利用でGC圧力を低減
-  - アクター統合のベースラインを提供（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent` メッセージ配送）。バックプレッシャ整合は後続対応
+  - アクター統合のベースラインを提供（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent` メッセージ配送、`IOWatchOptions` による指数バックオフ）
   - `go test ./...` は緑を維持
 
 #### 3.4.2 ファイルシステム抽象化 ✅ 完了
@@ -626,7 +628,7 @@
 - **成果物**:
   - [x] VFS: `internal/runtime/vfs`（`FileSystem`/`File` 抽象、`OSFS`/`MemFS` 実装）
   - [x] パス操作ユーティリティ（`Join`/`Clean`）
-  - [x] 監視: ポータブルなポーリングWatcher（`SimpleWatcher`）
+  - [x] 監視: ポータブルなポーリングWatcher（`SimpleWatcher`）とOSネイティブ監視（`FSNotifyWatcher`）
   - [x] テスト: OSFS/MemFS/Watcher の基本動作検証
 - **依存関係**: 3.4.1
 - **推定工数**: 大（22日）
