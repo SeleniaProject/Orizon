@@ -489,13 +489,13 @@
 
 ### 3.2 アクターシステム
 
-#### 3.2.1 軽量プロセス実装
-- [ ] **目的**: 100万同時実行可能な軽量プロセス
+#### 3.2.1 軽量プロセス実装 ✅ 完了
+- [x] **目的**: 100万同時実行可能な軽量プロセス
 - **関連ドキュメント**: design.md「Actor System」
 - **成果物**:
-  - [ ] `actor.go` アクターランタイム
-  - [ ] グリーンスレッド実装
-  - [ ] メッセージパッシング機構
+  - [x] `internal/runtime/actor.go` アクターランタイム（`ActorSystem.Spawn`/`ActorRef.Tell`）
+  - [x] グリーンスレッド実装（軽量生成・非同期送信・スケジューラWork Stealing）
+  - [x] メッセージパッシング機構（Mailbox/Dispatcher/Interceptor/Transformer/型別ルーティング）
 - **依存関係**: 3.1.1
 - **推定工数**: 大（35日）
  - **現状**:
@@ -511,8 +511,9 @@
   - タイマー: `ActorContext.StartTimer/StopTimer` による簡易タイマーAPI（内部`time.AfterFunc`）
   - ルーティング: `MessageDispatcher.AddRoute` による型別ルーティング（送信前にターゲットを切替）
   - グリーンスレッドAPI: `ActorSystem.Spawn`/`ActorRef.Tell` 追加（軽量スレッド風の生成と送信）
-  - テスト: `internal/runtime/actor_system_test.go`（ライフサイクル、手動・自動ディスパッチ、優先度キュー、レジストリ）
-  - ビルド状態: `go test ./internal/runtime -run "ActorSystem|Mailbox|Registry|AutoDispatch" -v` 成功
+  - テスト: `internal/runtime/actor_system_test.go`（ライフサイクル、手動/自動ディスパッチ、監督、グループ、タイマー、ルーティング、Spawn/Tell）
+  - ビルド状態: `go test ./...` 成功
+ - **完了**: ✅ 軽量プロセス実装一式の提供と包括的テストの緑化（監督戦略・グループ・BackPressure・タイマー・ルーティング・Work Stealing・Spawn/Tell）
 
 #### 3.2.2 Work Stealingスケジューラー
 - [ ] **目的**: 効率的なマルチコア活用スケジューリング
