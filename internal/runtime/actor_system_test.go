@@ -233,6 +233,26 @@ func TestSupervisor_RestForOne(t *testing.T) {
     }
 }
 
+func TestMailbox_BackPressure(t *testing.T) {
+    mb, _ := NewMailbox(StandardMailbox, 2)
+    mb.OverflowPolicy = BackPressure
+    mb.BackPressureWait = time.Millisecond * 50
+
+    // Fill capacity
+    _ = mb.Enqueue(Message{ID: 1})
+    _ = mb.Enqueue(Message{ID: 2})
+
+    // Enqueue with back pressure should timeout eventually
+    start := time.Now()
+    err := mb.Enqueue(Message{ID: 3})
+    if err == nil {
+        t.Fatal("expected back pressure timeout")
+    }
+    if time.Since(start) < mb.BackPressureWait {
+        t.Error("back pressure did not wait long enough")
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {

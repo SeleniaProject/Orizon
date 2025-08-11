@@ -506,6 +506,7 @@
   - 監督タイプ: OneForOne/OneForAll/RestForOne に対応。`childOrder`によりRestForOneの対象範囲を決定
   - ルート監督: システム起動時に`root`スーパーバイザを生成し、新規アクターを配下に接続（OneForOne）
   - メッセージパイプライン: `MessageDispatcher`にInterceptor/Transformerを組み込み、送信前に適用
+  - メールボックス: `BackPressure`時に待機（`BackPressureWait`）して空きが出れば投入、タイムアウト時はエラー
   - テスト: `internal/runtime/actor_system_test.go`（ライフサイクル、手動・自動ディスパッチ、優先度キュー、レジストリ）
   - ビルド状態: `go test ./internal/runtime -run "ActorSystem|Mailbox|Registry|AutoDispatch" -v` 成功
 

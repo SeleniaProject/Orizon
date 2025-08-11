@@ -73,6 +73,7 @@ type Mailbox struct {
 	Statistics     MailboxStatistics     // Mailbox statistics
 	OverflowPolicy MailboxOverflowPolicy // Overflow handling
 	LastActivity   time.Time             // Last activity
+    BackPressureWait time.Duration       // Maximum wait time when applying back pressure
 	mutex          sync.RWMutex          // Mailbox synchronization
 }
 
@@ -681,7 +682,7 @@ func NewActor(name string, actorType ActorType, behavior ActorBehavior, config A
 func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 	mailboxID := MailboxID(atomic.AddUint64(&globalMailboxID, 1))
 
-	mailbox := &Mailbox{
+    mailbox := &Mailbox{
 		ID:             mailboxID,
 		Type:           mailboxType,
 		Capacity:       capacity,
@@ -690,6 +691,7 @@ func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 		Filters:        make([]MessageFilter, 0),
 		OverflowPolicy: DropOldest,
 		LastActivity:   time.Now(),
+        BackPressureWait: time.Millisecond * 100,
 	}
 
 	// Initialize priority queue for priority mailboxes
@@ -1138,7 +1140,18 @@ func (m *Mailbox) handleOverflow(msg Message) error {
 			m.Messages = append(m.Messages, msg)
 		}
 	case BackPressure:
-		return fmt.Errorf("mailbox full, back pressure applied")
+        // Apply timed back pressure: wait for room up to BackPressureWait
+        deadline := time.Now().Add(m.BackPressureWait)
+        for time.Now().Before(deadline) {
+            if uint32(len(m.Messages)) < m.Capacity {
+                m.Messages = append(m.Messages, msg)
+                return nil
+            }
+            m.mutex.Unlock()
+            time.Sleep(time.Millisecond * 5)
+            m.mutex.Lock()
+        }
+        return fmt.Errorf("mailbox back pressure timeout")
 	case DeadLetter:
 		m.DeadLetters = append(m.DeadLetters, msg)
 	}
