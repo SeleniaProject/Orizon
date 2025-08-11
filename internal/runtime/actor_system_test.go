@@ -337,6 +337,35 @@ func TestDispatcher_RouteToTarget(t *testing.T) {
     }
 }
 
+type pingBehavior struct{ got chan string }
+func (p *pingBehavior) Receive(ctx *ActorContext, msg Message) error {
+    if s, _ := msg.Payload.(string); s != "" { p.got <- s }
+    return nil
+}
+func (p *pingBehavior) PreStart(*ActorContext) error { return nil }
+func (p *pingBehavior) PostStop(*ActorContext) error { return nil }
+func (p *pingBehavior) PreRestart(*ActorContext, error, *Message) error { return nil }
+func (p *pingBehavior) PostRestart(*ActorContext, error) error { return nil }
+func (p *pingBehavior) GetBehaviorName() string { return "ping" }
+
+func TestActor_SpawnAndTell(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    pb := &pingBehavior{got: make(chan string, 1)}
+    ref, err := system.Spawn("p", pb, DefaultActorConfig)
+    if err != nil { t.Fatalf("spawn failed: %v", err) }
+
+    if err := ref.Tell(1, "hello"); err != nil { t.Fatalf("tell failed: %v", err) }
+    select {
+    case s := <-pb.got:
+        if s != "hello" { t.Fatalf("unexpected: %s", s) }
+    case <-time.After(time.Second):
+        t.Fatal("did not receive ping")
+    }
+}
+
 func TestMailbox_PriorityQueue(t *testing.T) {
 	mb, err := NewMailbox(PriorityMailbox, 16)
 	if err != nil {

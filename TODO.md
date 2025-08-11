@@ -510,6 +510,7 @@
   - グループ: 作成/登録/ブロードキャスト（`CreateGroup`/`AddToGroup`/`Broadcast`）
   - タイマー: `ActorContext.StartTimer/StopTimer` による簡易タイマーAPI（内部`time.AfterFunc`）
   - ルーティング: `MessageDispatcher.AddRoute` による型別ルーティング（送信前にターゲットを切替）
+  - グリーンスレッドAPI: `ActorSystem.Spawn`/`ActorRef.Tell` 追加（軽量スレッド風の生成と送信）
   - テスト: `internal/runtime/actor_system_test.go`（ライフサイクル、手動・自動ディスパッチ、優先度キュー、レジストリ）
   - ビルド状態: `go test ./internal/runtime -run "ActorSystem|Mailbox|Registry|AutoDispatch" -v` 成功
 
