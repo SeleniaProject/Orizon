@@ -533,24 +533,26 @@ type (
 
 // StartTimer starts or restarts a named timer on the actor context.
 func (ctx *ActorContext) StartTimer(id string, interval time.Duration, cb func()) {
-    if ctx.Timers == nil {
-        ctx.Timers = make(map[string]*ActorTimer)
-    }
-    // Stop existing
-    if t, ok := ctx.Timers[id]; ok && t != nil && t.timer != nil {
-        t.timer.Stop()
-    }
-    timer := time.AfterFunc(interval, cb)
-    ctx.Timers[id] = &ActorTimer{ID: id, Interval: interval, Callback: cb, timer: timer}
+	if ctx.Timers == nil {
+		ctx.Timers = make(map[string]*ActorTimer)
+	}
+	// Stop existing
+	if t, ok := ctx.Timers[id]; ok && t != nil && t.timer != nil {
+		t.timer.Stop()
+	}
+	timer := time.AfterFunc(interval, cb)
+	ctx.Timers[id] = &ActorTimer{ID: id, Interval: interval, Callback: cb, timer: timer}
 }
 
 // StopTimer stops and removes a named timer.
 func (ctx *ActorContext) StopTimer(id string) {
-    if ctx.Timers == nil { return }
-    if t, ok := ctx.Timers[id]; ok && t != nil && t.timer != nil {
-        t.timer.Stop()
-    }
-    delete(ctx.Timers, id)
+	if ctx.Timers == nil {
+		return
+	}
+	if t, ok := ctx.Timers[id]; ok && t != nil && t.timer != nil {
+		t.timer.Stop()
+	}
+	delete(ctx.Timers, id)
 }
 
 // Default configurations
@@ -1405,6 +1407,13 @@ func NewMessageDispatcher(config DispatcherConfig) *MessageDispatcher {
 	}
 }
 
+// AddRoute registers a simple route for a message type
+func (md *MessageDispatcher) AddRoute(msgType MessageType, rule DispatchRule) {
+	md.mutex.Lock()
+	defer md.mutex.Unlock()
+	md.routes[msgType] = append(md.routes[msgType], rule)
+}
+
 func NewMessagePriorityQueue(capacity int) *MessagePriorityQueue {
 	return &MessagePriorityQueue{
 		items:    make([]PriorityMessage, 0, capacity),
@@ -1503,8 +1512,33 @@ func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
 			}
 		case <-as.ctx.Done():
 			return
+		case <-time.After(time.Millisecond * 2):
+			// Try to steal work from other workers
+			if id, ok := as.trySteal(worker.ID); ok {
+				as.statistics.TasksCompleted++
+				if as.process != nil {
+					as.process(id)
+				}
+			}
 		}
 	}
+}
+
+// trySteal attempts to non-blockingly steal an actorID from other workers' queues
+func (as *ActorScheduler) trySteal(selfID int) (ActorID, bool) {
+	if len(as.workers) == 0 {
+		return 0, false
+	}
+	start := (selfID + 1) % len(as.workers)
+	for i := 0; i < len(as.workers)-1; i++ {
+		w := as.workers[(start+i)%len(as.workers)]
+		select {
+		case id := <-w.Queue:
+			return id, true
+		default:
+		}
+	}
+	return 0, false
 }
 
 // Dispatcher operations
