@@ -116,24 +116,36 @@ func (tx *Txn[T]) Commit() error {
 // Run executes f in a transactional loop with retry/backoff on conflict.
 // maxRetries <= 0 means default retries.
 func Run[T any](maxRetries int, f func(tx *Txn[T]) error) error {
-    if maxRetries <= 0 {
-        maxRetries = 16
-    }
-    base := time.Millisecond * 1
-    for i := 0; i < maxRetries; i++ {
+    unlimited := maxRetries <= 0
+    base := 50 * time.Microsecond
+    attempt := func() error {
         tx := Begin[T]()
         if err := f(tx); err != nil {
             return err
         }
-        if err := tx.Commit(); err == nil {
+        return tx.Commit()
+    }
+    if unlimited {
+        for i := 0; ; i++ {
+            if err := attempt(); err == nil {
+                return nil
+            }
+            // Small exponential backoff with microsecond jitter up to ~1ms
+            step := i
+            if step > 4 { step = 4 }
+            sleep := base << step
+            jitter := time.Duration(rand.Intn(200)) * time.Microsecond
+            time.Sleep(sleep + jitter)
+        }
+    }
+    for i := 0; i < maxRetries; i++ {
+        if err := attempt(); err == nil {
             return nil
         }
-        // backoff with jitter
-        sleep := base << i
-        if sleep > time.Millisecond*50 {
-            sleep = time.Millisecond * 50
-        }
-        jitter := time.Duration(rand.Intn(500)) * time.Microsecond
+        step := i
+        if step > 4 { step = 4 }
+        sleep := base << step
+        jitter := time.Duration(rand.Intn(200)) * time.Microsecond
         time.Sleep(sleep + jitter)
     }
     return ErrConflict
