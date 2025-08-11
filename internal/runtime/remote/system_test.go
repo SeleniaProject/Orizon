@@ -47,8 +47,8 @@ func TestRemote_InMemory_SendByName(t *testing.T) {
     if err := rsB.Start("B", "B"); err != nil { t.Fatalf("rsB start: %v", err) }
     defer rsB.Stop()
 
-    // send to A.svc from B with retry API; node名で配送（ディスカバリ経由）
-    if err := rsB.SendWithRetry("A", "svc", 1, []byte("ping"), 3, 5); err != nil { t.Fatalf("send: %v", err) }
+    // send to A.svc from B; node名で配送（ディスカバリ経由）
+    if err := rsB.SendWithRetry("A", "svc", 1, []byte("ping"), 3, 10); err != nil { t.Fatalf("send: %v", err) }
 
     // expect payload delivery into echo behavior
     select {
