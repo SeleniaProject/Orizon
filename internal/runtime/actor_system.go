@@ -7,7 +7,7 @@ package runtime
 import (
 	"context"
 	"fmt"
-    stdrt "runtime"
+	stdrt "runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,6 +21,11 @@ type (
 	MailboxID    uint64 // Mailbox identifier
 	ActorGroupID uint64 // Actor group identifier
 	MessageType  uint32 // Message type identifier
+)
+
+// Reserved system message types
+const (
+	SystemTerminated MessageType = 0xFFFF0001
 )
 
 // Actor system main structure
@@ -113,9 +118,9 @@ type Supervisor struct {
 	Config      SupervisorConfig     // Configuration
 	Parent      *Supervisor          // Parent supervisor
 	CreateTime  time.Time            // Creation time
-    mutex       sync.RWMutex         // Synchronization
-    // restartTrack keeps per-child restart timestamps to enforce MaxRetries/RetryPeriod.
-    restartTrack map[ActorID][]time.Time
+	mutex       sync.RWMutex         // Synchronization
+	// restartTrack keeps per-child restart timestamps to enforce MaxRetries/RetryPeriod.
+	restartTrack map[ActorID][]time.Time
 }
 
 // Actor registry for name resolution and discovery
@@ -353,11 +358,11 @@ type ActorConfig struct {
 	RestartWindow   time.Duration // Restart window
 	EnableStashing  bool          // Enable stashing
 	EnableWatching  bool          // Enable death watching
-    // CPUAffinityMask provides a scheduling hint for CPU/worker affinity.
-    // Each scheduler worker is assigned a CPU bitmask. When set to non-zero,
-    // the scheduler prefers workers whose mask overlaps with this mask while
-    // still applying load-aware selection.
-    CPUAffinityMask uint64
+	// CPUAffinityMask provides a scheduling hint for CPU/worker affinity.
+	// Each scheduler worker is assigned a CPU bitmask. When set to non-zero,
+	// the scheduler prefers workers whose mask overlaps with this mask while
+	// still applying load-aware selection.
+	CPUAffinityMask uint64
 }
 
 // Supervisor configuration
@@ -508,10 +513,10 @@ type (
 		ID      int
 		Queue   chan ActorID
 		Running bool
-        // CPUMask is the worker's CPU affinity mask used for biased scheduling.
-        CPUMask uint64
-        // QueueLen tracks the current length of the worker queue for load-aware scheduling.
-        QueueLen int64
+		// CPUMask is the worker's CPU affinity mask used for biased scheduling.
+		CPUMask uint64
+		// QueueLen tracks the current length of the worker queue for load-aware scheduling.
+		QueueLen int64
 	}
 	SchedulerStatistics struct{ TasksScheduled, TasksCompleted, WorkerUtilization uint64 }
 	DispatchRule        struct {
@@ -589,7 +594,7 @@ var DefaultActorConfig = ActorConfig{
 	RestartWindow:   time.Minute * 1,
 	EnableStashing:  true,
 	EnableWatching:  true,
-    CPUAffinityMask: 0,
+	CPUAffinityMask: 0,
 }
 
 var DefaultSupervisorConfig = SupervisorConfig{
@@ -756,19 +761,19 @@ func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 func NewSupervisor(name string, supervisorType SupervisorType, config SupervisorConfig) (*Supervisor, error) {
 	supervisorID := SupervisorID(atomic.AddUint64(&globalSupervisorID, 1))
 
-    supervisor := &Supervisor{
-		ID:          supervisorID,
-		Name:        name,
-		Type:        supervisorType,
-		Strategy:    config.Strategy,
-		Children:    make(map[ActorID]*Actor),
-		childOrder:  make([]ActorID, 0),
-		MaxRetries:  config.MaxRetries,
-		RetryPeriod: config.RetryPeriod,
-		Escalations: make([]EscalationRule, 0),
-		Config:      config,
-        CreateTime:  time.Now(),
-        restartTrack: make(map[ActorID][]time.Time),
+	supervisor := &Supervisor{
+		ID:           supervisorID,
+		Name:         name,
+		Type:         supervisorType,
+		Strategy:     config.Strategy,
+		Children:     make(map[ActorID]*Actor),
+		childOrder:   make([]ActorID, 0),
+		MaxRetries:   config.MaxRetries,
+		RetryPeriod:  config.RetryPeriod,
+		Escalations:  make([]EscalationRule, 0),
+		Config:       config,
+		CreateTime:   time.Now(),
+		restartTrack: make(map[ActorID][]time.Time),
 	}
 
 	// Initialize monitor if enabled
@@ -884,6 +889,62 @@ func (as *ActorSystem) CreateActor(name string, actorType ActorType, behavior Ac
 	return actor, nil
 }
 
+// CreateSupervisor creates a new supervisor under an optional parent (default: root) and returns it.
+func (as *ActorSystem) CreateSupervisor(name string, supervisorType SupervisorType, cfg SupervisorConfig, parent *Supervisor) (*Supervisor, error) {
+	if !as.running {
+		return nil, fmt.Errorf("actor system is not running")
+	}
+	sup, err := NewSupervisor(name, supervisorType, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if parent != nil {
+		sup.Parent = parent
+	} else {
+		sup.Parent = as.rootSupervisor
+	}
+	as.mutex.Lock()
+	as.supervisors[sup.ID] = sup
+	as.mutex.Unlock()
+	return sup, nil
+}
+
+// CreateActorUnder creates an actor supervised by the specified supervisor.
+func (as *ActorSystem) CreateActorUnder(supervisor *Supervisor, name string, actorType ActorType, behavior ActorBehavior, config ActorConfig) (*Actor, error) {
+	if !as.running {
+		return nil, fmt.Errorf("actor system is not running")
+	}
+	actor, err := NewActor(name, actorType, behavior, config)
+	if err != nil {
+		return nil, err
+	}
+	as.mutex.Lock()
+	as.actors[actor.ID] = actor
+	as.mailboxes[actor.Mailbox.ID] = actor.Mailbox
+	if supervisor != nil {
+		actor.Supervisor = supervisor
+		supervisor.Children[actor.ID] = actor
+		supervisor.childOrder = append(supervisor.childOrder, actor.ID)
+	} else if as.rootSupervisor != nil {
+		actor.Supervisor = as.rootSupervisor
+		as.rootSupervisor.Children[actor.ID] = actor
+		as.rootSupervisor.childOrder = append(as.rootSupervisor.childOrder, actor.ID)
+	}
+	as.mutex.Unlock()
+
+	if err := as.registry.Register(name, actor.ID); err != nil {
+		return nil, fmt.Errorf("failed to register actor: %v", err)
+	}
+	actor.Context.System = as
+	if err := actor.Behavior.PreStart(actor.Context); err != nil {
+		return nil, fmt.Errorf("PreStart failed: %v", err)
+	}
+	as.scheduler.Schedule(actor.ID)
+	atomic.AddUint64(&as.statistics.TotalActors, 1)
+	atomic.AddUint64(&as.statistics.ActiveActors, 1)
+	return actor, nil
+}
+
 // SendMessage sends a message to an actor
 func (as *ActorSystem) SendMessage(senderID, receiverID ActorID, messageType MessageType, payload interface{}) error {
 	if !as.running {
@@ -923,11 +984,11 @@ func (a *Actor) ProcessMessage(msg Message) error {
 	// Update context
 	a.Context.Sender = msg.Sender
 
-    // Update heartbeat before processing
-    a.LastHeartbeat = time.Now()
+	// Update heartbeat before processing
+	a.LastHeartbeat = time.Now()
 
-    // Process message
-    err := a.Behavior.Receive(a.Context, msg)
+	// Process message
+	err := a.Behavior.Receive(a.Context, msg)
 
 	// Update statistics
 	a.Statistics.MessagesReceived++
@@ -979,21 +1040,28 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 
 	switch sup.Strategy {
 	case RestartStrategy:
-        // Apply restart according to supervisor type with restart limits
+		// Apply restart according to supervisor type with restart limits
 		switch sup.Type {
 		case OneForOne:
-            if !as.canRestart(sup, failed) {
-                _ = as.stopActor(failed)
-                return
-            }
-            if d := failed.Config.RestartDelay; d > 0 { time.Sleep(d) }
-            _ = failed.Restart(reason)
+			if !as.canRestart(sup, failed) {
+				_ = as.stopActor(failed)
+				return
+			}
+			if d := failed.Config.RestartDelay; d > 0 {
+				time.Sleep(d)
+			}
+			_ = failed.Restart(reason)
 		case OneForAll:
 			// Restart all children
 			for _, child := range sup.Children {
-                if !as.canRestart(sup, child) { _ = as.stopActor(child); continue }
-                if d := child.Config.RestartDelay; d > 0 { time.Sleep(d) }
-                _ = child.Restart(reason)
+				if !as.canRestart(sup, child) {
+					_ = as.stopActor(child)
+					continue
+				}
+				if d := child.Config.RestartDelay; d > 0 {
+					time.Sleep(d)
+				}
+				_ = child.Restart(reason)
 			}
 		case RestForOne:
 			// Restart failed and all children created after it
@@ -1007,22 +1075,35 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 			if idx >= 0 {
 				for i := idx; i < len(sup.childOrder); i++ {
 					if c := sup.Children[sup.childOrder[i]]; c != nil {
-                        if !as.canRestart(sup, c) { _ = as.stopActor(c); continue }
-                        if d := c.Config.RestartDelay; d > 0 { time.Sleep(d) }
-                        _ = c.Restart(reason)
+						if !as.canRestart(sup, c) {
+							_ = as.stopActor(c)
+							continue
+						}
+						if d := c.Config.RestartDelay; d > 0 {
+							time.Sleep(d)
+						}
+						_ = c.Restart(reason)
 					}
 				}
 			} else {
-                if !as.canRestart(sup, failed) { _ = as.stopActor(failed) } else {
-                    if d := failed.Config.RestartDelay; d > 0 { time.Sleep(d) }
-                    _ = failed.Restart(reason)
-                }
+				if !as.canRestart(sup, failed) {
+					_ = as.stopActor(failed)
+				} else {
+					if d := failed.Config.RestartDelay; d > 0 {
+						time.Sleep(d)
+					}
+					_ = failed.Restart(reason)
+				}
 			}
 		default:
-            if !as.canRestart(sup, failed) { _ = as.stopActor(failed) } else {
-                if d := failed.Config.RestartDelay; d > 0 { time.Sleep(d) }
-                _ = failed.Restart(reason)
-            }
+			if !as.canRestart(sup, failed) {
+				_ = as.stopActor(failed)
+			} else {
+				if d := failed.Config.RestartDelay; d > 0 {
+					time.Sleep(d)
+				}
+				_ = failed.Restart(reason)
+			}
 		}
 	case StopStrategy:
 		// Stop according to supervisor type
@@ -1058,10 +1139,10 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 		return
 	case EscalateStrategy:
 		// Bubble up to parent supervisor
-        if failed.Supervisor != nil && failed.Supervisor.Parent != nil {
-            // escalate towards parent supervisor (simple propagation)
-            // Note: this simplified escalation reuses the same failed actor context.
-            as.handleFailure(failed, fmt.Errorf("escalated: %v", reason))
+		if failed.Supervisor != nil && failed.Supervisor.Parent != nil {
+			// escalate towards parent supervisor (simple propagation)
+			// Note: this simplified escalation reuses the same failed actor context.
+			as.handleFailure(failed, fmt.Errorf("escalated: %v", reason))
 		} else {
 			_ = failed.Restart(reason)
 		}
@@ -1072,28 +1153,28 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 
 // canRestart checks supervisor's restart policy window for a child and records the attempt.
 func (as *ActorSystem) canRestart(sup *Supervisor, child *Actor) bool {
-    sup.mutex.Lock()
-    defer sup.mutex.Unlock()
-    if sup.MaxRetries == 0 || sup.RetryPeriod <= 0 {
-        return true
-    }
-    hist := sup.restartTrack[child.ID]
-    now := time.Now()
-    cutoff := now.Add(-sup.RetryPeriod)
-    filtered := hist[:0]
-    for _, t := range hist {
-        if t.After(cutoff) {
-            filtered = append(filtered, t)
-        }
-    }
-    hist = filtered
-    if uint32(len(hist)) >= sup.MaxRetries {
-        sup.restartTrack[child.ID] = hist
-        return false
-    }
-    hist = append(hist, now)
-    sup.restartTrack[child.ID] = hist
-    return true
+	sup.mutex.Lock()
+	defer sup.mutex.Unlock()
+	if sup.MaxRetries == 0 || sup.RetryPeriod <= 0 {
+		return true
+	}
+	hist := sup.restartTrack[child.ID]
+	now := time.Now()
+	cutoff := now.Add(-sup.RetryPeriod)
+	filtered := hist[:0]
+	for _, t := range hist {
+		if t.After(cutoff) {
+			filtered = append(filtered, t)
+		}
+	}
+	hist = filtered
+	if uint32(len(hist)) >= sup.MaxRetries {
+		sup.restartTrack[child.ID] = hist
+		return false
+	}
+	hist = append(hist, now)
+	sup.restartTrack[child.ID] = hist
+	return true
 }
 
 // Mailbox operations
@@ -1311,10 +1392,55 @@ func (as *ActorSystem) stopActor(actor *Actor) error {
 
 	actor.State = ActorStopped
 
+	// Notify watchers with a system termination message
+	if actor.Context != nil && len(actor.Context.Watchers) > 0 {
+		for watcherID := range actor.Context.Watchers {
+			_ = as.SendMessage(actor.ID, watcherID, SystemTerminated, actor.ID)
+		}
+	}
+
 	// Update statistics
 	atomic.AddUint64(&as.statistics.ActiveActors, ^uint64(0)) // Decrement
 
 	return nil
+}
+
+// Watch registers the current actor as a watcher of the target actor. When the
+// target terminates, a SystemTerminated message with payload=targetID is sent
+// to the watcher.
+func (ctx *ActorContext) Watch(target ActorID) {
+	if ctx.Watched == nil {
+		ctx.Watched = make(map[ActorID]bool)
+	}
+	ctx.Watched[target] = true
+	if ctx.System != nil {
+		ctx.System.mutex.RLock()
+		tgt := ctx.System.actors[target]
+		ctx.System.mutex.RUnlock()
+		if tgt != nil {
+			if tgt.Context == nil {
+				tgt.Context = &ActorContext{Watchers: make(map[ActorID]bool)}
+			}
+			if tgt.Context.Watchers == nil {
+				tgt.Context.Watchers = make(map[ActorID]bool)
+			}
+			tgt.Context.Watchers[ctx.ActorID] = true
+		}
+	}
+}
+
+// Unwatch unregisters a watcher from the target actor.
+func (ctx *ActorContext) Unwatch(target ActorID) {
+	if ctx.System == nil {
+		return
+	}
+	ctx.System.mutex.RLock()
+	tgt := ctx.System.actors[target]
+	ctx.System.mutex.RUnlock()
+	if tgt != nil && tgt.Context != nil && tgt.Context.Watchers != nil {
+		delete(tgt.Context.Watchers, ctx.ActorID)
+	}
+	delete(ctx.Watched, target)
 }
 
 // System maintenance
@@ -1522,33 +1648,33 @@ func (as *ActorScheduler) Start(ctx context.Context) error {
 	as.ctx = ctx
 	as.running = true
 
-    // Start workers with CPU mask assignment (simple round-robin over logical CPUs)
-    cpuCount := stdrt.NumCPU()
-    var defaultMasks []uint64
-    if cpuCount <= 64 {
-        defaultMasks = make([]uint64, len(as.workers))
-        for i := 0; i < len(as.workers); i++ {
-            bit := uint64(1) << uint((i)%cpuCount)
-            defaultMasks[i] = bit
-        }
-    } else {
-        // If CPUs > 64, group multiple CPUs per worker; still provide a non-zero mask
-        defaultMasks = make([]uint64, len(as.workers))
-        for i := 0; i < len(as.workers); i++ {
-            defaultMasks[i] = ^uint64(0) // all bits as a fallback
-        }
-    }
+	// Start workers with CPU mask assignment (simple round-robin over logical CPUs)
+	cpuCount := stdrt.NumCPU()
+	var defaultMasks []uint64
+	if cpuCount <= 64 {
+		defaultMasks = make([]uint64, len(as.workers))
+		for i := 0; i < len(as.workers); i++ {
+			bit := uint64(1) << uint((i)%cpuCount)
+			defaultMasks[i] = bit
+		}
+	} else {
+		// If CPUs > 64, group multiple CPUs per worker; still provide a non-zero mask
+		defaultMasks = make([]uint64, len(as.workers))
+		for i := 0; i < len(as.workers); i++ {
+			defaultMasks[i] = ^uint64(0) // all bits as a fallback
+		}
+	}
 
-    for i := 0; i < len(as.workers); i++ {
-        as.workers[i] = &SchedulerWorker{
-            ID:      i,
-            Queue:   make(chan ActorID, 100),
-            Running: true,
-            CPUMask: defaultMasks[i],
-            QueueLen: 0,
-        }
-        go as.runWorker(as.workers[i])
-    }
+	for i := 0; i < len(as.workers); i++ {
+		as.workers[i] = &SchedulerWorker{
+			ID:       i,
+			Queue:    make(chan ActorID, 100),
+			Running:  true,
+			CPUMask:  defaultMasks[i],
+			QueueLen: 0,
+		}
+		go as.runWorker(as.workers[i])
+	}
 
 	return nil
 }
@@ -1565,12 +1691,12 @@ func (as *ActorScheduler) Stop() {
 }
 
 func (as *ActorScheduler) Schedule(actorID ActorID) {
-    as.scheduleInternal(actorID, 0)
+	as.scheduleInternal(actorID, 0)
 }
 
 // ScheduleWithAffinity schedules with a CPU affinity mask hint.
 func (as *ActorScheduler) ScheduleWithAffinity(actorID ActorID, cpuMask uint64) {
-    as.scheduleInternal(actorID, cpuMask)
+	as.scheduleInternal(actorID, cpuMask)
 }
 
 func (as *ActorScheduler) scheduleInternal(actorID ActorID, actorMask uint64) {
@@ -1578,59 +1704,59 @@ func (as *ActorScheduler) scheduleInternal(actorID ActorID, actorMask uint64) {
 		return
 	}
 
-    // Choose candidate workers set: all workers if no mask, otherwise those overlapping.
-    candidates := make([]*SchedulerWorker, 0, len(as.workers))
-    if actorMask == 0 {
-        candidates = as.workers
-    } else {
-        for _, w := range as.workers {
-            if w.CPUMask&actorMask != 0 {
-                candidates = append(candidates, w)
-            }
-        }
-        if len(candidates) == 0 {
-            candidates = as.workers
-        }
-    }
+	// Choose candidate workers set: all workers if no mask, otherwise those overlapping.
+	candidates := make([]*SchedulerWorker, 0, len(as.workers))
+	if actorMask == 0 {
+		candidates = as.workers
+	} else {
+		for _, w := range as.workers {
+			if w.CPUMask&actorMask != 0 {
+				candidates = append(candidates, w)
+			}
+		}
+		if len(candidates) == 0 {
+			candidates = as.workers
+		}
+	}
 
-    // Pick least loaded candidate worker
-    best := candidates[0]
-    bestLen := atomic.LoadInt64(&best.QueueLen)
-    for _, w := range candidates[1:] {
-        if l := atomic.LoadInt64(&w.QueueLen); l < bestLen {
-            best = w
-            bestLen = l
-        }
-    }
+	// Pick least loaded candidate worker
+	best := candidates[0]
+	bestLen := atomic.LoadInt64(&best.QueueLen)
+	for _, w := range candidates[1:] {
+		if l := atomic.LoadInt64(&w.QueueLen); l < bestLen {
+			best = w
+			bestLen = l
+		}
+	}
 
-    // Try enqueue to best, then fallback to a sibling worker if full
-    idx := best.ID
-    select {
-    case as.workers[idx].Queue <- actorID:
-        atomic.AddInt64(&as.workers[idx].QueueLen, 1)
-        as.statistics.TasksScheduled++
-        return
-    default:
-        // Fallback: probe another worker (least loaded among all)
-    }
+	// Try enqueue to best, then fallback to a sibling worker if full
+	idx := best.ID
+	select {
+	case as.workers[idx].Queue <- actorID:
+		atomic.AddInt64(&as.workers[idx].QueueLen, 1)
+		as.statistics.TasksScheduled++
+		return
+	default:
+		// Fallback: probe another worker (least loaded among all)
+	}
 
-    // Global least-loaded fallback
-    fallback := as.workers[0]
-    fallbackLen := atomic.LoadInt64(&fallback.QueueLen)
-    for _, w := range as.workers[1:] {
-        if l := atomic.LoadInt64(&w.QueueLen); l < fallbackLen {
-            fallback = w
-            fallbackLen = l
-        }
-    }
-    j := fallback.ID
-    select {
-    case as.workers[j].Queue <- actorID:
-        atomic.AddInt64(&as.workers[j].QueueLen, 1)
-        as.statistics.TasksScheduled++
-    default:
-        // All queues appear saturated; drop the scheduling hint (message stays in mailbox until next attempt)
-    }
+	// Global least-loaded fallback
+	fallback := as.workers[0]
+	fallbackLen := atomic.LoadInt64(&fallback.QueueLen)
+	for _, w := range as.workers[1:] {
+		if l := atomic.LoadInt64(&w.QueueLen); l < fallbackLen {
+			fallback = w
+			fallbackLen = l
+		}
+	}
+	j := fallback.ID
+	select {
+	case as.workers[j].Queue <- actorID:
+		atomic.AddInt64(&as.workers[j].QueueLen, 1)
+		as.statistics.TasksScheduled++
+	default:
+		// All queues appear saturated; drop the scheduling hint (message stays in mailbox until next attempt)
+	}
 }
 
 func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
@@ -1638,7 +1764,7 @@ func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
 		select {
 		case actorID := <-worker.Queue:
 			// Process actor task
-            atomic.AddInt64(&worker.QueueLen, -1)
+			atomic.AddInt64(&worker.QueueLen, -1)
 			as.statistics.TasksCompleted++
 			if as.process != nil {
 				as.process(actorID)
@@ -1669,8 +1795,8 @@ func (as *ActorScheduler) trySteal(selfID int) (ActorID, bool) {
 		w := as.workers[(start+i)%len(as.workers)]
 		select {
 		case id := <-w.Queue:
-            // Decrement source queue length since we stole one
-            atomic.AddInt64(&w.QueueLen, -1)
+			// Decrement source queue length since we stole one
+			atomic.AddInt64(&w.QueueLen, -1)
 			return id, true
 		default:
 		}
@@ -1680,15 +1806,15 @@ func (as *ActorScheduler) trySteal(selfID int) (ActorID, bool) {
 
 // GetQueueLengths returns a snapshot of per-worker queue lengths. Intended for testing/monitoring.
 func (as *ActorScheduler) GetQueueLengths() []int64 {
-    as.mutex.RLock()
-    defer as.mutex.RUnlock()
-    out := make([]int64, len(as.workers))
-    for i, w := range as.workers {
-        if w != nil {
-            out[i] = atomic.LoadInt64(&w.QueueLen)
-        }
-    }
-    return out
+	as.mutex.RLock()
+	defer as.mutex.RUnlock()
+	out := make([]int64, len(as.workers))
+	for i, w := range as.workers {
+		if w != nil {
+			out[i] = atomic.LoadInt64(&w.QueueLen)
+		}
+	}
+	return out
 }
 
 // Dispatcher operations

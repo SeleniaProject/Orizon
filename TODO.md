@@ -532,16 +532,16 @@
   - 既存のWork Stealingは`WorkStealingEnabled`で制御し、負荷分散と整合
 - **ビルド状態**: `go test ./...` 成功
 
-#### 3.2.3 耐障害性機構 ✅ 一部完了（継続）
+#### 3.2.3 耐障害性機構 ✅ 完了
 - [x] **目的**: Erlang風の障害分離と回復
 - **成果物**:
   - [x] スーパーバイザの再起動回数・時間窓制御（`MaxRetries`/`RetryPeriod`）と適用ロジック
   - [x] 失敗時の再起動ディレイ適用（`ActorConfig.RestartDelay`）
   - [x] ハートビート更新の確実化（処理前に `LastHeartbeat` 更新）
-  - [ ] スーパーバイザーツリーAPI（子スーパーバイザ作成・アタッチの高水準ヘルパ）
-  - [ ] ウォッチ/監視とTermination通知（システムメッセージの導入）
+  - [x] スーパーバイザーツリーAPI（`CreateSupervisor`/`CreateActorUnder`）
+  - [x] ウォッチ/監視とTermination通知（`SystemTerminated`システムメッセージ、`Watch`/`Unwatch`）
 - **依存関係**: 3.2.2
-- **備考**: 次のコミットでツリーAPIとウォッチ/通知機構、対応テストを追加
+- **テスト**: `internal/runtime/actor_system_test.go`（再起動上限停止、Termination通知）
 
 #### 3.2.4 分散アクター
 - [ ] **目的**: ネットワーク越しの透明なアクター通信

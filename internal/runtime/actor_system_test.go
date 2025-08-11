@@ -219,6 +219,50 @@ func TestSupervisor_RestartLimits_StopAfterMaxRetries(t *testing.T) {
     }
 }
 
+type termProbe struct{ term chan ActorID }
+func (tp *termProbe) Receive(ctx *ActorContext, msg Message) error {
+    if msg.Type == SystemTerminated {
+        if id, _ := msg.Payload.(ActorID); id != 0 {
+            tp.term <- id
+        }
+    }
+    return nil
+}
+func (tp *termProbe) PreStart(*ActorContext) error { return nil }
+func (tp *termProbe) PostStop(*ActorContext) error { return nil }
+func (tp *termProbe) PreRestart(*ActorContext, error, *Message) error { return nil }
+func (tp *termProbe) PostRestart(*ActorContext, error) error { return nil }
+func (tp *termProbe) GetBehaviorName() string { return "termProbe" }
+
+func TestActor_WatchTermination(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    _ = system.Start()
+    defer system.Stop()
+
+    // watcher actor
+    probe := &termProbe{term: make(chan ActorID, 1)}
+    watcher, err := system.CreateActor("watcher", UserActor, probe, DefaultActorConfig)
+    if err != nil { t.Fatalf("create watcher: %v", err) }
+
+    // target actor
+    tb := &testBehavior{received: make(chan Message, 1), name: "t"}
+    target, err := system.CreateActor("target", UserActor, tb, DefaultActorConfig)
+    if err != nil { t.Fatalf("create target: %v", err) }
+
+    // register watch
+    watcher.Context.Watch(target.ID)
+
+    // stop target
+    _ = system.stopActor(target)
+
+    select {
+    case got := <-probe.term:
+        if got != target.ID { t.Fatalf("expected term for %v, got %v", target.ID, got) }
+    case <-time.After(time.Second):
+        t.Fatal("did not receive termination notification")
+    }
+}
+
 func TestSupervisor_OneForAll(t *testing.T) {
     system, _ := NewActorSystem(DefaultActorSystemConfig)
     _ = system.Start()
