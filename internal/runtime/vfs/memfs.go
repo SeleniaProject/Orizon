@@ -81,9 +81,18 @@ type memEnt struct {
 
 func NewMem() *MemFS { return &MemFS{ents: make(map[string]*memEnt)} }
 
+func norm(p string) string {
+    q := Clean(p)
+    if strings.HasPrefix(q, "/") {
+        q = strings.TrimPrefix(q, "/")
+    }
+    return q
+}
+
 func (m *MemFS) ensureDir(p string) {
-    if p == "/" || p == "" { return }
-    parts := strings.Split(Clean(p), "/")
+    p = norm(p)
+    if p == "" { return }
+    parts := strings.Split(p, "/")
     cur := ""
     for _, part := range parts {
         if part == "" { continue }
@@ -95,7 +104,8 @@ func (m *MemFS) ensureDir(p string) {
 }
 
 func (m *MemFS) Open(name string) (File, error) {
-    m.mu.RLock(); e := m.ents[name]; m.mu.RUnlock()
+    key := norm(name)
+    m.mu.RLock(); e := m.ents[key]; m.mu.RUnlock()
     if e == nil || e.dir { return nil, fs.ErrNotExist }
     return e.file, nil
 }
@@ -104,31 +114,48 @@ func (m *MemFS) Create(name string) (File, error) {
     m.mu.Lock(); defer m.mu.Unlock()
     m.ensureDir(path.Dir(name))
     f := newMemFile(name, nil, 0)
-    m.ents[name] = &memEnt{file: f}
+    m.ents[norm(name)] = &memEnt{file: f}
     return f, nil
 }
 
-func (m *MemFS) Mkdir(name string, perm fs.FileMode) error    { m.mu.Lock(); defer m.mu.Unlock(); m.ensureDir(name); m.ents[name] = &memEnt{dir: true}; return nil }
+func (m *MemFS) Mkdir(name string, perm fs.FileMode) error    { m.mu.Lock(); defer m.mu.Unlock(); m.ensureDir(name); m.ents[norm(name)] = &memEnt{dir: true}; return nil }
 func (m *MemFS) MkdirAll(name string, perm fs.FileMode) error { m.mu.Lock(); defer m.mu.Unlock(); m.ensureDir(name); return nil }
-func (m *MemFS) Remove(name string) error                     { m.mu.Lock(); defer m.mu.Unlock(); delete(m.ents, name); return nil }
-func (m *MemFS) RemoveAll(name string) error                  { m.mu.Lock(); defer m.mu.Unlock(); for k := range m.ents { if strings.HasPrefix(k, name) { delete(m.ents, k) } }; return nil }
-func (m *MemFS) Stat(name string) (fs.FileInfo, error)        { m.mu.RLock(); defer m.mu.RUnlock(); e := m.ents[name]; if e == nil { return nil, fs.ErrNotExist }; if e.dir { return fileInfo{name: path.Base(name), mode: fs.ModeDir}, nil }; return e.file.Stat() }
+func (m *MemFS) Remove(name string) error                     { m.mu.Lock(); defer m.mu.Unlock(); delete(m.ents, norm(name)); return nil }
+func (m *MemFS) RemoveAll(name string) error                  { m.mu.Lock(); defer m.mu.Unlock(); key := norm(name); for k := range m.ents { if k == key || strings.HasPrefix(k, key+"/") { delete(m.ents, k) } }; return nil }
+func (m *MemFS) Stat(name string) (fs.FileInfo, error)        { m.mu.RLock(); defer m.mu.RUnlock(); key := norm(name); e := m.ents[key]; if e == nil { return nil, fs.ErrNotExist }; if e.dir { return fileInfo{name: path.Base(key), mode: fs.ModeDir}, nil }; return e.file.Stat() }
 
 func (m *MemFS) ReadDir(name string) ([]fs.DirEntry, error) {
     m.mu.RLock(); defer m.mu.RUnlock()
     var out []fs.DirEntry
-    prefix := Clean(name)
-    if prefix != "/" && !strings.HasSuffix(prefix, "/") { prefix += "/" }
+    prefix := norm(name)
+    base := prefix
+    if base != "" { base += "/" }
     seen := make(map[string]struct{})
     for p := range m.ents {
-        if !strings.HasPrefix(p, prefix) { continue }
-        rest := strings.TrimPrefix(p, prefix)
+        // limit to direct children under prefix
+        if prefix != "" {
+            if p != prefix && !strings.HasPrefix(p, base) { continue }
+            if p == prefix { continue }
+            rest := strings.TrimPrefix(p, base)
+            first := rest
+            if i := strings.IndexByte(rest, '/'); i >= 0 { first = rest[:i] }
+            if first == "" { continue }
+            if _, ok := seen[first]; ok { continue }
+            seen[first] = struct{}{}
+            info, err := m.Stat(path.Join(prefix, first))
+            if err != nil || info == nil { continue }
+            out = append(out, fs.FileInfoToDirEntry(info))
+            continue
+        }
+        // top-level listing
+        rest := p
         first := rest
         if i := strings.IndexByte(rest, '/'); i >= 0 { first = rest[:i] }
         if first == "" { continue }
         if _, ok := seen[first]; ok { continue }
         seen[first] = struct{}{}
-        info, _ := m.Stat(path.Join(prefix, first))
+        info, err := m.Stat(first)
+        if err != nil || info == nil { continue }
         out = append(out, fs.FileInfoToDirEntry(info))
     }
     return out, nil
