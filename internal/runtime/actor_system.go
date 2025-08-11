@@ -5,15 +5,15 @@
 package runtime
 
 import (
-    "context"
-    "fmt"
-    "net"
-    stdrt "runtime"
-    "sync"
-    "sync/atomic"
-    "time"
+	"context"
+	"fmt"
+	"net"
+	stdrt "runtime"
+	"sync"
+	"sync/atomic"
+	"time"
 
-    asyncio "github.com/orizon-lang/orizon/internal/runtime/asyncio"
+	asyncio "github.com/orizon-lang/orizon/internal/runtime/asyncio"
 )
 
 // Type definitions for actor system
@@ -33,16 +33,16 @@ const (
 
 // I/O event message types for asyncio integration
 const (
-    IOReadable MessageType = 0x00010001
-    IOWritable MessageType = 0x00010002
-    IOErrorEvt MessageType = 0x00010003
+	IOReadable MessageType = 0x00010001
+	IOWritable MessageType = 0x00010002
+	IOErrorEvt MessageType = 0x00010003
 )
 
 // IOEvent carries I/O readiness information to actors
 type IOEvent struct {
-    Conn net.Conn
-    Type asyncio.EventType
-    Err  error
+	Conn net.Conn
+	Type asyncio.EventType
+	Err  error
 }
 
 // Actor system main structure
@@ -62,10 +62,12 @@ type ActorSystem struct {
 	cancel         context.CancelFunc    // Cancel function
 	rootSupervisor *Supervisor           // Root supervisor
 	mutex          sync.RWMutex          // Synchronization
-    // Remote enables distributed actor messaging integration when attached.
-    Remote        interface{ Send(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}) error } // minimal interface to avoid import cycle in runtime package
-    // ioPoller integrates asyncio events with the actor system when attached.
-    ioPoller      asyncio.Poller
+	// Remote enables distributed actor messaging integration when attached.
+	Remote interface {
+		Send(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}) error
+	} // minimal interface to avoid import cycle in runtime package
+	// ioPoller integrates asyncio events with the actor system when attached.
+	ioPoller asyncio.Poller
 }
 
 // Actor represents an individual actor
@@ -825,17 +827,17 @@ func (as *ActorSystem) Start() error {
 		return fmt.Errorf("failed to start scheduler: %v", err)
 	}
 
-    // Start dispatcher
-    if err := as.dispatcher.Start(as.ctx); err != nil {
+	// Start dispatcher
+	if err := as.dispatcher.Start(as.ctx); err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
 
-    // Start I/O poller if present
-    if as.ioPoller != nil {
-        if err := as.ioPoller.Start(as.ctx); err != nil {
-            return fmt.Errorf("failed to start io poller: %v", err)
-        }
-    }
+	// Start I/O poller if present
+	if as.ioPoller != nil {
+		if err := as.ioPoller.Start(as.ctx); err != nil {
+			return fmt.Errorf("failed to start io poller: %v", err)
+		}
+	}
 
 	as.running = true
 
@@ -860,17 +862,17 @@ func (as *ActorSystem) Stop() error {
 		as.stopActor(actor)
 	}
 
-    // Stop scheduler and dispatcher
-    as.scheduler.Stop()
-    as.dispatcher.Stop()
+	// Stop scheduler and dispatcher
+	as.scheduler.Stop()
+	as.dispatcher.Stop()
 
-    // Stop I/O poller if attached
-    if as.ioPoller != nil {
-        _ = as.ioPoller.Stop()
-    }
+	// Stop I/O poller if attached
+	if as.ioPoller != nil {
+		_ = as.ioPoller.Stop()
+	}
 
-    // Cancel context
-    as.cancel()
+	// Cancel context
+	as.cancel()
 
 	as.running = false
 
@@ -879,43 +881,82 @@ func (as *ActorSystem) Stop() error {
 
 // SetIOPoller attaches an asyncio Poller to the actor system lifecycle.
 func (as *ActorSystem) SetIOPoller(p asyncio.Poller) {
-    as.mutex.Lock()
-    as.ioPoller = p
-    as.mutex.Unlock()
+	as.mutex.Lock()
+	as.ioPoller = p
+	as.mutex.Unlock()
 }
 
 // WatchConnWithActor registers a net.Conn with the attached poller and routes events to target actor.
 func (as *ActorSystem) WatchConnWithActor(conn net.Conn, kinds []asyncio.EventType, target ActorID) error {
-    as.mutex.RLock()
-    p := as.ioPoller
-    as.mutex.RUnlock()
-    if p == nil {
-        return fmt.Errorf("no io poller attached")
-    }
+    return as.WatchConnWithActorOpts(conn, kinds, target, IOWatchOptions{})
+}
+
+// IOWatchOptions controls backpressure alignment when delivering I/O events to actors.
+type IOWatchOptions struct {
+    // DropOnOverflow drops events immediately when the target mailbox reports overflow.
+    // If false, a small exponential backoff re-registration is attempted.
+    DropOnOverflow bool
+    // BackoffInitial is the initial delay for re-register when overflow occurs.
+    BackoffInitial time.Duration
+    // BackoffMax is the maximum backoff delay.
+    BackoffMax time.Duration
+}
+
+// WatchConnWithActorOpts registers with options for backpressure alignment.
+func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.EventType, target ActorID, opts IOWatchOptions) error {
+	as.mutex.RLock()
+	p := as.ioPoller
+	as.mutex.RUnlock()
+	if p == nil {
+		return fmt.Errorf("no io poller attached")
+	}
+    if opts.BackoffInitial <= 0 { opts.BackoffInitial = time.Millisecond * 5 }
+    if opts.BackoffMax <= 0 { opts.BackoffMax = time.Millisecond * 100 }
+    backoff := opts.BackoffInitial
     handler := func(ev asyncio.Event) {
-        var mt MessageType
-        switch ev.Type {
-        case asyncio.Readable:
-            mt = IOReadable
-        case asyncio.Writable:
-            mt = IOWritable
-        default:
-            mt = IOErrorEvt
+		var mt MessageType
+		switch ev.Type {
+		case asyncio.Readable:
+			mt = IOReadable
+		case asyncio.Writable:
+			mt = IOWritable
+		default:
+			mt = IOErrorEvt
+		}
+        if err := as.SendMessage(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err}); err != nil {
+            // Mailbox overflow/backpressure: either drop or temporarily deregister and retry
+            if opts.DropOnOverflow {
+                return
+            }
+            _ = p.Deregister(conn)
+            d := backoff
+            if d > opts.BackoffMax { d = opts.BackoffMax }
+            time.AfterFunc(d, func() {
+                // re-register and reset/increase backoff
+                _ = p.Register(conn, kinds, handler)
+            })
+            // Exponential growth for next time
+            if backoff < opts.BackoffMax {
+                backoff *= 2
+                if backoff > opts.BackoffMax { backoff = opts.BackoffMax }
+            }
+        } else {
+            // successful delivery resets backoff
+            backoff = opts.BackoffInitial
         }
-        _ = as.SendMessage(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err})
-    }
-    return p.Register(conn, kinds, handler)
+	}
+	return p.Register(conn, kinds, handler)
 }
 
 // UnwatchConn deregisters a net.Conn from the attached poller.
 func (as *ActorSystem) UnwatchConn(conn net.Conn) error {
-    as.mutex.RLock()
-    p := as.ioPoller
-    as.mutex.RUnlock()
-    if p == nil {
-        return fmt.Errorf("no io poller attached")
-    }
-    return p.Deregister(conn)
+	as.mutex.RLock()
+	p := as.ioPoller
+	as.mutex.RUnlock()
+	if p == nil {
+		return fmt.Errorf("no io poller attached")
+	}
+	return p.Deregister(conn)
 }
 
 // CreateActor creates a new actor in the system
@@ -1045,26 +1086,30 @@ func (as *ActorSystem) SendMessage(senderID, receiverID ActorID, messageType Mes
 // SendToName delivers a message to an actor by its registered name. If a Remote is attached and
 // the name is qualified as node:name (e.g., "nodeA:svc"), it will attempt remote delivery.
 func (as *ActorSystem) SendToName(senderID ActorID, qualifiedName string, messageType MessageType, payload interface{}) error {
-    if !as.running { return fmt.Errorf("actor system is not running") }
-    // Remote qualified route: node:name
-    if idx := indexByte(qualifiedName, ':'); idx > 0 && idx < len(qualifiedName)-1 && as.Remote != nil {
-        node := qualifiedName[:idx]
-        name := qualifiedName[idx+1:]
-        return as.Remote.Send(node, name, uint32(messageType), payload)
-    }
-    // Local lookup
-    if id, ok := as.registry.Lookup(qualifiedName); ok {
-        return as.SendMessage(senderID, id, messageType, payload)
-    }
-    return fmt.Errorf("actor not found: %s", qualifiedName)
+	if !as.running {
+		return fmt.Errorf("actor system is not running")
+	}
+	// Remote qualified route: node:name
+	if idx := indexByte(qualifiedName, ':'); idx > 0 && idx < len(qualifiedName)-1 && as.Remote != nil {
+		node := qualifiedName[:idx]
+		name := qualifiedName[idx+1:]
+		return as.Remote.Send(node, name, uint32(messageType), payload)
+	}
+	// Local lookup
+	if id, ok := as.registry.Lookup(qualifiedName); ok {
+		return as.SendMessage(senderID, id, messageType, payload)
+	}
+	return fmt.Errorf("actor not found: %s", qualifiedName)
 }
 
 // indexByte is a tiny helper to avoid extra import for strings.IndexByte in this file context.
 func indexByte(s string, c byte) int {
-    for i := 0; i < len(s); i++ {
-        if s[i] == c { return i }
-    }
-    return -1
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return i
+		}
+	}
+	return -1
 }
 
 // Actor operations
@@ -1624,8 +1669,10 @@ func NewActorRegistry() *ActorRegistry {
 
 // LookupActorID returns the actor ID for a registered name.
 func (as *ActorSystem) LookupActorID(name string) (ActorID, bool) {
-    if as == nil || as.registry == nil { return 0, false }
-    return as.registry.Lookup(name)
+	if as == nil || as.registry == nil {
+		return 0, false
+	}
+	return as.registry.Lookup(name)
 }
 
 // Group operations
