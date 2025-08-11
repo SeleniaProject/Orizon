@@ -1,0 +1,154 @@
+// Orizon Macro System Examples
+// Phase 1.2.3: Comprehensive macro demonstration
+
+// Simple expression macro
+macro double(x) {
+    x * 2
+}
+
+// Macro with multiple parameters and default values
+macro greet(name = "World", prefix = "Hello") {
+    println!(prefix + ", " + name + "!")
+}
+
+// Block macro with multiple statements
+macro debug_trace(value, message = "Debug") {
+    println!("[DEBUG] " + message + ": " + value);
+    return value;
+}
+
+// Pattern matching macro (advanced feature)
+macro match_op(op, a, b) {
+    op == "+" -> a + b
+    op == "-" -> a - b  
+    op == "*" -> a * b
+    op == "/" -> a / b
+    _ -> 0
+}
+
+// Conditional macro with guard expressions
+macro safe_divide(a, b) {
+    b != 0 -> a / b
+    _ -> {
+        println!("Error: Division by zero");
+        return 0;
+    }
+}
+
+// Variadic macro (conceptual - for future implementation)
+macro println_multi(args...) {
+    for arg in args {
+        println!(arg);
+    }
+}
+
+// Hygienic macro demonstration
+macro swap(a, b) {
+    let temp = a;
+    a = b;
+    b = temp;
+}
+
+// Macro using compile-time computation
+macro compile_time_max(a, b) {
+    a > b -> a
+    _ -> b
+}
+
+// Main function demonstrating macro usage
+func main() {
+    // Simple macro invocation
+    let doubled = double!(21);
+    println!("Doubled value: " + doubled);
+    
+    // Macro with defaults
+    greet!();
+    greet!("Alice");
+    greet!("Bob", "Hi");
+    
+    // Debug tracing
+    let x = debug_trace!(42, "Variable x");
+    let y = debug_trace!(13);
+    
+    // Pattern matching operations
+    let sum = match_op!("+", 10, 5);
+    let product = match_op!("*", 6, 7);
+    
+    // Safe operations
+    let result1 = safe_divide!(10, 2);
+    let result2 = safe_divide!(10, 0); // Should print error
+    
+    // Hygiene demonstration
+    let temp = 999; // This should not interfere with macro's temp
+    swap!(x, y);
+    println!("After swap: x=" + x + ", y=" + y);
+    println!("Outer temp unchanged: " + temp);
+    
+    // Compile-time computation
+    let max_val = compile_time_max!(100, 42);
+    println!("Maximum value: " + max_val);
+    
+    return 0;
+}
+
+// Additional macro examples for specific use cases
+
+// Assertion macro for debugging
+macro assert(condition, message = "Assertion failed") {
+    condition == false -> {
+        println!("ASSERTION FAILED: " + message);
+        return 1; // Error code
+    }
+    _ -> {} // Do nothing if assertion passes
+}
+
+// Macro for repetitive code generation
+macro define_getter_setter(type_name, field_name) {
+    func get_field() -> int {
+        return this.field_value;
+    }
+    
+    func set_field(value: int) {
+        this.field_value = value;
+    }
+}
+
+// Simple timing macro for performance measurement
+macro time_execution(code_block) {
+    let start_time = 0;
+    code_block;
+    let end_time = 1;
+    println!("Execution completed");
+}
+
+// Simple test case macro  
+macro test_case(name, test_function) {
+    func test_basic() {
+        println!("Running test");
+        test_function;
+    }
+}
+
+// Examples of macro invocations in various contexts
+func demo_advanced_macros() {
+    // Assertion testing
+    assert!(true, "test assertion");
+    
+    // Performance timing
+    time_execution!({
+        let sum = 0;
+        println!("Computing");
+    });
+    
+    // Test case generation
+    test_case!("addition", {
+        return 2 + 2 == 4;
+    });
+    
+    test_case!("multiplication", {
+        return 3 * 4 == 12;
+    });
+    
+    // Call generated test functions
+    test_basic();
+}

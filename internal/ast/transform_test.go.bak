@@ -1,0 +1,923 @@
+// Package ast - Comprehensive test suite for AST transformation infrastructure
+// Phase 1.3.1: AST変換インフラテスト - Complete test coverage for transformation pipelines
+// This file provides exhaustive testing for AST transformations, optimizations, and validation
+package ast
+
+import (
+	"strings"
+	"testing"
+)
+
+// TestTransformationPipeline tests the transformation pipeline functionality
+func TestTransformationPipeline(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create a simple AST for testing
+	original := &BinaryExpression{
+		Span: span,
+		Left: &Literal{
+			Span:  createTestSpan(1, 1),
+			Kind:  LiteralInteger,
+			Value: int64(2),
+			Raw:   "2",
+		},
+		Operator: OpAdd,
+		Right: &Literal{
+			Span:  createTestSpan(1, 5),
+			Kind:  LiteralInteger,
+			Value: int64(3),
+			Raw:   "3",
+		},
+	}
+
+	// Create a transformation pipeline
+	pipeline := NewTransformationPipeline()
+	pipeline.AddTransformer(&ConstantFoldingTransformer{})
+
+	// Transform the AST
+	result, err := pipeline.Transform(original)
+	if err != nil {
+		t.Fatalf("Transformation should not fail: %v", err)
+	}
+
+	// The result should be a constant-folded literal
+	literal, ok := result.(*Literal)
+	if !ok {
+		t.Fatalf("Expected constant folding to produce Literal, got %T", result)
+	}
+
+	if literal.Value != int64(5) {
+		t.Errorf("Expected constant folding result 5, got %v", literal.Value)
+	}
+}
+
+// TestConstantFoldingTransformer tests constant folding transformation
+func TestConstantFoldingTransformer(t *testing.T) {
+	transformer := &ConstantFoldingTransformer{}
+	span := createTestSpan(1, 1)
+
+	// Test cases for constant folding
+	testCases := []struct {
+		name       string
+		expr       Expression
+		expected   interface{}
+		shouldFold bool
+	}{
+		{
+			name: "Integer addition",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(10),
+					Raw:   "10",
+				},
+				Operator: OpAdd,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(20),
+					Raw:   "20",
+				},
+			},
+			expected:   int64(30),
+			shouldFold: true,
+		},
+		{
+			name: "Integer subtraction",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(50),
+					Raw:   "50",
+				},
+				Operator: OpSub,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(30),
+					Raw:   "30",
+				},
+			},
+			expected:   int64(20),
+			shouldFold: true,
+		},
+		{
+			name: "Integer multiplication",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(6),
+					Raw:   "6",
+				},
+				Operator: OpMul,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(7),
+					Raw:   "7",
+				},
+			},
+			expected:   int64(42),
+			shouldFold: true,
+		},
+		{
+			name: "Integer division",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(15),
+					Raw:   "15",
+				},
+				Operator: OpDiv,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(3),
+					Raw:   "3",
+				},
+			},
+			expected:   int64(5),
+			shouldFold: true,
+		},
+		{
+			name: "Division by zero (should not fold)",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(15),
+					Raw:   "15",
+				},
+				Operator: OpDiv,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(0),
+					Raw:   "0",
+				},
+			},
+			shouldFold: false,
+		},
+		{
+			name: "Variable reference (should not fold)",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Identifier{
+					Span:  span,
+					Value: "x",
+				},
+				Operator: OpAdd,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(5),
+					Raw:   "5",
+				},
+			},
+			shouldFold: false,
+		},
+		{
+			name: "Boolean AND true",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralBoolean,
+					Value: true,
+					Raw:   "true",
+				},
+				Operator: OpAnd,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralBoolean,
+					Value: false,
+					Raw:   "false",
+				},
+			},
+			expected:   false,
+			shouldFold: true,
+		},
+		{
+			name: "String concatenation",
+			expr: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralString,
+					Value: "Hello, ",
+					Raw:   "\"Hello, \"",
+				},
+				Operator: OpAdd,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralString,
+					Value: "World!",
+					Raw:   "\"World!\"",
+				},
+			},
+			expected:   "Hello, World!",
+			shouldFold: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := transformer.Transform(tc.expr)
+			if err != nil {
+				t.Fatalf("Transformation should not fail: %v", err)
+			}
+
+			if tc.shouldFold {
+				literal, ok := result.(*Literal)
+				if !ok {
+					t.Fatalf("Expected constant folding to produce Literal, got %T", result)
+				}
+
+				if literal.Value != tc.expected {
+					t.Errorf("Expected folded value %v, got %v", tc.expected, literal.Value)
+				}
+			} else {
+				// Should return the original expression unchanged
+				if result != tc.expr {
+					t.Errorf("Expression that cannot be folded should be unchanged")
+				}
+			}
+		})
+	}
+}
+
+// TestDeadCodeEliminationTransformer tests dead code elimination
+func TestDeadCodeEliminationTransformer(t *testing.T) {
+	transformer := &DeadCodeEliminationTransformer{}
+	span := createTestSpan(1, 1)
+
+	// Test dead code elimination in if statements
+	testCases := []struct {
+		name     string
+		stmt     Statement
+		expected string // Description of expected result
+	}{
+		{
+			name: "If with constant true condition",
+			stmt: &IfStatement{
+				Span: span,
+				Condition: &Literal{
+					Span:  span,
+					Kind:  LiteralBoolean,
+					Value: true,
+					Raw:   "true",
+				},
+				ThenBlock: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						&ExpressionStatement{
+							Span: span,
+							Expression: &CallExpression{
+								Span: span,
+								Function: &Identifier{
+									Span:  span,
+									Value: "doSomething",
+								},
+							},
+						},
+					},
+				},
+				ElseBlock: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						&ExpressionStatement{
+							Span: span,
+							Expression: &CallExpression{
+								Span: span,
+								Function: &Identifier{
+									Span:  span,
+									Value: "deadCode",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "should return then block only",
+		},
+		{
+			name: "If with constant false condition",
+			stmt: &IfStatement{
+				Span: span,
+				Condition: &Literal{
+					Span:  span,
+					Kind:  LiteralBoolean,
+					Value: false,
+					Raw:   "false",
+				},
+				ThenBlock: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						&ExpressionStatement{
+							Span: span,
+							Expression: &CallExpression{
+								Span: span,
+								Function: &Identifier{
+									Span:  span,
+									Value: "deadCode",
+								},
+							},
+						},
+					},
+				},
+				ElseBlock: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						&ExpressionStatement{
+							Span: span,
+							Expression: &CallExpression{
+								Span: span,
+								Function: &Identifier{
+									Span:  span,
+									Value: "doSomething",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "should return else block only",
+		},
+		{
+			name: "If with variable condition",
+			stmt: &IfStatement{
+				Span: span,
+				Condition: &Identifier{
+					Span:  span,
+					Value: "condition",
+				},
+				ThenBlock: &BlockStatement{
+					Span:       span,
+					Statements: []Statement{},
+				},
+				ElseBlock: &BlockStatement{
+					Span:       span,
+					Statements: []Statement{},
+				},
+			},
+			expected: "should remain unchanged",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := transformer.Transform(tc.stmt)
+			if err != nil {
+				t.Fatalf("Transformation should not fail: %v", err)
+			}
+
+			// Verify that the transformation produces reasonable results
+			if result == nil {
+				t.Errorf("Transformation should not return nil")
+			}
+
+			// For constant true condition, should return then block
+			if tc.name == "If with constant true condition" {
+				block, ok := result.(*BlockStatement)
+				if !ok {
+					t.Errorf("Expected BlockStatement for constant true if")
+				} else if len(block.Statements) == 0 {
+					t.Errorf("Then block should not be empty")
+				}
+			}
+
+			// For constant false condition, should return else block
+			if tc.name == "If with constant false condition" {
+				block, ok := result.(*BlockStatement)
+				if !ok {
+					t.Errorf("Expected BlockStatement for constant false if")
+				} else if len(block.Statements) == 0 {
+					t.Errorf("Else block should not be empty")
+				}
+			}
+		})
+	}
+}
+
+// TestValidatorTransformer tests AST validation
+func TestValidatorTransformer(t *testing.T) {
+	validator := &ValidatorTransformer{}
+	span := createTestSpan(1, 1)
+
+	// Test valid AST nodes
+	validNodes := []Node{
+		&Program{
+			Span:         span,
+			Declarations: []Declaration{},
+		},
+		&FunctionDeclaration{
+			Span: span,
+			Name: &Identifier{
+				Span:  span,
+				Value: "validFunction",
+			},
+			Body: &BlockStatement{
+				Span:       span,
+				Statements: []Statement{},
+			},
+		},
+		&VariableDeclaration{
+			Span: span,
+			Name: &Identifier{
+				Span:  span,
+				Value: "validVariable",
+			},
+			Type: &BasicType{
+				Span: span,
+				Kind: BasicInt,
+			},
+			Value: &Literal{
+				Span:  span,
+				Kind:  LiteralInteger,
+				Value: int64(42),
+				Raw:   "42",
+			},
+			Kind: VarKindLet,
+		},
+	}
+
+	for i, node := range validNodes {
+		t.Run(string(rune('A'+i)), func(t *testing.T) {
+			result, err := validator.Transform(node)
+			if err != nil {
+				t.Errorf("Valid node should not produce validation error: %v", err)
+			}
+			if result != node {
+				t.Errorf("Validator should return original node for valid input")
+			}
+		})
+	}
+
+	// Test invalid AST nodes
+	invalidNodes := []Node{
+		&FunctionDeclaration{
+			Span: span,
+			Name: nil, // Invalid: missing name
+			Body: &BlockStatement{
+				Span:       span,
+				Statements: []Statement{},
+			},
+		},
+		&VariableDeclaration{
+			Span: span,
+			Name: &Identifier{
+				Span:  span,
+				Value: "", // Invalid: empty name
+			},
+			Type: &BasicType{
+				Span: span,
+				Kind: BasicInt,
+			},
+			Kind: VarKindLet,
+		},
+	}
+
+	for i, node := range invalidNodes {
+		t.Run(string(rune('X'+i)), func(t *testing.T) {
+			_, err := validator.Transform(node)
+			if err == nil {
+				t.Errorf("Invalid node should produce validation error")
+			}
+		})
+	}
+}
+
+// TestASTBuilder tests the fluent AST builder interface
+func TestASTBuilder(t *testing.T) {
+	span := createTestSpan(1, 1)
+	builder := NewASTBuilder()
+
+	// Test building a simple identifier
+	ident := builder.Identifier("test").Build()
+	if ident == nil {
+		t.Fatalf("Builder should create non-nil identifier")
+	}
+
+	identCast, ok := ident.(*Identifier)
+	if !ok {
+		t.Fatalf("Identifier should be *Identifier")
+	}
+
+	if identCast.Value != "test" {
+		t.Errorf("Identifier value should be 'test', got %q", identCast.Value)
+	}
+
+	// Test building a literal
+	literal := builder.Literal(42).Build()
+	if literal == nil {
+		t.Fatalf("Builder should create non-nil literal")
+	}
+
+	literalCast, ok := literal.(*Literal)
+	if !ok {
+		t.Fatalf("Literal should be *Literal")
+	}
+
+	if literalCast.Value != int64(42) {
+		t.Errorf("Literal value should be 42, got %v", literalCast.Value)
+	}
+
+	// Test span handling
+	builderWithSpan := NewASTBuilderWithSpan(span)
+	identWithSpan := builderWithSpan.Identifier("test").Build()
+
+	identWithSpanCast, ok := identWithSpan.(*Identifier)
+	if !ok {
+		t.Fatalf("Identifier should be *Identifier")
+	}
+
+	if identWithSpanCast.Span != span {
+		t.Errorf("Builder should use provided span")
+	}
+} // TestTransformationPipelineWithMultipleTransformers tests complex pipelines
+func TestTransformationPipelineWithMultipleTransformers(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create a complex AST with constant expressions and dead code
+	original := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: span,
+				Name: &Identifier{
+					Span:  span,
+					Value: "test",
+				},
+				Body: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						&IfStatement{
+							Span: span,
+							Condition: &BinaryExpression{
+								Span: span,
+								Left: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(1),
+									Raw:   "1",
+								},
+								Operator: OpEq,
+								Right: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(1),
+									Raw:   "1",
+								},
+							},
+							ThenBlock: &BlockStatement{
+								Span: span,
+								Statements: []Statement{
+									&ExpressionStatement{
+										Span: span,
+										Expression: &CallExpression{
+											Span: span,
+											Function: &Identifier{
+												Span:  span,
+												Value: "alwaysExecuted",
+											},
+										},
+									},
+								},
+							},
+							ElseBlock: &BlockStatement{
+								Span: span,
+								Statements: []Statement{
+									&ExpressionStatement{
+										Span: span,
+										Expression: &CallExpression{
+											Span: span,
+											Function: &Identifier{
+												Span:  span,
+												Value: "neverExecuted",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Create pipeline with multiple transformers
+	pipeline := NewTransformationPipeline()
+	pipeline.AddTransformer(&ConstantFoldingTransformer{})
+	pipeline.AddTransformer(&DeadCodeEliminationTransformer{})
+	pipeline.AddTransformer(&ValidatorTransformer{})
+
+	result, err := pipeline.Transform(original)
+	if err != nil {
+		t.Fatalf("Pipeline transformation should not fail: %v", err)
+	}
+
+	program, ok := result.(*Program)
+	if !ok {
+		t.Fatalf("Result should be Program")
+	}
+
+	// Verify that transformations were applied
+	if len(program.Declarations) == 0 {
+		t.Fatalf("Program should have declarations")
+	}
+
+	funcDecl, ok := program.Declarations[0].(*FunctionDeclaration)
+	if !ok {
+		t.Fatalf("Declaration should be FunctionDeclaration")
+	}
+
+	// The if statement should be simplified due to constant condition
+	blockStmt, ok := funcDecl.Body.(*BlockStatement)
+	if !ok {
+		t.Fatalf("Function body should be BlockStatement")
+	}
+
+	if len(blockStmt.Statements) == 0 {
+		t.Errorf("Function body should have statements after transformation")
+	}
+}
+
+// TestTransformationErrors tests error handling in transformations
+func TestTransformationErrors(t *testing.T) {
+	// Test transformer that returns errors
+	errorTransformer := &ErrorTransformer{shouldError: true}
+	pipeline := NewTransformationPipeline()
+	pipeline.AddTransformer(errorTransformer)
+
+	span := createTestSpan(1, 1)
+	program := &Program{Span: span}
+
+	_, err := pipeline.Transform(program)
+	if err == nil {
+		t.Errorf("Pipeline should propagate transformer errors")
+	}
+
+	expectedError := "test transformation error"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Error should contain expected message, got: %v", err)
+	}
+}
+
+// ErrorTransformer is a test transformer that can be configured to return errors
+type ErrorTransformer struct {
+	shouldError bool
+}
+
+func (et *ErrorTransformer) Transform(node Node) (Node, error) {
+	if et.shouldError {
+		return nil, NewTransformationError("test transformation error", node.GetSpan())
+	}
+	return node, nil
+}
+
+// TestTransformationError tests transformation error functionality
+func TestTransformationError(t *testing.T) {
+	span := createTestSpan(1, 1)
+	err := NewTransformationError("test error", span)
+
+	if err.Message != "test error" {
+		t.Errorf("Error message should be 'test error', got %q", err.Message)
+	}
+
+	if err.Span != span {
+		t.Errorf("Error span should match provided span")
+	}
+
+	errorStr := err.Error()
+	expectedElements := []string{"transformation error", "test error", "test.oriz:1:1"}
+
+	for _, element := range expectedElements {
+		if !strings.Contains(errorStr, element) {
+			t.Errorf("Error string should contain %q, got: %v", element, errorStr)
+		}
+	}
+}
+
+// TestComplexTransformationScenario tests a complex real-world transformation
+func TestComplexTransformationScenario(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create a program that calculates fibonacci but has inefficiencies
+	original := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: span,
+				Name: &Identifier{
+					Span:  span,
+					Value: "fibonacci",
+				},
+				Parameters: []*Parameter{
+					{
+						Span: span,
+						Name: &Identifier{
+							Span:  span,
+							Value: "n",
+						},
+						Type: &BasicType{
+							Span: span,
+							Kind: BasicInt,
+						},
+					},
+				},
+				ReturnType: &BasicType{
+					Span: span,
+					Kind: BasicInt,
+				},
+				Body: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						// Unnecessary constant computation
+						&VariableDeclaration{
+							Span: span,
+							Name: &Identifier{
+								Span:  span,
+								Value: "temp",
+							},
+							Value: &BinaryExpression{
+								Span: span,
+								Left: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(5),
+									Raw:   "5",
+								},
+								Operator: OpMul,
+								Right: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(1),
+									Raw:   "1",
+								},
+							},
+							Kind: VarKindLet,
+						},
+						// Dead code that will never execute
+						&IfStatement{
+							Span: span,
+							Condition: &Literal{
+								Span:  span,
+								Kind:  LiteralBoolean,
+								Value: false,
+								Raw:   "false",
+							},
+							ThenBlock: &BlockStatement{
+								Span: span,
+								Statements: []Statement{
+									&ReturnStatement{
+										Span: span,
+										Value: &Literal{
+											Span:  span,
+											Kind:  LiteralInteger,
+											Value: int64(-1),
+											Raw:   "-1",
+										},
+									},
+								},
+							},
+						},
+						// Actual logic
+						&IfStatement{
+							Span: span,
+							Condition: &BinaryExpression{
+								Span: span,
+								Left: &Identifier{
+									Span:  span,
+									Value: "n",
+								},
+								Operator: OpLe,
+								Right: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(1),
+									Raw:   "1",
+								},
+							},
+							ThenBlock: &BlockStatement{
+								Span: span,
+								Statements: []Statement{
+									&ReturnStatement{
+										Span: span,
+										Value: &Identifier{
+											Span:  span,
+											Value: "n",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				IsExported: true,
+			},
+		},
+	}
+
+	// Apply comprehensive optimization pipeline
+	pipeline := NewTransformationPipeline()
+	pipeline.AddTransformer(&ConstantFoldingTransformer{})
+	pipeline.AddTransformer(&DeadCodeEliminationTransformer{})
+	pipeline.AddTransformer(&ValidatorTransformer{})
+
+	result, err := pipeline.Transform(original)
+	if err != nil {
+		t.Fatalf("Complex transformation should not fail: %v", err)
+	}
+
+	program, ok := result.(*Program)
+	if !ok {
+		t.Fatalf("Result should be Program")
+	}
+
+	funcDecl, ok := program.Declarations[0].(*FunctionDeclaration)
+	if !ok {
+		t.Fatalf("Declaration should be FunctionDeclaration")
+	}
+
+	// Check that the function body was optimized
+	blockStmt := funcDecl.Body
+
+	// Should have fewer statements after optimization
+	if len(blockStmt.Statements) >= len(original.Declarations[0].(*FunctionDeclaration).Body.Statements) {
+		t.Errorf("Optimized function should have fewer statements")
+	} // Verify that constant folding occurred in variable declaration
+	if len(blockStmt.Statements) > 0 {
+		if varDecl, ok := blockStmt.Statements[0].(*VariableDeclaration); ok {
+			if literal, ok := varDecl.Value.(*Literal); ok {
+				if literal.Value != int64(5) {
+					t.Errorf("Constant folding should result in value 5, got %v", literal.Value)
+				}
+			}
+		}
+	}
+}
+
+// BenchmarkTransformationPipeline benchmarks transformation performance
+func BenchmarkTransformationPipeline(b *testing.B) {
+	span := createTestSpan(1, 1)
+
+	// Create a moderately complex AST
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: span,
+				Name: &Identifier{
+					Span:  span,
+					Value: "benchmarkFunction",
+				},
+				Body: &BlockStatement{
+					Span: span,
+					Statements: []Statement{
+						&ExpressionStatement{
+							Span: span,
+							Expression: &BinaryExpression{
+								Span: span,
+								Left: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(100),
+									Raw:   "100",
+								},
+								Operator: OpAdd,
+								Right: &Literal{
+									Span:  span,
+									Kind:  LiteralInteger,
+									Value: int64(200),
+									Raw:   "200",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pipeline := NewTransformationPipeline()
+	pipeline.AddTransformer(&ConstantFoldingTransformer{})
+	pipeline.AddTransformer(&DeadCodeEliminationTransformer{})
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := pipeline.Transform(program)
+		if err != nil {
+			b.Fatalf("Benchmark transformation failed: %v", err)
+		}
+	}
+}

@@ -1,0 +1,780 @@
+// Package ast - Comprehensive test suite for visitor pattern implementation
+// Phase 1.3.1: Visitorパターンテスト - Complete test coverage for AST visitor patterns
+// This file provides exhaustive testing for visitor implementations and AST traversal
+package ast
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
+
+// TestBaseVisitor tests the base visitor implementation
+func TestBaseVisitor(t *testing.T) {
+	visitor := &BaseVisitor{}
+	span := createTestSpan(1, 1)
+
+	// Test that base visitor returns node itself for all visit methods
+	testCases := []struct {
+		name string
+		node Node
+	}{
+		{"Program", &Program{Span: span}},
+		{"Comment", &Comment{Span: span}},
+		{"FunctionDeclaration", &FunctionDeclaration{Span: span}},
+		{"Parameter", &Parameter{Span: span}},
+		{"VariableDeclaration", &VariableDeclaration{Span: span}},
+		{"TypeDeclaration", &TypeDeclaration{Span: span}},
+		{"BlockStatement", &BlockStatement{Span: span}},
+		{"ExpressionStatement", &ExpressionStatement{Span: span}},
+		{"ReturnStatement", &ReturnStatement{Span: span}},
+		{"IfStatement", &IfStatement{Span: span}},
+		{"WhileStatement", &WhileStatement{Span: span}},
+		{"Identifier", &Identifier{Span: span}},
+		{"Literal", &Literal{Span: span}},
+		{"BinaryExpression", &BinaryExpression{Span: span}},
+		{"UnaryExpression", &UnaryExpression{Span: span}},
+		{"CallExpression", &CallExpression{Span: span}},
+		{"BasicType", &BasicType{Span: span}},
+		{"IdentifierType", &IdentifierType{Span: span}},
+		{"Attribute", &Attribute{Span: span}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.node.Accept(visitor)
+			if result != tc.node {
+				t.Errorf("BaseVisitor should return the node itself, got %v", result)
+			}
+		})
+	}
+}
+
+// TestPrettyPrintVisitor tests the pretty print visitor implementation
+func TestPrettyPrintVisitor(t *testing.T) {
+	visitor := &PrettyPrintVisitor{indent: 0}
+	span := createTestSpan(1, 1)
+
+	// Create a simple program for testing
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: createTestSpan(2, 1),
+				Name: &Identifier{
+					Span:  createTestSpan(2, 5),
+					Value: "main",
+				},
+				Parameters: []*Parameter{},
+				ReturnType: &BasicType{
+					Span: createTestSpan(2, 12),
+					Kind: BasicVoid,
+				},
+				Body: &BlockStatement{
+					Span: createTestSpan(2, 17),
+					Statements: []Statement{
+						&ExpressionStatement{
+							Span: createTestSpan(3, 2),
+							Expression: &CallExpression{
+								Span: createTestSpan(3, 2),
+								Function: &Identifier{
+									Span:  createTestSpan(3, 2),
+									Value: "println",
+								},
+								Arguments: []Expression{
+									&Literal{
+										Span:  createTestSpan(3, 10),
+										Kind:  LiteralString,
+										Value: "Hello, World!",
+										Raw:   "\"Hello, World!\"",
+									},
+								},
+							},
+						},
+					},
+				},
+				IsExported: false,
+			},
+		},
+	}
+
+	// Test pretty printing
+	result := program.Accept(visitor)
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("PrettyPrintVisitor should return string, got %T", result)
+	}
+
+	// Verify the output contains expected elements
+	expectedElements := []string{
+		"Program",
+		"FunctionDeclaration",
+		"main",
+		"BlockStatement",
+		"ExpressionStatement",
+		"CallExpression",
+		"println",
+		"Hello, World!",
+	}
+
+	for _, element := range expectedElements {
+		if !strings.Contains(resultStr, element) {
+			t.Errorf("Pretty print output should contain %q", element)
+		}
+	}
+}
+
+// TestNodeCountVisitor tests the node count visitor implementation
+func TestNodeCountVisitor(t *testing.T) {
+	visitor := &NodeCountVisitor{count: 0}
+	span := createTestSpan(1, 1)
+
+	// Create a simple AST with known node count
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				Span: createTestSpan(1, 1),
+				Name: &Identifier{
+					Span:  createTestSpan(1, 5),
+					Value: "x",
+				},
+				Type: &BasicType{
+					Span: createTestSpan(1, 8),
+					Kind: BasicInt,
+				},
+				Value: &Literal{
+					Span:  createTestSpan(1, 15),
+					Kind:  LiteralInteger,
+					Value: int64(42),
+					Raw:   "42",
+				},
+				Kind: VarKindLet,
+			},
+		},
+	}
+
+	// Visit the AST
+	result := program.Accept(visitor)
+	count, ok := result.(int)
+	if !ok {
+		t.Fatalf("NodeCountVisitor should return int, got %T", result)
+	}
+
+	// Expected nodes: Program(1) + VariableDeclaration(1) + Identifier(1) + BasicType(1) + Literal(1) = 5
+	expectedCount := 5
+	if count != expectedCount {
+		t.Errorf("Expected node count %d, got %d", expectedCount, count)
+	}
+}
+
+// TestWalkingVisitorTraversal tests the walking visitor functionality
+func TestWalkingVisitorTraversal(t *testing.T) {
+	visitor := &WalkingTestVisitor{visitedNodes: make([]string, 0)}
+	span := createTestSpan(1, 1)
+
+	// Create a nested AST structure
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: createTestSpan(1, 1),
+				Name: &Identifier{
+					Span:  createTestSpan(1, 5),
+					Value: "test",
+				},
+				Parameters: []*Parameter{
+					{
+						Span: createTestSpan(1, 10),
+						Name: &Identifier{
+							Span:  createTestSpan(1, 10),
+							Value: "x",
+						},
+						Type: &BasicType{
+							Span: createTestSpan(1, 13),
+							Kind: BasicInt,
+						},
+					},
+				},
+				Body: &BlockStatement{
+					Span: createTestSpan(1, 18),
+					Statements: []Statement{
+						&ReturnStatement{
+							Span: createTestSpan(2, 2),
+							Value: &BinaryExpression{
+								Span: createTestSpan(2, 9),
+								Left: &Identifier{
+									Span:  createTestSpan(2, 9),
+									Value: "x",
+								},
+								Operator: OpAdd,
+								Right: &Literal{
+									Span:  createTestSpan(2, 13),
+									Kind:  LiteralInteger,
+									Value: int64(1),
+									Raw:   "1",
+								},
+							},
+						},
+					},
+				},
+				IsExported: false,
+			},
+		},
+	}
+
+	// Visit the AST
+	program.Accept(visitor)
+
+	// Verify that all expected nodes were visited
+	expectedNodeTypes := []string{
+		"Program",
+		"FunctionDeclaration",
+		"Identifier", // function name
+		"Parameter",
+		"Identifier", // parameter name
+		"BasicType",
+		"BlockStatement",
+		"ReturnStatement",
+		"BinaryExpression",
+		"Identifier", // left operand
+		"Literal",    // right operand
+	}
+
+	if len(visitor.visitedNodes) != len(expectedNodeTypes) {
+		t.Errorf("Expected %d visited nodes, got %d", len(expectedNodeTypes), len(visitor.visitedNodes))
+	}
+
+	for i, expected := range expectedNodeTypes {
+		if i < len(visitor.visitedNodes) && visitor.visitedNodes[i] != expected {
+			t.Errorf("Expected node type %q at position %d, got %q", expected, i, visitor.visitedNodes[i])
+		}
+	}
+}
+
+// TestWalkingVisitor is a test implementation that records visited nodes
+type WalkingTestVisitor struct {
+	WalkingVisitor
+	visitedNodes []string
+}
+
+func (v *WalkingTestVisitor) VisitProgram(node *Program) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "Program")
+	return v.WalkingVisitor.VisitProgram(node)
+}
+
+func (v *WalkingTestVisitor) VisitFunctionDeclaration(node *FunctionDeclaration) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "FunctionDeclaration")
+	return v.WalkingVisitor.VisitFunctionDeclaration(node)
+}
+
+func (v *WalkingTestVisitor) VisitParameter(node *Parameter) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "Parameter")
+	return v.WalkingVisitor.VisitParameter(node)
+}
+
+func (v *WalkingTestVisitor) VisitVariableDeclaration(node *VariableDeclaration) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "VariableDeclaration")
+	return v.WalkingVisitor.VisitVariableDeclaration(node)
+}
+
+func (v *WalkingTestVisitor) VisitBlockStatement(node *BlockStatement) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "BlockStatement")
+	return v.WalkingVisitor.VisitBlockStatement(node)
+}
+
+func (v *WalkingTestVisitor) VisitExpressionStatement(node *ExpressionStatement) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "ExpressionStatement")
+	return v.WalkingVisitor.VisitExpressionStatement(node)
+}
+
+func (v *WalkingTestVisitor) VisitReturnStatement(node *ReturnStatement) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "ReturnStatement")
+	return v.WalkingVisitor.VisitReturnStatement(node)
+}
+
+func (v *WalkingTestVisitor) VisitIfStatement(node *IfStatement) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "IfStatement")
+	return v.WalkingVisitor.VisitIfStatement(node)
+}
+
+func (v *WalkingTestVisitor) VisitWhileStatement(node *WhileStatement) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "WhileStatement")
+	return v.WalkingVisitor.VisitWhileStatement(node)
+}
+
+func (v *WalkingTestVisitor) VisitIdentifier(node *Identifier) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "Identifier")
+	return v.WalkingVisitor.VisitIdentifier(node)
+}
+
+func (v *WalkingTestVisitor) VisitLiteral(node *Literal) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "Literal")
+	return v.WalkingVisitor.VisitLiteral(node)
+}
+
+func (v *WalkingTestVisitor) VisitBinaryExpression(node *BinaryExpression) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "BinaryExpression")
+	return v.WalkingVisitor.VisitBinaryExpression(node)
+}
+
+func (v *WalkingTestVisitor) VisitUnaryExpression(node *UnaryExpression) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "UnaryExpression")
+	return v.WalkingVisitor.VisitUnaryExpression(node)
+}
+
+func (v *WalkingTestVisitor) VisitCallExpression(node *CallExpression) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "CallExpression")
+	return v.WalkingVisitor.VisitCallExpression(node)
+}
+
+func (v *WalkingTestVisitor) VisitBasicType(node *BasicType) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "BasicType")
+	return v.WalkingVisitor.VisitBasicType(node)
+}
+
+func (v *WalkingTestVisitor) VisitIdentifierType(node *IdentifierType) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "IdentifierType")
+	return v.WalkingVisitor.VisitIdentifierType(node)
+}
+
+func (v *WalkingTestVisitor) VisitAttribute(node *Attribute) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "Attribute")
+	return v.WalkingVisitor.VisitAttribute(node)
+}
+
+func (v *WalkingTestVisitor) VisitComment(node *Comment) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "Comment")
+	return v.WalkingVisitor.VisitComment(node)
+}
+
+func (v *WalkingTestVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{} {
+	v.visitedNodes = append(v.visitedNodes, "TypeDeclaration")
+	return v.WalkingVisitor.VisitTypeDeclaration(node)
+}
+
+// TestVisitorWithComplexAST tests visitor pattern with a complex AST structure
+func TestVisitorWithComplexAST(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create a complex AST with nested structures
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: createTestSpan(1, 1),
+				Name: &Identifier{
+					Span:  createTestSpan(1, 5),
+					Value: "fibonacci",
+				},
+				Parameters: []*Parameter{
+					{
+						Span: createTestSpan(1, 15),
+						Name: &Identifier{
+							Span:  createTestSpan(1, 15),
+							Value: "n",
+						},
+						Type: &BasicType{
+							Span: createTestSpan(1, 18),
+							Kind: BasicInt,
+						},
+					},
+				},
+				ReturnType: &BasicType{
+					Span: createTestSpan(1, 25),
+					Kind: BasicInt,
+				},
+				Body: &BlockStatement{
+					Span: createTestSpan(1, 30),
+					Statements: []Statement{
+						&IfStatement{
+							Span: createTestSpan(2, 2),
+							Condition: &BinaryExpression{
+								Span: createTestSpan(2, 5),
+								Left: &Identifier{
+									Span:  createTestSpan(2, 5),
+									Value: "n",
+								},
+								Operator: OpLe,
+								Right: &Literal{
+									Span:  createTestSpan(2, 10),
+									Kind:  LiteralInteger,
+									Value: int64(1),
+									Raw:   "1",
+								},
+							},
+							ThenBlock: &BlockStatement{
+								Span: createTestSpan(2, 13),
+								Statements: []Statement{
+									&ReturnStatement{
+										Span: createTestSpan(3, 4),
+										Value: &Identifier{
+											Span:  createTestSpan(3, 11),
+											Value: "n",
+										},
+									},
+								},
+							},
+							ElseBlock: &BlockStatement{
+								Span: createTestSpan(4, 8),
+								Statements: []Statement{
+									&ReturnStatement{
+										Span: createTestSpan(5, 4),
+										Value: &BinaryExpression{
+											Span: createTestSpan(5, 11),
+											Left: &CallExpression{
+												Span: createTestSpan(5, 11),
+												Function: &Identifier{
+													Span:  createTestSpan(5, 11),
+													Value: "fibonacci",
+												},
+												Arguments: []Expression{
+													&BinaryExpression{
+														Span: createTestSpan(5, 21),
+														Left: &Identifier{
+															Span:  createTestSpan(5, 21),
+															Value: "n",
+														},
+														Operator: OpSub,
+														Right: &Literal{
+															Span:  createTestSpan(5, 25),
+															Kind:  LiteralInteger,
+															Value: int64(1),
+															Raw:   "1",
+														},
+													},
+												},
+											},
+											Operator: OpAdd,
+											Right: &CallExpression{
+												Span: createTestSpan(5, 30),
+												Function: &Identifier{
+													Span:  createTestSpan(5, 30),
+													Value: "fibonacci",
+												},
+												Arguments: []Expression{
+													&BinaryExpression{
+														Span: createTestSpan(5, 40),
+														Left: &Identifier{
+															Span:  createTestSpan(5, 40),
+															Value: "n",
+														},
+														Operator: OpSub,
+														Right: &Literal{
+															Span:  createTestSpan(5, 44),
+															Kind:  LiteralInteger,
+															Value: int64(2),
+															Raw:   "2",
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				IsExported: true,
+			},
+		},
+	}
+
+	// Test with pretty print visitor
+	prettyVisitor := &PrettyPrintVisitor{indent: 0}
+	result := program.Accept(prettyVisitor)
+	resultStr, ok := result.(string)
+	if !ok {
+		t.Fatalf("PrettyPrintVisitor should return string")
+	}
+
+	// Verify complex structure is represented
+	expectedElements := []string{
+		"fibonacci",
+		"if",
+		"n <= 1",
+		"return",
+		"fibonacci(n - 1)",
+		"fibonacci(n - 2)",
+	}
+
+	for _, element := range expectedElements {
+		if !strings.Contains(resultStr, element) {
+			t.Errorf("Pretty print of complex AST should contain %q", element)
+		}
+	}
+
+	// Test with node count visitor
+	countVisitor := &NodeCountVisitor{count: 0}
+	countResult := program.Accept(countVisitor)
+	count, ok := countResult.(int)
+	if !ok {
+		t.Fatalf("NodeCountVisitor should return int")
+	}
+
+	// The complex fibonacci function should have a significant number of nodes
+	if count < 20 {
+		t.Errorf("Complex fibonacci function should have at least 20 nodes, got %d", count)
+	}
+}
+
+// TestTransformingVisitor tests visitor pattern for AST transformations
+func TestTransformingVisitor(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create an AST with identifiers to rename
+	original := &BinaryExpression{
+		Span: span,
+		Left: &Identifier{
+			Span:  createTestSpan(1, 1),
+			Value: "oldName",
+		},
+		Operator: OpAdd,
+		Right: &Identifier{
+			Span:  createTestSpan(1, 10),
+			Value: "anotherName",
+		},
+	}
+
+	// Create a renaming visitor
+	renameVisitor := &RenameVisitor{
+		oldName: "oldName",
+		newName: "newName",
+	}
+
+	// Transform the AST
+	result := original.Accept(renameVisitor)
+	transformed, ok := result.(*BinaryExpression)
+	if !ok {
+		t.Fatalf("RenameVisitor should return BinaryExpression")
+	}
+
+	// Check that the identifier was renamed
+	leftIdent, ok := transformed.Left.(*Identifier)
+	if !ok {
+		t.Fatalf("Left operand should be Identifier")
+	}
+
+	if leftIdent.Value != "newName" {
+		t.Errorf("Expected renamed identifier 'newName', got %q", leftIdent.Value)
+	}
+
+	// Check that other identifiers were not affected
+	rightIdent, ok := transformed.Right.(*Identifier)
+	if !ok {
+		t.Fatalf("Right operand should be Identifier")
+	}
+
+	if rightIdent.Value != "anotherName" {
+		t.Errorf("Expected unchanged identifier 'anotherName', got %q", rightIdent.Value)
+	}
+}
+
+// RenameVisitor is a test visitor that renames identifiers
+type RenameVisitor struct {
+	BaseVisitor
+	oldName string
+	newName string
+}
+
+func (rv *RenameVisitor) VisitIdentifier(node *Identifier) interface{} {
+	if node.Value == rv.oldName {
+		return &Identifier{
+			Span:  node.Span,
+			Value: rv.newName,
+		}
+	}
+	return node
+}
+
+func (rv *RenameVisitor) VisitBinaryExpression(node *BinaryExpression) interface{} {
+	left := node.Left.Accept(rv)
+	right := node.Right.Accept(rv)
+
+	return &BinaryExpression{
+		Span:     node.Span,
+		Left:     left.(Expression),
+		Operator: node.Operator,
+		Right:    right.(Expression),
+	}
+}
+
+// TestVisitorErrorHandling tests visitor error handling scenarios
+func TestVisitorErrorHandling(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test with nil nodes (should not panic)
+	visitor := &BaseVisitor{}
+
+	// These should not panic even with minimal node structures
+	emptyProgram := &Program{Span: span}
+	result := emptyProgram.Accept(visitor)
+	if result != emptyProgram {
+		t.Errorf("BaseVisitor should return the node itself")
+	}
+
+	emptyBlock := &BlockStatement{Span: span}
+	result = emptyBlock.Accept(visitor)
+	if result != emptyBlock {
+		t.Errorf("BaseVisitor should return the node itself")
+	}
+
+	emptyCall := &CallExpression{Span: span}
+	result = emptyCall.Accept(visitor)
+	if result != emptyCall {
+		t.Errorf("BaseVisitor should return the node itself")
+	}
+}
+
+// TestVisitorPerformance tests visitor performance with large ASTs
+func TestVisitorPerformance(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create a large AST with many nodes
+	statements := make([]Statement, 1000)
+	for i := 0; i < 1000; i++ {
+		statements[i] = &ExpressionStatement{
+			Span: span,
+			Expression: &BinaryExpression{
+				Span: span,
+				Left: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(i),
+					Raw:   fmt.Sprintf("%d", i),
+				},
+				Operator: OpAdd,
+				Right: &Literal{
+					Span:  span,
+					Kind:  LiteralInteger,
+					Value: int64(i + 1),
+					Raw:   fmt.Sprintf("%d", i+1),
+				},
+			},
+		}
+	}
+
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&FunctionDeclaration{
+				Span: span,
+				Name: &Identifier{
+					Span:  span,
+					Value: "largeFunction",
+				},
+				Body: &BlockStatement{
+					Span:       span,
+					Statements: statements,
+				},
+				IsExported: false,
+			},
+		},
+	}
+
+	// Test node counting performance
+	visitor := &NodeCountVisitor{count: 0}
+	result := program.Accept(visitor)
+	count, ok := result.(int)
+	if !ok {
+		t.Fatalf("NodeCountVisitor should return int")
+	}
+
+	// Expected: Program(1) + FunctionDeclaration(1) + Identifier(1) + BlockStatement(1) +
+	//           1000 * (ExpressionStatement(1) + BinaryExpression(1) + 2*Literal(2)) = 5004
+	expectedCount := 5004
+	if count != expectedCount {
+		t.Errorf("Expected node count %d for large AST, got %d", expectedCount, count)
+	}
+}
+
+// TestCustomVisitorImplementation tests custom visitor implementation
+func TestCustomVisitorImplementation(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create an AST with various expression types
+	program := &Program{
+		Span: span,
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				Span: span,
+				Name: &Identifier{
+					Span:  span,
+					Value: "result",
+				},
+				Value: &BinaryExpression{
+					Span: span,
+					Left: &CallExpression{
+						Span: span,
+						Function: &Identifier{
+							Span:  span,
+							Value: "getValue",
+						},
+						Arguments: []Expression{},
+					},
+					Operator: OpMul,
+					Right: &Literal{
+						Span:  span,
+						Kind:  LiteralInteger,
+						Value: int64(2),
+						Raw:   "2",
+					},
+				},
+				Kind: VarKindLet,
+			},
+		},
+	}
+
+	// Test expression type counter
+	exprCounter := &ExpressionTypeCounter{
+		counts: make(map[string]int),
+	}
+
+	program.Accept(exprCounter)
+
+	// Verify that different expression types were counted
+	expectedCounts := map[string]int{
+		"BinaryExpression": 1,
+		"CallExpression":   1,
+		"Identifier":       2, // "result" and "getValue"
+		"Literal":          1,
+	}
+
+	for exprType, expectedCount := range expectedCounts {
+		if actualCount, exists := exprCounter.counts[exprType]; !exists || actualCount != expectedCount {
+			t.Errorf("Expected %d %s expressions, got %d", expectedCount, exprType, actualCount)
+		}
+	}
+}
+
+// ExpressionTypeCounter is a custom visitor that counts expression types
+type ExpressionTypeCounter struct {
+	WalkingVisitor
+	counts map[string]int
+}
+
+func (etc *ExpressionTypeCounter) VisitBinaryExpression(node *BinaryExpression) interface{} {
+	etc.counts["BinaryExpression"]++
+	return etc.WalkingVisitor.VisitBinaryExpression(node)
+}
+
+func (etc *ExpressionTypeCounter) VisitUnaryExpression(node *UnaryExpression) interface{} {
+	etc.counts["UnaryExpression"]++
+	return etc.WalkingVisitor.VisitUnaryExpression(node)
+}
+
+func (etc *ExpressionTypeCounter) VisitCallExpression(node *CallExpression) interface{} {
+	etc.counts["CallExpression"]++
+	return etc.WalkingVisitor.VisitCallExpression(node)
+}
+
+func (etc *ExpressionTypeCounter) VisitIdentifier(node *Identifier) interface{} {
+	etc.counts["Identifier"]++
+	return etc.WalkingVisitor.VisitIdentifier(node)
+}
+
+func (etc *ExpressionTypeCounter) VisitLiteral(node *Literal) interface{} {
+	etc.counts["Literal"]++
+	return etc.WalkingVisitor.VisitLiteral(node)
+}

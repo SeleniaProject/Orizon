@@ -99,6 +99,11 @@ func TestParserErrors(t *testing.T) {
 			hasErrors := len(errors) > 0
 			if hasErrors != tt.expectedError {
 				t.Errorf("Expected error: %v, got errors: %v", tt.expectedError, errors)
+				t.Logf("Input: %s", tt.input)
+				t.Logf("Number of errors: %d", len(errors))
+				for i, err := range errors {
+					t.Logf("Error %d: %v", i, err)
+				}
 			}
 
 			if hasErrors {

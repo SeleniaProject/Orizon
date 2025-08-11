@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/orizon-lang/orizon/internal/lexer"
+	p "github.com/orizon-lang/orizon/internal/parser"
 )
 
 var (
@@ -23,6 +24,8 @@ func main() {
 		showVersion = flag.Bool("version", false, "show version information")
 		showHelp    = flag.Bool("help", false, "show help information")
 		debugLexer  = flag.Bool("debug-lexer", false, "enable lexer debug output")
+		doParse     = flag.Bool("parse", false, "parse the input and print AST (parser AST)")
+		optLevel    = flag.String("optimize-level", "", "optimize via ast pipeline: none|basic|default|aggressive")
 	)
 
 	flag.Parse()
@@ -46,7 +49,7 @@ func main() {
 	}
 
 	inputFile := args[0]
-	if err := compileFile(inputFile, *debugLexer); err != nil {
+	if err := compileFile(inputFile, *debugLexer, *doParse, *optLevel); err != nil {
 		log.Fatalf("Compilation failed: %v", err)
 	}
 }
@@ -67,7 +70,7 @@ func showUsage() {
 	fmt.Println("    orizon-compiler --debug-lexer example.oriz")
 }
 
-func compileFile(filename string, debugLexer bool) error {
+func compileFile(filename string, debugLexer bool, doParse bool, optLevel string) error {
 	// ファイル存在チェック
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return fmt.Errorf("file not found: %s", filename)
@@ -101,7 +104,7 @@ func compileFile(filename string, debugLexer bool) error {
 			}
 		}
 		fmt.Println(strings.Repeat("=", 50))
-	} else {
+	} else if !doParse && optLevel == "" {
 		// 通常のコンパイル（現在は字句解析のみ）
 		tokenCount := 0
 		for {
@@ -120,10 +123,32 @@ func compileFile(filename string, debugLexer bool) error {
 		}
 
 		fmt.Printf("✅ Lexing completed: %d tokens processed\n", tokenCount)
-	}
+	} else {
+		// Parse phase (optional) and optional optimization via AST bridge
+		pr := p.NewParser(lexer.NewWithFilename(string(source), filename), filename)
+		program, parseErrors := pr.Parse()
+		if len(parseErrors) > 0 {
+			for _, e := range parseErrors {
+				fmt.Fprintf(os.Stderr, "Parse error: %v\n", e)
+			}
+			return fmt.Errorf("parse failed with %d error(s)", len(parseErrors))
+		}
 
-	fmt.Println("🎉 Phase 1.1.2: Incremental lexing capability successful!")
-	fmt.Println("📝 Note: Full compilation pipeline coming in future phases")
+		if doParse && optLevel == "" {
+			// Print parser AST
+			fmt.Println("📦 Parsed AST (parser):")
+			fmt.Println(p.PrettyPrint(program))
+		}
+
+		if optLevel != "" {
+			optimized, err := p.OptimizeViaAstPipe(program, strings.ToLower(optLevel))
+			if err != nil {
+				return fmt.Errorf("optimization failed: %w", err)
+			}
+			fmt.Printf("✨ Optimized via AST pipeline (level=%s)\n", strings.ToLower(optLevel))
+			fmt.Println(p.PrettyPrint(optimized))
+		}
+	}
 
 	return nil
 }

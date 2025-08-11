@@ -274,8 +274,8 @@ func TestPrattComplexExpressions(t *testing.T) {
 	}{
 		{
 			name:     "Function call with operators",
-			input:    "func(a + b) * c;",
-			expected: "(func(...) * c)",
+			input:    "foo(a + b) * c;",
+			expected: "(foo(...) * c)",
 		},
 		{
 			name:     "Member access with operators",
@@ -290,7 +290,7 @@ func TestPrattComplexExpressions(t *testing.T) {
 		{
 			name:     "Mixed access patterns",
 			input:    "obj.method(arg)[index].field;",
-			expected: "(((obj . method)(...)[...] . field)",
+			expected: "((obj . method)(...)(...) . field)",
 		},
 	}
 

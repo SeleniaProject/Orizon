@@ -312,6 +312,207 @@ func (t *TernaryExpression) Accept(visitor Visitor) interface{} {
 }
 func (t *TernaryExpression) expressionNode() {}
 
+// MacroDefinition represents a macro definition
+type MacroDefinition struct {
+	Span       Span
+	Name       *Identifier
+	Parameters []*MacroParameter
+	Body       *MacroBody
+	IsPublic   bool
+	IsHygienic bool // Whether this is a hygienic macro
+}
+
+func (m *MacroDefinition) GetSpan() Span                      { return m.Span }
+func (m *MacroDefinition) String() string                     { return fmt.Sprintf("macro %s", m.Name.Value) }
+func (m *MacroDefinition) Accept(visitor Visitor) interface{} { return visitor.VisitMacroDefinition(m) }
+func (m *MacroDefinition) statementNode()                     {}
+func (m *MacroDefinition) declarationNode()                   {}
+
+// MacroParameter represents a macro parameter with optional type constraints
+type MacroParameter struct {
+	Span         Span
+	Name         *Identifier
+	Kind         MacroParameterKind
+	Constraint   *MacroConstraint // Optional type/pattern constraint
+	IsVariadic   bool             // Whether this parameter accepts multiple arguments
+	DefaultValue Expression       // Optional default value
+}
+
+func (p *MacroParameter) GetSpan() Span                      { return p.Span }
+func (p *MacroParameter) String() string                     { return fmt.Sprintf("$%s", p.Name.Value) }
+func (p *MacroParameter) Accept(visitor Visitor) interface{} { return visitor.VisitMacroParameter(p) }
+
+// MacroParameterKind defines the kind of macro parameter
+type MacroParameterKind int
+
+const (
+	MacroParamExpression MacroParameterKind = iota // $expr
+	MacroParamStatement                            // $stmt
+	MacroParamType                                 // $type
+	MacroParamIdentifier                           // $ident
+	MacroParamLiteral                              // $literal
+	MacroParamPattern                              // $pat
+	MacroParamBlock                                // $block
+	MacroParamToken                                // $token - for low-level macros
+)
+
+// MacroConstraint represents constraints on macro parameters
+type MacroConstraint struct {
+	Span        Span
+	Kind        MacroConstraintKind
+	TypePattern Type        // For type constraints
+	ValueRange  *ValueRange // For value constraints
+	Pattern     string      // For pattern constraints
+}
+
+func (c *MacroConstraint) GetSpan() Span                      { return c.Span }
+func (c *MacroConstraint) String() string                     { return "constraint" }
+func (c *MacroConstraint) Accept(visitor Visitor) interface{} { return visitor.VisitMacroConstraint(c) }
+
+// MacroConstraintKind defines types of macro constraints
+type MacroConstraintKind int
+
+const (
+	MacroConstraintType MacroConstraintKind = iota
+	MacroConstraintValue
+	MacroConstraintPattern
+)
+
+// ValueRange represents a range of values for constraints
+type ValueRange struct {
+	Min Expression
+	Max Expression
+}
+
+// MacroBody represents the body of a macro definition
+type MacroBody struct {
+	Span      Span
+	Templates []*MacroTemplate // Multiple templates for pattern matching
+}
+
+func (b *MacroBody) GetSpan() Span                      { return b.Span }
+func (b *MacroBody) String() string                     { return "macro_body" }
+func (b *MacroBody) Accept(visitor Visitor) interface{} { return visitor.VisitMacroBody(b) }
+
+// MacroTemplate represents a single template in a macro body
+type MacroTemplate struct {
+	Span     Span
+	Pattern  *MacroPattern // Pattern to match against
+	Body     []Statement   // Code to generate
+	Guard    Expression    // Optional guard expression
+	Priority int           // Priority for template selection
+}
+
+func (t *MacroTemplate) GetSpan() Span                      { return t.Span }
+func (t *MacroTemplate) String() string                     { return "template" }
+func (t *MacroTemplate) Accept(visitor Visitor) interface{} { return visitor.VisitMacroTemplate(t) }
+
+// MacroPattern represents a pattern for macro template matching
+type MacroPattern struct {
+	Span     Span
+	Elements []*MacroPatternElement
+}
+
+func (p *MacroPattern) GetSpan() Span                      { return p.Span }
+func (p *MacroPattern) String() string                     { return "pattern" }
+func (p *MacroPattern) Accept(visitor Visitor) interface{} { return visitor.VisitMacroPattern(p) }
+
+// MacroPatternElement represents an element in a macro pattern
+type MacroPatternElement struct {
+	Span       Span
+	Kind       MacroPatternKind
+	Value      string           // Literal text or parameter name
+	Constraint *MacroConstraint // Optional constraint
+	Repetition *MacroRepetition // Optional repetition specifier
+}
+
+func (e *MacroPatternElement) GetSpan() Span  { return e.Span }
+func (e *MacroPatternElement) String() string { return e.Value }
+func (e *MacroPatternElement) Accept(visitor Visitor) interface{} {
+	return visitor.VisitMacroPatternElement(e)
+}
+
+// MacroPatternKind defines types of macro pattern elements
+type MacroPatternKind int
+
+const (
+	MacroPatternLiteral   MacroPatternKind = iota // Literal text that must match exactly
+	MacroPatternParameter                         // Parameter reference ($param)
+	MacroPatternWildcard                          // Wildcard match (_)
+	MacroPatternGroup                             // Grouped pattern (...)
+)
+
+// MacroRepetition represents repetition in macro patterns
+type MacroRepetition struct {
+	Span      Span
+	Kind      MacroRepetitionKind
+	Min       int    // Minimum repetitions
+	Max       int    // Maximum repetitions (-1 for unlimited)
+	Separator string // Optional separator
+}
+
+// MacroRepetitionKind defines types of repetition
+type MacroRepetitionKind int
+
+const (
+	MacroRepeatZeroOrMore MacroRepetitionKind = iota // *
+	MacroRepeatOneOrMore                             // +
+	MacroRepeatOptional                              // ?
+	MacroRepeatExact                                 // {n}
+	MacroRepeatRange                                 // {min,max}
+)
+
+// MacroInvocation represents a macro invocation in code
+type MacroInvocation struct {
+	Span      Span
+	Name      *Identifier
+	Arguments []*MacroArgument
+	Context   *MacroContext // Context for hygienic expansion
+}
+
+func (i *MacroInvocation) GetSpan() Span                      { return i.Span }
+func (i *MacroInvocation) String() string                     { return fmt.Sprintf("%s!(...)", i.Name.Value) }
+func (i *MacroInvocation) Accept(visitor Visitor) interface{} { return visitor.VisitMacroInvocation(i) }
+func (i *MacroInvocation) expressionNode()                    {}
+func (i *MacroInvocation) statementNode()                     {} // Macros can be both expressions and statements
+
+// MacroArgument represents an argument passed to a macro
+type MacroArgument struct {
+	Span  Span
+	Value interface{} // Can be Expression, Statement, Type, etc.
+	Kind  MacroArgumentKind
+}
+
+func (a *MacroArgument) GetSpan() Span                      { return a.Span }
+func (a *MacroArgument) String() string                     { return "arg" }
+func (a *MacroArgument) Accept(visitor Visitor) interface{} { return visitor.VisitMacroArgument(a) }
+
+// MacroArgumentKind defines types of macro arguments
+type MacroArgumentKind int
+
+const (
+	MacroArgExpression MacroArgumentKind = iota
+	MacroArgStatement
+	MacroArgType
+	MacroArgIdentifier
+	MacroArgLiteral
+	MacroArgBlock
+	MacroArgTokenStream
+)
+
+// MacroContext represents the context for hygienic macro expansion
+type MacroContext struct {
+	Span           Span
+	ScopeId        uint64            // Unique scope identifier
+	CapturedNames  map[string]string // Mapping of captured names to unique names
+	ExpansionDepth int               // Depth of macro expansion to prevent infinite recursion
+	SourceLocation Position          // Original source location for debugging
+}
+
+func (c *MacroContext) GetSpan() Span                      { return c.Span }
+func (c *MacroContext) String() string                     { return "context" }
+func (c *MacroContext) Accept(visitor Visitor) interface{} { return visitor.VisitMacroContext(c) }
+
 // ====== Types ======
 
 // ====== Types ======
@@ -380,6 +581,40 @@ type Visitor interface {
 	VisitTernaryExpression(*TernaryExpression) interface{}
 	VisitBasicType(*BasicType) interface{}
 	VisitOperator(*Operator) interface{}
+	// Macro-related visitor methods
+	VisitMacroDefinition(*MacroDefinition) interface{}
+	VisitMacroParameter(*MacroParameter) interface{}
+	VisitMacroConstraint(*MacroConstraint) interface{}
+	VisitMacroBody(*MacroBody) interface{}
+	VisitMacroTemplate(*MacroTemplate) interface{}
+	VisitMacroPattern(*MacroPattern) interface{}
+	VisitMacroPatternElement(*MacroPatternElement) interface{}
+	VisitMacroInvocation(*MacroInvocation) interface{}
+	VisitMacroArgument(*MacroArgument) interface{}
+	VisitMacroContext(*MacroContext) interface{}
+	// Extended type system visitor methods
+	VisitArrayType(*ArrayType) interface{}
+	VisitFunctionType(*FunctionType) interface{}
+	VisitStructType(*StructType) interface{}
+	VisitEnumType(*EnumType) interface{}
+	VisitTraitType(*TraitType) interface{}
+	VisitGenericType(*GenericType) interface{}
+	// Extended expression and statement visitor methods
+	VisitArrayExpression(*ArrayExpression) interface{}
+	VisitIndexExpression(*IndexExpression) interface{}
+	VisitMemberExpression(*MemberExpression) interface{}
+	VisitStructExpression(*StructExpression) interface{}
+	VisitForStatement(*ForStatement) interface{}
+	VisitBreakStatement(*BreakStatement) interface{}
+	VisitContinueStatement(*ContinueStatement) interface{}
+	VisitMatchStatement(*MatchStatement) interface{}
+	// Dependent type system visitor methods
+	VisitDependentFunctionType(*DependentFunctionType) interface{}
+	VisitDependentParameter(*DependentParameter) interface{}
+	VisitRefinementType(*RefinementType) interface{}
+	VisitSizedArrayType(*SizedArrayType) interface{}
+	VisitIndexType(*IndexType) interface{}
+	VisitProofType(*ProofType) interface{}
 }
 
 // ====== AST Builder Utilities ======

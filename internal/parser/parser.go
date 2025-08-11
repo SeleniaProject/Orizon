@@ -18,6 +18,11 @@ type Parser struct {
 
 	// Parser state
 	filename string
+
+	// Error recovery and suggestion system (Phase 1.2.4)
+	suggestionEngine *SuggestionEngine
+	suggestions      []Suggestion
+	recoveryMode     ErrorRecoveryMode
 }
 
 // ParseError represents a parsing error with context
@@ -76,10 +81,15 @@ func (p *Parser) parseInfixExpression(left Expression) Expression {
 // NewParser creates a new parser instance
 func NewParser(l *lexer.Lexer, filename string) *Parser {
 	p := &Parser{
-		lexer:    l,
-		filename: filename,
-		errors:   make([]error, 0),
+		lexer:        l,
+		filename:     filename,
+		errors:       make([]error, 0),
+		suggestions:  make([]Suggestion, 0),
+		recoveryMode: PhraseLevel, // Default to phrase-level recovery
 	}
+
+	// Initialize suggestion engine with phrase-level recovery
+	p.suggestionEngine = NewSuggestionEngine(p.recoveryMode)
 
 	// Read the first two tokens
 	p.nextToken()
@@ -117,23 +127,95 @@ func (p *Parser) expectPeek(tokenType lexer.TokenType) bool {
 		return true
 	}
 	p.peekError(tokenType)
+
+	// Attempt error recovery if enabled (Phase 1.2.4)
+	if p.recoveryMode != PanicMode && p.suggestionEngine != nil {
+		recovered := p.recoverFromError(fmt.Sprintf("expecting %s", tokenType.String()))
+		if recovered {
+			// Check if we can continue after recovery
+			if p.peekTokenIs(tokenType) {
+				p.nextToken()
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
 // peekError records a peek token mismatch error
 func (p *Parser) peekError(expected lexer.TokenType) {
 	msg := fmt.Sprintf("expected %s, got %s", expected.String(), p.peek.Type.String())
+
+	// Track expected token for suggestion engine (Phase 1.2.4)
+	if p.suggestionEngine != nil {
+		p.suggestionEngine.AddExpectedToken(expected)
+	}
+
 	p.addError(TokenToPosition(p.peek), msg, "token mismatch")
 }
 
 // addError adds an error to the parser's error list
 func (p *Parser) addError(pos Position, message, context string) {
 	pos.File = p.filename
-	p.errors = append(p.errors, &ParseError{
+	parseErr := &ParseError{
 		Position: pos,
 		Message:  message,
 		Context:  context,
-	})
+	}
+	p.errors = append(p.errors, parseErr)
+
+	// Generate suggestions using the error recovery system (Phase 1.2.4)
+	if p.suggestionEngine != nil {
+		newSuggestions := p.suggestionEngine.RecoverFromError(p, parseErr)
+		p.suggestions = append(p.suggestions, newSuggestions...)
+	}
+}
+
+// addErrorWithSuggestion adds an error with manual suggestions
+func (p *Parser) addErrorWithSuggestion(pos Position, message, context string, suggestions []Suggestion) {
+	pos.File = p.filename
+	parseErr := &ParseError{
+		Position: pos,
+		Message:  message,
+		Context:  context,
+	}
+	p.errors = append(p.errors, parseErr)
+	p.suggestions = append(p.suggestions, suggestions...)
+}
+
+// recoverFromError attempts intelligent error recovery
+func (p *Parser) recoverFromError(expectedContext string) bool {
+	if p.suggestionEngine == nil {
+		return false
+	}
+
+	// Create a temporary error for recovery analysis
+	tempErr := &ParseError{
+		Position: TokenToPosition(p.current),
+		Message:  fmt.Sprintf("unexpected token in %s", expectedContext),
+		Context:  expectedContext,
+	}
+
+	// Let the suggestion engine handle recovery
+	suggestions := p.suggestionEngine.RecoverFromError(p, tempErr)
+	p.suggestions = append(p.suggestions, suggestions...)
+
+	// Return true if recovery was successful (parser position changed)
+	return true
+}
+
+// GetSuggestions returns all accumulated suggestions
+func (p *Parser) GetSuggestions() []Suggestion {
+	return p.suggestions
+}
+
+// SetRecoveryMode changes the error recovery strategy
+func (p *Parser) SetRecoveryMode(mode ErrorRecoveryMode) {
+	p.recoveryMode = mode
+	if p.suggestionEngine != nil {
+		p.suggestionEngine.mode = mode
+	}
 }
 
 // skipTo skips tokens until one of the given types is found
@@ -182,6 +264,8 @@ func (p *Parser) parseDeclaration() Declaration {
 		return p.parseFunctionDeclaration()
 	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
 		return p.parseVariableDeclaration()
+	case lexer.TokenMacro:
+		return p.parseMacroDeclaration()
 	default:
 		// Try to parse as expression statement
 		stmt := p.parseExpressionStatement()
@@ -191,7 +275,7 @@ func (p *Parser) parseDeclaration() Declaration {
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("unexpected token %s in declaration", p.current.Type.String()),
 			"declaration parsing")
-		p.skipTo(lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenEOF)
+		p.skipTo(lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenMacro, lexer.TokenStruct, lexer.TokenEnum, lexer.TokenEOF)
 		return nil
 	}
 } // parseFunctionDeclaration parses a function declaration
@@ -387,6 +471,11 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 		p.nextToken()
 	}
 
+	// Check if we hit EOF without finding closing brace
+	if p.currentTokenIs(lexer.TokenEOF) {
+		p.addError(TokenToPosition(p.current), "Unclosed block: missing closing brace", "block parsing")
+	}
+
 	endPos := TokenToPosition(p.current)
 	span := SpanBetween(startPos, endPos)
 
@@ -410,7 +499,17 @@ func (p *Parser) parseStatement() Statement {
 	case lexer.TokenLBrace:
 		return p.parseBlockStatement()
 	default:
-		return p.parseExpressionStatement()
+		// Enhanced error recovery for unknown statement beginnings
+		stmt := p.parseExpressionStatement()
+		if stmt == nil && p.recoveryMode != PanicMode {
+			p.recoverFromError("statement")
+			// Try to continue parsing after recovery
+			if p.current.Type != lexer.TokenEOF {
+				p.nextToken()
+				return p.parseStatement()
+			}
+		}
+		return stmt
 	}
 }
 
@@ -518,8 +617,24 @@ func (p *Parser) parseExpressionStatement() *ExpressionStatement {
 
 	expr := p.parseExpression(LOWEST)
 
+	// Enhanced semicolon handling with error recovery (Phase 1.2.4)
 	if p.peekTokenIs(lexer.TokenSemicolon) {
 		p.nextToken()
+	} else if p.peekTokenIs(lexer.TokenNewline) {
+		// Missing semicolon before newline - common error
+		if p.suggestionEngine != nil {
+			pos := TokenToPosition(p.current)
+			pos.File = p.filename
+			suggestion := Suggestion{
+				Type:        ErrorFix,
+				Message:     "Insert semicolon before newline",
+				Position:    pos,
+				Replacement: ";",
+				Confidence:  0.9,
+				Category:    SyntaxError,
+			}
+			p.suggestions = append(p.suggestions, suggestion)
+		}
 	}
 
 	endPos := TokenToPosition(p.current)
@@ -539,8 +654,8 @@ type Precedence int
 const (
 	_ Precedence = iota
 	LOWEST
-	TERNARY     // ? :
 	ASSIGN      // = += -= *= /= %= &= |= ^= <<= >>=
+	TERNARY     // ? :
 	LOGICAL_OR  // ||
 	LOGICAL_AND // &&
 	BITWISE_OR  // |
@@ -551,8 +666,8 @@ const (
 	SHIFT       // << >>
 	SUM         // + -
 	PRODUCT     // * / %
-	POWER       // ** (right associative)
 	PREFIX      // -X !X ~X
+	POWER       // ** (right associative)
 	POSTFIX     // X++ X-- X!
 	CALL        // myFunction(X) X[Y] X.Y
 )
@@ -708,6 +823,10 @@ func (p *Parser) shouldContinueParsing(precedence Precedence) bool {
 func (p *Parser) parsePrefixExpression() Expression {
 	switch p.current.Type {
 	case lexer.TokenIdentifier:
+		// Check if this is a macro invocation pattern (identifier followed by !)
+		if p.peek.Type == lexer.TokenMacroInvoke {
+			return p.parseMacroInvocationWithIdent()
+		}
 		return p.parseIdentifier()
 	case lexer.TokenInteger:
 		return p.parseIntegerLiteral()
@@ -722,6 +841,9 @@ func (p *Parser) parsePrefixExpression() Expression {
 		return p.parseUnaryExpression()
 	case lexer.TokenLParen:
 		return p.parseGroupedExpression()
+	// Macro invocation starting with !
+	case lexer.TokenMacroInvoke:
+		return p.parseMacroInvocation()
 	default:
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("no prefix parse function for %s", p.current.Type.String()),
@@ -992,5 +1114,339 @@ func (p *Parser) parseTernaryExpression(left Expression) Expression {
 		Condition: left,
 		TrueExpr:  trueExpr,
 		FalseExpr: falseExpr,
+	}
+}
+
+// parseMacroDeclaration parses a macro definition
+func (p *Parser) parseMacroDeclaration() *MacroDefinition {
+	startPos := TokenToPosition(p.current)
+
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	// Parse parameters if present
+	var params []*MacroParameter
+	if p.peek.Type == lexer.TokenLParen {
+		p.nextToken()
+		params = p.parseMacroParameters()
+		if !p.expectPeek(lexer.TokenRParen) {
+			return nil
+		}
+	}
+
+	// Parse macro body
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+
+	body := p.parseMacroBody()
+	if body == nil {
+		return nil
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroDefinition{
+		Span:       span,
+		Name:       name,
+		Parameters: params,
+		Body:       body,
+		IsHygienic: true, // Default to hygienic macros
+	}
+}
+
+// parseMacroParameters parses macro parameter list
+func (p *Parser) parseMacroParameters() []*MacroParameter {
+	var params []*MacroParameter
+
+	if p.peek.Type == lexer.TokenRParen {
+		return params
+	}
+
+	p.nextToken()
+	for {
+		param := p.parseMacroParameter()
+		if param != nil {
+			params = append(params, param)
+		}
+
+		if p.peek.Type != lexer.TokenComma {
+			break
+		}
+		p.nextToken() // consume comma
+		p.nextToken() // move to next parameter
+	}
+
+	return params
+}
+
+// parseMacroParameter parses a single macro parameter
+func (p *Parser) parseMacroParameter() *MacroParameter {
+	if p.current.Type != lexer.TokenIdentifier {
+		p.addError(TokenToPosition(p.current),
+			"expected parameter name",
+			"macro parameter parsing")
+		return nil
+	}
+
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	// Check for default value
+	var defaultValue Expression
+	if p.peek.Type == lexer.TokenAssign {
+		p.nextToken() // consume =
+		p.nextToken() // move to value
+		defaultValue = p.parseExpression(LOWEST)
+	}
+
+	return &MacroParameter{
+		Span:         name.Span,
+		Name:         name,
+		Constraint:   nil, // Type constraints not implemented yet
+		DefaultValue: defaultValue,
+	}
+}
+
+// parseMacroBody parses the body of a macro definition
+func (p *Parser) parseMacroBody() *MacroBody {
+	startPos := TokenToPosition(p.current)
+	var templates []*MacroTemplate
+
+	p.nextToken() // consume {
+
+	for p.current.Type != lexer.TokenRBrace && p.current.Type != lexer.TokenEOF {
+		template := p.parseMacroTemplate()
+		if template != nil {
+			templates = append(templates, template)
+		}
+		p.nextToken()
+	}
+
+	if p.current.Type != lexer.TokenRBrace {
+		p.addError(TokenToPosition(p.current),
+			"expected '}' to close macro body",
+			"macro body parsing")
+		return nil
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroBody{
+		Span:      span,
+		Templates: templates,
+	}
+}
+
+// parseMacroTemplate parses a single macro template
+func (p *Parser) parseMacroTemplate() *MacroTemplate {
+	startPos := TokenToPosition(p.current)
+
+	// Parse pattern
+	pattern := p.parseMacroPattern()
+	if pattern == nil {
+		return nil
+	}
+
+	// Parse guard if present
+	var guard Expression
+	if p.current.Type == lexer.TokenIf {
+		p.nextToken()
+		guard = p.parseExpression(LOWEST)
+	}
+
+	// Parse arrow
+	if !p.expectPeek(lexer.TokenArrow) {
+		return nil
+	}
+
+	// Parse template body
+	p.nextToken()
+	var body []Statement
+
+	if p.current.Type == lexer.TokenLBrace {
+		// Block body
+		blockStmt := p.parseBlockStatement()
+		if blockStmt != nil {
+			body = blockStmt.Statements
+		}
+	} else {
+		// Single statement or expression
+		stmt := p.parseStatement()
+		if stmt != nil {
+			body = append(body, stmt)
+		}
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroTemplate{
+		Span:     span,
+		Pattern:  pattern,
+		Guard:    guard,
+		Body:     body,
+		Priority: 0, // Default priority
+	}
+}
+
+// parseMacroPattern parses a macro pattern
+func (p *Parser) parseMacroPattern() *MacroPattern {
+	startPos := TokenToPosition(p.current)
+	var elements []*MacroPatternElement
+
+	// For now, implement basic pattern parsing
+	for p.current.Type != lexer.TokenArrow && p.current.Type != lexer.TokenIf && p.current.Type != lexer.TokenEOF {
+		element := p.parseMacroPatternElement()
+		if element != nil {
+			elements = append(elements, element)
+		}
+		p.nextToken()
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroPattern{
+		Span:     span,
+		Elements: elements,
+	}
+}
+
+// parseMacroPatternElement parses a single pattern element
+func (p *Parser) parseMacroPatternElement() *MacroPatternElement {
+	switch p.current.Type {
+	case lexer.TokenIdentifier:
+		// Parameter pattern
+		return &MacroPatternElement{
+			Span:  TokenToSpan(p.current),
+			Kind:  MacroPatternParameter,
+			Value: p.current.Literal,
+		}
+	case lexer.TokenMul:
+		// Wildcard pattern
+		return &MacroPatternElement{
+			Span: TokenToSpan(p.current),
+			Kind: MacroPatternWildcard,
+		}
+	default:
+		// Literal pattern
+		return &MacroPatternElement{
+			Span:  TokenToSpan(p.current),
+			Kind:  MacroPatternLiteral,
+			Value: p.current.Literal,
+		}
+	}
+}
+
+// parseMacroInvocation parses a macro invocation expression
+func (p *Parser) parseMacroInvocation() *MacroInvocation {
+	startPos := TokenToPosition(p.current)
+
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	// Parse arguments
+	if !p.expectPeek(lexer.TokenLParen) {
+		return nil
+	}
+
+	args := p.parseMacroArguments()
+
+	if !p.expectPeek(lexer.TokenRParen) {
+		return nil
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroInvocation{
+		Span:      span,
+		Name:      name,
+		Arguments: args,
+	}
+}
+
+// parseMacroArguments parses macro invocation arguments
+func (p *Parser) parseMacroArguments() []*MacroArgument {
+	var args []*MacroArgument
+
+	if p.peek.Type == lexer.TokenRParen {
+		return args
+	}
+
+	p.nextToken()
+	for {
+		arg := p.parseMacroArgument()
+		if arg != nil {
+			args = append(args, arg)
+		}
+
+		if p.peek.Type != lexer.TokenComma {
+			break
+		}
+		p.nextToken() // consume comma
+		p.nextToken() // move to next argument
+	}
+
+	return args
+}
+
+// parseMacroArgument parses a single macro argument
+func (p *Parser) parseMacroArgument() *MacroArgument {
+	startPos := TokenToPosition(p.current)
+
+	// For now, treat all arguments as expressions
+	expr := p.parseExpression(LOWEST)
+	if expr == nil {
+		return nil
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroArgument{
+		Span:  span,
+		Kind:  MacroArgExpression,
+		Value: expr,
+	}
+}
+
+// parseMacroInvocationWithIdent parses macro invocation in the form: identifier!(args)
+func (p *Parser) parseMacroInvocationWithIdent() *MacroInvocation {
+	startPos := TokenToPosition(p.current)
+
+	// Current token is identifier, next should be !
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	if !p.expectPeek(lexer.TokenMacroInvoke) {
+		return nil
+	}
+
+	// Parse arguments
+	if !p.expectPeek(lexer.TokenLParen) {
+		return nil
+	}
+
+	args := p.parseMacroArguments()
+
+	if !p.expectPeek(lexer.TokenRParen) {
+		return nil
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &MacroInvocation{
+		Span:      span,
+		Name:      name,
+		Arguments: args,
 	}
 }

@@ -1,0 +1,855 @@
+// Package ast - Comprehensive test suite for AST nodes and operations
+// Phase 1.3.1: 型安全AST定義テスト - Complete test coverage for type-safe AST implementation
+// This file provides exhaustive testing for AST node creation, manipulation, and visitor patterns
+package ast
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/orizon-lang/orizon/internal/position"
+)
+
+// Helper function to create test spans
+func createTestSpan(line, col int) position.Span {
+	start := position.Position{Filename: "test.oriz", Line: line, Column: col, Offset: 0}
+	end := position.Position{Filename: "test.oriz", Line: line, Column: col + 10, Offset: 10}
+	return position.Span{Start: start, End: end}
+}
+
+// TestPosition tests position functionality
+func TestPosition(t *testing.T) {
+	pos := position.Position{
+		Filename: "test.oriz",
+		Line:     10,
+		Column:   5,
+		Offset:   100,
+	}
+
+	expected := "test.oriz:10:5"
+	if pos.String() != expected {
+		t.Errorf("Expected position string %q, got %q", expected, pos.String())
+	}
+
+	// Test position without file
+	posNoFile := position.Position{Line: 10, Column: 5}
+	expectedNoFile := "10:5"
+	if posNoFile.String() != expectedNoFile {
+		t.Errorf("Expected position string %q, got %q", expectedNoFile, posNoFile.String())
+	}
+}
+
+// TestSpan tests span functionality
+func TestSpan(t *testing.T) {
+	start := Position{File: "test.oriz", Line: 1, Column: 1, Offset: 0}
+	end := Position{File: "test.oriz", Line: 1, Column: 10, Offset: 9}
+	span := Span{Start: start, End: end}
+
+	// Test string representation
+	expected := "test.oriz:1:1-10"
+	if span.String() != expected {
+		t.Errorf("Expected span string %q, got %q", expected, span.String())
+	}
+
+	// Test contains
+	midPos := Position{File: "test.oriz", Line: 1, Column: 5, Offset: 4}
+	if !span.Contains(midPos) {
+		t.Errorf("Span should contain position at offset 4")
+	}
+
+	outsidePos := Position{File: "test.oriz", Line: 1, Column: 15, Offset: 14}
+	if span.Contains(outsidePos) {
+		t.Errorf("Span should not contain position at offset 14")
+	}
+}
+
+// TestSpanBetween tests span creation helper
+func TestSpanBetween(t *testing.T) {
+	start := Position{File: "test.oriz", Line: 1, Column: 1, Offset: 0}
+	end := Position{File: "test.oriz", Line: 2, Column: 1, Offset: 20}
+	span := SpanBetween(start, end)
+
+	if span.Start != start {
+		t.Errorf("Span start should be %v, got %v", start, span.Start)
+	}
+	if span.End != end {
+		t.Errorf("Span end should be %v, got %v", end, span.End)
+	}
+}
+
+// TestProgram tests program node functionality
+func TestProgram(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create a simple program with one function declaration
+	funcDecl := &FunctionDeclaration{
+		Span: createTestSpan(2, 1),
+		Name: &Identifier{
+			Span:  createTestSpan(2, 6),
+			Value: "main",
+		},
+		Parameters: make([]*Parameter, 0),
+		Body: &BlockStatement{
+			Span:       createTestSpan(2, 13),
+			Statements: make([]Statement, 0),
+		},
+		Attributes: make([]Attribute, 0),
+		IsExported: false,
+		Comments:   make([]Comment, 0),
+	}
+
+	program := &Program{
+		Span:         span,
+		Declarations: []Declaration{funcDecl},
+		Comments:     make([]Comment, 0),
+	}
+
+	// Test basic properties
+	if program.GetSpan() != span {
+		t.Errorf("Program span should be %v, got %v", span, program.GetSpan())
+	}
+
+	if len(program.Declarations) != 1 {
+		t.Errorf("Program should have 1 declaration, got %d", len(program.Declarations))
+	}
+
+	// Test string representation
+	programStr := program.String()
+	if !strings.Contains(programStr, "main") {
+		t.Errorf("Program string should contain function name 'main'")
+	}
+}
+
+// TestFunctionDeclaration tests function declaration functionality
+func TestFunctionDeclaration(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Create function with parameters
+	param := &Parameter{
+		Span: createTestSpan(1, 10),
+		Name: &Identifier{
+			Span:  createTestSpan(1, 10),
+			Value: "x",
+		},
+		Type: &BasicType{
+			Span: createTestSpan(1, 13),
+			Kind: BasicInt,
+		},
+		IsMutable: false,
+	}
+
+	funcDecl := &FunctionDeclaration{
+		Span: span,
+		Name: &Identifier{
+			Span:  createTestSpan(1, 5),
+			Value: "test",
+		},
+		Parameters: []*Parameter{param},
+		ReturnType: &BasicType{
+			Span: createTestSpan(1, 20),
+			Kind: BasicInt,
+		},
+		Body: &BlockStatement{
+			Span:       createTestSpan(1, 25),
+			Statements: make([]Statement, 0),
+		},
+		Attributes: make([]Attribute, 0),
+		IsExported: true,
+		Comments:   make([]Comment, 0),
+	}
+
+	// Test string representation
+	funcStr := funcDecl.String()
+	if !strings.Contains(funcStr, "pub") {
+		t.Errorf("Exported function string should contain 'pub'")
+	}
+	if !strings.Contains(funcStr, "test") {
+		t.Errorf("Function string should contain function name 'test'")
+	}
+	if !strings.Contains(funcStr, "x: int") {
+		t.Errorf("Function string should contain parameter 'x: int'")
+	}
+}
+
+// TestParameter tests parameter functionality
+func TestParameter(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test parameter with default value
+	defaultValue := &Literal{
+		Span:  createTestSpan(1, 15),
+		Kind:  LiteralInteger,
+		Value: int64(42),
+		Raw:   "42",
+	}
+
+	param := &Parameter{
+		Span: span,
+		Name: &Identifier{
+			Span:  createTestSpan(1, 1),
+			Value: "x",
+		},
+		Type: &BasicType{
+			Span: createTestSpan(1, 4),
+			Kind: BasicInt,
+		},
+		DefaultValue: defaultValue,
+		IsMutable:    true,
+	}
+
+	paramStr := param.String()
+	if !strings.Contains(paramStr, "mut") {
+		t.Errorf("Mutable parameter string should contain 'mut'")
+	}
+	if !strings.Contains(paramStr, "= 42") {
+		t.Errorf("Parameter string should contain default value '= 42'")
+	}
+}
+
+// TestVariableDeclaration tests variable declaration functionality
+func TestVariableDeclaration(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test different variable kinds
+	testCases := []struct {
+		kind     VarKind
+		keyword  string
+		mutable  bool
+		exported bool
+	}{
+		{VarKindLet, "let", false, false},
+		{VarKindVar, "var", true, false},
+		{VarKindConst, "const", false, true},
+	}
+
+	for _, tc := range testCases {
+		varDecl := &VariableDeclaration{
+			Span: span,
+			Name: &Identifier{
+				Span:  createTestSpan(1, 5),
+				Value: "x",
+			},
+			Type: &BasicType{
+				Span: createTestSpan(1, 8),
+				Kind: BasicInt,
+			},
+			Value: &Literal{
+				Span:  createTestSpan(1, 15),
+				Kind:  LiteralInteger,
+				Value: int64(42),
+				Raw:   "42",
+			},
+			Kind:       tc.kind,
+			IsMutable:  tc.mutable,
+			IsExported: tc.exported,
+		}
+
+		varStr := varDecl.String()
+		if !strings.Contains(varStr, tc.keyword) {
+			t.Errorf("Variable declaration should contain keyword '%s'", tc.keyword)
+		}
+
+		if tc.exported && !strings.Contains(varStr, "pub") {
+			t.Errorf("Exported variable should contain 'pub'")
+		}
+
+		if tc.mutable && tc.kind == VarKindLet && !strings.Contains(varStr, "mut") {
+			t.Errorf("Mutable let variable should contain 'mut'")
+		}
+	}
+}
+
+// TestLiterals tests literal functionality
+func TestLiterals(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test different literal types
+	testCases := []struct {
+		kind     LiteralKind
+		value    interface{}
+		raw      string
+		expected string
+	}{
+		{LiteralInteger, int64(42), "42", "42"},
+		{LiteralFloat, float64(3.14), "3.14", "3.14"},
+		{LiteralString, "hello", "\"hello\"", "\"hello\""},
+		{LiteralBoolean, true, "true", "true"},
+		{LiteralCharacter, 'A', "'A'", "'A'"},
+		{LiteralNull, nil, "null", "null"},
+	}
+
+	for _, tc := range testCases {
+		literal := &Literal{
+			Span:  span,
+			Kind:  tc.kind,
+			Value: tc.value,
+			Raw:   tc.raw,
+		}
+
+		if literal.String() != tc.expected {
+			t.Errorf("Literal string should be %q, got %q", tc.expected, literal.String())
+		}
+
+		if literal.Kind.String() == "unknown" {
+			t.Errorf("Literal kind should have valid string representation")
+		}
+	}
+}
+
+// TestBinaryExpression tests binary expression functionality
+func TestBinaryExpression(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	left := &Literal{
+		Span:  createTestSpan(1, 1),
+		Kind:  LiteralInteger,
+		Value: int64(10),
+		Raw:   "10",
+	}
+
+	right := &Literal{
+		Span:  createTestSpan(1, 5),
+		Kind:  LiteralInteger,
+		Value: int64(20),
+		Raw:   "20",
+	}
+
+	// Test different operators
+	operators := []Operator{
+		OpAdd, OpSub, OpMul, OpDiv, OpMod, OpPow,
+		OpEq, OpNe, OpLt, OpLe, OpGt, OpGe,
+		OpAnd, OpOr, OpBitAnd, OpBitOr, OpBitXor,
+	}
+
+	for _, op := range operators {
+		binExpr := &BinaryExpression{
+			Span:     span,
+			Left:     left,
+			Operator: op,
+			Right:    right,
+		}
+
+		exprStr := binExpr.String()
+		if !strings.Contains(exprStr, op.String()) {
+			t.Errorf("Binary expression should contain operator %q", op.String())
+		}
+		if !strings.Contains(exprStr, "10") || !strings.Contains(exprStr, "20") {
+			t.Errorf("Binary expression should contain operands")
+		}
+	}
+}
+
+// TestUnaryExpression tests unary expression functionality
+func TestUnaryExpression(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	operand := &Literal{
+		Span:  createTestSpan(1, 2),
+		Kind:  LiteralInteger,
+		Value: int64(42),
+		Raw:   "42",
+	}
+
+	unaryExpr := &UnaryExpression{
+		Span:     span,
+		Operator: OpNot,
+		Operand:  operand,
+	}
+
+	exprStr := unaryExpr.String()
+	if !strings.Contains(exprStr, "!") {
+		t.Errorf("Unary expression should contain operator '!'")
+	}
+	if !strings.Contains(exprStr, "42") {
+		t.Errorf("Unary expression should contain operand '42'")
+	}
+}
+
+// TestCallExpression tests call expression functionality
+func TestCallExpression(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	function := &Identifier{
+		Span:  createTestSpan(1, 1),
+		Value: "println",
+	}
+
+	arg1 := &Literal{
+		Span:  createTestSpan(1, 9),
+		Kind:  LiteralString,
+		Value: "hello",
+		Raw:   "\"hello\"",
+	}
+
+	arg2 := &Literal{
+		Span:  createTestSpan(1, 17),
+		Kind:  LiteralInteger,
+		Value: int64(42),
+		Raw:   "42",
+	}
+
+	callExpr := &CallExpression{
+		Span:      span,
+		Function:  function,
+		Arguments: []Expression{arg1, arg2},
+	}
+
+	callStr := callExpr.String()
+	if !strings.Contains(callStr, "println") {
+		t.Errorf("Call expression should contain function name 'println'")
+	}
+	if !strings.Contains(callStr, "hello") {
+		t.Errorf("Call expression should contain argument 'hello'")
+	}
+	if !strings.Contains(callStr, "42") {
+		t.Errorf("Call expression should contain argument '42'")
+	}
+}
+
+// TestBasicType tests basic type functionality
+func TestBasicType(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	basicTypes := []struct {
+		kind     BasicKind
+		expected string
+	}{
+		{BasicInt, "int"},
+		{BasicFloat, "float"},
+		{BasicString, "string"},
+		{BasicBool, "bool"},
+		{BasicChar, "char"},
+		{BasicVoid, "void"},
+	}
+
+	for _, bt := range basicTypes {
+		basicType := &BasicType{
+			Span: span,
+			Kind: bt.kind,
+		}
+
+		if basicType.String() != bt.expected {
+			t.Errorf("Basic type string should be %q, got %q", bt.expected, basicType.String())
+		}
+	}
+}
+
+// TestIdentifierType tests identifier type functionality
+func TestIdentifierType(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	identType := &IdentifierType{
+		Span: span,
+		Name: &Identifier{
+			Span:  span,
+			Value: "MyType",
+		},
+	}
+
+	if identType.String() != "MyType" {
+		t.Errorf("Identifier type string should be 'MyType', got %q", identType.String())
+	}
+}
+
+// TestStatements tests statement functionality
+func TestStatements(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test block statement
+	blockStmt := &BlockStatement{
+		Span:       span,
+		Statements: make([]Statement, 0),
+	}
+
+	if blockStmt.String() != "{}" {
+		t.Errorf("Empty block statement should be '{}', got %q", blockStmt.String())
+	}
+
+	// Test expression statement
+	expr := &Literal{
+		Span:  span,
+		Kind:  LiteralInteger,
+		Value: int64(42),
+		Raw:   "42",
+	}
+
+	exprStmt := &ExpressionStatement{
+		Span:       span,
+		Expression: expr,
+	}
+
+	if !strings.Contains(exprStmt.String(), "42;") {
+		t.Errorf("Expression statement should contain '42;'")
+	}
+
+	// Test return statement
+	returnStmt := &ReturnStatement{
+		Span:  span,
+		Value: expr,
+	}
+
+	if !strings.Contains(returnStmt.String(), "return 42") {
+		t.Errorf("Return statement should contain 'return 42'")
+	}
+
+	// Test return statement without value
+	bareReturnStmt := &ReturnStatement{
+		Span:  span,
+		Value: nil,
+	}
+
+	if bareReturnStmt.String() != "return" {
+		t.Errorf("Bare return statement should be 'return', got %q", bareReturnStmt.String())
+	}
+}
+
+// TestIfStatement tests if statement functionality
+func TestIfStatement(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	condition := &Literal{
+		Span:  createTestSpan(1, 4),
+		Kind:  LiteralBoolean,
+		Value: true,
+		Raw:   "true",
+	}
+
+	thenBlock := &BlockStatement{
+		Span:       createTestSpan(1, 9),
+		Statements: make([]Statement, 0),
+	}
+
+	// Test if without else
+	ifStmt := &IfStatement{
+		Span:      span,
+		Condition: condition,
+		ThenBlock: thenBlock,
+		ElseBlock: nil,
+	}
+
+	ifStr := ifStmt.String()
+	if !strings.Contains(ifStr, "if true") {
+		t.Errorf("If statement should contain 'if true'")
+	}
+
+	// Test if with else
+	elseBlock := &BlockStatement{
+		Span:       createTestSpan(1, 15),
+		Statements: make([]Statement, 0),
+	}
+
+	ifElseStmt := &IfStatement{
+		Span:      span,
+		Condition: condition,
+		ThenBlock: thenBlock,
+		ElseBlock: elseBlock,
+	}
+
+	ifElseStr := ifElseStmt.String()
+	if !strings.Contains(ifElseStr, "else") {
+		t.Errorf("If-else statement should contain 'else'")
+	}
+}
+
+// TestWhileStatement tests while statement functionality
+func TestWhileStatement(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	condition := &Literal{
+		Span:  createTestSpan(1, 7),
+		Kind:  LiteralBoolean,
+		Value: true,
+		Raw:   "true",
+	}
+
+	body := &BlockStatement{
+		Span:       createTestSpan(1, 12),
+		Statements: make([]Statement, 0),
+	}
+
+	whileStmt := &WhileStatement{
+		Span:      span,
+		Condition: condition,
+		Body:      body,
+	}
+
+	whileStr := whileStmt.String()
+	if !strings.Contains(whileStr, "while true") {
+		t.Errorf("While statement should contain 'while true'")
+	}
+}
+
+// TestOperators tests operator functionality
+func TestOperators(t *testing.T) {
+	// Test that all operators have valid string representations
+	operators := []Operator{
+		OpAdd, OpSub, OpMul, OpDiv, OpMod, OpPow,
+		OpEq, OpNe, OpLt, OpLe, OpGt, OpGe,
+		OpAnd, OpOr, OpNot,
+		OpBitAnd, OpBitOr, OpBitXor, OpBitNot, OpShl, OpShr,
+		OpAssign, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
+	}
+
+	for _, op := range operators {
+		opStr := op.String()
+		if opStr == "unknown" || opStr == "" {
+			t.Errorf("Operator %d should have valid string representation", int(op))
+		}
+	}
+}
+
+// TestVarKind tests variable kind functionality
+func TestVarKind(t *testing.T) {
+	kinds := []struct {
+		kind     VarKind
+		expected string
+	}{
+		{VarKindLet, "let"},
+		{VarKindVar, "var"},
+		{VarKindConst, "const"},
+	}
+
+	for _, k := range kinds {
+		if k.kind.String() != k.expected {
+			t.Errorf("VarKind string should be %q, got %q", k.expected, k.kind.String())
+		}
+	}
+}
+
+// TestLiteralKind tests literal kind functionality
+func TestLiteralKind(t *testing.T) {
+	kinds := []struct {
+		kind     LiteralKind
+		expected string
+	}{
+		{LiteralInteger, "integer"},
+		{LiteralFloat, "float"},
+		{LiteralString, "string"},
+		{LiteralBoolean, "boolean"},
+		{LiteralCharacter, "character"},
+		{LiteralNull, "null"},
+	}
+
+	for _, k := range kinds {
+		if k.kind.String() != k.expected {
+			t.Errorf("LiteralKind string should be %q, got %q", k.expected, k.kind.String())
+		}
+	}
+}
+
+// TestBasicKind tests basic kind functionality
+func TestBasicKind(t *testing.T) {
+	kinds := []struct {
+		kind     BasicKind
+		expected string
+	}{
+		{BasicInt, "int"},
+		{BasicFloat, "float"},
+		{BasicString, "string"},
+		{BasicBool, "bool"},
+		{BasicChar, "char"},
+		{BasicVoid, "void"},
+	}
+
+	for _, k := range kinds {
+		if k.kind.String() != k.expected {
+			t.Errorf("BasicKind string should be %q, got %q", k.expected, k.kind.String())
+		}
+	}
+}
+
+// TestAttributes tests attribute functionality
+func TestAttributes(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test attribute without arguments
+	simpleAttr := &Attribute{
+		Span: span,
+		Name: &Identifier{
+			Span:  span,
+			Value: "pure",
+		},
+		Args: make([]Expression, 0),
+	}
+
+	if simpleAttr.String() != "@pure" {
+		t.Errorf("Simple attribute should be '@pure', got %q", simpleAttr.String())
+	}
+
+	// Test attribute with arguments
+	arg := &Literal{
+		Span:  span,
+		Kind:  LiteralString,
+		Value: "test",
+		Raw:   "\"test\"",
+	}
+
+	argAttr := &Attribute{
+		Span: span,
+		Name: &Identifier{
+			Span:  span,
+			Value: "doc",
+		},
+		Args: []Expression{arg},
+	}
+
+	attrStr := argAttr.String()
+	if !strings.Contains(attrStr, "@doc(") {
+		t.Errorf("Attribute with args should contain '@doc('")
+	}
+	if !strings.Contains(attrStr, "test") {
+		t.Errorf("Attribute with args should contain argument 'test'")
+	}
+}
+
+// TestComment tests comment functionality
+func TestComment(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test line comment
+	lineComment := &Comment{
+		Span:    span,
+		Text:    "This is a line comment",
+		IsBlock: false,
+	}
+
+	lineStr := lineComment.String()
+	if !strings.HasPrefix(lineStr, "//") {
+		t.Errorf("Line comment should start with '//'")
+	}
+
+	// Test block comment
+	blockComment := &Comment{
+		Span:    span,
+		Text:    "This is a block comment",
+		IsBlock: true,
+	}
+
+	blockStr := blockComment.String()
+	if !strings.HasPrefix(blockStr, "/*") || !strings.HasSuffix(blockStr, "*/") {
+		t.Errorf("Block comment should be wrapped with /* */")
+	}
+}
+
+// TestNodeTypeChecking tests that nodes implement correct interfaces
+func TestNodeTypeChecking(t *testing.T) {
+	span := createTestSpan(1, 1)
+
+	// Test that declarations implement Declaration interface
+	var decl Declaration = &FunctionDeclaration{Span: span}
+	if decl == nil {
+		t.Errorf("FunctionDeclaration should implement Declaration interface")
+	}
+
+	decl = &VariableDeclaration{Span: span}
+	if decl == nil {
+		t.Errorf("VariableDeclaration should implement Declaration interface")
+	}
+
+	// Test that statements implement Statement interface
+	var stmt Statement = &BlockStatement{Span: span}
+	if stmt == nil {
+		t.Errorf("BlockStatement should implement Statement interface")
+	}
+
+	stmt = &ExpressionStatement{Span: span}
+	if stmt == nil {
+		t.Errorf("ExpressionStatement should implement Statement interface")
+	}
+
+	// Test that expressions implement Expression interface
+	var expr Expression = &Identifier{Span: span}
+	if expr == nil {
+		t.Errorf("Identifier should implement Expression interface")
+	}
+
+	expr = &BinaryExpression{Span: span}
+	if expr == nil {
+		t.Errorf("BinaryExpression should implement Expression interface")
+	}
+
+	// Test that types implement Type interface
+	var typ Type = &BasicType{Span: span}
+	if typ == nil {
+		t.Errorf("BasicType should implement Type interface")
+	}
+
+	typ = &IdentifierType{Span: span}
+	if typ == nil {
+		t.Errorf("IdentifierType should implement Type interface")
+	}
+}
+
+// TestNodeAcceptMethod tests that all nodes implement Accept method
+func TestNodeAcceptMethod(t *testing.T) {
+	span := createTestSpan(1, 1)
+	visitor := &TestVisitor{}
+
+	// Test various node types
+	nodes := []Node{
+		&Program{Span: span},
+		&FunctionDeclaration{Span: span},
+		&VariableDeclaration{Span: span},
+		&BlockStatement{Span: span},
+		&ExpressionStatement{Span: span},
+		&ReturnStatement{Span: span},
+		&IfStatement{Span: span},
+		&WhileStatement{Span: span},
+		&Identifier{Span: span},
+		&Literal{Span: span},
+		&BinaryExpression{Span: span},
+		&UnaryExpression{Span: span},
+		&CallExpression{Span: span},
+		&BasicType{Span: span},
+		&IdentifierType{Span: span},
+		&Comment{Span: span},
+		&Attribute{Span: span},
+		&Parameter{Span: span},
+	}
+
+	for _, node := range nodes {
+		result := node.Accept(visitor)
+		if result == nil {
+			t.Errorf("Node %T should return non-nil result from Accept", node)
+		}
+	}
+}
+
+// TestVisitor is a test implementation of the Visitor interface
+type TestVisitor struct {
+	BaseVisitor
+}
+
+func (tv *TestVisitor) VisitProgram(node *Program) interface{} { return "Program" }
+func (tv *TestVisitor) VisitComment(node *Comment) interface{} { return "Comment" }
+func (tv *TestVisitor) VisitFunctionDeclaration(node *FunctionDeclaration) interface{} {
+	return "FunctionDeclaration"
+}
+func (tv *TestVisitor) VisitParameter(node *Parameter) interface{} { return "Parameter" }
+func (tv *TestVisitor) VisitVariableDeclaration(node *VariableDeclaration) interface{} {
+	return "VariableDeclaration"
+}
+func (tv *TestVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{} {
+	return "TypeDeclaration"
+}
+func (tv *TestVisitor) VisitBlockStatement(node *BlockStatement) interface{} { return "BlockStatement" }
+func (tv *TestVisitor) VisitExpressionStatement(node *ExpressionStatement) interface{} {
+	return "ExpressionStatement"
+}
+func (tv *TestVisitor) VisitReturnStatement(node *ReturnStatement) interface{} {
+	return "ReturnStatement"
+}
+func (tv *TestVisitor) VisitIfStatement(node *IfStatement) interface{}       { return "IfStatement" }
+func (tv *TestVisitor) VisitWhileStatement(node *WhileStatement) interface{} { return "WhileStatement" }
+func (tv *TestVisitor) VisitIdentifier(node *Identifier) interface{}         { return "Identifier" }
+func (tv *TestVisitor) VisitLiteral(node *Literal) interface{}               { return "Literal" }
+func (tv *TestVisitor) VisitBinaryExpression(node *BinaryExpression) interface{} {
+	return "BinaryExpression"
+}
+func (tv *TestVisitor) VisitUnaryExpression(node *UnaryExpression) interface{} {
+	return "UnaryExpression"
+}
+func (tv *TestVisitor) VisitCallExpression(node *CallExpression) interface{} { return "CallExpression" }
+func (tv *TestVisitor) VisitBasicType(node *BasicType) interface{}           { return "BasicType" }
+func (tv *TestVisitor) VisitIdentifierType(node *IdentifierType) interface{} { return "IdentifierType" }
+func (tv *TestVisitor) VisitAttribute(node *Attribute) interface{}           { return "Attribute" }

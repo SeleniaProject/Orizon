@@ -68,6 +68,14 @@ const (
 	TokenWhere
 	TokenUnsafe
 
+	// マクロ関連
+	TokenMacro
+	TokenMacroInvoke  // !
+	TokenBackquote    // `
+	TokenMacroPattern // Pattern matching markers
+	TokenMacroRepeat  // Repetition markers (* + ?)
+	TokenMacroGroup   // Grouping markers
+
 	// 演算子
 	TokenPlus
 	TokenMinus
@@ -205,6 +213,14 @@ var tokenNames = map[TokenType]string{
 	TokenWhere:    "WHERE",
 	TokenUnsafe:   "UNSAFE",
 
+	// マクロ関連
+	TokenMacro:        "MACRO",
+	TokenMacroInvoke:  "MACRO_INVOKE",
+	TokenBackquote:    "BACKQUOTE",
+	TokenMacroPattern: "MACRO_PATTERN",
+	TokenMacroRepeat:  "MACRO_REPEAT",
+	TokenMacroGroup:   "MACRO_GROUP",
+
 	TokenPlus:         "PLUS",
 	TokenMinus:        "MINUS",
 	TokenMul:          "MUL",
@@ -296,6 +312,7 @@ var keywords = map[string]TokenType{
 	"in":       TokenIn,
 	"where":    TokenWhere,
 	"unsafe":   TokenUnsafe,
+	"macro":    TokenMacro,
 	"true":     TokenBool,
 	"false":    TokenBool,
 }
@@ -355,6 +372,10 @@ func NewWithFilename(input, filename string) *Lexer {
 		filename:   filename,
 		cacheValid: false,
 	}
+
+	// Initialize error recovery system
+	l.errorRecovery = NewErrorRecovery()
+
 	l.readChar()
 	return l
 }
@@ -447,12 +468,12 @@ func (l *Lexer) readIdentifier() string {
 			}
 		} else {
 			// Check for invalid characters that might be typos in identifiers
-			if l.ch == '-' || l.ch == '@' || l.ch == '#' || l.ch == '$' {
+			if l.ch == '-' || l.ch == '@' || l.ch == '#' || l.ch == '$' || l.ch == '%' || l.ch == '^' || l.ch == '&' || l.ch == '*' {
 				if l.errorRecovery != nil {
 					err := l.CreateInvalidCharacterError(rune(l.ch))
 					l.addError(err)
-					l.hasIdentifierError = true
 				}
+				l.hasIdentifierError = true
 				l.readChar() // Skip the invalid character
 				continue
 			}
@@ -502,25 +523,29 @@ func (l *Lexer) readNumber() string {
 	}
 
 	// Check for multiple decimal points
-	remaining := l.input[l.position:]
-	if hasDecimal && containsSubstring(remaining, ".") {
-		// Look ahead for another decimal point
-		nextDot := -1
+	if hasDecimal {
+		remaining := l.input[l.position:]
 		for i, r := range remaining {
 			if r == '.' {
-				nextDot = i
-				break
+				// Found another decimal point - this is malformed
+				if l.errorRecovery != nil {
+					// Read the full malformed literal including the second decimal point
+					extraPos := l.position + i + 1
+					for extraPos < len(l.input) && isDigit(l.input[extraPos]) {
+						extraPos++
+					}
+					malformedLiteral := l.input[position:extraPos]
+					err := l.CreateMalformedNumberError(malformedLiteral)
+					l.addError(err)
+				}
+				// Advance position to consume the malformed part
+				for l.ch == '.' || isDigit(l.ch) {
+					l.readChar()
+				}
+				return l.input[position:l.position]
 			}
 			if !isDigit(byte(r)) {
 				break
-			}
-		}
-
-		if nextDot >= 0 {
-			if l.errorRecovery != nil {
-				malformedLiteral := l.input[position : l.position+nextDot+1]
-				err := l.CreateMalformedNumberError(malformedLiteral)
-				l.addError(err)
 			}
 		}
 	}
@@ -688,7 +713,24 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			tok = l.newToken(TokenNe, string(ch)+string(l.ch))
 		} else {
-			tok = l.newTokenFromChar(TokenNot, l.ch)
+			// Context-based disambiguation between logical NOT and macro invocation
+			nextChar := l.peekChar()
+
+			// Check if we're in a macro context by looking at surrounding tokens
+			// If followed immediately by another operator or identifier at end of line, it's macro
+			// If followed by space and then identifier/expression, it's NOT
+			if nextChar == ' ' || nextChar == '\t' || nextChar == '\n' || nextChar == '\r' {
+				tok = l.newTokenFromChar(TokenNot, l.ch)
+			} else if isLetter(nextChar) || isDigit(nextChar) {
+				// Directly followed by identifier or number - this is NOT
+				tok = l.newTokenFromChar(TokenNot, l.ch)
+			} else if nextChar == '!' || nextChar == '~' || nextChar == '-' || nextChar == '+' {
+				// Followed by another operator - this is NOT (for chains like !!a)
+				tok = l.newTokenFromChar(TokenNot, l.ch)
+			} else {
+				// At end of line or followed by punctuation - likely macro
+				tok = l.newTokenFromChar(TokenMacroInvoke, l.ch)
+			}
 		}
 	case '<':
 		if l.peekChar() == '=' {
