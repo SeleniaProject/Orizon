@@ -564,14 +564,17 @@
 
 ### 3.3 並行性プリミティブ
 
-#### 3.3.1 ロックフリーデータ構造
-- [ ] **目的**: 高性能な並行データ構造の実装
+#### 3.3.1 ロックフリーデータ構造 ✅ 完了
+- [x] **目的**: 高性能な並行データ構造の実装
 - **成果物**:
-  - [ ] ロックフリーキュー
-  - [ ] ロックフリーハッシュマップ
-  - [ ] CAS (Compare-and-Swap) プリミティブ
+  - [x] ロックフリーキュー: `internal/runtime/concurrency/lfqueue.go`（Vyukov方式のbounded MPMC ring buffer）
+  - [x] ロックフリーハッシュマップ: `internal/runtime/concurrency/lfmap.go`（固定バケット・原子的リンクリスト）
+  - [x] CAS (Compare-and-Swap) ヘルパー: `internal/runtime/concurrency/cas.go`
+- **テスト**:
+  - `internal/runtime/concurrency/lfqueue_test.go` 基本/並行テスト（安定化のため生産・消費パラメータ調整）
+  - `internal/runtime/concurrency/lfmap_test.go` 基本/並行テスト
 - **依存関係**: 3.2.1
-- **推定工数**: 大（25日）
+- **ビルド状態**: `go test ./...` 成功
 
 #### 3.3.2 Software Transactional Memory
 - [ ] **目的**: 一貫性のある並行状態管理
