@@ -71,7 +71,7 @@ func (rs *RemoteSystem) Send(remoteAddrOrNode, receiverName string, msgType uint
     if err != nil { return err }
     env := Envelope{
         SenderNode:    node,
-        ReceiverNode:  remoteAddr,
+        ReceiverNode:  remoteAddrOrNode,
         ReceiverName:  receiverName,
         MessageType:   msgType,
         PayloadBytes:  b,
