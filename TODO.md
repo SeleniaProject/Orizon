@@ -610,13 +610,15 @@
   - [ ] Windows: `IOCP` 実装（現状は互換ポーラ委譲: `internal/runtime/asyncio/iocp_poller_windows.go`）
   - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
   - [ ] 真のゼロコピーI/O経路（Linux: `sendfile`/`splice`、Windows: `TransmitFile`、macOS: `sendfile`）
-  - [ ] バッファプール・再利用戦略（GC圧力低減）
+  - [x] バッファプール・再利用戦略（GC圧力低減）
   - [ ] アクターシステム統合（I/Oイベント→メールボックス投入・バックプレッシャ整合）
 - **依存関係**: 3.3.3
 - **推定工数**: 大（28日）
 - **現状**:
   - `epoll`/`kqueue` 実装とファクトリ導入によりOS最適ポーラを選択可能。Windowsは今後IOCP実装予定
-  - ゼロコピーI/Oはヘルパーを追加済み。OS固有の真のゼロコピー経路は次段で対応
+  - ゼロコピーI/Oはヘルパー（`internal/runtime/asyncio/zerocopy.go`）を追加済み。OS固有の真のゼロコピー経路は次段で対応
+  - バッファプール（`internal/runtime/asyncio/buffer_pool.go`）を追加し、I/Oバッファの再利用でGC圧力を低減
+  - アクター統合のベースラインを提供（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent` メッセージ配送）。バックプレッシャ整合は後続対応
   - `go test ./...` は緑を維持
 
 #### 3.4.2 ファイルシステム抽象化 ✅ 完了
