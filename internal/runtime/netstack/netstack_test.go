@@ -36,7 +36,8 @@ func TestUDP_Roundtrip(t *testing.T) {
     if err != nil { t.Fatal(err) }
     defer cli.Close()
     msg := []byte("hi")
-    n, err := cli.WriteTo(msg, srv.conn.LocalAddr().(*net.UDPAddr))
+    // since cli is connected, use Write (not WriteTo)
+    n, err := cli.Write(msg)
     if err != nil || n != len(msg) { t.Fatalf("write: %v n=%d", err, n) }
     buf := make([]byte, 16)
     _ = srv.conn.SetReadDeadline(time.Now().Add(time.Second))
@@ -46,7 +47,7 @@ func TestUDP_Roundtrip(t *testing.T) {
     // reply
     _, _ = srv.WriteTo([]byte("ok"), addr)
     _ = cli.conn.SetReadDeadline(time.Now().Add(time.Second))
-    n, _, err = cli.conn.ReadFromUDP(buf)
+    n, err = cli.Read(buf)
     if err != nil { t.Fatal(err) }
     if string(buf[:n]) != "ok" { t.Fatalf("got %q", string(buf[:n])) }
 }
@@ -55,7 +56,7 @@ func TestTLS_Wrap(t *testing.T) {
     ln, err := net.Listen("tcp", "127.0.0.1:0")
     if err != nil { t.Fatal(err) }
     defer ln.Close()
-    // self-signed insecure config for local test use only
+    // Insecure local test: wrap both client and server with TLS using the same config
     cfg := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}
     tln := TLSServer(ln, cfg)
     go func(){
