@@ -1,0 +1,127 @@
+// Package stm implements a simple Software Transactional Memory runtime
+// providing optimistic concurrency with versioned TVars and transactional
+// read/write/commit with validation and automatic retry.
+package stm
+
+import (
+    "errors"
+    "math/rand"
+    "sync/atomic"
+    "time"
+)
+
+// TVar is a transactional variable holding a value of type T with a version.
+type TVar[T any] struct {
+    ver uint64        // monotonically increasing version
+    val atomic.Value  // stores T
+}
+
+// NewTVar creates a new TVar with the given initial value.
+func NewTVar[T any](v T) *TVar[T] {
+    tv := &TVar[T]{}
+    tv.val.Store(v)
+    atomic.StoreUint64(&tv.ver, 1)
+    return tv
+}
+
+// Txn represents an active transaction context.
+type Txn[T any] struct {
+    // readSet records TVar version and snapshot value at first read
+    readSet map[*TVar[T]]readEntry[T]
+    // writeSet records intended new values (overrides reads)
+    writeSet map[*TVar[T]]T
+}
+
+type readEntry[T any] struct {
+    ver uint64
+    val T
+}
+
+// Begin starts a new transaction.
+func Begin[T any]() *Txn[T] {
+    return &Txn[T]{
+        readSet:  make(map[*TVar[T]]readEntry[T]),
+        writeSet: make(map[*TVar[T]]T),
+    }
+}
+
+// Read reads a value from a TVar under the transaction.
+func (tx *Txn[T]) Read(tv *TVar[T]) T {
+    if v, ok := tx.writeSet[tv]; ok {
+        return v
+    }
+    if e, ok := tx.readSet[tv]; ok {
+        return e.val
+    }
+    ver := atomic.LoadUint64(&tv.ver)
+    vAny := tv.val.Load()
+    val := vAny.(T)
+    tx.readSet[tv] = readEntry[T]{ver: ver, val: val}
+    return val
+}
+
+// Write writes a value to a TVar under the transaction.
+func (tx *Txn[T]) Write(tv *TVar[T], val T) {
+    tx.writeSet[tv] = val
+}
+
+// ErrConflict indicates validation failed due to concurrent modification.
+var ErrConflict = errors.New("stm: conflict")
+
+// Commit validates and applies the transaction. On conflict it returns ErrConflict.
+func (tx *Txn[T]) Commit() error {
+    // Validate read set (excluding those we will write, which we validate during write CAS)
+    for tv, e := range tx.readSet {
+        if _, willWrite := tx.writeSet[tv]; willWrite {
+            continue
+        }
+        if atomic.LoadUint64(&tv.ver) != e.ver {
+            return ErrConflict
+        }
+    }
+    // Apply writes
+    for tv, newVal := range tx.writeSet {
+        // expected version is from read set if present; else load current
+        exp := uint64(0)
+        if e, ok := tx.readSet[tv]; ok {
+            exp = e.ver
+        } else {
+            exp = atomic.LoadUint64(&tv.ver)
+        }
+        // Try to claim by CAS on version to exp+1
+        if !atomic.CompareAndSwapUint64(&tv.ver, exp, exp+1) {
+            return ErrConflict
+        }
+        // Store value after version bump (readers validate version)
+        tv.val.Store(newVal)
+    }
+    return nil
+}
+
+// Run executes f in a transactional loop with retry/backoff on conflict.
+// maxRetries <= 0 means default retries.
+func Run[T any](maxRetries int, f func(tx *Txn[T]) error) error {
+    if maxRetries <= 0 {
+        maxRetries = 16
+    }
+    base := time.Millisecond * 1
+    for i := 0; i < maxRetries; i++ {
+        tx := Begin[T]()
+        if err := f(tx); err != nil {
+            return err
+        }
+        if err := tx.Commit(); err == nil {
+            return nil
+        }
+        // backoff with jitter
+        sleep := base << i
+        if sleep > time.Millisecond*50 {
+            sleep = time.Millisecond * 50
+        }
+        jitter := time.Duration(rand.Intn(500)) * time.Microsecond
+        time.Sleep(sleep + jitter)
+    }
+    return ErrConflict
+}
+
+
