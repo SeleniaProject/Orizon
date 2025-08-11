@@ -3,7 +3,6 @@ package vfs
 import (
     "bytes"
     "errors"
-    "io"
     "io/fs"
     "path"
     "strings"
@@ -121,7 +120,7 @@ func (m *MemFS) ReadDir(name string) ([]fs.DirEntry, error) {
     prefix := Clean(name)
     if prefix != "/" && !strings.HasSuffix(prefix, "/") { prefix += "/" }
     seen := make(map[string]struct{})
-    for p, e := range m.ents {
+    for p := range m.ents {
         if !strings.HasPrefix(p, prefix) { continue }
         rest := strings.TrimPrefix(p, prefix)
         first := rest
