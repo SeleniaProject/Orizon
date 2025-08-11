@@ -1,12 +1,41 @@
 package netstack
 
 import (
+    "crypto/rand"
+    "crypto/rsa"
     "crypto/tls"
+    "crypto/x509"
+    "encoding/pem"
     "io"
+    "math/big"
     "net"
     "testing"
     "time"
 )
+
+func selfSignedPair(t *testing.T) (*tls.Config, *tls.Config) {
+    t.Helper()
+    // generate a simple self-signed certificate for localhost testing
+    priv, err := rsa.GenerateKey(rand.Reader, 2048)
+    if err != nil { t.Fatalf("key gen: %v", err) }
+    tmpl := &x509.Certificate{
+        SerialNumber: big.NewInt(1),
+        NotBefore:    time.Now().Add(-time.Hour),
+        NotAfter:     time.Now().Add(24 * time.Hour),
+        KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+        ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+        DNSNames:     []string{"localhost"},
+    }
+    der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
+    if err != nil { t.Fatalf("crt gen: %v", err) }
+    certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+    keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+    pair, err := tls.X509KeyPair(certPEM, keyPEM)
+    if err != nil { t.Fatalf("pair: %v", err) }
+    serverCfg := &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}
+    clientCfg := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}
+    return serverCfg, clientCfg
+}
 
 func TestTCP_Echo(t *testing.T) {
     srv := NewTCPServer("127.0.0.1:0")
@@ -56,14 +85,13 @@ func TestTLS_Wrap(t *testing.T) {
     ln, err := net.Listen("tcp", "127.0.0.1:0")
     if err != nil { t.Fatal(err) }
     defer ln.Close()
-    // Insecure local test: wrap both client and server with TLS using the same config
-    cfg := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}
-    tln := TLSServer(ln, cfg)
+    srvCfg, cliCfg := selfSignedPair(t)
+    tln := TLSServer(ln, srvCfg)
     go func(){
         c, _ := tln.Accept()
         if c != nil { _ = c.Close() }
     }()
-    c, err := TLSDial("tcp", ln.Addr().String(), cfg)
+    c, err := TLSDial("tcp", ln.Addr().String(), cliCfg)
     if err != nil { t.Fatal(err) }
     _ = c.Close()
 }
