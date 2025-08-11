@@ -93,6 +93,28 @@ func (rs *RemoteSystem) Send(remoteAddrOrNode, receiverName string, msgType uint
     return rs.sendWithRetry(target, env)
 }
 
+// SendWithRetry allows specifying custom attempts/backoff for a single send.
+func (rs *RemoteSystem) SendWithRetry(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}, attempts int, initialMs int) error {
+    rs.mutex.RLock(); codec := rs.Default; node := rs.NodeName; rs.mutex.RUnlock()
+    var b []byte
+    var err error
+    if pb, ok := payload.([]byte); ok {
+        b, err = codec.Marshal(pb)
+    } else {
+        b, err = codec.Marshal(payload)
+    }
+    if err != nil { return err }
+    env := Envelope{ SenderNode: node, ReceiverNode: remoteAddrOrNode, ReceiverName: receiverName, MessageType: msgType, PayloadBytes: b, TimestampUnix: NowUnix() }
+    target := remoteAddrOrNode
+    if rs.Discover != nil { if addr, ok := rs.Discover.Resolve(remoteAddrOrNode); ok { target = addr } }
+    // temporarily override
+    prevA, prevI := rs.RetryMaxAttempts, rs.RetryInitialMs
+    if attempts > 0 { rs.RetryMaxAttempts = attempts }
+    if initialMs > 0 { rs.RetryInitialMs = initialMs }
+    defer func(){ rs.RetryMaxAttempts, rs.RetryInitialMs = prevA, prevI }()
+    return rs.sendWithRetry(target, env)
+}
+
 // sendWithRetry attempts to send with exponential backoff up to configured attempts.
 func (rs *RemoteSystem) sendWithRetry(target string, env Envelope) error {
     attempts := rs.RetryMaxAttempts

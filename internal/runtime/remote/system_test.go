@@ -2,6 +2,7 @@ package remote
 
 import (
     "testing"
+    "time"
     rt "github.com/orizon-lang/orizon/internal/runtime"
 )
 
@@ -47,9 +48,6 @@ func TestRemote_InMemory_SendByName(t *testing.T) {
     defer rsB.Stop()
 
     // send to A.svc from B with retry API; node名で配送（ディスカバリ経由）
-    rsB.RetryMaxAttempts = 3
-    rsB.RetryInitialMs = 10
-    rsB.RetryMaxBackoffMs = 50
     if err := rsB.SendWithRetry("A", "svc", 1, []byte("ping"), 3, 5); err != nil { t.Fatalf("send: %v", err) }
 
     // expect payload delivery into echo behavior
@@ -81,7 +79,7 @@ func TestRemote_Retry_Backoff_LateJoin(t *testing.T) {
 
     // Send to node C (not yet started); the retry loop should eventually resolve once C registers
     done := make(chan error, 1)
-    go func(){ done <- rsB.Send("C", "svc", 1, []byte("late")) }()
+    go func(){ done <- rsB.SendWithRetry("C", "svc", 1, []byte("late"), 10, 10) }()
 
     // Start node C after a short delay
     rsC := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}, Discover: disc}
