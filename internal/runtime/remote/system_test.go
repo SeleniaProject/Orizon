@@ -36,16 +36,18 @@ func TestRemote_InMemory_SendByName(t *testing.T) {
     if err != nil { t.Fatalf("create: %v", err) }
 
     // remote system for A
-    rsA := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}}
+    disc := NewStaticDiscovery()
+    rsA := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}, Discover: disc}
     if err := rsA.Start("A", "A"); err != nil { t.Fatalf("rsA start: %v", err) }
     defer rsA.Stop()
 
     // remote client B (no local system needed for sending in this test)
-    rsB := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}}
+    rsB := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}, Discover: disc}
     if err := rsB.Start("B", "B"); err != nil { t.Fatalf("rsB start: %v", err) }
     defer rsB.Stop()
 
     // send to A.svc from B
+    // node名で配送（ディスカバリ経由）
     if err := rsB.Send("A", "svc", 1, []byte("ping")); err != nil { t.Fatalf("send: %v", err) }
 
     // expect payload delivery into echo behavior

@@ -21,6 +21,7 @@ type RemoteSystem struct {
     Trans     Transport
     Local     LocalDispatcher
     Resolver  NameResolver
+    Discover  Discovery
     started   bool
     mutex     sync.RWMutex
 }
@@ -42,6 +43,7 @@ func (rs *RemoteSystem) Start(nodeName, addr string) error {
     if err := rs.Trans.Start(addr, handler); err != nil { return err }
     rs.Address = rs.Trans.Address()
     rs.started = true
+    if rs.Discover != nil { _ = rs.Discover.Register(nodeName, rs.Address) }
     return nil
 }
 
@@ -50,12 +52,13 @@ func (rs *RemoteSystem) Stop() error {
     rs.mutex.Lock(); defer rs.mutex.Unlock()
     if !rs.started { return nil }
     rs.started = false
+    if rs.Discover != nil { rs.Discover.Unregister(rs.NodeName) }
     if rs.Trans != nil { return rs.Trans.Stop() }
     return nil
 }
 
 // Send delivers a message to a remote node.
-func (rs *RemoteSystem) Send(remoteAddr, receiverName string, msgType uint32, payload interface{}) error {
+func (rs *RemoteSystem) Send(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}) error {
     rs.mutex.RLock(); codec := rs.Default; node := rs.NodeName; rs.mutex.RUnlock()
     // For byte payloads, wrap in JSON so Unmarshal to []byte works symmetrically
     var b []byte
@@ -74,7 +77,12 @@ func (rs *RemoteSystem) Send(remoteAddr, receiverName string, msgType uint32, pa
         PayloadBytes:  b,
         TimestampUnix: NowUnix(),
     }
-    return rs.Trans.Send(remoteAddr, env)
+    // If a discovery is available, allow passing node name instead of address
+    target := remoteAddrOrNode
+    if rs.Discover != nil {
+        if addr, ok := rs.Discover.Resolve(remoteAddrOrNode); ok { target = addr }
+    }
+    return rs.Trans.Send(target, env)
 }
 
 // receive handles an incoming envelope and dispatches to a local actor by name.
