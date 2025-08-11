@@ -57,7 +57,14 @@ func (rs *RemoteSystem) Stop() error {
 // Send delivers a message to a remote node.
 func (rs *RemoteSystem) Send(remoteAddr, receiverName string, msgType uint32, payload interface{}) error {
     rs.mutex.RLock(); codec := rs.Default; node := rs.NodeName; rs.mutex.RUnlock()
-    b, err := codec.Marshal(payload)
+    // For byte payloads, wrap in JSON so Unmarshal to []byte works symmetrically
+    var b []byte
+    var err error
+    if pb, ok := payload.([]byte); ok {
+        b, err = codec.Marshal(pb)
+    } else {
+        b, err = codec.Marshal(payload)
+    }
     if err != nil { return err }
     env := Envelope{
         SenderNode:    node,
@@ -79,9 +86,13 @@ func (rs *RemoteSystem) receive(env Envelope) error {
         return fmt.Errorf("local actor not found: %s", env.ReceiverName)
     }
     var payload interface{}
-    // The default codec is opaque for interface{} payload; for test purposes, treat as raw bytes (string)
-    // A real implementation would use schema-aware serialization.
-    payload = env.PayloadBytes
+    // Attempt to decode with default codec into raw bytes; fall back to raw envelope payload on error.
+    var raw []byte
+    if err := rs.Default.Unmarshal(env.PayloadBytes, &raw); err == nil {
+        payload = raw
+    } else {
+        payload = env.PayloadBytes
+    }
     return rs.Local.SendMessage(0, id, env.MessageType, payload)
 }
 
