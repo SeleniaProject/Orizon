@@ -112,14 +112,10 @@ func (rs *RemoteSystem) sendWithRetry(target string, env Envelope) error {
         if rs.Discover != nil {
             if addr, ok := rs.Discover.Resolve(env.ReceiverNode); ok { target = addr }
         }
-        // sleep backoff
         if i < attempts-1 {
             d := backoff
             if d > max { d = max }
-            // local sleep without import time here; delay delegated by transport if needed (simple loop)
-            // Use a minimal busy-wait with small handoff to avoid adding import cycles.
-            // Note: we keep code simple; tests rely on small timings.
-            sleepMs(d)
+            time.Sleep(time.Duration(d) * time.Millisecond)
             backoff <<= 1
             if backoff > max { backoff = max }
         }

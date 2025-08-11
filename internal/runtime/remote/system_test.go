@@ -47,13 +47,56 @@ func TestRemote_InMemory_SendByName(t *testing.T) {
     defer rsB.Stop()
 
     // send to A.svc from B with retry API; node名で配送（ディスカバリ経由）
-    rsB.Retry = RetryPolicy{MaxAttempts: 3, InitialBackoff: 5e6, MaxBackoff: 5e7}
-    if err := rsB.SendWithRetry("A", "svc", 1, []byte("ping")); err != nil { t.Fatalf("send: %v", err) }
+    rsB.RetryMaxAttempts = 3
+    rsB.RetryInitialMs = 10
+    rsB.RetryMaxBackoffMs = 50
+    if err := rsB.SendWithRetry("A", "svc", 1, []byte("ping"), 3, 5); err != nil { t.Fatalf("send: %v", err) }
 
     // expect payload delivery into echo behavior
     select {
     case b := <-eb.got:
         if string(b) != "ping" { t.Fatalf("unexpected payload: %q", string(b)) }
+    }
+}
+
+// Late join node: send before destination started, ensure retry succeeds after it joins.
+func TestRemote_Retry_Backoff_LateJoin(t *testing.T) {
+    // local node A
+    a, _ := rt.NewActorSystem(rt.DefaultActorSystemConfig)
+    _ = a.Start()
+    defer a.Stop()
+    eb := &echoBehavior{got: make(chan []byte, 1)}
+    _, err := a.CreateActor("svc", rt.UserActor, eb, rt.DefaultActorConfig)
+    if err != nil { t.Fatalf("create: %v", err) }
+
+    disc := NewStaticDiscovery()
+    rsA := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}, Discover: disc}
+    if err := rsA.Start("A", "A"); err != nil { t.Fatalf("rsA start: %v", err) }
+    defer rsA.Stop()
+
+    // Sender B (will start later after first send)
+    rsB := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}, Discover: disc}
+    if err := rsB.Start("B", "B"); err != nil { t.Fatalf("rsB start: %v", err) }
+    defer rsB.Stop()
+
+    // Send to node C (not yet started); the retry loop should eventually resolve once C registers
+    done := make(chan error, 1)
+    go func(){ done <- rsB.Send("C", "svc", 1, []byte("late")) }()
+
+    // Start node C after a short delay
+    rsC := &RemoteSystem{Trans: &InMemoryTransport{}, Default: JSONCodec{}, Local: adapter{a}, Resolver: regAdapter{a}, Discover: disc}
+    // let retry attempt run a couple of times
+    time.Sleep(80 * time.Millisecond)
+    if err := rsC.Start("C", "C"); err != nil { t.Fatalf("rsC start: %v", err) }
+    defer rsC.Stop()
+
+    if err := <-done; err != nil { t.Fatalf("send finished with error: %v", err) }
+
+    select {
+    case b := <-eb.got:
+        if string(b) != "late" { t.Fatalf("unexpected payload: %q", string(b)) }
+    case <-time.After(time.Second):
+        t.Fatal("did not receive retried delivery")
     }
 }
 
