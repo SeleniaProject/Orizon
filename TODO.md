@@ -638,8 +638,8 @@
 - **成果物**:
   - [x] TCP/UDP抽象化: `internal/runtime/netstack`（`TCPServer`/`DialTCP`、`UDPEndpoint`）
   - [x] TLSラッパ: `TLSDial`/`TLSServer`（自己署名証明書でのローカル疎通テスト含む）
-  - [ ] HTTP/3実装
-  - [ ] TLS 1.3サポート（明示設定・検証）
+  - [x] HTTP/3最小実装: `internal/runtime/netstack/http3.go`（`http3.Server`/`Transport`ラッパ、ループバックテスト）
+  - [x] TLS 1.3サポート: QUIC経由でTLS 1.3を使用（自己署名でローカル検証）。汎用TLS設定拡張は後続
 - **依存関係**: 3.4.2
 - **推定工数**: 大（35日）
 
