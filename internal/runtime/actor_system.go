@@ -133,6 +133,9 @@ type ActorScheduler struct {
 	statistics SchedulerStatistics           // Statistics
 	running    bool                          // Scheduler running
 	ctx        context.Context               // Context
+    // process is a callback invoked by workers to process one scheduled actor.
+    // The callback must be set by the owning ActorSystem.
+    process    func(ActorID)
 	mutex      sync.RWMutex                  // Synchronization
 }
 
@@ -584,7 +587,7 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 	// Initialize registry
 	system.registry = NewActorRegistry()
 
-	// Initialize scheduler
+    // Initialize scheduler
 	schedulerConfig := SchedulerConfig{
 		WorkerCount:          4,
 		Strategy:             FairScheduling,
@@ -593,7 +596,20 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		WorkStealingEnabled:  true,
 		LoadBalancingEnabled: true,
 	}
-	system.scheduler = NewActorScheduler(schedulerConfig)
+    system.scheduler = NewActorScheduler(schedulerConfig)
+    // Wire scheduler worker callback to process actor mailboxes
+    system.scheduler.process = func(aid ActorID) {
+        system.mutex.RLock()
+        actor := system.actors[aid]
+        system.mutex.RUnlock()
+        if actor == nil {
+            return
+        }
+        // Drain one message if available and process
+        if msg, ok := actor.Mailbox.Dequeue(); ok {
+            _ = actor.ProcessMessage(msg)
+        }
+    }
 
 	// Initialize dispatcher
 	dispatcherConfig := DispatcherConfig{
@@ -1251,9 +1267,12 @@ func (as *ActorScheduler) Schedule(actorID ActorID) {
 func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
 	for worker.Running {
 		select {
-		case <-worker.Queue:
-			// Process actor task
-			as.statistics.TasksCompleted++
+        case actorID := <-worker.Queue:
+            // Process actor task
+            as.statistics.TasksCompleted++
+            if as.process != nil {
+                as.process(actorID)
+            }
 		case <-as.ctx.Done():
 			return
 		}

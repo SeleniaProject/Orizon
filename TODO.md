@@ -473,14 +473,19 @@
    - 最小スタブ: `RefCountEventProcessor` の最小定義を追加し、依存フィールドの未定義を解消
    - テスト整備: 旧設計に依存した未使用変数を修正し、`go test ./...` を全リポジトリで成功
 
-#### 3.1.3 NUMA対応最適化
-- [ ] **目的**: 分散メモリアーキテクチャでの最適化
+#### 3.1.3 NUMA対応最適化 ✅ 完了
+- [x] **目的**: 分散メモリアーキテクチャでの最適化
 - **成果物**:
-  - [ ] NUMA局所性認識
-  - [ ] メモリアフィニティ制御
-  - [ ] 動的負荷分散
+  - [x] NUMA局所性認識（`internal/runtime/numa/optimizer.go` Topology/Node/距離行列）
+  - [x] メモリアフィニティ制御（AffinityManager: CPU/Memoryマスク・ポリシー）
+  - [x] 動的負荷分散（LoadBalancer: 負荷/閾値/マイグレーション、Scheduler: per-node queue/worker）
 - **依存関係**: 3.1.2
 - **推定工数**: 大（20日）
+- **実装内容**:
+  - Optimizer: Topology/Scheduler/Allocator/Monitorの統合、NUMAヒント付き割当・スケジューリング
+  - Allocator: per-node `MemoryPool`、ローカル優先/リモート許可、フラグメンテーション管理の骨子
+  - Monitor: per-node Sampler と Metrics 集約、しきい値越えで Alert 発報
+  - テスト: `internal/runtime/numa/optimizer_test.go`（トポロジ・距離行列・割当・スケジューリング・負荷分散・統計・並行性能）とベンチ
 
 ### 3.2 アクターシステム
 
@@ -493,6 +498,11 @@
   - [ ] メッセージパッシング機構
 - **依存関係**: 3.1.1
 - **推定工数**: 大（35日）
+ - **現状**:
+   - アクター基盤: `internal/runtime/actor_system.go` （アクター・メールボックス・レジストリ・スケジューラ・ディスパッチャ・スーパーバイザの骨子、心拍/GCループ）
+  - スケジューラ: ワーカーからアクターIDを受け取り、メールボックスからメッセージを1件自動ディスパッチ（`Actor.ProcessMessage`呼び出し）
+  - テスト: `internal/runtime/actor_system_test.go`（ライフサイクル、手動・自動ディスパッチ、優先度キュー、レジストリ）
+  - ビルド状態: `go test ./internal/runtime -run "ActorSystem|Mailbox|Registry|AutoDispatch" -v` 成功
 
 #### 3.2.2 Work Stealingスケジューラー
 - [ ] **目的**: 効率的なマルチコア活用スケジューリング
