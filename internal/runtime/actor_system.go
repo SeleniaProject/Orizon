@@ -5,12 +5,15 @@
 package runtime
 
 import (
-	"context"
-	"fmt"
-	stdrt "runtime"
-	"sync"
-	"sync/atomic"
-	"time"
+    "context"
+    "fmt"
+    "net"
+    stdrt "runtime"
+    "sync"
+    "sync/atomic"
+    "time"
+
+    asyncio "github.com/orizon-lang/orizon/internal/runtime/asyncio"
 )
 
 // Type definitions for actor system
@@ -27,6 +30,20 @@ type (
 const (
 	SystemTerminated MessageType = 0xFFFF0001
 )
+
+// I/O event message types for asyncio integration
+const (
+    IOReadable MessageType = 0x00010001
+    IOWritable MessageType = 0x00010002
+    IOErrorEvt MessageType = 0x00010003
+)
+
+// IOEvent carries I/O readiness information to actors
+type IOEvent struct {
+    Conn net.Conn
+    Type asyncio.EventType
+    Err  error
+}
 
 // Actor system main structure
 type ActorSystem struct {
@@ -47,6 +64,8 @@ type ActorSystem struct {
 	mutex          sync.RWMutex          // Synchronization
     // Remote enables distributed actor messaging integration when attached.
     Remote        interface{ Send(remoteAddrOrNode, receiverName string, msgType uint32, payload interface{}) error } // minimal interface to avoid import cycle in runtime package
+    // ioPoller integrates asyncio events with the actor system when attached.
+    ioPoller      asyncio.Poller
 }
 
 // Actor represents an individual actor
@@ -806,10 +825,17 @@ func (as *ActorSystem) Start() error {
 		return fmt.Errorf("failed to start scheduler: %v", err)
 	}
 
-	// Start dispatcher
-	if err := as.dispatcher.Start(as.ctx); err != nil {
+    // Start dispatcher
+    if err := as.dispatcher.Start(as.ctx); err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
+
+    // Start I/O poller if present
+    if as.ioPoller != nil {
+        if err := as.ioPoller.Start(as.ctx); err != nil {
+            return fmt.Errorf("failed to start io poller: %v", err)
+        }
+    }
 
 	as.running = true
 
@@ -834,16 +860,62 @@ func (as *ActorSystem) Stop() error {
 		as.stopActor(actor)
 	}
 
-	// Stop scheduler and dispatcher
-	as.scheduler.Stop()
-	as.dispatcher.Stop()
+    // Stop scheduler and dispatcher
+    as.scheduler.Stop()
+    as.dispatcher.Stop()
 
-	// Cancel context
-	as.cancel()
+    // Stop I/O poller if attached
+    if as.ioPoller != nil {
+        _ = as.ioPoller.Stop()
+    }
+
+    // Cancel context
+    as.cancel()
 
 	as.running = false
 
 	return nil
+}
+
+// SetIOPoller attaches an asyncio Poller to the actor system lifecycle.
+func (as *ActorSystem) SetIOPoller(p asyncio.Poller) {
+    as.mutex.Lock()
+    as.ioPoller = p
+    as.mutex.Unlock()
+}
+
+// WatchConnWithActor registers a net.Conn with the attached poller and routes events to target actor.
+func (as *ActorSystem) WatchConnWithActor(conn net.Conn, kinds []asyncio.EventType, target ActorID) error {
+    as.mutex.RLock()
+    p := as.ioPoller
+    as.mutex.RUnlock()
+    if p == nil {
+        return fmt.Errorf("no io poller attached")
+    }
+    handler := func(ev asyncio.Event) {
+        var mt MessageType
+        switch ev.Type {
+        case asyncio.Readable:
+            mt = IOReadable
+        case asyncio.Writable:
+            mt = IOWritable
+        default:
+            mt = IOErrorEvt
+        }
+        _ = as.SendMessage(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err})
+    }
+    return p.Register(conn, kinds, handler)
+}
+
+// UnwatchConn deregisters a net.Conn from the attached poller.
+func (as *ActorSystem) UnwatchConn(conn net.Conn) error {
+    as.mutex.RLock()
+    p := as.ioPoller
+    as.mutex.RUnlock()
+    if p == nil {
+        return fmt.Errorf("no io poller attached")
+    }
+    return p.Deregister(conn)
 }
 
 // CreateActor creates a new actor in the system

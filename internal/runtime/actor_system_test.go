@@ -2,8 +2,10 @@ package runtime
 
 import (
     "fmt"
+    "net"
     "testing"
     "time"
+    asyncio "github.com/orizon-lang/orizon/internal/runtime/asyncio"
 )
 
 // testBehavior is a simple actor behavior used for testing.
@@ -446,6 +448,54 @@ func TestActor_SpawnAndTell(t *testing.T) {
     case <-time.After(time.Second):
         t.Fatal("did not receive ping")
     }
+}
+
+// ioBehavior receives IOEvent messages and signals when a Readable event arrives.
+type ioBehavior struct{ got chan struct{} }
+func (b *ioBehavior) Receive(ctx *ActorContext, msg Message) error {
+    if msg.Type == IOReadable {
+        b.got <- struct{}{}
+    }
+    return nil
+}
+func (b *ioBehavior) PreStart(*ActorContext) error { return nil }
+func (b *ioBehavior) PostStop(*ActorContext) error { return nil }
+func (b *ioBehavior) PreRestart(*ActorContext, error, *Message) error { return nil }
+func (b *ioBehavior) PostRestart(*ActorContext, error) error { return nil }
+func (b *ioBehavior) GetBehaviorName() string { return "io" }
+
+func TestActorSystem_IOPollerIntegration(t *testing.T) {
+    system, _ := NewActorSystem(DefaultActorSystemConfig)
+    // attach OS poller
+    system.SetIOPoller(asyncio.NewOSPoller())
+    _ = system.Start()
+    defer system.Stop()
+
+    beh := &ioBehavior{got: make(chan struct{}, 1)}
+    actor, err := system.CreateActor("io", UserActor, beh, DefaultActorConfig)
+    if err != nil { t.Fatalf("create actor: %v", err) }
+
+    // Create loopback TCP to trigger readability
+    ln, err := net.Listen("tcp", "127.0.0.1:0")
+    if err != nil { t.Fatal(err) }
+    defer ln.Close()
+    addr := ln.Addr().String()
+
+    client, err := net.Dial("tcp", addr)
+    if err != nil { t.Fatal(err) }
+    defer client.Close()
+
+    go func(){ c, _ := ln.Accept(); if c != nil { defer c.Close(); _ = system.WatchConnWithActor(c, []asyncio.EventType{asyncio.Readable}, actor.ID); time.Sleep(20*time.Millisecond); _, _ = c.Write([]byte("x")) } }()
+
+    // wait for event delivered to actor
+    select {
+    case <-beh.got:
+        // ok
+    case <-time.After(2 * time.Second):
+        t.Fatal("did not receive IOReadable event")
+    }
+
+    _ = client.Close()
 }
 
 func TestMailbox_PriorityQueue(t *testing.T) {
