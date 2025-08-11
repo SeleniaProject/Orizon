@@ -226,7 +226,7 @@ func TestIntegration(t *testing.T) {
 	system := NewGCAvoidanceSystem(config)
 
 	// Simulate a function call with various allocations
-	scope := system.lifetimeTracker.EnterScope("integration_test")
+	system.lifetimeTracker.EnterScope("integration_test")
 	frame := system.stackManager.PushFrame("integration_test")
 
 	if frame == nil {
@@ -285,7 +285,7 @@ func BenchmarkGCAvoidanceSystem(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scope := system.lifetimeTracker.EnterScope("bench")
+		system.lifetimeTracker.EnterScope("bench")
 		frame := system.stackManager.PushFrame("bench")
 
 		if frame != nil {

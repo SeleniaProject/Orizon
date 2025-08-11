@@ -93,7 +93,7 @@ func (t TrackingAllocType) String() string {
 type OptimizedRefCountManager struct {
 	counters       map[uintptr]*OptimizedRefCounter
 	cycleDetector  *CycleDetector
-	weakReferences map[uintptr]*WeakReference
+	weakReferences map[uintptr]*WeakRef
 	eventProcessor *RefCountEventProcessor
 	config         RefCountConfig
 	statistics     RefCountStatistics
@@ -202,13 +202,15 @@ type GCAvoidanceStatistics struct {
 	OptimizationTime    time.Duration
 }
 
-type RefCountStatistics struct {
-	TotalIncrements      int64
-	TotalDecrements      int64
-	CyclesDetected       int64
-	CyclesBroken         int64
-	OptimizationsApplied int64
-}
+// NOTE: Duplicate of the authoritative definition in refcount_optimizer.go.
+// Commented out here to avoid re-declaration conflicts.
+// type RefCountStatistics struct {
+//     TotalIncrements      int64
+//     TotalDecrements      int64
+//     CyclesDetected       int64
+//     CyclesBroken         int64
+//     OptimizationsApplied int64
+// }
 
 type StackStatistics struct {
 	FramesCreated    int64
@@ -225,11 +227,12 @@ type EscapeStatistics struct {
 	OptimizationsSaved int64
 }
 
-type SchedulerStatistics struct {
-	OperationsScheduled int64
-	OperationsCompleted int64
-	AverageLatency      time.Duration
-}
+// NOTE: Duplicate of SchedulerStatistics in actor_system.go. Commented out.
+// type SchedulerStatistics struct {
+//     OperationsScheduled int64
+//     OperationsCompleted int64
+//     AverageLatency      time.Duration
+// }
 
 // NewGCAvoidanceSystem creates a new GC avoidance system
 func NewGCAvoidanceSystem(config GCAvoidanceConfig) *GCAvoidanceSystem {
@@ -396,14 +399,10 @@ func (lt *LifetimeTracker) doesEscape(data *TrackingData) bool {
 func NewOptimizedRefCountManager() *OptimizedRefCountManager {
 	rcm := &OptimizedRefCountManager{
 		counters:       make(map[uintptr]*OptimizedRefCounter),
-		cycleDetector:  NewCycleDetector(),
-		weakReferences: make(map[uintptr]*WeakReference),
-		eventProcessor: NewRefCountEventProcessor(),
-		config: RefCountConfig{
-			EnableCycleDetection: true,
-			EnableWeakReferences: true,
-			CycleCheckInterval:   time.Second * 5,
-		},
+		cycleDetector:  NewCycleDetector(DefaultCycleConfig),
+		weakReferences: make(map[uintptr]*WeakRef),
+		eventProcessor: nil,
+		config:         DefaultRefCountConfig,
 	}
 
 	// Start background processes
@@ -473,7 +472,8 @@ func (rcm *OptimizedRefCountManager) applyOptimizations(counter *OptimizedRefCou
 		counter.optimizations = append(counter.optimizations, "batch_updates")
 	}
 
-	atomic.AddInt64(&rcm.statistics.OptimizationsApplied, 1)
+	// Count as an optimization applied; map to OptimizedObjects in authoritative stats
+	atomic.AddInt64(&rcm.statistics.OptimizedObjects, 1)
 }
 
 // handleZeroRefCount handles cleanup when reference count reaches zero
@@ -720,14 +720,17 @@ func (gca *GCAvoidanceSystem) String() string {
 }
 
 // Placeholder types and functions to complete the implementation
-type CycleDetector struct{}
-type WeakReference struct{}
+// NOTE: Duplicates of types defined elsewhere. Commented out to use the real ones.
+// type CycleDetector struct{}
+// type WeakReference struct{}
+// Define minimal stub to satisfy field reference without conflicting with real implementations.
 type RefCountEventProcessor struct{}
-type RefCountConfig struct {
-	EnableCycleDetection bool
-	EnableWeakReferences bool
-	CycleCheckInterval   time.Duration
-}
+
+//	type RefCountConfig struct {
+//	    EnableCycleDetection bool
+//	    EnableWeakReferences bool
+//	    CycleCheckInterval   time.Duration
+//	}
 type StackOptimization struct {
 	EnableInlining  bool
 	EnableTailCall  bool
@@ -740,9 +743,9 @@ type MemoryWorker struct {
 	operations <-chan *MemoryOperation
 }
 
-func NewCycleDetector() *CycleDetector                   { return &CycleDetector{} }
-func NewRefCountEventProcessor() *RefCountEventProcessor { return &RefCountEventProcessor{} }
-func NewCallGraph() *CallGraph                           { return &CallGraph{} }
+// func NewCycleDetector() *CycleDetector                   { return &CycleDetector{} }
+// func NewRefCountEventProcessor() *RefCountEventProcessor { return &RefCountEventProcessor{} }
+func NewCallGraph() *CallGraph { return &CallGraph{} }
 func NewMemoryWorker(id int, ops <-chan *MemoryOperation) *MemoryWorker {
 	return &MemoryWorker{id: id, operations: ops}
 }
@@ -822,244 +825,76 @@ const (
 	LeakDetectedEvent
 )
 
-// StackAllocator manages stack allocation prioritization
-type StackAllocator struct {
-	frames       []*StackFrame
-	currentFrame *StackFrame
-	maxDepth     int
-	currentDepth int
-	framePool    sync.Pool
-
-	// Optimization settings
-	escapeAnalysis     bool
-	inlineOptimization bool
-	tailCallOpt        bool
-
-	// Statistics
-	stackAllocations int64
-	heapEscapes      int64
-	inlineSuccesses  int64
-	frameReuses      int64
-}
+// NOTE: Legacy StackAllocator implementation disabled in favor of stack_optimizer.go.
+// Keeping type alias for compatibility if referenced, but without implementation.
+// Use NewStackOptimizer and related APIs in stack_optimizer.go for stack optimization.
+//
+// type StackAllocator struct{}
 
 // StackFrame represents a stack frame
-type StackFrame struct {
-	id          int
-	function    string
-	allocations map[uintptr]*StackAllocation
-	parent      *StackFrame
-	children    []*StackFrame
-	size        uintptr
-	used        uintptr
-	canGrow     bool
-	isInlined   bool
-}
+// NOTE: Duplicate of StackFrame in stack_optimizer.go. Commented out.
+// type StackFrame struct {
+//     id          int
+//     function    string
+//     allocations map[uintptr]*StackAllocation
+//     parent      *StackFrame
+//     children    []*StackFrame
+//     size        uintptr
+//     used        uintptr
+//     canGrow     bool
+//     isInlined   bool
+// }
 
 // StackAllocation represents a stack-allocated object
-type StackAllocation struct {
-	ptr        uintptr
-	size       uintptr
-	offset     uintptr
-	frame      *StackFrame
-	variable   string
-	isLive     bool
-	references []uintptr
-}
+// NOTE: Duplicate of StackAllocation in lifetime_analyzer.go. Commented out.
+// type StackAllocation struct {
+//     ptr        uintptr
+//     size       uintptr
+//     offset     uintptr
+//     frame      *StackFrame
+//     variable   string
+//     isLive     bool
+//     references []uintptr
+// }
 
 // NewLifetimeAnalyzer creates a new lifetime analyzer
-func NewLifetimeAnalyzer() *LifetimeAnalyzer {
-	return &LifetimeAnalyzer{
-		scopes:         make([]*Scope, 0),
-		allocations:    make(map[uintptr]*Allocation),
-		lifetimes:      make(map[uintptr]*Lifetime),
-		dependencies:   make(map[uintptr][]uintptr),
-		stackPriority:  true,
-		regionPriority: true,
-	}
-}
+// func NewLifetimeAnalyzer() *LifetimeAnalyzer {
+//     return &LifetimeAnalyzer{
+//         scopes:         make([]*Scope, 0),
+//         allocations:    make(map[uintptr]*Allocation),
+//         lifetimes:      make(map[uintptr]*Lifetime),
+//         dependencies:   make(map[uintptr][]uintptr),
+//         stackPriority:  true,
+//         regionPriority: true,
+//     }
+// }
 
 // NewScope creates a new lexical scope
-func (la *LifetimeAnalyzer) NewScope(function string, startLine int) *Scope {
-	la.mutex.Lock()
-	defer la.mutex.Unlock()
-
-	scope := &Scope{
-		id:          len(la.scopes),
-		parent:      la.currentScope,
-		children:    make([]*Scope, 0),
-		allocations: make([]uintptr, 0),
-		startLine:   startLine,
-		function:    function,
-		variables:   make(map[string]*Variable),
-	}
-
-	if la.currentScope != nil {
-		la.currentScope.children = append(la.currentScope.children, scope)
-	}
-
-	la.scopes = append(la.scopes, scope)
-	la.currentScope = scope
-
-	return scope
-}
+// NOTE: Legacy LifetimeAnalyzer scope API disabled. Use lifetime_analyzer.go structures instead.
+// func (la *LifetimeAnalyzer) NewScope(function string, startLine int) *Scope { return nil }
 
 // EndScope ends the current scope
-func (la *LifetimeAnalyzer) EndScope(endLine int) {
-	la.mutex.Lock()
-	defer la.mutex.Unlock()
-
-	if la.currentScope != nil {
-		la.currentScope.endLine = endLine
-		la.finalizeScope(la.currentScope)
-		la.currentScope = la.currentScope.parent
-	}
-}
+// func (la *LifetimeAnalyzer) EndScope(endLine int) {}
 
 // finalizeScope performs lifetime analysis for a completed scope
-func (la *LifetimeAnalyzer) finalizeScope(scope *Scope) {
-	// Analyze variable lifetimes
-	for _, variable := range scope.variables {
-		if !variable.escapesToHeap && variable.refCount == 1 {
-			// Can be stack allocated
-			if lifetime, exists := la.lifetimes[variable.ptr]; exists {
-				lifetime.mustStack = true
-				lifetime.priority = 1000 // High priority for stack allocation
-			}
-		}
-	}
-
-	// Detect escaping allocations
-	for _, ptr := range scope.allocations {
-		if alloc, exists := la.allocations[ptr]; exists {
-			if la.doesEscape(alloc, scope) {
-				alloc.allocType = EscapedAllocation
-			}
-		}
-	}
-}
+// func (la *LifetimeAnalyzer) finalizeScope(scope *Scope) {}
 
 // doesEscape determines if an allocation escapes the scope
-func (la *LifetimeAnalyzer) doesEscape(alloc *Allocation, scope *Scope) bool {
-	// Check if references exist outside the scope
-	if deps, exists := la.dependencies[alloc.ptr]; exists {
-		for _, depPtr := range deps {
-			if depAlloc, exists := la.allocations[depPtr]; exists {
-				if depAlloc.owner != scope {
-					return true
-				}
-			}
-		}
-	}
-
-	// Check if the allocation is returned from function
-	if alloc.lifetime != nil && alloc.lifetime.canEscape {
-		return true
-	}
-
-	return false
-}
+// func (la *LifetimeAnalyzer) doesEscape(alloc *Allocation, scope *Scope) bool { return false }
 
 // AllocateWithLifetime allocates memory with lifetime tracking
-func (la *LifetimeAnalyzer) AllocateWithLifetime(size uintptr, variable string) uintptr {
-	la.mutex.Lock()
-	defer la.mutex.Unlock()
-
-	// Use unsafe.Pointer for low-level memory operations
-	ptr := uintptr(unsafe.Pointer(&make([]byte, size)[0]))
-
-	lifetime := &Lifetime{
-		start:      time.Now(),
-		scope:      la.currentScope,
-		references: make([]uintptr, 0),
-		isActive:   true,
-		priority:   100, // Default priority
-	}
-
-	allocation := &Allocation{
-		ptr:       ptr,
-		size:      size,
-		allocType: StackAllocation, // Default to stack
-		lifetime:  lifetime,
-		refCount:  1,
-		owner:     la.currentScope,
-		isValid:   true,
-		timestamp: time.Now(),
-	}
-
-	// Determine allocation type
-	if la.stackPriority && size <= 8192 { // 8KB stack limit
-		allocation.allocType = StackAllocation
-		lifetime.mustStack = true
-	} else if la.regionPriority {
-		allocation.allocType = RegionAllocation
-	} else {
-		allocation.allocType = RefCountedAllocation
-	}
-
-	la.allocations[ptr] = allocation
-	la.lifetimes[ptr] = lifetime
-
-	if la.currentScope != nil {
-		la.currentScope.allocations = append(la.currentScope.allocations, ptr)
-		la.currentScope.variables[variable] = &Variable{
-			name:          variable,
-			ptr:           ptr,
-			lifetime:      lifetime,
-			escapesToHeap: false,
-			refCount:      1,
-			isDropped:     false,
-		}
-	}
-
-	return ptr
-}
+// NOTE: The following legacy LifetimeAnalyzer allocation methods were part of an older design
+// that conflicts with the authoritative structures in lifetime_analyzer.go. They are disabled to
+// avoid type and field mismatches and to keep a single source of truth. If a local allocation API
+// is needed here, it should delegate to lifetime_analyzer.go types.
+/*
+func (la *LifetimeAnalyzer) AllocateWithLifetime(size uintptr, variable string) uintptr { return 0 }
+func (la *LifetimeAnalyzer) AddReference(ptr, refPtr uintptr)                           {}
+func (la *LifetimeAnalyzer) RemoveReference(ptr, refPtr uintptr)                        {}
+*/
 
 // AddReference adds a reference to an allocation
-func (la *LifetimeAnalyzer) AddReference(ptr, refPtr uintptr) {
-	la.mutex.Lock()
-	defer la.mutex.Unlock()
-
-	if deps, exists := la.dependencies[ptr]; exists {
-		la.dependencies[ptr] = append(deps, refPtr)
-	} else {
-		la.dependencies[ptr] = []uintptr{refPtr}
-	}
-
-	if alloc, exists := la.allocations[ptr]; exists {
-		atomic.AddInt32(&alloc.refCount, 1)
-	}
-
-	if lifetime, exists := la.lifetimes[ptr]; exists {
-		lifetime.references = append(lifetime.references, refPtr)
-	}
-}
-
-// RemoveReference removes a reference from an allocation
-func (la *LifetimeAnalyzer) RemoveReference(ptr, refPtr uintptr) {
-	la.mutex.Lock()
-	defer la.mutex.Unlock()
-
-	if alloc, exists := la.allocations[ptr]; exists {
-		newCount := atomic.AddInt32(&alloc.refCount, -1)
-		if newCount == 0 {
-			la.deallocate(ptr)
-		}
-	}
-}
-
-// deallocate deallocates memory when reference count reaches zero
-func (la *LifetimeAnalyzer) deallocate(ptr uintptr) {
-	if alloc, exists := la.allocations[ptr]; exists {
-		alloc.isValid = false
-		if lifetime, exists := la.lifetimes[ptr]; exists {
-			lifetime.end = time.Now()
-			lifetime.isActive = false
-		}
-		delete(la.allocations, ptr)
-		delete(la.lifetimes, ptr)
-		delete(la.dependencies, ptr)
-	}
-}
+// func (la *LifetimeAnalyzer) deallocate(ptr uintptr) {}
 
 // NewRefCountManager creates a new reference count manager
 func NewRefCountManager() *RefCountManager {
@@ -1247,143 +1082,22 @@ func (rcm *RefCountManager) DetectCycles() [][]uintptr {
 }
 
 // NewStackAllocator creates a new stack allocator
-func NewStackAllocator(maxDepth int) *StackAllocator {
-	sa := &StackAllocator{
-		frames:             make([]*StackFrame, 0),
-		maxDepth:           maxDepth,
-		escapeAnalysis:     true,
-		inlineOptimization: true,
-		tailCallOpt:        true,
-	}
-
-	sa.framePool = sync.Pool{
-		New: func() interface{} {
-			return &StackFrame{
-				allocations: make(map[uintptr]*StackAllocation),
-				children:    make([]*StackFrame, 0),
-			}
-		},
-	}
-
-	return sa
-}
+// func NewStackAllocator(maxDepth int) *StackAllocator { return &StackAllocator{} }
 
 // PushFrame pushes a new stack frame
-func (sa *StackAllocator) PushFrame(function string) *StackFrame {
-	if sa.currentDepth >= sa.maxDepth {
-		return nil // Stack overflow protection
-	}
-
-	frame := sa.framePool.Get().(*StackFrame)
-	frame.id = len(sa.frames)
-	frame.function = function
-	frame.parent = sa.currentFrame
-	frame.size = 0
-	frame.used = 0
-	frame.canGrow = true
-	frame.isInlined = false
-
-	// Clear previous allocations
-	for k := range frame.allocations {
-		delete(frame.allocations, k)
-	}
-	frame.children = frame.children[:0]
-
-	if sa.currentFrame != nil {
-		sa.currentFrame.children = append(sa.currentFrame.children, frame)
-	}
-
-	sa.frames = append(sa.frames, frame)
-	sa.currentFrame = frame
-	sa.currentDepth++
-
-	return frame
-}
+// func (sa *StackAllocator) PushFrame(function string) *StackFrame { return nil }
 
 // PopFrame pops the current stack frame
-func (sa *StackAllocator) PopFrame() {
-	if sa.currentFrame == nil {
-		return
-	}
-
-	// Cleanup allocations in the frame
-	for ptr, alloc := range sa.currentFrame.allocations {
-		if alloc.isLive {
-			sa.deallocateStack(ptr)
-		}
-	}
-
-	// Return frame to pool
-	frame := sa.currentFrame
-	sa.currentFrame = frame.parent
-	sa.currentDepth--
-
-	sa.framePool.Put(frame)
-	atomic.AddInt64(&sa.frameReuses, 1)
-}
+// func (sa *StackAllocator) PopFrame() {}
 
 // AllocateStack allocates memory on the stack
-func (sa *StackAllocator) AllocateStack(size uintptr, variable string) uintptr {
-	if sa.currentFrame == nil {
-		return 0
-	}
-
-	// Check if allocation fits in current frame
-	if sa.currentFrame.used+size > sa.currentFrame.size && !sa.currentFrame.canGrow {
-		// Try to escape to heap
-		atomic.AddInt64(&sa.heapEscapes, 1)
-		return 0
-	}
-
-	// Allocate on stack (simplified)
-	ptr := uintptr(unsafe.Pointer(&make([]byte, size)[0]))
-
-	allocation := &StackAllocation{
-		ptr:        ptr,
-		size:       size,
-		offset:     sa.currentFrame.used,
-		frame:      sa.currentFrame,
-		variable:   variable,
-		isLive:     true,
-		references: make([]uintptr, 0),
-	}
-
-	sa.currentFrame.allocations[ptr] = allocation
-	sa.currentFrame.used += size
-	atomic.AddInt64(&sa.stackAllocations, 1)
-
-	return ptr
-}
+// func (sa *StackAllocator) AllocateStack(size uintptr, variable string) uintptr { return 0 }
 
 // deallocateStack deallocates stack memory
-func (sa *StackAllocator) deallocateStack(ptr uintptr) {
-	if sa.currentFrame == nil {
-		return
-	}
-
-	if alloc, exists := sa.currentFrame.allocations[ptr]; exists {
-		alloc.isLive = false
-		delete(sa.currentFrame.allocations, ptr)
-	}
-}
+// func (sa *StackAllocator) deallocateStack(ptr uintptr) {}
 
 // CanInline determines if a function call can be inlined
-func (sa *StackAllocator) CanInline(function string, size uintptr) bool {
-	if !sa.inlineOptimization {
-		return false
-	}
-
-	// Simple heuristics for inlining
-	if size > 1024 { // 1KB limit for inline functions
-		return false
-	}
-
-	if sa.currentDepth >= sa.maxDepth-5 { // Leave some stack space
-		return false
-	}
-
-	return true
-}
+// func (sa *StackAllocator) CanInline(function string, size uintptr) bool { return false }
 
 // GetStatistics returns GC avoidance statistics
 func (la *LifetimeAnalyzer) GetStatistics() map[string]interface{} {
@@ -1391,17 +1105,10 @@ func (la *LifetimeAnalyzer) GetStatistics() map[string]interface{} {
 	defer la.mutex.RUnlock()
 
 	stats := make(map[string]interface{})
+	// Provide minimal, conflict-free statistics using authoritative fields
 	stats["total_scopes"] = len(la.scopes)
-	stats["total_allocations"] = len(la.allocations)
-	stats["active_lifetimes"] = len(la.lifetimes)
-
-	// Count by allocation type
-	typeCounts := make(map[string]int)
-	for _, alloc := range la.allocations {
-		typeCounts[alloc.allocType.String()]++
-	}
-	stats["allocation_types"] = typeCounts
-
+	stats["total_variables"] = len(la.variables)
+	stats["total_functions"] = len(la.functions)
 	return stats
 }
 
@@ -1423,8 +1130,4 @@ func (rcm *RefCountManager) String() string {
 }
 
 // String returns a string representation of the stack allocator
-func (sa *StackAllocator) String() string {
-	return fmt.Sprintf("StackAllocator{frames: %d, depth: %d/%d, stack_allocs: %d, heap_escapes: %d, inlines: %d, reuses: %d}",
-		len(sa.frames), sa.currentDepth, sa.maxDepth, atomic.LoadInt64(&sa.stackAllocations),
-		atomic.LoadInt64(&sa.heapEscapes), atomic.LoadInt64(&sa.inlineSuccesses), atomic.LoadInt64(&sa.frameReuses))
-}
+// func (sa *StackAllocator) String() string { return "StackAllocator{}" }
