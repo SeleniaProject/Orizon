@@ -194,12 +194,12 @@
 - **依存関係**: 1.2.1
 - **推定工数**: 中（10日）
 - **現状**:
-  - `internal/ast/` および `internal/parser/` にAST・Visitor・変換関連の実装が存在（重複定義のため統合方針の確定が必要）
-  - ブリッジ実装: `internal/ast/bridge_parser.go`（`parser.Program` ⇄ `ast.Program` 変換）
-  - ブリッジ検証テスト: `internal/ast/bridge_parser_test.go`（往復変換・Span/Operator/Literal検証）
-  - 統合ポイント: `internal/parser/ast_optimization_bridge.go`（`internal/ast`最適化パイプラインを`parser`フローに接続）
-  - 統合テスト: `internal/parser/ast_optimization_bridge_test.go`（定数畳み込み・デッドコード除去の往復を検証）
-  - CLI統合: `cmd/orizon-compiler/main.go` に `--parse` と `--optimize-level` を追加し、最適化結果を`parser` ASTで出力
+  - `internal/ast/` および `internal/parser/` にAST・Visitor・変換関連の実装が存在（重複定義はブリッジ方式で相互運用を確保、最終統合方針の決定は保留）
+  - ブリッジ実装: `internal/astbridge/convert.go`（`parser.Program` ⇄ `ast.Program` 変換ユーティリティ）
+  - parser統合: `internal/parser/ast_optimization_bridge.go`（`internal/ast`の最適化パイプラインをレベル別に適用。必要最小限のローカル変換実装で循環依存回避）
+  - 統合テスト: `internal/parser/ast_optimization_bridge_test.go`（定数畳み込み・デッドコード除去の往復検証がグリーン）
+  - CLI統合: `cmd/orizon-compiler/main.go` に `--parse` と `--optimize-level` を追加。`--optimize-level` は none/basic/default/aggressive に対応
+  - 現在のビルド状態: `go test ./...` が成功。`internal/runtime` の重複定義整理により全体ビルド健全化
 
 #### 1.3.2 ソース位置情報管理
 - [x] **目的**: デバッグとエラー報告のための位置情報追跡
@@ -467,6 +467,11 @@
 - **依存関係**: 3.1.1
 - **推定工数**: 大（25日）
 - **完了**: ✅ Phase 3.1.2 実装完了 - 完全なGC回避システム実装完了（gcavoidanceパッケージ、1,800+ lines、17 passing tests）
+ - **実装補足**:
+   - ランタイム統合: `internal/runtime/gc_avoidance.go` の重複定義と非権威実装を整理し、`lifetime_analyzer.go`・`stack_optimizer.go` を権威とする構成へ統一
+   - 統計整合: 参照カウント最適化統計を `RefCountStatistics.OptimizedObjects` に集約（旧`OptimizationsApplied`参照を更新）
+   - 最小スタブ: `RefCountEventProcessor` の最小定義を追加し、依存フィールドの未定義を解消
+   - テスト整備: 旧設計に依存した未使用変数を修正し、`go test ./...` を全リポジトリで成功
 
 #### 3.1.3 NUMA対応最適化
 - [ ] **目的**: 分散メモリアーキテクチャでの最適化
