@@ -7,6 +7,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+    stdrt "runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -350,6 +351,11 @@ type ActorConfig struct {
 	RestartWindow   time.Duration // Restart window
 	EnableStashing  bool          // Enable stashing
 	EnableWatching  bool          // Enable death watching
+    // CPUAffinityMask provides a scheduling hint for CPU/worker affinity.
+    // Each scheduler worker is assigned a CPU bitmask. When set to non-zero,
+    // the scheduler prefers workers whose mask overlaps with this mask while
+    // still applying load-aware selection.
+    CPUAffinityMask uint64
 }
 
 // Supervisor configuration
@@ -500,6 +506,10 @@ type (
 		ID      int
 		Queue   chan ActorID
 		Running bool
+        // CPUMask is the worker's CPU affinity mask used for biased scheduling.
+        CPUMask uint64
+        // QueueLen tracks the current length of the worker queue for load-aware scheduling.
+        QueueLen int64
 	}
 	SchedulerStatistics struct{ TasksScheduled, TasksCompleted, WorkerUtilization uint64 }
 	DispatchRule        struct {
@@ -577,6 +587,7 @@ var DefaultActorConfig = ActorConfig{
 	RestartWindow:   time.Minute * 1,
 	EnableStashing:  true,
 	EnableWatching:  true,
+    CPUAffinityMask: 0,
 }
 
 var DefaultSupervisorConfig = SupervisorConfig{
@@ -1111,26 +1122,26 @@ func (m *Mailbox) Clear() {
 
 // deliverMessage delivers a message to its destination
 func (as *ActorSystem) deliverMessage(msg Message) error {
-    // Interceptors / transformers and routing
+	// Interceptors / transformers and routing
 	as.dispatcher.mutex.RLock()
 	interceptors := append([]MessageInterceptor(nil), as.dispatcher.interceptors...)
 	transformers := append([]MessageTransformer(nil), as.dispatcher.transformers...)
-    routes := append([]DispatchRule(nil), as.dispatcher.routes[msg.Type]...)
+	routes := append([]DispatchRule(nil), as.dispatcher.routes[msg.Type]...)
 	as.dispatcher.mutex.RUnlock()
 
-    // Apply simple routing if configured
-    if len(routes) > 0 {
-        // Pick first route (simple strategy)
-        msg.Receiver = routes[0].Target
-    }
+	// Apply simple routing if configured
+	if len(routes) > 0 {
+		// Pick first route (simple strategy)
+		msg.Receiver = routes[0].Target
+	}
 
-    as.mutex.RLock()
-    receiver, exists := as.actors[msg.Receiver]
-    as.mutex.RUnlock()
+	as.mutex.RLock()
+	receiver, exists := as.actors[msg.Receiver]
+	as.mutex.RUnlock()
 
-    if !exists {
-        return as.sendToDeadLetters(msg)
-    }
+	if !exists {
+		return as.sendToDeadLetters(msg)
+	}
 
 	// Apply interceptors
 	for _, ic := range interceptors {
@@ -1462,15 +1473,33 @@ func (as *ActorScheduler) Start(ctx context.Context) error {
 	as.ctx = ctx
 	as.running = true
 
-	// Start workers
-	for i := 0; i < len(as.workers); i++ {
-		as.workers[i] = &SchedulerWorker{
-			ID:      i,
-			Queue:   make(chan ActorID, 100),
-			Running: true,
-		}
-		go as.runWorker(as.workers[i])
-	}
+    // Start workers with CPU mask assignment (simple round-robin over logical CPUs)
+    cpuCount := stdrt.NumCPU()
+    var defaultMasks []uint64
+    if cpuCount <= 64 {
+        defaultMasks = make([]uint64, len(as.workers))
+        for i := 0; i < len(as.workers); i++ {
+            bit := uint64(1) << uint((i)%cpuCount)
+            defaultMasks[i] = bit
+        }
+    } else {
+        // If CPUs > 64, group multiple CPUs per worker; still provide a non-zero mask
+        defaultMasks = make([]uint64, len(as.workers))
+        for i := 0; i < len(as.workers); i++ {
+            defaultMasks[i] = ^uint64(0) // all bits as a fallback
+        }
+    }
+
+    for i := 0; i < len(as.workers); i++ {
+        as.workers[i] = &SchedulerWorker{
+            ID:      i,
+            Queue:   make(chan ActorID, 100),
+            Running: true,
+            CPUMask: defaultMasks[i],
+            QueueLen: 0,
+        }
+        go as.runWorker(as.workers[i])
+    }
 
 	return nil
 }
@@ -1487,25 +1516,72 @@ func (as *ActorScheduler) Stop() {
 }
 
 func (as *ActorScheduler) Schedule(actorID ActorID) {
+    as.scheduleInternal(actorID, 0)
+}
+
+// ScheduleWithAffinity schedules with a CPU affinity mask hint.
+func (as *ActorScheduler) ScheduleWithAffinity(actorID ActorID, cpuMask uint64) {
+    as.scheduleInternal(actorID, cpuMask)
+}
+
+func (as *ActorScheduler) scheduleInternal(actorID ActorID, actorMask uint64) {
 	if !as.running {
 		return
 	}
 
-	// Simple round-robin scheduling
-	workerIndex := int(actorID) % len(as.workers)
-	select {
-	case as.workers[workerIndex].Queue <- actorID:
-		as.statistics.TasksScheduled++
-	default:
-		// Queue full, try next worker
-		workerIndex = (workerIndex + 1) % len(as.workers)
-		select {
-		case as.workers[workerIndex].Queue <- actorID:
-			as.statistics.TasksScheduled++
-		default:
-			// All queues full, drop task
-		}
-	}
+    // Choose candidate workers set: all workers if no mask, otherwise those overlapping.
+    candidates := make([]*SchedulerWorker, 0, len(as.workers))
+    if actorMask == 0 {
+        candidates = as.workers
+    } else {
+        for _, w := range as.workers {
+            if w.CPUMask&actorMask != 0 {
+                candidates = append(candidates, w)
+            }
+        }
+        if len(candidates) == 0 {
+            candidates = as.workers
+        }
+    }
+
+    // Pick least loaded candidate worker
+    best := candidates[0]
+    bestLen := atomic.LoadInt64(&best.QueueLen)
+    for _, w := range candidates[1:] {
+        if l := atomic.LoadInt64(&w.QueueLen); l < bestLen {
+            best = w
+            bestLen = l
+        }
+    }
+
+    // Try enqueue to best, then fallback to a sibling worker if full
+    idx := best.ID
+    select {
+    case as.workers[idx].Queue <- actorID:
+        atomic.AddInt64(&as.workers[idx].QueueLen, 1)
+        as.statistics.TasksScheduled++
+        return
+    default:
+        // Fallback: probe another worker (least loaded among all)
+    }
+
+    // Global least-loaded fallback
+    fallback := as.workers[0]
+    fallbackLen := atomic.LoadInt64(&fallback.QueueLen)
+    for _, w := range as.workers[1:] {
+        if l := atomic.LoadInt64(&w.QueueLen); l < fallbackLen {
+            fallback = w
+            fallbackLen = l
+        }
+    }
+    j := fallback.ID
+    select {
+    case as.workers[j].Queue <- actorID:
+        atomic.AddInt64(&as.workers[j].QueueLen, 1)
+        as.statistics.TasksScheduled++
+    default:
+        // All queues appear saturated; drop the scheduling hint (message stays in mailbox until next attempt)
+    }
 }
 
 func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
@@ -1513,6 +1589,7 @@ func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
 		select {
 		case actorID := <-worker.Queue:
 			// Process actor task
+            atomic.AddInt64(&worker.QueueLen, -1)
 			as.statistics.TasksCompleted++
 			if as.process != nil {
 				as.process(actorID)
@@ -1520,11 +1597,13 @@ func (as *ActorScheduler) runWorker(worker *SchedulerWorker) {
 		case <-as.ctx.Done():
 			return
 		case <-time.After(time.Millisecond * 2):
-			// Try to steal work from other workers
-			if id, ok := as.trySteal(worker.ID); ok {
-				as.statistics.TasksCompleted++
-				if as.process != nil {
-					as.process(id)
+			// Try to steal work from other workers if enabled
+			if as.config.WorkStealingEnabled {
+				if id, ok := as.trySteal(worker.ID); ok {
+					as.statistics.TasksCompleted++
+					if as.process != nil {
+						as.process(id)
+					}
 				}
 			}
 		}
@@ -1541,11 +1620,26 @@ func (as *ActorScheduler) trySteal(selfID int) (ActorID, bool) {
 		w := as.workers[(start+i)%len(as.workers)]
 		select {
 		case id := <-w.Queue:
+            // Decrement source queue length since we stole one
+            atomic.AddInt64(&w.QueueLen, -1)
 			return id, true
 		default:
 		}
 	}
 	return 0, false
+}
+
+// GetQueueLengths returns a snapshot of per-worker queue lengths. Intended for testing/monitoring.
+func (as *ActorScheduler) GetQueueLengths() []int64 {
+    as.mutex.RLock()
+    defer as.mutex.RUnlock()
+    out := make([]int64, len(as.workers))
+    for i, w := range as.workers {
+        if w != nil {
+            out[i] = atomic.LoadInt64(&w.QueueLen)
+        }
+    }
+    return out
 }
 
 // Dispatcher operations

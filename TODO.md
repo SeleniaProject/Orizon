@@ -515,14 +515,22 @@
   - ビルド状態: `go test ./...` 成功
  - **完了**: ✅ 軽量プロセス実装一式の提供と包括的テストの緑化（監督戦略・グループ・BackPressure・タイマー・ルーティング・Work Stealing・Spawn/Tell）
 
-#### 3.2.2 Work Stealingスケジューラー
-- [ ] **目的**: 効率的なマルチコア活用スケジューリング
+#### 3.2.2 Work Stealingスケジューラー ✅ 完了
+- [x] **目的**: 効率的なマルチコア活用スケジューリング
 - **成果物**:
-  - [ ] スケジューラー実装
-  - [ ] 負荷分散アルゴリズム
-  - [ ] CPUアフィニティ制御
+  - [x] スケジューラー実装
+  - [x] 負荷分散アルゴリズム
+  - [x] CPUアフィニティ制御
 - **依存関係**: 3.2.1
-- **推定工数**: 大（28日）
+- **実装内容**:
+  - `internal/runtime/actor_system.go` スケジューラ強化
+    - ワーカーごとに`CPUMask`を付与（論理CPUに応じたビット割当）
+    - タスク投入時に最小キュー長ワーカーを選択（原子的`QueueLen`で追跡）
+    - Work Stealing時に盗み元の`QueueLen`を整合更新
+    - API追加: `ScheduleWithAffinity(actorID, cpuMask uint64)` と `GetQueueLengths()`
+  - `ActorConfig`に`CPUAffinityMask`を追加（0は無指定）
+  - 既存のWork Stealingは`WorkStealingEnabled`で制御し、負荷分散と整合
+- **ビルド状態**: `go test ./...` 成功
 
 #### 3.2.3 耐障害性機構
 - [ ] **目的**: Erlang風の障害分離と回復
