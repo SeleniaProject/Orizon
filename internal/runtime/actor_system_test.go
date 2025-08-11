@@ -1,17 +1,23 @@
 package runtime
 
 import (
-	"testing"
-	"time"
+    "fmt"
+    "testing"
+    "time"
 )
 
 // testBehavior is a simple actor behavior used for testing.
 type testBehavior struct {
-	received chan Message
-	name     string
+    received chan Message
+    name     string
+    failOnce bool
 }
 
 func (tb *testBehavior) Receive(ctx *ActorContext, msg Message) error {
+    if tb.failOnce {
+        tb.failOnce = false
+        return fmt.Errorf("fail")
+    }
 	select {
 	case tb.received <- msg:
 	default:
@@ -149,6 +155,29 @@ func TestDispatcher_Interception_Transformation(t *testing.T) {
         if got.Headers["tagged"] != true { t.Error("transformer did not tag header") }
     case <-time.After(time.Second):
         t.Fatal("did not receive message via pipeline")
+    }
+}
+
+func TestSupervisor_Restart_OnFailure(t *testing.T) {
+    system, err := NewActorSystem(DefaultActorSystemConfig)
+    if err != nil { t.Fatalf("failed to create actor system: %v", err) }
+    if err := system.Start(); err != nil { t.Fatalf("failed to start: %v", err) }
+    defer system.Stop()
+
+    tb := &testBehavior{received: make(chan Message, 1), name: "fail", failOnce: true}
+    actor, err := system.CreateActor("fail", UserActor, tb, DefaultActorConfig)
+    if err != nil { t.Fatalf("failed to create actor: %v", err) }
+
+    // First message will fail; supervisor should restart actor; second message should succeed
+    if err := system.SendMessage(0, actor.ID, 1, "first"); err != nil { t.Fatalf("send failed: %v", err) }
+    if err := system.SendMessage(0, actor.ID, 1, "second"); err != nil { t.Fatalf("send failed: %v", err) }
+
+    // Expect at least one successful receipt
+    select {
+    case <-tb.received:
+        // ok
+    case <-time.After(1500 * time.Millisecond):
+        t.Fatal("supervisor did not restart actor in time")
     }
 }
 

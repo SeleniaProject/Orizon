@@ -101,6 +101,7 @@ type Supervisor struct {
 	Type        SupervisorType       // Supervisor type
 	Strategy    SupervisionStrategy  // Supervision strategy
 	Children    map[ActorID]*Actor   // Supervised actors
+    childOrder  []ActorID            // Children creation order
 	MaxRetries  uint32               // Maximum retries
 	RetryPeriod time.Duration        // Retry period
 	Escalations []EscalationRule     // Escalation rules
@@ -607,12 +608,12 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 			return
 		}
 		// Drain one message if available and process
-		if msg, ok := actor.Mailbox.Dequeue(); ok {
-			if err := actor.ProcessMessage(msg); err != nil {
-				// Simple supervision: restart on failure
-				_ = actor.Restart(err)
-			}
-		}
+        if msg, ok := actor.Mailbox.Dequeue(); ok {
+            if err := actor.ProcessMessage(msg); err != nil {
+                // Delegate to supervisor strategy
+                system.handleFailure(actor, err)
+            }
+        }
 	}
 
     // Initialize dispatcher
@@ -703,12 +704,13 @@ func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 func NewSupervisor(name string, supervisorType SupervisorType, config SupervisorConfig) (*Supervisor, error) {
 	supervisorID := SupervisorID(atomic.AddUint64(&globalSupervisorID, 1))
 
-	supervisor := &Supervisor{
+    supervisor := &Supervisor{
 		ID:          supervisorID,
 		Name:        name,
 		Type:        supervisorType,
 		Strategy:    config.Strategy,
-		Children:    make(map[ActorID]*Actor),
+        Children:    make(map[ActorID]*Actor),
+        childOrder:  make([]ActorID, 0),
 		MaxRetries:  config.MaxRetries,
 		RetryPeriod: config.RetryPeriod,
 		Escalations: make([]EscalationRule, 0),
@@ -802,6 +804,7 @@ func (as *ActorSystem) CreateActor(name string, actorType ActorType, behavior Ac
     if as.rootSupervisor != nil {
         actor.Supervisor = as.rootSupervisor
         as.rootSupervisor.Children[actor.ID] = actor
+        as.rootSupervisor.childOrder = append(as.rootSupervisor.childOrder, actor.ID)
     }
     as.mutex.Unlock()
 
@@ -897,10 +900,7 @@ func (a *Actor) Restart(reason error) error {
 		return fmt.Errorf("PreRestart failed: %v", err)
 	}
 
-	// Clear mailbox if configured
-	if a.Config.MailboxType != StashingMailbox {
-		a.Mailbox.Clear()
-	}
+    // Do not clear mailbox to preserve pending messages across restarts.
 
 	// Call PostRestart
 	if err := a.Behavior.PostRestart(a.Context, reason); err != nil {
@@ -911,6 +911,33 @@ func (a *Actor) Restart(reason error) error {
 	a.Statistics.Restarts++
 
 	return nil
+}
+
+// handleFailure applies supervisor strategy for a failed actor
+func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
+    sup := failed.Supervisor
+    if sup == nil {
+        _ = failed.Restart(reason)
+        return
+    }
+
+    switch sup.Strategy {
+    case RestartStrategy: // OneForOne semantics for simplicity
+        _ = failed.Restart(reason)
+    case StopStrategy:
+        _ = as.stopActor(failed)
+    case ResumeStrategy:
+        // No action
+    case EscalateStrategy:
+        // Bubble up to parent supervisor
+        if failed.Parent != nil {
+            as.handleFailure(failed.Parent, reason)
+        } else {
+            _ = failed.Restart(reason)
+        }
+    default:
+        _ = failed.Restart(reason)
+    }
 }
 
 // Mailbox operations
