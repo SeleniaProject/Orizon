@@ -27,7 +27,7 @@ func TestAsyncIO_Echo_Ready(t *testing.T) {
     if err != nil { t.Fatal(err) }
     defer client.Close()
 
-    p := NewDefaultPoller()
+    p := NewOSPoller()
     ctx, cancel := context.WithTimeout(context.Background(), time.Second)
     defer cancel()
     if err := p.Start(ctx); err != nil { t.Fatal(err) }
