@@ -53,11 +53,22 @@ func (tx *Txn[T]) Read(tv *TVar[T]) T {
     if e, ok := tx.readSet[tv]; ok {
         return e.val
     }
-    ver := atomic.LoadUint64(&tv.ver)
-    vAny := tv.val.Load()
-    val := vAny.(T)
-    tx.readSet[tv] = readEntry[T]{ver: ver, val: val}
-    return val
+    // Read with validation: ensure version is even and unchanged after reading value
+    for {
+        ver1 := atomic.LoadUint64(&tv.ver)
+        if ver1&1 == 1 { // writer holds lock
+            time.Sleep(time.Microsecond)
+            continue
+        }
+        vAny := tv.val.Load()
+        ver2 := atomic.LoadUint64(&tv.ver)
+        if ver1 == ver2 && (ver2&1) == 0 {
+            val := vAny.(T)
+            tx.readSet[tv] = readEntry[T]{ver: ver2, val: val}
+            return val
+        }
+        // changed concurrently; retry
+    }
 }
 
 // Write writes a value to a TVar under the transaction.
@@ -70,30 +81,34 @@ var ErrConflict = errors.New("stm: conflict")
 
 // Commit validates and applies the transaction. On conflict it returns ErrConflict.
 func (tx *Txn[T]) Commit() error {
-    // Validate read set (excluding those we will write, which we validate during write CAS)
+    // Validate read set (excluding those we will write, which we validate during write lock)
     for tv, e := range tx.readSet {
         if _, willWrite := tx.writeSet[tv]; willWrite {
             continue
         }
-        if atomic.LoadUint64(&tv.ver) != e.ver {
+        v := atomic.LoadUint64(&tv.ver)
+        if v != e.ver || (v&1) == 1 { // changed or locked
             return ErrConflict
         }
     }
     // Apply writes
     for tv, newVal := range tx.writeSet {
-        // expected version is from read set if present; else load current
-        exp := uint64(0)
-        if e, ok := tx.readSet[tv]; ok {
-            exp = e.ver
-        } else {
-            exp = atomic.LoadUint64(&tv.ver)
+        // expected even version from read set if present; else load current and ensure even
+        exp := func() uint64 {
+            if e, ok := tx.readSet[tv]; ok { return e.ver }
+            return atomic.LoadUint64(&tv.ver)
+        }()
+        if exp&1 == 1 { // locked
+            return ErrConflict
         }
-        // Try to claim by CAS on version to exp+1
+        // Lock variable by moving to odd version
         if !atomic.CompareAndSwapUint64(&tv.ver, exp, exp+1) {
             return ErrConflict
         }
-        // Store value after version bump (readers validate version)
+        // Write value while locked
         tv.val.Store(newVal)
+        // Unlock by setting to next even version
+        atomic.StoreUint64(&tv.ver, exp+2)
     }
     return nil
 }
