@@ -602,12 +602,19 @@
 #### 3.4.1 非同期I/O抽象化
 - [ ] **目的**: プラットフォーム非依存の高性能I/O
 - **成果物**:
-  - [ ] `async_io.go` I/Oランタイム
-  - [ ] epoll/kqueue/IOCP抽象化
-  - [ ] ゼロコピーI/O
+  - [x] `internal/runtime/asyncio/async_io.go`: I/Oランタイム基盤（`Poller`インターフェース、`Event`/`EventType`、`Handler`、`Start`/`Stop`/`Register`/`Deregister`）
+  - [x] デフォルト実装: ゴルーチン駆動ポーラ（移植性重視のベースライン）
+  - [x] テスト: `internal/runtime/asyncio/async_io_test.go`（TCPエコーでReadable/Writable通知の検証）
+  - [ ] epoll/kqueue/IOCP抽象化（OS別ポーラ実装: Linux/Windows/BSD）
+  - [ ] ゼロコピーI/O（Linux: `sendfile`/`splice`、Windows: `TransmitFile`、macOS: `sendfile`）
+  - [ ] バッファプール・再利用戦略（GC圧力低減）
+  - [ ] アクターシステム統合（I/Oイベント→メールボックス投入・バックプレッシャ整合）
 - **依存関係**: 3.3.3
 - **推定工数**: 大（28日）
-- **備考**: C依存を避けるためシステムコール直接使用
+- **現状**:
+  - ポータブルな`Poller`抽象と、ゴルーチン駆動の既定実装を追加済み。軽量ポーリングでReadable/Writable通知を提供
+  - エンドツーエンドでのTCPエコーテストがグリーン（`go test ./...` 全体成功）
+  - 次段としてOS固有ポーラ（epoll/kqueue/IOCP）およびゼロコピーI/Fを追加し、ランタイム（アクター）と密結合予定
 
 #### 3.4.2 ファイルシステム抽象化
 - [ ] **目的**: 仮想ファイルシステム実装
