@@ -22,30 +22,38 @@ func TestLockFreeMap_Concurrent(t *testing.T) {
     writers := 4
     readers := 4
     var seen uint64
-    wg := sync.WaitGroup{}
-    wg.Add(writers)
+
+    // writers
+    wgW := sync.WaitGroup{}
+    wgW.Add(writers)
     for w := 0; w < writers; w++ {
         go func(id int) {
-            defer wg.Done()
+            defer wgW.Done()
             for i := 0; i < keys; i++ {
                 k := keyOf(id, i)
                 m.Store(k, i)
             }
         }(w)
     }
+
+    // readers
     done := make(chan struct{})
-    wg.Add(readers)
+    wgR := sync.WaitGroup{}
+    wgR.Add(readers)
     for r := 0; r < readers; r++ {
         go func() {
-            defer wg.Done()
+            defer wgR.Done()
             for {
                 select { case <-done: return; default: }
                 m.Range(func(k string, v int) bool { atomic.AddUint64(&seen, 1); return true })
             }
         }()
     }
-    wg.Wait()
+
+    // wait for writers, then stop readers and wait
+    wgW.Wait()
     close(done)
+    wgR.Wait()
     if seen == 0 { t.Fatal("no reads observed") }
 }
 
