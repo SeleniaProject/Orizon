@@ -5,7 +5,6 @@ package asyncio
 
 import (
     "context"
-    "errors"
     "io"
     "net"
     "os"
