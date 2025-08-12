@@ -501,15 +501,15 @@ func (s *Server) write(v any) {
 
 // filePathFromURI converts file:// URI to OS path best-effort
 func filePathFromURI(uri string) string {
-    if strings.HasPrefix(uri, "file://") {
-        p := strings.TrimPrefix(uri, "file://")
-        // On Windows, leading '/' may appear before drive letter
-        if len(p) >= 3 && p[0] == '/' && ((p[1] >= 'A' && p[1] <= 'Z') || (p[1] >= 'a' && p[1] <= 'z')) && p[2] == ':' {
-            p = p[1:]
-        }
-        return p
-    }
-    return ""
+	if strings.HasPrefix(uri, "file://") {
+		p := strings.TrimPrefix(uri, "file://")
+		// On Windows, leading '/' may appear before drive letter
+		if len(p) >= 3 && p[0] == '/' && ((p[1] >= 'A' && p[1] <= 'Z') || (p[1] >= 'a' && p[1] <= 'z')) && p[2] == ':' {
+			p = p[1:]
+		}
+		return p
+	}
+	return ""
 }
 
 func itoa(n int) string {
@@ -1263,7 +1263,7 @@ func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, end
 		}
 	}
 
-	// Refactor: extract selection to a local variable when a range is provided
+    // Refactor: extract selection to a local variable when a range is provided
 	if startLine >= 0 && endLine >= startLine {
 		startOff := offsetFromLineCharUTF16(text, startLine, startChar)
 		endOff := offsetFromLineCharUTF16(text, endLine, endChar)
@@ -1271,30 +1271,34 @@ func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, end
 			sel := strings.TrimSpace(text[startOff:endOff])
 			if sel != "" && !strings.Contains(sel, "\n") {
 				name := "extracted"
-				// Insert variable before the selection line
-				insLineStart, _ := getLineBounds(text, startLine)
-				ins := "let " + name + " = " + sel + "\n"
-				newDoc := text[:insLineStart] + ins + text
-				// Replace selection with variable name
-				replStart := insLineStart + len(ins) + startOff - insLineStart
-				replEnd := insLineStart + len(ins) + endOff - insLineStart
-				newDoc = newDoc[:replStart] + name + newDoc[replEnd:]
-				eL, eC := utf16LineCharFromOffset(text, len(text))
-				actions = append(actions, map[string]any{
-					"title": "Refactor: extract to variable",
-					"kind":  "refactor.extract",
-					"edit": map[string]any{
-						"changes": map[string]any{
-							uri: []map[string]any{{
-								"range": map[string]any{
-									"start": map[string]any{"line": 0, "character": 0},
-									"end":   map[string]any{"line": eL, "character": eC},
-								},
-								"newText": newDoc,
-							}},
-						},
-					},
-				})
+                // Minimal edits: (1) insert declaration at start of selection line, (2) replace selection with variable name
+                insLineStart, _ := getLineBounds(text, startLine)
+                sL, sC := utf16LineCharFromOffset(text, insLineStart)
+                // selection range in LSP positions is provided by caller
+                actions = append(actions, map[string]any{
+                    "title": "Refactor: extract to variable",
+                    "kind":  "refactor.extract",
+                    "edit": map[string]any{
+                        "changes": map[string]any{
+                            uri: []map[string]any{
+                                {
+                                    "range": map[string]any{
+                                        "start": map[string]any{"line": sL, "character": sC},
+                                        "end":   map[string]any{"line": sL, "character": sC},
+                                    },
+                                    "newText": "let " + name + " = " + sel + "\n",
+                                },
+                                {
+                                    "range": map[string]any{
+                                        "start": map[string]any{"line": startLine, "character": startChar},
+                                        "end":   map[string]any{"line": endLine, "character": endChar},
+                                    },
+                                    "newText": name,
+                                },
+                            },
+                        },
+                    },
+                })
 			}
 		}
 	}
@@ -1646,8 +1650,8 @@ func (s *Server) handleRename(uri string, line, character int, newName string) (
 		}
 	}
 
-    // Collect edits for all identifier tokens that match the name
-    edits := make([]map[string]any, 0, 32)
+	// Collect edits for all identifier tokens that match the name
+	edits := make([]map[string]any, 0, 32)
 	lx := lexer.NewWithFilename(text, uri)
 	for {
 		tok := lx.NextToken()
@@ -1671,32 +1675,36 @@ func (s *Server) handleRename(uri string, line, character int, newName string) (
 			})
 		}
 	}
-    // Cross-file edits using workspace index
-    wsChanges := map[string]any{uri: edits}
-    for _, loc := range s.wsIndex[name] {
-        if loc.URI == uri { continue }
-        // Load file content (from open docs cache or filesystem)
-        otherText := s.docs[loc.URI]
-        if otherText == "" {
-            if path := filePathFromURI(loc.URI); path != "" {
-                b, err := os.ReadFile(path)
-                if err == nil {
-                    otherText = string(b)
-                }
-            }
-        }
-        if otherText == "" { continue }
-        l0, c0 := utf16LineCharFromOffset(otherText, loc.Span.Start.Offset)
-        l1, c1 := utf16LineCharFromOffset(otherText, loc.Span.End.Offset)
-        wsChanges[loc.URI] = append([]map[string]any{}, map[string]any{
-            "range": map[string]any{
-                "start": map[string]any{"line": l0, "character": c0},
-                "end":   map[string]any{"line": l1, "character": c1},
-            },
-            "newText": newName,
-        })
-    }
-    return map[string]any{"changes": wsChanges}, ""
+	// Cross-file edits using workspace index
+	wsChanges := map[string]any{uri: edits}
+	for _, loc := range s.wsIndex[name] {
+		if loc.URI == uri {
+			continue
+		}
+		// Load file content (from open docs cache or filesystem)
+		otherText := s.docs[loc.URI]
+		if otherText == "" {
+			if path := filePathFromURI(loc.URI); path != "" {
+				b, err := os.ReadFile(path)
+				if err == nil {
+					otherText = string(b)
+				}
+			}
+		}
+		if otherText == "" {
+			continue
+		}
+		l0, c0 := utf16LineCharFromOffset(otherText, loc.Span.Start.Offset)
+		l1, c1 := utf16LineCharFromOffset(otherText, loc.Span.End.Offset)
+		wsChanges[loc.URI] = append([]map[string]any{}, map[string]any{
+			"range": map[string]any{
+				"start": map[string]any{"line": l0, "character": c0},
+				"end":   map[string]any{"line": l1, "character": c1},
+			},
+			"newText": newName,
+		})
+	}
+	return map[string]any{"changes": wsChanges}, ""
 }
 
 // handleWorkspaceSymbol returns flat symbol info for all indexed documents that match the query (prefix match).
