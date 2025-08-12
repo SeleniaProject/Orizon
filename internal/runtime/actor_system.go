@@ -1401,6 +1401,16 @@ func (m *Mailbox) Clear() {
 	}
 }
 
+// Len returns the current number of queued messages in the mailbox.
+func (m *Mailbox) Len() int {
+    m.mutex.RLock()
+    defer m.mutex.RUnlock()
+    if m.Type == PriorityMailbox && m.PriorityQueue != nil {
+        return m.PriorityQueue.size
+    }
+    return len(m.Messages)
+}
+
 // Helper methods
 
 // deliverMessage delivers a message to its destination
@@ -1844,20 +1854,20 @@ func (as *ActorScheduler) Stop() {
 	as.mutex.Lock()
 	defer as.mutex.Unlock()
 
-    if !as.running {
-        return
-    }
-    as.running = false
-    for _, worker := range as.workers {
-        if worker == nil {
-            continue
-        }
-        worker.Running = false
-        if worker.Queue != nil {
-            close(worker.Queue)
-            worker.Queue = nil
-        }
-    }
+	if !as.running {
+		return
+	}
+	as.running = false
+	for _, worker := range as.workers {
+		if worker == nil {
+			continue
+		}
+		worker.Running = false
+		if worker.Queue != nil {
+			close(worker.Queue)
+			worker.Queue = nil
+		}
+	}
 }
 
 func (as *ActorScheduler) Schedule(actorID ActorID) {
