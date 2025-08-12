@@ -4,7 +4,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
+
+	rt "github.com/orizon-lang/orizon/internal/runtime"
+	ns "github.com/orizon-lang/orizon/internal/runtime/netstack"
 )
 
 // Effect system types (simplified for demo)
@@ -347,6 +351,14 @@ func (iea *IntegratedEffectAnalyzer) GetSignature(functionName string) (*Integra
 func main() {
 	fmt.Println("🔗 Orizon Integrated Effect System Demo")
 	fmt.Println("=======================================")
+
+	// Start a lightweight metrics server exposing runtime counters for manual inspection
+	if addr, stop, err := rt.StartMetricsServer(":0", map[string]rt.MetricFunc{
+		"runtime_tcp": func() map[string]float64 { return ns.TCPMetricsForExport() },
+	}); err == nil {
+		fmt.Println("📊 Metrics server listening on", addr)
+		defer func() { _ = stop(context.Background()) }()
+	}
 
 	// Demo 1: Basic Integrated Effects
 	fmt.Println("\n📍 Demo 1: Basic Integrated Effects")
