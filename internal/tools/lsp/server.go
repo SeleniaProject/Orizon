@@ -53,6 +53,8 @@ type Server struct {
 	rootURI string
 	// Global symbol index across documents: name -> list of (uri, span)
 	wsIndex map[string][]SymbolLocation
+    // diagnostics cache to avoid redundant notifications (hashed JSON of diags)
+    diagCache map[string]string
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
@@ -65,7 +67,8 @@ func NewServer(r io.Reader, w io.Writer) *Server {
 		docsVer:  make(map[string]int),
 		incLexer: lexer.NewIncrementalLexer(),
 		tokCache: make(map[string][]lexer.Token),
-		wsIndex:  make(map[string][]SymbolLocation),
+        wsIndex:  make(map[string][]SymbolLocation),
+        diagCache: make(map[string]string),
 	}
 }
 
@@ -633,12 +636,21 @@ func (s *Server) publishDiagnosticsFor(uri, text string) {
 		}
 	}
 
-	ver := s.docsVer[uri]
-	s.notify("textDocument/publishDiagnostics", map[string]any{
-		"uri":         uri,
-		"diagnostics": diags,
-		"version":     ver,
-	})
+    ver := s.docsVer[uri]
+    payload := map[string]any{
+        "uri":         uri,
+        "diagnostics": diags,
+        "version":     ver,
+    }
+    // Emit only if changed
+    if b, err := json.Marshal(payload); err == nil {
+        hash := string(b)
+        if s.diagCache[uri] == hash {
+            return
+        }
+        s.diagCache[uri] = hash
+    }
+    s.notify("textDocument/publishDiagnostics", payload)
 }
 
 // updateTokensIncremental updates cached tokens using the incremental lexer.
@@ -1263,7 +1275,7 @@ func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, end
 		}
 	}
 
-    // Refactor: extract selection to a local variable when a range is provided
+	// Refactor: extract selection to a local variable when a range is provided
 	if startLine >= 0 && endLine >= startLine {
 		startOff := offsetFromLineCharUTF16(text, startLine, startChar)
 		endOff := offsetFromLineCharUTF16(text, endLine, endChar)
@@ -1271,34 +1283,34 @@ func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, end
 			sel := strings.TrimSpace(text[startOff:endOff])
 			if sel != "" && !strings.Contains(sel, "\n") {
 				name := "extracted"
-                // Minimal edits: (1) insert declaration at start of selection line, (2) replace selection with variable name
-                insLineStart, _ := getLineBounds(text, startLine)
-                sL, sC := utf16LineCharFromOffset(text, insLineStart)
-                // selection range in LSP positions is provided by caller
-                actions = append(actions, map[string]any{
-                    "title": "Refactor: extract to variable",
-                    "kind":  "refactor.extract",
-                    "edit": map[string]any{
-                        "changes": map[string]any{
-                            uri: []map[string]any{
-                                {
-                                    "range": map[string]any{
-                                        "start": map[string]any{"line": sL, "character": sC},
-                                        "end":   map[string]any{"line": sL, "character": sC},
-                                    },
-                                    "newText": "let " + name + " = " + sel + "\n",
-                                },
-                                {
-                                    "range": map[string]any{
-                                        "start": map[string]any{"line": startLine, "character": startChar},
-                                        "end":   map[string]any{"line": endLine, "character": endChar},
-                                    },
-                                    "newText": name,
-                                },
-                            },
-                        },
-                    },
-                })
+				// Minimal edits: (1) insert declaration at start of selection line, (2) replace selection with variable name
+				insLineStart, _ := getLineBounds(text, startLine)
+				sL, sC := utf16LineCharFromOffset(text, insLineStart)
+				// selection range in LSP positions is provided by caller
+				actions = append(actions, map[string]any{
+					"title": "Refactor: extract to variable",
+					"kind":  "refactor.extract",
+					"edit": map[string]any{
+						"changes": map[string]any{
+							uri: []map[string]any{
+								{
+									"range": map[string]any{
+										"start": map[string]any{"line": sL, "character": sC},
+										"end":   map[string]any{"line": sL, "character": sC},
+									},
+									"newText": "let " + name + " = " + sel + "\n",
+								},
+								{
+									"range": map[string]any{
+										"start": map[string]any{"line": startLine, "character": startChar},
+										"end":   map[string]any{"line": endLine, "character": endChar},
+									},
+									"newText": name,
+								},
+							},
+						},
+					},
+				})
 			}
 		}
 	}
