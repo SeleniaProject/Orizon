@@ -1192,7 +1192,7 @@ func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, end
 		})
 	}
 
-    // Action: parser suggestions as quickfixes (insert replacement at position)
+	// Action: parser suggestions as quickfixes (insert replacement at position)
 	lx := lexer.NewWithFilename(text, uri)
 	pr := parser.NewParser(lx, uri)
 	_, _ = pr.Parse()
@@ -1221,41 +1221,41 @@ func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, end
 		}
 	}
 
-    // Refactor: extract selection to a local variable when a range is provided
-    if startLine >= 0 && endLine >= startLine {
-        startOff := offsetFromLineCharUTF16(text, startLine, startChar)
-        endOff := offsetFromLineCharUTF16(text, endLine, endChar)
-        if startOff >= 0 && endOff > startOff && endOff <= len(text) {
-            sel := strings.TrimSpace(text[startOff:endOff])
-            if sel != "" && !strings.Contains(sel, "\n") {
-                name := "extracted"
-                // Insert variable before the selection line
-                insLineStart, _ := getLineBounds(text, startLine)
-                ins := "let " + name + " = " + sel + "\n"
-                newDoc := text[:insLineStart] + ins + text
-                // Replace selection with variable name
-                replStart := insLineStart + len(ins) + startOff - insLineStart
-                replEnd := insLineStart + len(ins) + endOff - insLineStart
-                newDoc = newDoc[:replStart] + name + newDoc[replEnd:]
-                eL, eC := utf16LineCharFromOffset(text, len(text))
-                actions = append(actions, map[string]any{
-                    "title": "Refactor: extract to variable",
-                    "kind":  "refactor.extract",
-                    "edit": map[string]any{
-                        "changes": map[string]any{
-                            uri: []map[string]any{{
-                                "range": map[string]any{
-                                    "start": map[string]any{"line": 0, "character": 0},
-                                    "end":   map[string]any{"line": eL, "character": eC},
-                                },
-                                "newText": newDoc,
-                            }},
-                        },
-                    },
-                })
-            }
-        }
-    }
+	// Refactor: extract selection to a local variable when a range is provided
+	if startLine >= 0 && endLine >= startLine {
+		startOff := offsetFromLineCharUTF16(text, startLine, startChar)
+		endOff := offsetFromLineCharUTF16(text, endLine, endChar)
+		if startOff >= 0 && endOff > startOff && endOff <= len(text) {
+			sel := strings.TrimSpace(text[startOff:endOff])
+			if sel != "" && !strings.Contains(sel, "\n") {
+				name := "extracted"
+				// Insert variable before the selection line
+				insLineStart, _ := getLineBounds(text, startLine)
+				ins := "let " + name + " = " + sel + "\n"
+				newDoc := text[:insLineStart] + ins + text
+				// Replace selection with variable name
+				replStart := insLineStart + len(ins) + startOff - insLineStart
+				replEnd := insLineStart + len(ins) + endOff - insLineStart
+				newDoc = newDoc[:replStart] + name + newDoc[replEnd:]
+				eL, eC := utf16LineCharFromOffset(text, len(text))
+				actions = append(actions, map[string]any{
+					"title": "Refactor: extract to variable",
+					"kind":  "refactor.extract",
+					"edit": map[string]any{
+						"changes": map[string]any{
+							uri: []map[string]any{{
+								"range": map[string]any{
+									"start": map[string]any{"line": 0, "character": 0},
+									"end":   map[string]any{"line": eL, "character": eC},
+								},
+								"newText": newDoc,
+							}},
+						},
+					},
+				})
+			}
+		}
+	}
 	return actions
 }
 
@@ -2010,6 +2010,7 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 			item := map[string]any{
 				"label": kw,
 				"kind":  14, // Keyword
+				"data":  map[string]any{"type": "keyword", "label": kw},
 			}
 			if meta.Detail != "" {
 				item["detail"] = meta.Detail
