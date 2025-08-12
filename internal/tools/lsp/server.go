@@ -44,8 +44,11 @@ type Server struct {
 	symIndex map[string]map[string][]SymbolInfo
 	// astCache keeps the last parsed AST per document for tooling features
 	astCache map[string]*parser.Program
-	// docsVer holds the last known version per document URI
-	docsVer map[string]int
+    // docsVer holds the last known version per document URI
+    docsVer map[string]int
+    // Incremental lexing engine and token cache per document
+    incLexer *lexer.IncrementalLexer
+    tokCache map[string][]lexer.Token
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
@@ -55,7 +58,9 @@ func NewServer(r io.Reader, w io.Writer) *Server {
 		docs:     make(map[string]string),
 		symIndex: make(map[string]map[string][]SymbolInfo),
 		astCache: make(map[string]*parser.Program),
-		docsVer:  make(map[string]int),
+        docsVer:  make(map[string]int),
+        incLexer: lexer.NewIncrementalLexer(),
+        tokCache: make(map[string][]lexer.Token),
 	}
 }
 
@@ -188,6 +193,8 @@ func (s *Server) Run() error {
 				} else {
 					s.docsVer[p.TextDocument.URI] = p.TextDocument.Ver
 				}
+				// Update token cache using incremental lexer (full pass on open)
+				s.updateTokensIncremental(p.TextDocument.URI, p.TextDocument.Text, nil)
 				// Trigger diagnostics on open
 				s.publishDiagnosticsFor(p.TextDocument.URI, p.TextDocument.Text)
 			}
@@ -213,9 +220,11 @@ func (s *Server) Run() error {
 			if uri := p.TextDocument.URI; uri != "" && len(p.ContentChanges) > 0 {
 				curr := s.docs[uri]
 				// Apply changes in order as specified by LSP
+				var ilChanges []lexer.Change
 				for _, ch := range p.ContentChanges {
 					if ch.Range == nil {
 						// Full document change
+						ilChanges = append(ilChanges, lexer.Change{Start: 0, End: len(curr), OldText: curr, NewText: ch.Text, Type: lexer.ChangeReplaceBlock})
 						curr = ch.Text
 					} else {
 						start := offsetFromLineCharUTF16(curr, ch.Range.Start.Line, ch.Range.Start.Character)
@@ -223,7 +232,9 @@ func (s *Server) Run() error {
 						if start < 0 || end < 0 || start > len(curr) || end > len(curr) || start > end {
 							// Ignore invalid range; continue
 						} else {
+							oldText := curr[start:end]
 							curr = curr[:start] + ch.Text + curr[end:]
+							ilChanges = append(ilChanges, lexer.Change{Start: start, End: end, OldText: oldText, NewText: ch.Text, Type: lexer.ChangeReplaceBlock})
 						}
 					}
 				}
@@ -233,6 +244,8 @@ func (s *Server) Run() error {
 				} else {
 					s.docsVer[uri] = s.docsVer[uri] + 1
 				}
+				// Update token cache incrementally
+				s.updateTokensIncremental(uri, curr, ilChanges)
 				// Trigger diagnostics on change
 				s.publishDiagnosticsFor(uri, curr)
 			}
@@ -560,6 +573,21 @@ func (s *Server) publishDiagnosticsFor(uri, text string) {
 		"diagnostics": diags,
 		"version":     ver,
 	})
+}
+
+// updateTokensIncremental updates cached tokens using the incremental lexer.
+// When changes is nil, a full pass is performed.
+func (s *Server) updateTokensIncremental(uri, text string, changes []lexer.Change) {
+    if s.incLexer == nil {
+        return
+    }
+    // For now, call LexIncremental; the API accepts a list of changes but current
+    // implementation may choose to re-lex fully based on hashing.
+    toks, err := s.incLexer.LexIncremental(uri, []byte(text), changes)
+    if err != nil {
+        return
+    }
+    s.tokCache[uri] = toks
 }
 
 // handleHover returns minimal hover info at the given position.
