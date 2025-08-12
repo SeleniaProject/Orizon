@@ -8,6 +8,9 @@ import (
 
 	asyncio "github.com/orizon-lang/orizon/internal/runtime/asyncio"
     vfs "github.com/orizon-lang/orizon/internal/runtime/vfs"
+    "context"
+    "path/filepath"
+    "os"
 )
 
 // testBehavior is a simple actor behavior used for testing.
