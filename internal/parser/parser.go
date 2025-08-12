@@ -259,17 +259,39 @@ func (p *Parser) parseProgram() *Program {
 
 // parseDeclaration parses a top-level declaration
 func (p *Parser) parseDeclaration() Declaration {
+	// Parse optional modifiers at declaration start: pub/async (order-insensitive)
+	isPublic := false
+	isAsync := false
+	for {
+		switch p.current.Type {
+		case lexer.TokenPub:
+			isPublic = true
+			p.nextToken()
+			continue
+		case lexer.TokenAsync:
+			isAsync = true
+			p.nextToken()
+			continue
+		}
+		break
+	}
+
+	var decl Declaration
 	switch p.current.Type {
 	case lexer.TokenFunc:
-		return p.parseFunctionDeclaration()
+		decl = p.parseFunctionDeclaration()
 	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
-		return p.parseVariableDeclaration()
+		decl = p.parseVariableDeclaration()
 	case lexer.TokenMacro:
-		return p.parseMacroDeclaration()
+		decl = p.parseMacroDeclaration()
 	default:
 		// Try to parse as expression statement
 		stmt := p.parseExpressionStatement()
 		if stmt != nil {
+			// Modifiers are not allowed for expression statements
+			if isPublic || isAsync {
+				p.addError(TokenToPosition(p.current), "modifiers not allowed for expression statements", "declaration modifiers")
+			}
 			return stmt
 		}
 		p.addError(TokenToPosition(p.current),
@@ -278,6 +300,35 @@ func (p *Parser) parseDeclaration() Declaration {
 		p.skipTo(lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenMacro, lexer.TokenStruct, lexer.TokenEnum, lexer.TokenEOF)
 		return nil
 	}
+
+	// Apply parsed modifiers to the declaration where applicable
+	switch d := decl.(type) {
+	case *FunctionDeclaration:
+		if d == nil {
+			return nil
+		}
+		d.IsPublic = isPublic
+		// If 'async' modifier present, mark declaration as async
+		d.IsAsync = isAsync
+	case *VariableDeclaration:
+		if d == nil {
+			return nil
+		}
+		d.IsPublic = isPublic
+		if isAsync {
+			// async on variables is invalid; report but continue
+			p.addError(TokenToPosition(p.current), "async modifier is not valid for variable declarations", "declaration modifiers")
+		}
+	case *MacroDefinition:
+		if d == nil {
+			return nil
+		}
+		d.IsPublic = isPublic
+		if isAsync {
+			p.addError(TokenToPosition(p.current), "async modifier is not valid for macro declarations", "declaration modifiers")
+		}
+	}
+	return decl
 } // parseFunctionDeclaration parses a function declaration
 func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 	startPos := TokenToPosition(p.current)
@@ -324,8 +375,8 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 		Parameters: parameters,
 		ReturnType: returnType,
 		Body:       body,
-		IsPublic:   false, // TODO: handle pub modifier
-		IsAsync:    false, // TODO: handle async modifier
+		IsPublic:   false,
+		IsAsync:    false,
 	}
 }
 
@@ -361,6 +412,12 @@ func (p *Parser) parseParameterList() []*Parameter {
 // parseParameter parses a single parameter
 func (p *Parser) parseParameter() *Parameter {
 	startPos := TokenToPosition(p.current)
+	// Optional 'mut' modifier on parameters
+	isMut := false
+	if p.currentTokenIs(lexer.TokenMut) {
+		isMut = true
+		p.nextToken()
+	}
 
 	if !p.currentTokenIs(lexer.TokenIdentifier) {
 		p.addError(TokenToPosition(p.current),
@@ -384,7 +441,7 @@ func (p *Parser) parseParameter() *Parameter {
 		Span:     span,
 		Name:     name,
 		TypeSpec: typeSpec,
-		IsMut:    false, // TODO: handle mut modifier
+		IsMut:    isMut,
 	}
 }
 
@@ -393,6 +450,11 @@ func (p *Parser) parseVariableDeclaration() *VariableDeclaration {
 	startPos := TokenToPosition(p.current)
 
 	isMutable := p.currentTokenIs(lexer.TokenVar)
+	// Support `let mut name` form
+	if p.currentTokenIs(lexer.TokenLet) && p.peekTokenIs(lexer.TokenMut) {
+		p.nextToken() // consume 'mut'
+		isMutable = true
+	}
 
 	if !p.expectPeek(lexer.TokenIdentifier) {
 		return nil
@@ -430,7 +492,8 @@ func (p *Parser) parseVariableDeclaration() *VariableDeclaration {
 		TypeSpec:    typeSpec,
 		Initializer: initializer,
 		IsMutable:   isMutable,
-		IsPublic:    false, // TODO: handle pub modifier
+		// Public visibility is applied by parseDeclaration based on leading modifiers
+		IsPublic: false,
 	}
 }
 
