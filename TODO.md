@@ -661,7 +661,7 @@
 - **成果物**:
   - [x] `internal/tools/lsp/server.go` 実装（stdioサーバー・JSON-RPC 2.0フレーミング）
   - [x] JSON-RPC通信レイヤー（Content-Length framing/エラーハンドリング最小）
-  - [ ] プロトコル準拠チェック
+  - [x] プロトコル準拠チェック
 - **依存関係**: 2.5.3, 3.1.1
  - **推定工数**: 大（25日）
   - **進捗**:
@@ -676,7 +676,7 @@
    - [x] リネーム: `prepareRename`/`rename`（スコープ限定・競合検出）
    - [x] フォーマット: `textDocument/formatting`（括弧ベース整形・行末空白除去）
    - [x] OnType整形: `textDocument/onTypeFormatting`（`}`/`\n`/`)`/`;` 対応）
-   - [ ] プロトコル準拠テスト、バリデータ連携
+    - [x] プロトコル準拠テスト、バリデータ連携
 
 #### 4.1.2 リアルタイム解析
 - [ ] **目的**: 入力と同時の静的解析とエラー検出
