@@ -44,6 +44,8 @@ type Server struct {
 	symIndex map[string]map[string][]SymbolInfo
 	// astCache keeps the last parsed AST per document for tooling features
 	astCache map[string]*parser.Program
+    // docsVer holds the last known version per document URI
+    docsVer map[string]int
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
@@ -52,7 +54,8 @@ func NewServer(r io.Reader, w io.Writer) *Server {
 		out:      w,
 		docs:     make(map[string]string),
 		symIndex: make(map[string]map[string][]SymbolInfo),
-		astCache: make(map[string]*parser.Program),
+        astCache: make(map[string]*parser.Program),
+        docsVer:  make(map[string]int),
 	}
 }
 
@@ -105,12 +108,12 @@ func (s *Server) Run() error {
 		switch req.Method {
 		case "initialize":
 			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
-			caps := map[string]any{
+            caps := map[string]any{
 				"positionEncoding": "utf-16",
-				"textDocumentSync": map[string]any{
-					"openClose": true,
-					"change":    1, // TextDocumentSyncKind: Incremental(2) not yet; use Full(1)
-				},
+                "textDocumentSync": map[string]any{
+                    "openClose": true,
+                    "change":    2, // Incremental
+                },
 				"completionProvider": map[string]any{
 					"triggerCharacters": []string{".", ":", ",", "(", "[", " "},
 				},
@@ -148,7 +151,7 @@ func (s *Server) Run() error {
 			s.reply(req.ID, nil)
 		case "exit":
 			return nil
-		case "textDocument/didClose":
+        case "textDocument/didClose":
 			var p struct {
 				TextDocument struct {
 					URI string `json:"uri"`
@@ -158,10 +161,12 @@ func (s *Server) Run() error {
 			if p.TextDocument.URI != "" {
 				delete(s.docs, p.TextDocument.URI)
 				delete(s.symIndex, p.TextDocument.URI)
+                delete(s.docsVer, p.TextDocument.URI)
 				// Clear diagnostics on close
 				s.notify("textDocument/publishDiagnostics", map[string]any{
 					"uri":         p.TextDocument.URI,
 					"diagnostics": []any{},
+                    "version":     0,
 				})
 			}
 			if len(req.ID) > 0 {
@@ -172,11 +177,17 @@ func (s *Server) Run() error {
 				TextDocument struct {
 					URI  string `json:"uri"`
 					Text string `json:"text"`
+                    Ver  int    `json:"version"`
 				} `json:"textDocument"`
 			}
 			_ = json.Unmarshal(req.Params, &p)
 			if p.TextDocument.URI != "" {
 				s.docs[p.TextDocument.URI] = p.TextDocument.Text
+                if p.TextDocument.Ver == 0 {
+                    s.docsVer[p.TextDocument.URI] = 1
+                } else {
+                    s.docsVer[p.TextDocument.URI] = p.TextDocument.Ver
+                }
 				// Trigger diagnostics on open
 				s.publishDiagnosticsFor(p.TextDocument.URI, p.TextDocument.Text)
 			}
@@ -186,18 +197,45 @@ func (s *Server) Run() error {
 		case "textDocument/didChange":
 			var p struct {
 				TextDocument struct {
-					URI string `json:"uri"`
+                    URI     string `json:"uri"`
+                    Version int    `json:"version"`
 				} `json:"textDocument"`
 				ContentChanges []struct {
-					Text string `json:"text"`
+                    Text  string `json:"text"`
+                    Range *struct {
+                        Start struct{ Line, Character int } `json:"start"`
+                        End   struct{ Line, Character int } `json:"end"`
+                    } `json:"range"`
+                    RangeLength *int `json:"rangeLength"`
 				} `json:"contentChanges"`
 			}
 			_ = json.Unmarshal(req.Params, &p)
-			if len(p.ContentChanges) > 0 {
-				s.docs[p.TextDocument.URI] = p.ContentChanges[len(p.ContentChanges)-1].Text
-				// Trigger diagnostics on change
-				s.publishDiagnosticsFor(p.TextDocument.URI, s.docs[p.TextDocument.URI])
-			}
+            if uri := p.TextDocument.URI; uri != "" && len(p.ContentChanges) > 0 {
+                curr := s.docs[uri]
+                // Apply changes in order as specified by LSP
+                for _, ch := range p.ContentChanges {
+                    if ch.Range == nil {
+                        // Full document change
+                        curr = ch.Text
+                    } else {
+                        start := offsetFromLineCharUTF16(curr, ch.Range.Start.Line, ch.Range.Start.Character)
+                        end := offsetFromLineCharUTF16(curr, ch.Range.End.Line, ch.Range.End.Character)
+                        if start < 0 || end < 0 || start > len(curr) || end > len(curr) || start > end {
+                            // Ignore invalid range; continue
+                        } else {
+                            curr = curr[:start] + ch.Text + curr[end:]
+                        }
+                    }
+                }
+                s.docs[uri] = curr
+                if p.TextDocument.Version != 0 {
+                    s.docsVer[uri] = p.TextDocument.Version
+                } else {
+                    s.docsVer[uri] = s.docsVer[uri] + 1
+                }
+                // Trigger diagnostics on change
+                s.publishDiagnosticsFor(uri, curr)
+            }
 			if len(req.ID) > 0 {
 				s.reply(req.ID, nil)
 			}

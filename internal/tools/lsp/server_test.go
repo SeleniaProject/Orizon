@@ -159,7 +159,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 
 	outReader := bufio.NewReader(outR)
 
-    // 1) initialize request → expect response with capabilities and serverInfo
+	// 1) initialize request → expect response with capabilities and serverInfo
 	initReq := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -179,19 +179,20 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	if caps == nil {
 		t.Fatalf("initialize missing capabilities: %v", msg)
 	}
-    if si := msg["result"].(map[string]any)["serverInfo"]; si == nil {
-        t.Fatalf("initialize missing serverInfo: %v", msg)
-    }
+	if si := msg["result"].(map[string]any)["serverInfo"]; si == nil {
+		t.Fatalf("initialize missing serverInfo: %v", msg)
+	}
 
 	// 2) didOpen notification → expect publishDiagnostics notification
-	source := "func main() { let x = 1 }\n"
+    source := "func main() { let x = 1 }\n"
 	didOpen := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "textDocument/didOpen",
 		"params": map[string]any{
 			"textDocument": map[string]any{
 				"uri":  "file:///test.oriz",
-				"text": source,
+                "text": source,
+                "version": 1,
 			},
 		},
 	}
@@ -205,8 +206,30 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	if m, ok := diagMsg["method"].(string); !ok || m != "textDocument/publishDiagnostics" {
 		t.Fatalf("expected publishDiagnostics, got: %v", diagMsg)
 	}
+    // Send an incremental change that appends an identifier to ensure change:2 path
+    didChange := map[string]any{
+        "jsonrpc": "2.0",
+        "method":  "textDocument/didChange",
+        "params": map[string]any{
+            "textDocument": map[string]any{"uri": "file:///test.oriz", "version": 2},
+            "contentChanges": []any{
+                map[string]any{
+                    "range": map[string]any{
+                        "start": map[string]any{"line": 0, "character": 24},
+                        "end":   map[string]any{"line": 0, "character": 24},
+                    },
+                    "text": " y",
+                },
+            },
+        },
+    }
+    writeFramedJSON(t, inW, didChange)
+    // Expect diagnostics again (empty or not is fine); just confirm server responds
+    if _, err := readFramedJSON(t, outReader, 5*time.Second); err != nil {
+        t.Fatalf("read diagnostics after change: %v", err)
+    }
 
-    // didClose は後で検証する（hoverのためにドキュメントを保持する）
+	// didClose は後で検証する（hoverのためにドキュメントを保持する）
 
 	// 3) hover request over identifier x (line 0, near position of x)
 	// Find position of 'x' in UTF-16 units
