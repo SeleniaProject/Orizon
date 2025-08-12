@@ -113,23 +113,23 @@ func (s *Server) Run() error {
 		switch req.Method {
 		case "initialize":
 			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
-            caps := map[string]any{
+			caps := map[string]any{
 				"positionEncoding": "utf-16",
 				"textDocumentSync": map[string]any{
 					"openClose": true,
 					"change":    2, // Incremental
 				},
-                "completionProvider": map[string]any{
-                    "triggerCharacters": []string{".", ":", ",", "(", "[", " "},
-                    "resolveProvider":  true,
-                },
-				"hoverProvider":              true,
-				"definitionProvider":         true,
-				"referencesProvider":         true,
-                "documentSymbolProvider":     true,
-                "codeActionProvider": map[string]any{
-                    "codeActionKinds": []string{"quickfix", "refactor", "refactor.extract"},
-                },
+				"completionProvider": map[string]any{
+					"triggerCharacters": []string{".", ":", ",", "(", "[", " "},
+					"resolveProvider":   true,
+				},
+				"hoverProvider":          true,
+				"definitionProvider":     true,
+				"referencesProvider":     true,
+				"documentSymbolProvider": true,
+				"codeActionProvider": map[string]any{
+					"codeActionKinds": []string{"quickfix", "refactor", "refactor.extract"},
+				},
 				"documentFormattingProvider": true,
 				"signatureHelpProvider":      map[string]any{"triggerCharacters": []string{"(", ","}},
 				"documentOnTypeFormattingProvider": map[string]any{
@@ -411,7 +411,7 @@ func (s *Server) Run() error {
 				} `json:"context"`
 			}
 			_ = json.Unmarshal(req.Params, &p)
-			actions := s.handleCodeAction(p.TextDocument.URI)
+			actions := s.handleCodeAction(p.TextDocument.URI, p.Range.Start.Line, p.Range.Start.Character, p.Range.End.Line, p.Range.End.Character)
 			s.reply(req.ID, actions)
 		case "textDocument/completion":
 			var p struct {
@@ -424,6 +424,27 @@ func (s *Server) Run() error {
 			_ = json.Unmarshal(req.Params, &p)
 			items := s.handleCompletion(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, map[string]any{"isIncomplete": false, "items": items})
+		case "completionItem/resolve":
+			// Enrich completion item with documentation/detail on demand
+			var item map[string]any
+			_ = json.Unmarshal(req.Params, &item)
+			if item != nil {
+				if dataAny, ok := item["data"].(map[string]any); ok {
+					if kind, _ := dataAny["type"].(string); kind == "keyword" {
+						if label, _ := item["label"].(string); label != "" {
+							if meta, ok := keywordMeta[label]; ok {
+								if meta.Detail != "" {
+									item["detail"] = meta.Detail
+								}
+								if meta.Documentation != "" {
+									item["documentation"] = meta.Documentation
+								}
+							}
+						}
+					}
+				}
+			}
+			s.reply(req.ID, item)
 		default:
 			s.replyError(req.ID, -32601, "Method not found")
 		}
@@ -1135,7 +1156,7 @@ func (s *Server) handleRangeFormatting(uri string, startLine, endLine int, optio
 }
 
 // handleCodeAction provides simple quick fixes like inserting missing function body braces or removing trailing spaces.
-func (s *Server) handleCodeAction(uri string) []map[string]any {
+func (s *Server) handleCodeAction(uri string, startLine, startChar, endLine, endChar int) []map[string]any {
 	text := s.docs[uri]
 	if text == "" {
 		return []map[string]any{}
@@ -1171,7 +1192,7 @@ func (s *Server) handleCodeAction(uri string) []map[string]any {
 		})
 	}
 
-	// Action: parser suggestions as quickfixes (insert replacement at position)
+    // Action: parser suggestions as quickfixes (insert replacement at position)
 	lx := lexer.NewWithFilename(text, uri)
 	pr := parser.NewParser(lx, uri)
 	_, _ = pr.Parse()
@@ -1199,6 +1220,42 @@ func (s *Server) handleCodeAction(uri string) []map[string]any {
 			break
 		}
 	}
+
+    // Refactor: extract selection to a local variable when a range is provided
+    if startLine >= 0 && endLine >= startLine {
+        startOff := offsetFromLineCharUTF16(text, startLine, startChar)
+        endOff := offsetFromLineCharUTF16(text, endLine, endChar)
+        if startOff >= 0 && endOff > startOff && endOff <= len(text) {
+            sel := strings.TrimSpace(text[startOff:endOff])
+            if sel != "" && !strings.Contains(sel, "\n") {
+                name := "extracted"
+                // Insert variable before the selection line
+                insLineStart, _ := getLineBounds(text, startLine)
+                ins := "let " + name + " = " + sel + "\n"
+                newDoc := text[:insLineStart] + ins + text
+                // Replace selection with variable name
+                replStart := insLineStart + len(ins) + startOff - insLineStart
+                replEnd := insLineStart + len(ins) + endOff - insLineStart
+                newDoc = newDoc[:replStart] + name + newDoc[replEnd:]
+                eL, eC := utf16LineCharFromOffset(text, len(text))
+                actions = append(actions, map[string]any{
+                    "title": "Refactor: extract to variable",
+                    "kind":  "refactor.extract",
+                    "edit": map[string]any{
+                        "changes": map[string]any{
+                            uri: []map[string]any{{
+                                "range": map[string]any{
+                                    "start": map[string]any{"line": 0, "character": 0},
+                                    "end":   map[string]any{"line": eL, "character": eC},
+                                },
+                                "newText": newDoc,
+                            }},
+                        },
+                    },
+                })
+            }
+        }
+    }
 	return actions
 }
 
