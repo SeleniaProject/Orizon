@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"unicode"
 	"unicode/utf8"
 
@@ -53,22 +55,27 @@ type Server struct {
 	rootURI string
 	// Global symbol index across documents: name -> list of (uri, span)
 	wsIndex map[string][]SymbolLocation
-    // diagnostics cache to avoid redundant notifications (hashed JSON of diags)
-    diagCache map[string]string
+	// diagnostics cache to avoid redundant notifications (hashed JSON of diags)
+	diagCache map[string]string
+
+	// lightweight metrics (volatile)
+	reqCount uint64
+	errCount uint64
+	bytesOut uint64
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
 	return &Server{
-		in:       bufio.NewReader(r),
-		out:      w,
-		docs:     make(map[string]string),
-		symIndex: make(map[string]map[string][]SymbolInfo),
-		astCache: make(map[string]*parser.Program),
-		docsVer:  make(map[string]int),
-		incLexer: lexer.NewIncrementalLexer(),
-		tokCache: make(map[string][]lexer.Token),
-        wsIndex:  make(map[string][]SymbolLocation),
-        diagCache: make(map[string]string),
+		in:        bufio.NewReader(r),
+		out:       w,
+		docs:      make(map[string]string),
+		symIndex:  make(map[string]map[string][]SymbolInfo),
+		astCache:  make(map[string]*parser.Program),
+		docsVer:   make(map[string]int),
+		incLexer:  lexer.NewIncrementalLexer(),
+		tokCache:  make(map[string][]lexer.Token),
+		wsIndex:   make(map[string][]SymbolLocation),
+		diagCache: make(map[string]string),
 	}
 }
 
@@ -93,10 +100,26 @@ func (s *Server) Run() error {
 	for {
 		// read headers
 		contentLength := 0
+		// Header safety limits
+		const (
+			maxHeaderBytes   = 32 << 10 // 32 KiB
+			maxHeaderLines   = 100
+			maxContentLength = 8 << 20 // 8 MiB hard cap
+		)
+		headerBytes := 0
+		headerLines := 0
+		invalidHeaders := false
 		for {
 			line, err := s.in.ReadString('\n')
 			if err != nil {
 				return err
+			}
+			headerBytes += len(line)
+			headerLines++
+			if headerBytes > maxHeaderBytes || headerLines > maxHeaderLines {
+				s.replyError(nil, -32600, "headers too large")
+				invalidHeaders = true
+				break
 			}
 			if line == "\r\n" {
 				break
@@ -114,25 +137,42 @@ func (s *Server) Run() error {
 				}
 			}
 		}
-		if contentLength <= 0 {
+		if invalidHeaders {
 			continue
 		}
-		buf := make([]byte, contentLength)
-		if _, err := io.ReadFull(s.in, buf); err != nil {
-			return err
+		// Reject invalid or overly large requests to prevent memory exhaustion
+		if contentLength <= 0 || contentLength > maxContentLength {
+			s.replyError(nil, -32600, "invalid content length")
+			continue
 		}
+		// Stream decode request body to avoid allocating a large contiguous buffer
+		lr := &io.LimitedReader{R: s.in, N: int64(contentLength)}
+		dec := json.NewDecoder(lr)
 		var req Request
-		if err := json.Unmarshal(buf, &req); err != nil {
+		if err := dec.Decode(&req); err != nil {
+			// Malformed request; respond with parse error per JSON-RPC
+			s.replyError(nil, -32700, "parse error")
 			continue
 		}
+		// Drain any unread bytes from the limited reader (e.g., trailing whitespace)
+		if lr.N > 0 {
+			_, _ = io.CopyN(io.Discard, lr, lr.N)
+		}
+		atomic.AddUint64(&s.reqCount, 1)
 		switch req.Method {
+		case "orz/stats":
+			// Non-standard method to fetch server statistics (useful for diagnostics)
+			s.reply(req.ID, s.Stats())
 		case "initialize":
 			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
 			// Capture rootURI if provided
 			var initParams struct {
 				RootURI string `json:"rootUri"`
 			}
-			_ = json.Unmarshal(req.Params, &initParams)
+			if err := json.Unmarshal(req.Params, &initParams); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: initialize")
+				break
+			}
 			s.rootURI = initParams.RootURI
 			caps := map[string]any{
 				"positionEncoding": "utf-16",
@@ -176,6 +216,10 @@ func (s *Server) Run() error {
 				// Only reply if the client incorrectly sent an id
 				s.reply(req.ID, nil)
 			}
+			// Start workspace indexing asynchronously to avoid blocking initialize
+			if s.rootURI != "" {
+				go s.indexWorkspace()
+			}
 		case "shutdown":
 			s.reply(req.ID, nil)
 		case "exit":
@@ -186,7 +230,10 @@ func (s *Server) Run() error {
 					URI string `json:"uri"`
 				} `json:"textDocument"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: didClose")
+				break
+			}
 			if p.TextDocument.URI != "" {
 				delete(s.docs, p.TextDocument.URI)
 				delete(s.symIndex, p.TextDocument.URI)
@@ -210,7 +257,10 @@ func (s *Server) Run() error {
 					Ver  int    `json:"version"`
 				} `json:"textDocument"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: didOpen")
+				break
+			}
 			if p.TextDocument.URI != "" {
 				s.docs[p.TextDocument.URI] = p.TextDocument.Text
 				if p.TextDocument.Ver == 0 {
@@ -245,7 +295,10 @@ func (s *Server) Run() error {
 					RangeLength *int `json:"rangeLength"`
 				} `json:"contentChanges"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: didChange")
+				break
+			}
 			if uri := p.TextDocument.URI; uri != "" && len(p.ContentChanges) > 0 {
 				curr := s.docs[uri]
 				// Apply changes in order as specified by LSP
@@ -294,7 +347,10 @@ func (s *Server) Run() error {
 					Character int `json:"character"`
 				} `json:"position"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: hover")
+				break
+			}
 			result := s.handleHover(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, result)
 		case "textDocument/definition":
@@ -304,7 +360,10 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 				Position struct{ Line, Character int } `json:"position"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: definition")
+				break
+			}
 			defs := s.handleDefinition(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, defs)
 		case "textDocument/documentSymbol":
@@ -313,7 +372,10 @@ func (s *Server) Run() error {
 					URI string `json:"uri"`
 				} `json:"textDocument"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: documentSymbol")
+				break
+			}
 			syms := s.handleDocumentSymbol(p.TextDocument.URI)
 			s.reply(req.ID, syms)
 		case "textDocument/references":
@@ -326,7 +388,10 @@ func (s *Server) Run() error {
 					IncludeDeclaration bool `json:"includeDeclaration"`
 				} `json:"context"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: references")
+				break
+			}
 			refs := s.handleReferences(p.TextDocument.URI, p.Position.Line, p.Position.Character, p.Context.IncludeDeclaration)
 			// Also search in other open documents for the same identifier
 			cross := s.handleCrossFileReferences(p.TextDocument.URI, p.Position.Line, p.Position.Character)
@@ -339,7 +404,10 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 				Position struct{ Line, Character int } `json:"position"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: documentHighlight")
+				break
+			}
 			hl := s.handleDocumentHighlight(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, hl)
 		case "textDocument/foldingRange":
@@ -348,7 +416,10 @@ func (s *Server) Run() error {
 					URI string `json:"uri"`
 				} `json:"textDocument"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: foldingRange")
+				break
+			}
 			fr := s.handleFoldingRange(p.TextDocument.URI)
 			s.reply(req.ID, fr)
 		case "textDocument/prepareRename":
@@ -358,7 +429,10 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 				Position struct{ Line, Character int } `json:"position"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: prepareRename")
+				break
+			}
 			prep := s.handlePrepareRename(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, prep)
 		case "textDocument/rename":
@@ -369,7 +443,10 @@ func (s *Server) Run() error {
 				Position struct{ Line, Character int } `json:"position"`
 				NewName  string                        `json:"newName"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: rename")
+				break
+			}
 			edit, errMsg := s.handleRename(p.TextDocument.URI, p.Position.Line, p.Position.Character, p.NewName)
 			if errMsg != "" {
 				s.replyError(req.ID, -32602, errMsg)
@@ -380,7 +457,10 @@ func (s *Server) Run() error {
 			var p struct {
 				Query string `json:"query"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: workspace/symbol")
+				break
+			}
 			syms := s.handleWorkspaceSymbol(p.Query)
 			s.reply(req.ID, syms)
 		case "textDocument/signatureHelp":
@@ -390,7 +470,10 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 				Position struct{ Line, Character int } `json:"position"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: signatureHelp")
+				break
+			}
 			help := s.handleSignatureHelp(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, help)
 		case "textDocument/onTypeFormatting":
@@ -402,7 +485,10 @@ func (s *Server) Run() error {
 				Ch       string                        `json:"ch"`
 				Options  map[string]any                `json:"options"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: onTypeFormatting")
+				break
+			}
 			edits := s.handleOnTypeFormatting(p.TextDocument.URI, p.Position.Line, p.Position.Character, p.Ch, p.Options)
 			s.reply(req.ID, edits)
 		case "textDocument/formatting":
@@ -412,7 +498,10 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 				Options map[string]any `json:"options"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: formatting")
+				break
+			}
 			edits := s.handleFormatting(p.TextDocument.URI, p.Options)
 			s.reply(req.ID, edits)
 		case "textDocument/rangeFormatting":
@@ -426,7 +515,10 @@ func (s *Server) Run() error {
 				} `json:"range"`
 				Options map[string]any `json:"options"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: rangeFormatting")
+				break
+			}
 			edits := s.handleRangeFormatting(p.TextDocument.URI, p.Range.Start.Line, p.Range.End.Line, p.Options)
 			s.reply(req.ID, edits)
 		case "textDocument/codeAction":
@@ -442,7 +534,10 @@ func (s *Server) Run() error {
 					Diagnostics []any `json:"diagnostics"`
 				} `json:"context"`
 			}
-			_ = json.Unmarshal(req.Params, &p)
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: codeAction")
+				break
+			}
 			actions := s.handleCodeAction(p.TextDocument.URI, p.Range.Start.Line, p.Range.Start.Character, p.Range.End.Line, p.Range.End.Character)
 			s.reply(req.ID, actions)
 		case "textDocument/completion":
@@ -459,7 +554,10 @@ func (s *Server) Run() error {
 		case "completionItem/resolve":
 			// Enrich completion item with documentation/detail on demand
 			var item map[string]any
-			_ = json.Unmarshal(req.Params, &item)
+			if err := json.Unmarshal(req.Params, &item); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: completionItem/resolve")
+				break
+			}
 			if item != nil {
 				if dataAny, ok := item["data"].(map[string]any); ok {
 					if kind, _ := dataAny["type"].(string); kind == "keyword" {
@@ -491,15 +589,35 @@ func (s *Server) reply(id json.RawMessage, result any) {
 func (s *Server) replyError(id json.RawMessage, code int, msg string) {
 	resp := Response{JSONRPC: "2.0", ID: id, Error: &RespError{Code: code, Message: msg}}
 	s.write(resp)
+	atomic.AddUint64(&s.errCount, 1)
 }
 
 func (s *Server) write(v any) {
-	data, _ := json.Marshal(v)
-	// LSP framing (ignore write errors intentionally after best effort)
-	_, _ = io.WriteString(s.out, "Content-Length: ")
-	_, _ = io.WriteString(s.out, itoa(len(data)))
-	_, _ = io.WriteString(s.out, "\r\n\r\n")
-	_, _ = s.out.Write(data)
+	data, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	if _, err := io.WriteString(s.out, "Content-Length: "); err != nil {
+		return
+	}
+	if _, err := io.WriteString(s.out, itoa(len(data))); err != nil {
+		return
+	}
+	if _, err := io.WriteString(s.out, "\r\n\r\n"); err != nil {
+		return
+	}
+	if n, err2 := s.out.Write(data); err2 == nil && n > 0 {
+		atomic.AddUint64(&s.bytesOut, uint64(n))
+	}
+}
+
+// Stats returns a snapshot of server counters.
+func (s *Server) Stats() map[string]uint64 {
+	return map[string]uint64{
+		"requests": atomic.LoadUint64(&s.reqCount),
+		"errors":   atomic.LoadUint64(&s.errCount),
+		"bytesOut": atomic.LoadUint64(&s.bytesOut),
+	}
 }
 
 // filePathFromURI converts file:// URI to OS path best-effort
@@ -513,6 +631,68 @@ func filePathFromURI(uri string) string {
 		return p
 	}
 	return ""
+}
+
+// pathUnderRoot returns true if filePath is within the current rootURI directory.
+// When rootURI is empty, it returns true to avoid over-restricting single-file usage.
+func (s *Server) pathUnderRoot(filePath string) bool {
+	root := filePathFromURI(s.rootURI)
+	if root == "" || filePath == "" {
+		return true
+	}
+	// Normalize paths for comparison
+	rp := filepath.Clean(root)
+	fp := filepath.Clean(filePath)
+	// On Windows, make comparison case-insensitive by lowering both
+	rl := strings.ToLower(rp)
+	fl := strings.ToLower(fp)
+	// Ensure trailing separator for root prefix matching
+	if !strings.HasSuffix(rl, string(filepath.Separator)) {
+		rl += string(filepath.Separator)
+	}
+	if !strings.HasSuffix(fl, string(filepath.Separator)) {
+		// fl may point to a file; keep as-is for prefix check
+	}
+	return strings.HasPrefix(fl, rl)
+}
+
+// indexWorkspace scans rootURI for .oriz files and indexes top-level symbols (best-effort, blocking)
+func (s *Server) indexWorkspace() {
+	root := filePathFromURI(s.rootURI)
+	if root == "" {
+		return
+	}
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			// Skip unreadable paths but continue walking
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(path), ".oriz") {
+			return nil
+		}
+		// Only index files strictly under root to avoid symlink escapes
+		if !s.pathUnderRoot(path) {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		uri := "file://" + path
+		s.docs[uri] = string(b)
+		lx := lexer.NewWithFilename(string(b), uri)
+		pr := parser.NewParser(lx, uri)
+		ast, _ := pr.Parse()
+		if ast != nil {
+			s.astCache[uri] = ast
+			s.buildSymbolIndex(uri, ast)
+			s.updateWorkspaceIndex(uri, ast)
+		}
+		return nil
+	})
 }
 
 func itoa(n int) string {
@@ -636,21 +816,21 @@ func (s *Server) publishDiagnosticsFor(uri, text string) {
 		}
 	}
 
-    ver := s.docsVer[uri]
-    payload := map[string]any{
-        "uri":         uri,
-        "diagnostics": diags,
-        "version":     ver,
-    }
-    // Emit only if changed
-    if b, err := json.Marshal(payload); err == nil {
-        hash := string(b)
-        if s.diagCache[uri] == hash {
-            return
-        }
-        s.diagCache[uri] = hash
-    }
-    s.notify("textDocument/publishDiagnostics", payload)
+	ver := s.docsVer[uri]
+	payload := map[string]any{
+		"uri":         uri,
+		"diagnostics": diags,
+		"version":     ver,
+	}
+	// Emit only if changed
+	if b, err := json.Marshal(payload); err == nil {
+		hash := string(b)
+		if s.diagCache[uri] == hash {
+			return
+		}
+		s.diagCache[uri] = hash
+	}
+	s.notify("textDocument/publishDiagnostics", payload)
 }
 
 // updateTokensIncremental updates cached tokens using the incremental lexer.
@@ -1693,13 +1873,29 @@ func (s *Server) handleRename(uri string, line, character int, newName string) (
 		if loc.URI == uri {
 			continue
 		}
+		// Skip if target file already declares newName (declaration-level conflict)
+		if newLocs, ok := s.wsIndex[newName]; ok {
+			conflict := false
+			for _, nl := range newLocs {
+				if nl.URI == loc.URI {
+					conflict = true
+					break
+				}
+			}
+			if conflict {
+				continue
+			}
+		}
 		// Load file content (from open docs cache or filesystem)
 		otherText := s.docs[loc.URI]
 		if otherText == "" {
 			if path := filePathFromURI(loc.URI); path != "" {
-				b, err := os.ReadFile(path)
-				if err == nil {
-					otherText = string(b)
+				// Restrict access to files under workspace root
+				if s.pathUnderRoot(path) {
+					b, err := os.ReadFile(path)
+					if err == nil {
+						otherText = string(b)
+					}
 				}
 			}
 		}
@@ -2271,8 +2467,51 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 		identItems = append(identItems, item)
 	}
 
-	// Combine keyword items and identifier items; cap to a reasonable size
-	items := append(keywordItems, identItems...)
+	// Workspace symbols (type/import感知の土台として、ワークスペース索引から名前候補)
+	wsItems := make([]map[string]any, 0, 64)
+	for name, locs := range s.wsIndex {
+		if prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(prefix)) {
+			continue
+		}
+		if len(locs) == 0 {
+			continue
+		}
+		kind := locs[0].Kind
+		wsItems = append(wsItems, map[string]any{
+			"label":  name,
+			"kind":   kind,
+			"detail": "workspace symbol",
+			"data": map[string]any{"type": "symbol", "uris": func() []string {
+				m := map[string]struct{}{}
+				u := make([]string, 0, len(locs))
+				for _, l := range locs {
+					if _, ok := m[l.URI]; !ok {
+						m[l.URI] = struct{}{}
+						u = append(u, l.URI)
+					}
+				}
+				return u
+			}()},
+		})
+		if len(wsItems) >= 64 {
+			break
+		}
+	}
+
+	// Combine keyword, identifier and workspace items; dedupe by label
+	items := make([]map[string]any, 0, len(keywordItems)+len(identItems)+len(wsItems))
+	seen := map[string]bool{}
+	for _, col := range [][]map[string]any{keywordItems, identItems, wsItems} {
+		for _, it := range col {
+			if lab, _ := it["label"].(string); lab != "" {
+				if seen[lab] {
+					continue
+				}
+				seen[lab] = true
+			}
+			items = append(items, it)
+		}
+	}
 	if len(items) > 200 {
 		items = items[:200]
 	}

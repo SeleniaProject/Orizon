@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // Simple helpers to avoid importing strings/strconv to keep test local and deterministic.
@@ -282,5 +285,94 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 		// ok
 	case <-time.After(5 * time.Second):
 		t.Fatalf("server did not exit after 'exit' message")
+	}
+}
+
+func TestUTF16LineCharMappingWithEmoji(t *testing.T) {
+	// Text includes a surrogate pair (emoji) and non-ASCII character to verify UTF-16 mapping
+	text := "a🙂b\n中"
+	// Byte offsets of runes: a(0), 🙂(1..), b, newline, 中
+	// Round-trip a set of strategic positions. LSP uses UTF-16 columns, so
+	// interior byte offsets within a UTF-8 rune may legally map to the rune's
+	// start or end when converting back. Accept those canonicalizations.
+	positions := []int{0, 1, 5, len("a🙂b"), len(text) - 1, len(text)}
+	for _, off := range positions {
+		line, char := utf16LineCharFromOffset(text, off)
+		back := offsetFromLineCharUTF16(text, line, char)
+		// Allow mapping to the start or end of the rune that contains off.
+		cs, ce := runeContainingBounds(text, off)
+		if !(back == off || back == cs || back == ce) {
+			t.Fatalf("round-trip failed: off=%d line=%d char=%d back=%d (start=%d end=%d)", off, line, char, back, cs, ce)
+		}
+	}
+	// Also probe a position inside the emoji (between surrogate halves) by using the UTF-16 column
+	line, _ := utf16LineCharFromOffset(text, 2) // somewhere within emoji bytes
+	// The emoji occupies 2 UTF-16 units; step to the end of the emoji in UTF-16 space
+	chEnd := 2
+	off := offsetFromLineCharUTF16(text, line, chEnd)
+	if off <= 1 {
+		t.Fatalf("expected offset after emoji, got %d", off)
+	}
+}
+
+// runeBoundsAtOrBefore returns the UTF-8 byte start and end indices of the rune
+// that ends at or before the given byte offset. If off is at a rune boundary,
+// it returns that rune's bounds; if off is in the middle of a rune or at the
+// end of the string, it returns the preceding rune's bounds.
+func runeContainingBounds(s string, off int) (int, int) {
+	if off < 0 {
+		off = 0
+	}
+	if off >= len(s) {
+		// Use last rune
+		if len(s) == 0 {
+			return 0, 0
+		}
+		_, sz := utf8.DecodeLastRuneInString(s)
+		if sz <= 0 {
+			return len(s), len(s)
+		}
+		return len(s) - sz, len(s)
+	}
+	// Move to the start of the containing rune
+	start := off
+	for start > 0 && !utf8.RuneStart(s[start]) {
+		start--
+	}
+	_, sz := utf8.DecodeRuneInString(s[start:])
+	if sz <= 0 {
+		return start, start
+	}
+	return start, start + sz
+}
+
+func TestIndexWorkspaceRespectsRoot(t *testing.T) {
+	dir := t.TempDir()
+	// Create two .oriz files under root
+	a := filepath.Join(dir, "a.oriz")
+	b := filepath.Join(dir, "sub", "b.oriz")
+	if err := os.MkdirAll(filepath.Dir(b), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(a, []byte("func a() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b, []byte("func b() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// File outside root should not be indexed
+	outsideDir := t.TempDir()
+	outside := filepath.Join(outsideDir, "c.oriz")
+	_ = os.WriteFile(outside, []byte("func c() {}\n"), 0o644)
+
+	srv := NewServer(bytes.NewReader(nil), io.Discard)
+	srv.rootURI = "file://" + dir
+	srv.indexWorkspace()
+
+	// Expect only URIs that start with root path
+	for uri := range srv.docs {
+		if !srv.pathUnderRoot(filePathFromURI(uri)) {
+			t.Fatalf("indexed file outside root: %s", uri)
+		}
 	}
 }
