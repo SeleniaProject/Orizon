@@ -367,20 +367,20 @@ func (s *Server) Run() error {
 			_ = json.Unmarshal(req.Params, &p)
 			edits := s.handleFormatting(p.TextDocument.URI, p.Options)
 			s.reply(req.ID, edits)
-        case "textDocument/rangeFormatting":
-            var p struct {
-                TextDocument struct {
-                    URI string `json:"uri"`
-                } `json:"textDocument"`
-                Range struct {
-                    Start struct{ Line, Character int } `json:"start"`
-                    End   struct{ Line, Character int } `json:"end"`
-                } `json:"range"`
-                Options map[string]any `json:"options"`
-            }
-            _ = json.Unmarshal(req.Params, &p)
-            edits := s.handleRangeFormatting(p.TextDocument.URI, p.Range.Start.Line, p.Range.End.Line, p.Options)
-            s.reply(req.ID, edits)
+		case "textDocument/rangeFormatting":
+			var p struct {
+				TextDocument struct {
+					URI string `json:"uri"`
+				} `json:"textDocument"`
+				Range struct {
+					Start struct{ Line, Character int } `json:"start"`
+					End   struct{ Line, Character int } `json:"end"`
+				} `json:"range"`
+				Options map[string]any `json:"options"`
+			}
+			_ = json.Unmarshal(req.Params, &p)
+			edits := s.handleRangeFormatting(p.TextDocument.URI, p.Range.Start.Line, p.Range.End.Line, p.Options)
+			s.reply(req.ID, edits)
 		case "textDocument/codeAction":
 			var p struct {
 				TextDocument struct {
@@ -554,12 +554,12 @@ func (s *Server) publishDiagnosticsFor(uri, text string) {
 		}
 	}
 
-    ver := s.docsVer[uri]
-    s.notify("textDocument/publishDiagnostics", map[string]any{
-        "uri":         uri,
-        "diagnostics": diags,
-        "version":     ver,
-    })
+	ver := s.docsVer[uri]
+	s.notify("textDocument/publishDiagnostics", map[string]any{
+		"uri":         uri,
+		"diagnostics": diags,
+		"version":     ver,
+	})
 }
 
 // handleHover returns minimal hover info at the given position.
