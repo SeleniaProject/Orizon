@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"context"
+	"os"
+	"path/filepath"
+
 	asyncio "github.com/orizon-lang/orizon/internal/runtime/asyncio"
-    vfs "github.com/orizon-lang/orizon/internal/runtime/vfs"
-    "context"
-    "path/filepath"
-    "os"
+	vfs "github.com/orizon-lang/orizon/internal/runtime/vfs"
 )
 
 // testBehavior is a simple actor behavior used for testing.
@@ -65,13 +66,16 @@ func TestActor_MessageFlow_ManualDispatch(t *testing.T) {
 	}
 	defer system.Stop()
 
+    // Stop scheduler to avoid auto-dispatch interfering with manual dequeue below
+    system.scheduler.Stop()
+
 	tb := &testBehavior{received: make(chan Message, 1), name: "test"}
 	actor, err := system.CreateActor("echo", UserActor, tb, DefaultActorConfig)
 	if err != nil {
 		t.Fatalf("failed to create actor: %v", err)
 	}
 
-	// Send via system (enqueues to mailbox)
+    // Send via system (enqueues to mailbox)
 	if err := system.SendMessage(0, actor.ID, 1, "hello"); err != nil {
 		t.Fatalf("send failed: %v", err)
 	}
@@ -596,47 +600,56 @@ func TestActorSystem_IOPollerIntegration(t *testing.T) {
 }
 
 type fsProbe struct{ got chan string }
+
 func (p *fsProbe) Receive(ctx *ActorContext, msg Message) error {
-    if msg.Type == FSChanged {
-        if ev, ok := msg.Payload.(FSEvent); ok {
-            p.got <- ev.Path
-        }
-    }
-    return nil
+	if msg.Type == FSChanged {
+		if ev, ok := msg.Payload.(FSEvent); ok {
+			p.got <- ev.Path
+		}
+	}
+	return nil
 }
-func (p *fsProbe) PreStart(*ActorContext) error { return nil }
-func (p *fsProbe) PostStop(*ActorContext) error { return nil }
+func (p *fsProbe) PreStart(*ActorContext) error                    { return nil }
+func (p *fsProbe) PostStop(*ActorContext) error                    { return nil }
 func (p *fsProbe) PreRestart(*ActorContext, error, *Message) error { return nil }
-func (p *fsProbe) PostRestart(*ActorContext, error) error { return nil }
-func (p *fsProbe) GetBehaviorName() string { return "fsProbe" }
+func (p *fsProbe) PostRestart(*ActorContext, error) error          { return nil }
+func (p *fsProbe) GetBehaviorName() string                         { return "fsProbe" }
 
 func TestActorSystem_VFSWatchIntegration(t *testing.T) {
-    system, _ := NewActorSystem(DefaultActorSystemConfig)
-    _ = system.Start()
-    defer system.Stop()
+	system, _ := NewActorSystem(DefaultActorSystemConfig)
+	_ = system.Start()
+	defer system.Stop()
 
-    probe := &fsProbe{got: make(chan string, 1)}
-    a, err := system.CreateActor("fsp", UserActor, probe, DefaultActorConfig)
-    if err != nil { t.Fatalf("create actor: %v", err) }
+	probe := &fsProbe{got: make(chan string, 1)}
+	a, err := system.CreateActor("fsp", UserActor, probe, DefaultActorConfig)
+	if err != nil {
+		t.Fatalf("create actor: %v", err)
+	}
 
-    fsys := vfs.NewOS()
-    dir := t.TempDir()
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-    defer cancel()
-    closeFn, err := system.WatchPathWithActor(ctx, fsys, nil, dir, a.ID)
-    if err != nil { t.Skip("fsnotify may be unavailable:", err) }
-    defer closeFn()
+	fsys := vfs.NewOS()
+	dir := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	closeFn, err := system.WatchPathWithActor(ctx, fsys, nil, dir, a.ID)
+	if err != nil {
+		t.Skip("fsnotify may be unavailable:", err)
+	}
+	defer closeFn()
 
-    // trigger create
-    path := filepath.Join(dir, "a.txt")
-    if err := os.WriteFile(path, []byte("x"), 0o644); err != nil { t.Fatal(err) }
+	// trigger create
+	path := filepath.Join(dir, "a.txt")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-    select {
-    case pth := <-probe.got:
-        if pth == "" { t.Fatal("empty fs event path") }
-    case <-time.After(2 * time.Second):
-        t.Fatal("did not receive fs event")
-    }
+	select {
+	case pth := <-probe.got:
+		if pth == "" {
+			t.Fatal("empty fs event path")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive fs event")
+	}
 }
 
 func TestMailbox_PriorityQueue(t *testing.T) {
