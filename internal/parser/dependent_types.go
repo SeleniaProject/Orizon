@@ -156,7 +156,7 @@ func (dft *DependentFunctionType) Substitute(variable string, value Expression) 
 		Span:        dft.Span,
 		Parameters:  newParams,
 		ReturnType:  newReturnType,
-		Constraints: dft.Constraints, // TODO: substitute in constraints
+		Constraints: substituteConstraints(dft.Constraints, variable, value),
 		IsTotal:     dft.IsTotal,
 	}
 }
@@ -263,7 +263,7 @@ func (dp *DependentParameter) Substitute(variable string, value Expression) *Dep
 		Name:        dp.Name,
 		Type:        newType,
 		IsImplicit:  dp.IsImplicit,
-		Constraints: dp.Constraints, // TODO: substitute in constraints
+		Constraints: substituteConstraints(dp.Constraints, variable, value),
 	}
 }
 
@@ -335,11 +335,16 @@ func (rt *RefinementType) GetDependency() Expression {
 	return rt.Variable
 }
 func (rt *RefinementType) Substitute(variable string, value Expression) DependentType {
-	if rt.Variable.Value == variable {
-		// TODO: Replace the variable in the predicate
-		return rt // For now, return unchanged
+	// Perform capture-ignorant substitution within the predicate when variable matches
+	// the refinement variable name. For different names, still substitute inside predicate
+	// to allow outer substitutions to propagate.
+	newPred := substituteExpr(rt.Predicate, variable, value)
+	return &RefinementType{
+		Span:      rt.Span,
+		BaseType:  rt.BaseType,
+		Variable:  rt.Variable,
+		Predicate: newPred,
 	}
-	return rt
 }
 func (rt *RefinementType) IsRefined() bool {
 	return true
@@ -454,8 +459,12 @@ func (sat *SizedArrayType) GetDependency() Expression {
 	return sat.Size
 }
 func (sat *SizedArrayType) Substitute(variable string, value Expression) DependentType {
-	// TODO: Implement substitution in size expression
-	return sat
+	return &SizedArrayType{
+		Span:        sat.Span,
+		ElementType: sat.ElementType,
+		Size:        substituteExpr(sat.Size, variable, value),
+		SizeType:    sat.SizeType,
+	}
 }
 func (sat *SizedArrayType) IsRefined() bool {
 	return false
@@ -575,8 +584,10 @@ func (it *IndexType) GetDependency() Expression {
 	return it.MaxValue
 }
 func (it *IndexType) Substitute(variable string, value Expression) DependentType {
-	// TODO: Implement substitution in max value expression
-	return it
+	return &IndexType{
+		Span:     it.Span,
+		MaxValue: substituteExpr(it.MaxValue, variable, value),
+	}
 }
 func (it *IndexType) IsRefined() bool {
 	return true
@@ -666,8 +677,10 @@ func (pt *ProofType) GetDependency() Expression {
 	return pt.Proposition
 }
 func (pt *ProofType) Substitute(variable string, value Expression) DependentType {
-	// TODO: Implement substitution in proposition
-	return pt
+	return &ProofType{
+		Span:        pt.Span,
+		Proposition: substituteExpr(pt.Proposition, variable, value),
+	}
 }
 func (pt *ProofType) IsRefined() bool {
 	return false
@@ -729,19 +742,18 @@ func (pt *ProofType) ReplaceChild(index int, newChild TypeSafeNode) error {
 
 // EvaluateConstraint evaluates a type constraint for a given value
 func EvaluateConstraint(constraint TypeConstraint, value interface{}) (bool, error) {
-	switch constraint.Kind {
-	case ConstraintEquality:
-		// TODO: Implement equality checking
-		return true, nil
-	case ConstraintRange:
-		// TODO: Implement range checking
-		return true, nil
-	case ConstraintPredicate:
-		// TODO: Implement predicate evaluation
-		return true, nil
-	default:
-		return false, fmt.Errorf("unsupported constraint kind: %s", constraint.Kind)
+	// Build a small evaluation environment for the constrained variable
+	env := map[string]interface{}{}
+	if constraint.Variable != nil {
+		env[constraint.Variable.Value] = value
 	}
+	// Evaluate the predicate as boolean; fall back to true when not evaluable
+	ok, evalErr := evalBool(constraint.Predicate, env)
+	if evalErr != nil {
+		// When evaluation is not supported, do not fail hard
+		return true, nil
+	}
+	return ok, nil
 }
 
 // CheckConstraints checks all constraints for a dependent type
@@ -805,12 +817,378 @@ func inferLiteralType(lit *Literal) Type {
 
 // SimplifyDependentType attempts to simplify a dependent type by evaluating constraints
 func SimplifyDependentType(depType DependentType) DependentType {
-	// TODO: Implement type simplification
-	return depType
+	if depType == nil {
+		return nil
+	}
+	// Attempt simple constraint evaluation without an environment. If all
+	// constraints evaluate to true, we can drop them for display purposes.
+	cs := depType.GetConstraints()
+	if len(cs) == 0 {
+		return depType
+	}
+	allTrue := true
+	for _, c := range cs {
+		ok, err := evalBool(c.Predicate, map[string]interface{}{})
+		if err != nil || !ok {
+			allTrue = false
+			break
+		}
+	}
+	if !allTrue {
+		return depType
+	}
+	switch t := depType.(type) {
+	case *DependentFunctionType:
+		// Drop constraints when all true
+		nt := *t
+		nt.Constraints = nil
+		return &nt
+	default:
+		return depType
+	}
 }
 
 // UnifyDependentTypes attempts to unify two dependent types
 func UnifyDependentTypes(type1, type2 DependentType) (DependentType, error) {
-	// TODO: Implement dependent type unification
-	return nil, fmt.Errorf("dependent type unification not yet implemented")
+	if type1 == nil || type2 == nil {
+		return nil, fmt.Errorf("cannot unify nil types")
+	}
+	// Trivial equivalence
+	if type1.IsEquivalent(type2) {
+		return type1, nil
+	}
+	switch t1 := type1.(type) {
+	case *DependentFunctionType:
+		if t2, ok := type2.(*DependentFunctionType); ok {
+			if len(t1.Parameters) != len(t2.Parameters) {
+				return nil, fmt.Errorf("parameter arity mismatch: %d vs %d", len(t1.Parameters), len(t2.Parameters))
+			}
+			// Unify parameters pairwise
+			unifiedParams := make([]*DependentParameter, len(t1.Parameters))
+			for i := range t1.Parameters {
+				p1 := t1.Parameters[i]
+				p2 := t2.Parameters[i]
+				// Names may differ; unify types
+				ut, err := UnifyDependentTypes(p1.Type, p2.Type)
+				if err != nil {
+					return nil, fmt.Errorf("parameter %d type mismatch: %w", i, err)
+				}
+				unifiedParams[i] = &DependentParameter{
+					Span:        p1.Span,
+					Name:        p1.Name,
+					Type:        ut,
+					IsImplicit:  p1.IsImplicit && p2.IsImplicit,
+					Constraints: append([]TypeConstraint{}, p1.Constraints...),
+				}
+			}
+			// Unify return types
+			ur, err := UnifyDependentTypes(t1.ReturnType, t2.ReturnType)
+			if err != nil {
+				return nil, fmt.Errorf("return type mismatch: %w", err)
+			}
+			return &DependentFunctionType{
+				Span:        t1.Span,
+				Parameters:  unifiedParams,
+				ReturnType:  ur,
+				Constraints: append([]TypeConstraint{}, t1.Constraints...),
+				IsTotal:     t1.IsTotal && t2.IsTotal,
+			}, nil
+		}
+	case *SizedArrayType:
+		if t2, ok := type2.(*SizedArrayType); ok {
+			// Element types must be syntactically equal (by String); deeper check omitted here
+			if t1.ElementType.String() != t2.ElementType.String() {
+				return nil, fmt.Errorf("element type mismatch: %s vs %s", t1.ElementType.String(), t2.ElementType.String())
+			}
+			if t1.Size.String() == t2.Size.String() {
+				return t1, nil
+			}
+			return nil, fmt.Errorf("array size mismatch: %s vs %s (add equality constraint to unify)", t1.Size.String(), t2.Size.String())
+		}
+	case *RefinementType:
+		if t2, ok := type2.(*RefinementType); ok {
+			// Base type must match by String, predicates must match by String
+			if t1.BaseType.String() == t2.BaseType.String() && t1.Predicate.String() == t2.Predicate.String() {
+				return t1, nil
+			}
+			return nil, fmt.Errorf("refinement mismatch: %s | %s vs %s | %s", t1.BaseType.String(), t1.Predicate.String(), t2.BaseType.String(), t2.Predicate.String())
+		}
+	case *IndexType:
+		if t2, ok := type2.(*IndexType); ok {
+			if t1.MaxValue.String() == t2.MaxValue.String() {
+				return t1, nil
+			}
+			return nil, fmt.Errorf("index bound mismatch: %s vs %s", t1.MaxValue.String(), t2.MaxValue.String())
+		}
+	case *ProofType:
+		if t2, ok := type2.(*ProofType); ok {
+			if t1.Proposition.String() == t2.Proposition.String() {
+				return t1, nil
+			}
+			return nil, fmt.Errorf("proposition mismatch: %s vs %s", t1.Proposition.String(), t2.Proposition.String())
+		}
+	}
+	return nil, fmt.Errorf("unification not implemented for %T and %T", type1, type2)
+}
+
+// ====== Substitution and Evaluation Helpers ======
+
+// substituteConstraints applies variable substitution inside constraint predicates.
+func substituteConstraints(cs []TypeConstraint, varName string, value Expression) []TypeConstraint {
+	if len(cs) == 0 {
+		return cs
+	}
+	out := make([]TypeConstraint, len(cs))
+	for i, c := range cs {
+		out[i] = c
+		out[i].Predicate = substituteExpr(c.Predicate, varName, value)
+	}
+	return out
+}
+
+// substituteExpr performs a simple structural substitution of identifiers in an expression.
+func substituteExpr(expr Expression, varName string, value Expression) Expression {
+	if expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *Identifier:
+		if e.Value == varName {
+			return value
+		}
+		return e
+	case *Literal:
+		return e
+	case *UnaryExpression:
+		return &UnaryExpression{Span: e.Span, Operator: e.Operator, Operand: substituteExpr(e.Operand, varName, value)}
+	case *BinaryExpression:
+		return &BinaryExpression{Span: e.Span, Left: substituteExpr(e.Left, varName, value), Operator: e.Operator, Right: substituteExpr(e.Right, varName, value)}
+	case *TernaryExpression:
+		return &TernaryExpression{Span: e.Span, Condition: substituteExpr(e.Condition, varName, value), TrueExpr: substituteExpr(e.TrueExpr, varName, value), FalseExpr: substituteExpr(e.FalseExpr, varName, value)}
+	case *CallExpression:
+		args := make([]Expression, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = substituteExpr(a, varName, value)
+		}
+		return &CallExpression{Span: e.Span, Function: substituteExpr(e.Function, varName, value), Arguments: args}
+	case *AssignmentExpression:
+		return &AssignmentExpression{Span: e.Span, Left: substituteExpr(e.Left, varName, value), Operator: e.Operator, Right: substituteExpr(e.Right, varName, value)}
+	default:
+		return expr
+	}
+}
+
+// evalBool attempts to evaluate an expression to boolean under a simple environment.
+func evalBool(expr Expression, env map[string]interface{}) (bool, error) {
+	if expr == nil {
+		return false, fmt.Errorf("nil expression")
+	}
+	switch e := expr.(type) {
+	case *Literal:
+		if b, ok := e.Value.(bool); ok {
+			return b, nil
+		}
+		// Non-boolean literal: not directly evaluable
+		return false, fmt.Errorf("non-boolean literal")
+	case *Identifier:
+		v, ok := env[e.Value]
+		if !ok {
+			return false, fmt.Errorf("unknown identifier: %s", e.Value)
+		}
+		if b, ok := toBool(v); ok {
+			return b, nil
+		}
+		// Non-boolean identifier; not directly evaluable
+		return false, fmt.Errorf("non-boolean identifier")
+	case *UnaryExpression:
+		if e.Operator != nil && e.Operator.Value == "!" {
+			v, err := evalBool(e.Operand, env)
+			if err != nil {
+				return false, err
+			}
+			return !v, nil
+		}
+		return false, fmt.Errorf("unsupported unary operator: %s", opVal(e.Operator))
+	case *BinaryExpression:
+		if e.Operator == nil {
+			return false, fmt.Errorf("missing operator")
+		}
+		op := e.Operator.Value
+		switch op {
+		case "&&":
+			l, err := evalBool(e.Left, env)
+			if err != nil {
+				return false, err
+			}
+			if !l {
+				return false, nil
+			}
+			r, err := evalBool(e.Right, env)
+			if err != nil {
+				return false, err
+			}
+			return r, nil
+		case "||":
+			l, err := evalBool(e.Left, env)
+			if err == nil && l {
+				return true, nil
+			}
+			r, err2 := evalBool(e.Right, env)
+			if err2 != nil {
+				return false, err2
+			}
+			return r, nil
+		case "==", "!=", ">", ">=", "<", "<=":
+			ln, lok := evalNumber(e.Left, env)
+			rn, rok := evalNumber(e.Right, env)
+			if !lok || !rok {
+				return false, fmt.Errorf("non-numeric comparison")
+			}
+			switch op {
+			case "==":
+				return ln == rn, nil
+			case "!=":
+				return ln != rn, nil
+			case ">":
+				return ln > rn, nil
+			case ">=":
+				return ln >= rn, nil
+			case "<":
+				return ln < rn, nil
+			case "<=":
+				return ln <= rn, nil
+			}
+		default:
+			return false, fmt.Errorf("unsupported binary operator: %s", op)
+		}
+		return false, fmt.Errorf("unhandled binary")
+	default:
+		return false, fmt.Errorf("unsupported expression type")
+	}
+}
+
+// evalNumber evaluates an expression to a float64 if possible.
+func evalNumber(expr Expression, env map[string]interface{}) (float64, bool) {
+	switch e := expr.(type) {
+	case *Literal:
+		switch v := e.Value.(type) {
+		case int:
+			return float64(v), true
+		case int32:
+			return float64(v), true
+		case int64:
+			return float64(v), true
+		case float32:
+			return float64(v), true
+		case float64:
+			return v, true
+		case string:
+			// Try parse numeric string (common in tests)
+			var f float64
+			_, err := fmt.Sscan(v, &f)
+			if err == nil {
+				return f, true
+			}
+		}
+		return 0, false
+	case *Identifier:
+		v, ok := env[e.Value]
+		if !ok {
+			return 0, false
+		}
+		if f, ok := toFloat64(v); ok {
+			return f, true
+		}
+		return 0, false
+	case *UnaryExpression:
+		if e.Operator != nil && e.Operator.Value == "-" {
+			if n, ok := evalNumber(e.Operand, env); ok {
+				return -n, true
+			}
+		}
+		return 0, false
+	case *BinaryExpression:
+		if e.Operator == nil {
+			return 0, false
+		}
+		op := e.Operator.Value
+		switch op {
+		case "+", "-", "*", "/":
+			l, lok := evalNumber(e.Left, env)
+			r, rok := evalNumber(e.Right, env)
+			if !lok || !rok {
+				return 0, false
+			}
+			switch op {
+			case "+":
+				return l + r, true
+			case "-":
+				return l - r, true
+			case "*":
+				return l * r, true
+			case "/":
+				if r == 0 {
+					return 0, false
+				}
+				return l / r, true
+			}
+		}
+		return 0, false
+	default:
+		return 0, false
+	}
+}
+
+func toFloat64(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int8:
+		return float64(n), true
+	case int16:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case uint:
+		return float64(n), true
+	case uint8:
+		return float64(n), true
+	case uint16:
+		return float64(n), true
+	case uint32:
+		return float64(n), true
+	case uint64:
+		return float64(n), true
+	case float32:
+		return float64(n), true
+	case float64:
+		return n, true
+	case string:
+		var f float64
+		_, err := fmt.Sscan(n, &f)
+		if err == nil {
+			return f, true
+		}
+		return 0, false
+	default:
+		return 0, false
+	}
+}
+
+func toBool(v interface{}) (bool, bool) {
+	switch b := v.(type) {
+	case bool:
+		return b, true
+	default:
+		return false, false
+	}
+}
+
+func opVal(op *Operator) string {
+	if op == nil {
+		return ""
+	}
+	return op.Value
 }

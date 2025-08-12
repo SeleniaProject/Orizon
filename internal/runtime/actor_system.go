@@ -1201,9 +1201,11 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 				return
 			}
 			if d := failed.Config.RestartDelay; d > 0 {
-				time.Sleep(d)
+				// Schedule asynchronous restart to avoid blocking supervisor loop
+				time.AfterFunc(d, func() { _ = failed.Restart(reason) })
+			} else {
+				_ = failed.Restart(reason)
 			}
-			_ = failed.Restart(reason)
 		case OneForAll:
 			// Restart all children
 			for _, child := range sup.Children {
@@ -1212,9 +1214,12 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 					continue
 				}
 				if d := child.Config.RestartDelay; d > 0 {
-					time.Sleep(d)
+					time.AfterFunc(d, func(ch *Actor) func() {
+						return func() { _ = ch.Restart(reason) }
+					}(child))
+				} else {
+					_ = child.Restart(reason)
 				}
-				_ = child.Restart(reason)
 			}
 		case RestForOne:
 			// Restart failed and all children created after it
@@ -1233,9 +1238,12 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 							continue
 						}
 						if d := c.Config.RestartDelay; d > 0 {
-							time.Sleep(d)
+							time.AfterFunc(d, func(act *Actor) func() {
+								return func() { _ = act.Restart(reason) }
+							}(c))
+						} else {
+							_ = c.Restart(reason)
 						}
-						_ = c.Restart(reason)
 					}
 				}
 			} else {
@@ -1243,9 +1251,10 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 					_ = as.stopActor(failed)
 				} else {
 					if d := failed.Config.RestartDelay; d > 0 {
-						time.Sleep(d)
+						time.AfterFunc(d, func() { _ = failed.Restart(reason) })
+					} else {
+						_ = failed.Restart(reason)
 					}
-					_ = failed.Restart(reason)
 				}
 			}
 		default:
@@ -1253,9 +1262,10 @@ func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
 				_ = as.stopActor(failed)
 			} else {
 				if d := failed.Config.RestartDelay; d > 0 {
-					time.Sleep(d)
+					time.AfterFunc(d, func() { _ = failed.Restart(reason) })
+				} else {
+					_ = failed.Restart(reason)
 				}
-				_ = failed.Restart(reason)
 			}
 		}
 	case StopStrategy:
@@ -1403,12 +1413,12 @@ func (m *Mailbox) Clear() {
 
 // Len returns the current number of queued messages in the mailbox.
 func (m *Mailbox) Len() int {
-    m.mutex.RLock()
-    defer m.mutex.RUnlock()
-    if m.Type == PriorityMailbox && m.PriorityQueue != nil {
-        return m.PriorityQueue.size
-    }
-    return len(m.Messages)
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	if m.Type == PriorityMailbox && m.PriorityQueue != nil {
+		return m.PriorityQueue.size
+	}
+	return len(m.Messages)
 }
 
 // Helper methods

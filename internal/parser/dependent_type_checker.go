@@ -131,6 +131,8 @@ func (tc *DependentTypeChecker) CheckFunctionDeclaration(fn *FunctionDeclaration
 		paramType := tc.CheckType(param.TypeSpec)
 		paramTypes[i] = paramType
 		tc.environment.BindType(param.Name.Value, paramType)
+		// Validate parameter type constraints that are statically false
+		tc.validateConstraints(paramType, param.Span)
 	}
 
 	// Check return type
@@ -140,6 +142,8 @@ func (tc *DependentTypeChecker) CheckFunctionDeclaration(fn *FunctionDeclaration
 	} else {
 		returnType = CreateBasicDependentType(fn.Span, "Unit")
 	}
+	// Validate return type constraints
+	tc.validateConstraints(returnType, fn.Span)
 
 	// Check function body
 	if fn.Body != nil {
@@ -207,10 +211,35 @@ func (tc *DependentTypeChecker) CheckVariableDeclaration(vardecl *VariableDeclar
 		finalType = CreateBasicDependentType(vardecl.Span, "Error")
 	}
 
+	// Validate final type constraints that are statically false
+	tc.validateConstraints(finalType, vardecl.Span)
+
 	// Bind variable to its type
 	tc.environment.BindType(vardecl.Name.Value, finalType)
 
 	return finalType
+}
+
+// validateConstraints reports an error when all information available allows
+// a constraint to be determined as false (statically unsatisfiable).
+func (tc *DependentTypeChecker) validateConstraints(depType DependentType, span Span) {
+	if depType == nil {
+		return
+	}
+	constraints := depType.GetConstraints()
+	if len(constraints) == 0 {
+		return
+	}
+	for _, c := range constraints {
+		ok, err := evalBool(c.Predicate, map[string]interface{}{})
+		if err == nil && !ok {
+			tc.errors = append(tc.errors, DependentTypeError{
+				Span:    span,
+				Message: fmt.Sprintf("Unsatisfiable type constraint: %s", c.Predicate.String()),
+				Kind:    TypeErrorConstraintViolation,
+			})
+		}
+	}
 }
 
 // CheckStatement type checks a statement

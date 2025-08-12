@@ -71,7 +71,12 @@ func Clean(p string) string { return path.Clean(p) }
 // WithTimeout derives a context with timeout helper for watchers.
 func WithTimeout(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
 	if parent == nil {
-		parent = context.Background()
+		// Derive a fresh cancelable parent to avoid background leaks
+		c, cancel := context.WithCancel(context.Background())
+		// Caller receives a context with timeout layered on top of a cancelable base
+		ctx, tcancel := context.WithTimeout(c, d)
+		// Combine cancels: when timeout cancel is called, also cancel base
+		return ctx, func() { tcancel(); cancel() }
 	}
 	return context.WithTimeout(parent, d)
 }

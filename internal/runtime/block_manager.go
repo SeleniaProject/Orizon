@@ -205,6 +205,9 @@ func (bm *BlockManager) AllocateBlock(region *Region, size RegionSize, alignment
 	if bm.policy.EnableCanaries {
 		bm.writeCanaries(userPtr, size)
 	}
+	// Debug-build validation and strict canary check
+	debugPostAllocValidate(bm, userPtr, size)
+	debugStrictCanaryCheck(bm, userPtr, size)
 
 	return userPtr, nil
 }
@@ -229,12 +232,13 @@ func (bm *BlockManager) DeallocateBlock(ptr unsafe.Pointer) error {
 		return fmt.Errorf("buffer overflow detected at %p", ptr)
 	}
 
-	// Check canaries if enabled
+	// Check canaries if enabled (and enforce in debug)
 	if bm.policy.EnableCanaries {
 		if !bm.validateCanaries(ptr, RegionSize(header.Size)) {
 			return fmt.Errorf("buffer overflow detected via canaries at %p", ptr)
 		}
 	}
+	debugStrictCanaryCheck(bm, ptr, RegionSize(header.Size))
 
 	// Check reference count
 	if bm.policy.RefCountingEnabled {

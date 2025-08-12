@@ -106,6 +106,7 @@ var (
 
 // NewMessagePassingSystem creates a new message passing system
 func NewMessagePassingSystem(config MessagePassingConfig) (*MessagePassingSystem, error) {
+	// Use a cancelable base context to avoid leaks and allow orderly shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
 
 	system := &MessagePassingSystem{

@@ -83,23 +83,27 @@ func TestWatcher_Polling(t *testing.T) {
 }
 
 func TestWatcher_FSNotify(t *testing.T) {
-    fw, err := NewFSWatcher()
-    if err != nil {
-        t.Skip("fsnotify not supported: ", err)
-    }
-    defer fw.Close()
-    dir := t.TempDir()
-    if err := fw.Add(dir); err != nil { t.Fatal(err) }
-    done := make(chan struct{}, 1)
-    go func(){
-        f := filepath.Join(dir, "f.txt")
-        _ = os.WriteFile(f, []byte("x"), 0o644)
-    }()
-    select {
-    case ev := <-fw.Events():
-        if ev.Path == "" { t.Fatal("empty path") }
-    case <-time.After(2 * time.Second):
-        t.Fatal("timeout waiting for fsnotify event")
-    }
-    _ = done
+	fw, err := NewFSWatcher()
+	if err != nil {
+		t.Skip("fsnotify not supported: ", err)
+	}
+	defer fw.Close()
+	dir := t.TempDir()
+	if err := fw.Add(dir); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{}, 1)
+	go func() {
+		f := filepath.Join(dir, "f.txt")
+		_ = os.WriteFile(f, []byte("x"), 0o644)
+	}()
+	select {
+	case ev := <-fw.Events():
+		if ev.Path == "" {
+			t.Fatal("empty path")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for fsnotify event")
+	}
+	_ = done
 }

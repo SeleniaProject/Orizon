@@ -35,7 +35,10 @@ func (w *SimpleWatcher) Close() error {
 // StartPolling begins a naive timestamp-based change poll at given interval.
 func (w *SimpleWatcher) StartPolling(ctx context.Context, path string, interval time.Duration) error {
 	if ctx == nil {
-		ctx = context.Background()
+		// Derive a cancelable context for safety when caller passes nil
+		c, cancel := context.WithCancel(context.Background())
+		ctx = c
+		w.stop = cancel
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	w.stop = cancel

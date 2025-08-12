@@ -12,6 +12,7 @@ package modules
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -630,8 +631,15 @@ func (ml *ModuleLoader) loadModuleContent(module *Module) error {
 
 // fileExists checks if a file exists
 func fileExists(path string) bool {
-	// In a real implementation, this would check the filesystem
-	// For now, we'll return false to avoid file system dependencies
+	// Check the real filesystem for module files.
+	// This keeps ModuleLoader independent of OS-specific VFS while providing
+	// correct existence checks for ordinary project layouts.
+	if path == "" {
+		return false
+	}
+	if fi, err := os.Stat(path); err == nil {
+		return !fi.IsDir()
+	}
 	return false
 }
 

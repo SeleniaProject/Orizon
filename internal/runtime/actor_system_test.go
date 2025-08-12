@@ -66,8 +66,8 @@ func TestActor_MessageFlow_ManualDispatch(t *testing.T) {
 	}
 	defer system.Stop()
 
-    // Stop scheduler to avoid auto-dispatch interfering with manual dequeue below
-    system.scheduler.Stop()
+	// Stop scheduler to avoid auto-dispatch interfering with manual dequeue below
+	system.scheduler.Stop()
 
 	tb := &testBehavior{received: make(chan Message, 1), name: "test"}
 	actor, err := system.CreateActor("echo", UserActor, tb, DefaultActorConfig)
@@ -75,7 +75,7 @@ func TestActor_MessageFlow_ManualDispatch(t *testing.T) {
 		t.Fatalf("failed to create actor: %v", err)
 	}
 
-    // Send via system (enqueues to mailbox)
+	// Send via system (enqueues to mailbox)
 	if err := system.SendMessage(0, actor.ID, 1, "hello"); err != nil {
 		t.Fatalf("send failed: %v", err)
 	}

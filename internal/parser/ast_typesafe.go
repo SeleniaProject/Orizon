@@ -577,6 +577,36 @@ func (v *Validator) addWarning(node Node, message string) {
 
 // ====== AST Utility Functions ======
 
+// CollectValidationReports walks the AST and returns validation errors and warnings without returning an error.
+// This is designed for tooling (e.g., LSP diagnostics) to surface all issues in one pass.
+func CollectValidationReports(root Node) ([]ValidationError, []ValidationError) {
+	v := NewValidator(false)
+	v.errors = v.errors[:0]
+	v.warnings = v.warnings[:0]
+
+	walker := &WalkVisitor{
+		PreVisit: func(n Node) bool {
+			v.validateNode(n)
+			return true
+		},
+		OnError: func(err error) {
+			v.errors = append(v.errors, ValidationError{
+				Node:    root,
+				Message: err.Error(),
+				Span:    root.GetSpan(),
+			})
+		},
+	}
+
+	walker.Walk(root)
+
+	errs := make([]ValidationError, len(v.errors))
+	copy(errs, v.errors)
+	warns := make([]ValidationError, len(v.warnings))
+	copy(warns, v.warnings)
+	return errs, warns
+}
+
 // GetNodeType returns the reflect.Type of an AST node
 func GetNodeType(node Node) reflect.Type {
 	return reflect.TypeOf(node)
