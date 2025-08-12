@@ -49,10 +49,10 @@ type Server struct {
 	// Incremental lexing engine and token cache per document
 	incLexer *lexer.IncrementalLexer
 	tokCache map[string][]lexer.Token
-    // Workspace info
-    rootURI string
-    // Global symbol index across documents: name -> list of (uri, span)
-    wsIndex map[string][]SymbolLocation
+	// Workspace info
+	rootURI string
+	// Global symbol index across documents: name -> list of (uri, span)
+	wsIndex map[string][]SymbolLocation
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
@@ -64,17 +64,17 @@ func NewServer(r io.Reader, w io.Writer) *Server {
 		astCache: make(map[string]*parser.Program),
 		docsVer:  make(map[string]int),
 		incLexer: lexer.NewIncrementalLexer(),
-        tokCache: make(map[string][]lexer.Token),
-        wsIndex:  make(map[string][]SymbolLocation),
+		tokCache: make(map[string][]lexer.Token),
+		wsIndex:  make(map[string][]SymbolLocation),
 	}
 }
+
 // SymbolLocation represents a symbol occurrence in workspace
 type SymbolLocation struct {
-    URI  string
-    Span parser.Span
-    Kind int
+	URI  string
+	Span parser.Span
+	Kind int
 }
-
 
 // SymbolInfo represents an indexed symbol in a document
 type SymbolInfo struct {
@@ -123,14 +123,14 @@ func (s *Server) Run() error {
 			continue
 		}
 		switch req.Method {
-        case "initialize":
+		case "initialize":
 			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
-            // Capture rootURI if provided
-            var initParams struct {
-                RootURI string `json:"rootUri"`
-            }
-            _ = json.Unmarshal(req.Params, &initParams)
-            s.rootURI = initParams.RootURI
+			// Capture rootURI if provided
+			var initParams struct {
+				RootURI string `json:"rootUri"`
+			}
+			_ = json.Unmarshal(req.Params, &initParams)
+			s.rootURI = initParams.RootURI
 			caps := map[string]any{
 				"positionEncoding": "utf-16",
 				"textDocumentSync": map[string]any{
@@ -184,11 +184,11 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 			}
 			_ = json.Unmarshal(req.Params, &p)
-            if p.TextDocument.URI != "" {
+			if p.TextDocument.URI != "" {
 				delete(s.docs, p.TextDocument.URI)
 				delete(s.symIndex, p.TextDocument.URI)
 				delete(s.docsVer, p.TextDocument.URI)
-                s.removeDocFromWorkspaceIndex(p.TextDocument.URI)
+				s.removeDocFromWorkspaceIndex(p.TextDocument.URI)
 				// Clear diagnostics on close
 				s.notify("textDocument/publishDiagnostics", map[string]any{
 					"uri":         p.TextDocument.URI,
@@ -208,7 +208,7 @@ func (s *Server) Run() error {
 				} `json:"textDocument"`
 			}
 			_ = json.Unmarshal(req.Params, &p)
-            if p.TextDocument.URI != "" {
+			if p.TextDocument.URI != "" {
 				s.docs[p.TextDocument.URI] = p.TextDocument.Text
 				if p.TextDocument.Ver == 0 {
 					s.docsVer[p.TextDocument.URI] = 1
@@ -219,10 +219,10 @@ func (s *Server) Run() error {
 				s.updateTokensIncremental(p.TextDocument.URI, p.TextDocument.Text, nil)
 				// Trigger diagnostics on open
 				s.publishDiagnosticsFor(p.TextDocument.URI, p.TextDocument.Text)
-                // Update workspace index
-                if ast := s.astCache[p.TextDocument.URI]; ast != nil {
-                    s.updateWorkspaceIndex(p.TextDocument.URI, ast)
-                }
+				// Update workspace index
+				if ast := s.astCache[p.TextDocument.URI]; ast != nil {
+					s.updateWorkspaceIndex(p.TextDocument.URI, ast)
+				}
 			}
 			if len(req.ID) > 0 {
 				s.reply(req.ID, nil)
@@ -272,11 +272,11 @@ func (s *Server) Run() error {
 				}
 				// Update token cache incrementally
 				s.updateTokensIncremental(uri, curr, ilChanges)
-                // Trigger diagnostics on change
+				// Trigger diagnostics on change
 				s.publishDiagnosticsFor(uri, curr)
-                if ast := s.astCache[uri]; ast != nil {
-                    s.updateWorkspaceIndex(uri, ast)
-                }
+				if ast := s.astCache[uri]; ast != nil {
+					s.updateWorkspaceIndex(uri, ast)
+				}
 			}
 			if len(req.ID) > 0 {
 				s.reply(req.ID, nil)
@@ -313,7 +313,7 @@ func (s *Server) Run() error {
 			_ = json.Unmarshal(req.Params, &p)
 			syms := s.handleDocumentSymbol(p.TextDocument.URI)
 			s.reply(req.ID, syms)
-        case "textDocument/references":
+		case "textDocument/references":
 			var p struct {
 				TextDocument struct {
 					URI string `json:"uri"`
@@ -324,10 +324,10 @@ func (s *Server) Run() error {
 				} `json:"context"`
 			}
 			_ = json.Unmarshal(req.Params, &p)
-            refs := s.handleReferences(p.TextDocument.URI, p.Position.Line, p.Position.Character, p.Context.IncludeDeclaration)
-            // Also search in other open documents for the same identifier
-            cross := s.handleCrossFileReferences(p.TextDocument.URI, p.Position.Line, p.Position.Character)
-            refs = append(refs, cross...)
+			refs := s.handleReferences(p.TextDocument.URI, p.Position.Line, p.Position.Character, p.Context.IncludeDeclaration)
+			// Also search in other open documents for the same identifier
+			cross := s.handleCrossFileReferences(p.TextDocument.URI, p.Position.Line, p.Position.Character)
+			refs = append(refs, cross...)
 			s.reply(req.ID, refs)
 		case "textDocument/documentHighlight":
 			var p struct {
@@ -497,6 +497,19 @@ func (s *Server) write(v any) {
 	_, _ = io.WriteString(s.out, itoa(len(data)))
 	_, _ = io.WriteString(s.out, "\r\n\r\n")
 	_, _ = s.out.Write(data)
+}
+
+// filePathFromURI converts file:// URI to OS path best-effort
+func filePathFromURI(uri string) string {
+    if strings.HasPrefix(uri, "file://") {
+        p := strings.TrimPrefix(uri, "file://")
+        // On Windows, leading '/' may appear before drive letter
+        if len(p) >= 3 && p[0] == '/' && ((p[1] >= 'A' && p[1] <= 'Z') || (p[1] >= 'a' && p[1] <= 'z')) && p[2] == ':' {
+            p = p[1:]
+        }
+        return p
+    }
+    return ""
 }
 
 func itoa(n int) string {
@@ -1633,8 +1646,8 @@ func (s *Server) handleRename(uri string, line, character int, newName string) (
 		}
 	}
 
-	// Collect edits for all identifier tokens that match the name
-	edits := make([]map[string]any, 0, 32)
+    // Collect edits for all identifier tokens that match the name
+    edits := make([]map[string]any, 0, 32)
 	lx := lexer.NewWithFilename(text, uri)
 	for {
 		tok := lx.NextToken()
@@ -1658,11 +1671,32 @@ func (s *Server) handleRename(uri string, line, character int, newName string) (
 			})
 		}
 	}
-	return map[string]any{
-		"changes": map[string]any{
-			uri: edits,
-		},
-	}, ""
+    // Cross-file edits using workspace index
+    wsChanges := map[string]any{uri: edits}
+    for _, loc := range s.wsIndex[name] {
+        if loc.URI == uri { continue }
+        // Load file content (from open docs cache or filesystem)
+        otherText := s.docs[loc.URI]
+        if otherText == "" {
+            if path := filePathFromURI(loc.URI); path != "" {
+                b, err := os.ReadFile(path)
+                if err == nil {
+                    otherText = string(b)
+                }
+            }
+        }
+        if otherText == "" { continue }
+        l0, c0 := utf16LineCharFromOffset(otherText, loc.Span.Start.Offset)
+        l1, c1 := utf16LineCharFromOffset(otherText, loc.Span.End.Offset)
+        wsChanges[loc.URI] = append([]map[string]any{}, map[string]any{
+            "range": map[string]any{
+                "start": map[string]any{"line": l0, "character": c0},
+                "end":   map[string]any{"line": l1, "character": c1},
+            },
+            "newText": newName,
+        })
+    }
+    return map[string]any{"changes": wsChanges}, ""
 }
 
 // handleWorkspaceSymbol returns flat symbol info for all indexed documents that match the query (prefix match).
@@ -2007,87 +2041,115 @@ func (s *Server) buildSymbolIndex(uri string, root *parser.Program) {
 
 // updateWorkspaceIndex rebuilds the global index entries for a given document
 func (s *Server) updateWorkspaceIndex(uri string, root *parser.Program) {
-    // Remove existing entries for this uri
-    s.removeDocFromWorkspaceIndex(uri)
-    // Add fresh ones from current AST
-    var add func(node interface{})
-    add = func(node interface{}) {
-        switch n := node.(type) {
-        case *parser.Program:
-            for _, d := range n.Declarations {
-                add(d)
-            }
-        case *parser.FunctionDeclaration:
-            if n.Name != nil {
-                s.wsIndex[n.Name.Value] = append(s.wsIndex[n.Name.Value], SymbolLocation{URI: uri, Span: n.Name.Span, Kind: 12})
-            }
-            for _, p := range n.Parameters {
-                if p != nil && p.Name != nil {
-                    s.wsIndex[p.Name.Value] = append(s.wsIndex[p.Name.Value], SymbolLocation{URI: uri, Span: p.Name.Span, Kind: 13})
-                }
-            }
-            if n.Body != nil {
-                // Walk block for local vars
-                add(n.Body)
-            }
-        case *parser.BlockStatement:
-            for _, st := range n.Statements { add(st) }
-        case *parser.VariableDeclaration:
-            if n.Name != nil {
-                s.wsIndex[n.Name.Value] = append(s.wsIndex[n.Name.Value], SymbolLocation{URI: uri, Span: n.Name.Span, Kind: 13})
-            }
-        }
-    }
-    add(root)
+	// Remove existing entries for this uri
+	s.removeDocFromWorkspaceIndex(uri)
+	// Add fresh ones from current AST
+	var add func(node interface{})
+	add = func(node interface{}) {
+		switch n := node.(type) {
+		case *parser.Program:
+			for _, d := range n.Declarations {
+				add(d)
+			}
+		case *parser.FunctionDeclaration:
+			if n.Name != nil {
+				s.wsIndex[n.Name.Value] = append(s.wsIndex[n.Name.Value], SymbolLocation{URI: uri, Span: n.Name.Span, Kind: 12})
+			}
+			for _, p := range n.Parameters {
+				if p != nil && p.Name != nil {
+					s.wsIndex[p.Name.Value] = append(s.wsIndex[p.Name.Value], SymbolLocation{URI: uri, Span: p.Name.Span, Kind: 13})
+				}
+			}
+			if n.Body != nil {
+				// Walk block for local vars
+				add(n.Body)
+			}
+		case *parser.BlockStatement:
+			for _, st := range n.Statements {
+				add(st)
+			}
+		case *parser.VariableDeclaration:
+			if n.Name != nil {
+				s.wsIndex[n.Name.Value] = append(s.wsIndex[n.Name.Value], SymbolLocation{URI: uri, Span: n.Name.Span, Kind: 13})
+			}
+		}
+	}
+	add(root)
 }
 
 func (s *Server) removeDocFromWorkspaceIndex(uri string) {
-    if len(s.wsIndex) == 0 { return }
-    for name, locs := range s.wsIndex {
-        keep := locs[:0]
-        for _, loc := range locs {
-            if loc.URI != uri {
-                keep = append(keep, loc)
-            }
-        }
-        if len(keep) == 0 {
-            delete(s.wsIndex, name)
-        } else {
-            s.wsIndex[name] = keep
-        }
-    }
+	if len(s.wsIndex) == 0 {
+		return
+	}
+	for name, locs := range s.wsIndex {
+		keep := locs[:0]
+		for _, loc := range locs {
+			if loc.URI != uri {
+				keep = append(keep, loc)
+			}
+		}
+		if len(keep) == 0 {
+			delete(s.wsIndex, name)
+		} else {
+			s.wsIndex[name] = keep
+		}
+	}
 }
 
 // handleCrossFileReferences returns references of the symbol under position in other open documents
 func (s *Server) handleCrossFileReferences(uri string, line, character int) []map[string]any {
-    text := s.docs[uri]
-    if text == "" { return []map[string]any{} }
-    offset := offsetFromLineCharUTF16(text, line, character)
-    if offset < 0 || offset > len(text) { return []map[string]any{} }
-    // Identify name at position
-    start := offset
-    for start > 0 { r, sz := utf8.DecodeLastRuneInString(text[:start]); if sz<=0 || !isIdentRune(r){break}; start -= sz }
-    end := offset
-    for end < len(text) { r, sz := utf8.DecodeRuneInString(text[end:]); if sz<=0 || !isIdentRune(r){break}; end += sz }
-    if start >= end { return []map[string]any{} }
-    name := strings.TrimSpace(text[start:end])
-    if name == "" { return []map[string]any{} }
-    results := make([]map[string]any, 0, 16)
-    for _, loc := range s.wsIndex[name] {
-        if loc.URI == uri { continue }
-        t := s.docs[loc.URI]
-        if t == "" { continue }
-        l0, c0 := utf16LineCharFromOffset(t, loc.Span.Start.Offset)
-        l1, c1 := utf16LineCharFromOffset(t, loc.Span.End.Offset)
-        results = append(results, map[string]any{
-            "uri": loc.URI,
-            "range": map[string]any{
-                "start": map[string]any{"line": l0, "character": c0},
-                "end":   map[string]any{"line": l1, "character": c1},
-            },
-        })
-    }
-    return results
+	text := s.docs[uri]
+	if text == "" {
+		return []map[string]any{}
+	}
+	offset := offsetFromLineCharUTF16(text, line, character)
+	if offset < 0 || offset > len(text) {
+		return []map[string]any{}
+	}
+	// Identify name at position
+	start := offset
+	for start > 0 {
+		r, sz := utf8.DecodeLastRuneInString(text[:start])
+		if sz <= 0 || !isIdentRune(r) {
+			break
+		}
+		start -= sz
+	}
+	end := offset
+	for end < len(text) {
+		r, sz := utf8.DecodeRuneInString(text[end:])
+		if sz <= 0 || !isIdentRune(r) {
+			break
+		}
+		end += sz
+	}
+	if start >= end {
+		return []map[string]any{}
+	}
+	name := strings.TrimSpace(text[start:end])
+	if name == "" {
+		return []map[string]any{}
+	}
+	results := make([]map[string]any, 0, 16)
+	for _, loc := range s.wsIndex[name] {
+		if loc.URI == uri {
+			continue
+		}
+		t := s.docs[loc.URI]
+		if t == "" {
+			continue
+		}
+		l0, c0 := utf16LineCharFromOffset(t, loc.Span.Start.Offset)
+		l1, c1 := utf16LineCharFromOffset(t, loc.Span.End.Offset)
+		results = append(results, map[string]any{
+			"uri": loc.URI,
+			"range": map[string]any{
+				"start": map[string]any{"line": l0, "character": c0},
+				"end":   map[string]any{"line": l1, "character": c1},
+			},
+		})
+	}
+	return results
 }
 
 // handleCompletion returns completion items based on current document content and position.
