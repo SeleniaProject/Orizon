@@ -888,18 +888,18 @@ func (as *ActorSystem) SetIOPoller(p asyncio.Poller) {
 
 // WatchConnWithActor registers a net.Conn with the attached poller and routes events to target actor.
 func (as *ActorSystem) WatchConnWithActor(conn net.Conn, kinds []asyncio.EventType, target ActorID) error {
-    return as.WatchConnWithActorOpts(conn, kinds, target, IOWatchOptions{})
+	return as.WatchConnWithActorOpts(conn, kinds, target, IOWatchOptions{})
 }
 
 // IOWatchOptions controls backpressure alignment when delivering I/O events to actors.
 type IOWatchOptions struct {
-    // DropOnOverflow drops events immediately when the target mailbox reports overflow.
-    // If false, a small exponential backoff re-registration is attempted.
-    DropOnOverflow bool
-    // BackoffInitial is the initial delay for re-register when overflow occurs.
-    BackoffInitial time.Duration
-    // BackoffMax is the maximum backoff delay.
-    BackoffMax time.Duration
+	// DropOnOverflow drops events immediately when the target mailbox reports overflow.
+	// If false, a small exponential backoff re-registration is attempted.
+	DropOnOverflow bool
+	// BackoffInitial is the initial delay for re-register when overflow occurs.
+	BackoffInitial time.Duration
+	// BackoffMax is the maximum backoff delay.
+	BackoffMax time.Duration
 }
 
 // WatchConnWithActorOpts registers with options for backpressure alignment.
@@ -910,11 +910,15 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 	if p == nil {
 		return fmt.Errorf("no io poller attached")
 	}
-    if opts.BackoffInitial <= 0 { opts.BackoffInitial = time.Millisecond * 5 }
-    if opts.BackoffMax <= 0 { opts.BackoffMax = time.Millisecond * 100 }
-    backoff := opts.BackoffInitial
-    var handler func(ev asyncio.Event)
-    handler = func(ev asyncio.Event) {
+	if opts.BackoffInitial <= 0 {
+		opts.BackoffInitial = time.Millisecond * 5
+	}
+	if opts.BackoffMax <= 0 {
+		opts.BackoffMax = time.Millisecond * 100
+	}
+	backoff := opts.BackoffInitial
+	var handler func(ev asyncio.Event)
+	handler = func(ev asyncio.Event) {
 		var mt MessageType
 		switch ev.Type {
 		case asyncio.Readable:
@@ -924,27 +928,31 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 		default:
 			mt = IOErrorEvt
 		}
-        if err := as.SendMessage(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err}); err != nil {
-            // Mailbox overflow/backpressure: either drop or temporarily deregister and retry
-            if opts.DropOnOverflow {
-                return
-            }
-            _ = p.Deregister(conn)
-            d := backoff
-            if d > opts.BackoffMax { d = opts.BackoffMax }
-            time.AfterFunc(d, func() {
-                // re-register and reset/increase backoff
-                _ = p.Register(conn, kinds, handler)
-            })
-            // Exponential growth for next time
-            if backoff < opts.BackoffMax {
-                backoff *= 2
-                if backoff > opts.BackoffMax { backoff = opts.BackoffMax }
-            }
-        } else {
-            // successful delivery resets backoff
-            backoff = opts.BackoffInitial
-        }
+		if err := as.SendMessage(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err}); err != nil {
+			// Mailbox overflow/backpressure: either drop or temporarily deregister and retry
+			if opts.DropOnOverflow {
+				return
+			}
+			_ = p.Deregister(conn)
+			d := backoff
+			if d > opts.BackoffMax {
+				d = opts.BackoffMax
+			}
+			time.AfterFunc(d, func() {
+				// re-register and reset/increase backoff
+				_ = p.Register(conn, kinds, handler)
+			})
+			// Exponential growth for next time
+			if backoff < opts.BackoffMax {
+				backoff *= 2
+				if backoff > opts.BackoffMax {
+					backoff = opts.BackoffMax
+				}
+			}
+		} else {
+			// successful delivery resets backoff
+			backoff = opts.BackoffInitial
+		}
 	}
 	return p.Register(conn, kinds, handler)
 }
@@ -1836,11 +1844,20 @@ func (as *ActorScheduler) Stop() {
 	as.mutex.Lock()
 	defer as.mutex.Unlock()
 
-	as.running = false
-	for _, worker := range as.workers {
-		worker.Running = false
-		close(worker.Queue)
-	}
+    if !as.running {
+        return
+    }
+    as.running = false
+    for _, worker := range as.workers {
+        if worker == nil {
+            continue
+        }
+        worker.Running = false
+        if worker.Queue != nil {
+            close(worker.Queue)
+            worker.Queue = nil
+        }
+    }
 }
 
 func (as *ActorScheduler) Schedule(actorID ActorID) {
