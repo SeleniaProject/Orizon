@@ -629,6 +629,7 @@
   - [x] VFS: `internal/runtime/vfs`（`FileSystem`/`File` 抽象、`OSFS`/`MemFS` 実装）
   - [x] パス操作ユーティリティ（`Join`/`Clean`）
   - [x] 監視: ポータブルなポーリングWatcher（`SimpleWatcher`）とOSネイティブ監視（`FSNotifyWatcher`）
+  - [x] アクター連携: `ActorSystem.WatchPathWithActor` により `FSChanged` メッセージで監視イベントを配送
   - [x] テスト: OSFS/MemFS/Watcher の基本動作検証
 - **依存関係**: 3.4.1
 - **推定工数**: 大（22日）
