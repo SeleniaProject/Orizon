@@ -610,7 +610,9 @@
   - [ ] Windows: `IOCP` 実装（現状は互換ポーラ委譲: `internal/runtime/asyncio/iocp_poller_windows.go`）
   - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
   - [x] 真のゼロコピーI/O経路（Linux: `sendfile` による file→socket 転送を実装）
-  - [ ] 真のゼロコピーI/O経路（Windows: `TransmitFile`、macOS: `sendfile`、Linux: `splice` 拡張）
+  - [x] 真のゼロコピーI/O経路（Linux: `splice` による conn→conn 転送を実装）
+  - [x] 真のゼロコピーI/O経路（macOS: `sendfile` による file→socket 転送を実装）
+  - [ ] 真のゼロコピーI/O経路（Windows: `TransmitFile` 対応）
   - [x] バッファプール・再利用戦略（GC圧力低減）
   - [x] アクターシステム統合（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent`配送）
   - [ ] バックプレッシャ整合の高度化（優先度制御・水位ベースの自動レジストラ抑制）
