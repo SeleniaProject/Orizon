@@ -159,7 +159,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 
 	outReader := bufio.NewReader(outR)
 
-	// 1) initialize request → expect response with capabilities
+    // 1) initialize request → expect response with capabilities and serverInfo
 	initReq := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -179,6 +179,9 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	if caps == nil {
 		t.Fatalf("initialize missing capabilities: %v", msg)
 	}
+    if si := msg["result"].(map[string]any)["serverInfo"]; si == nil {
+        t.Fatalf("initialize missing serverInfo: %v", msg)
+    }
 
 	// 2) didOpen notification → expect publishDiagnostics notification
 	source := "func main() { let x = 1 }\n"
@@ -202,6 +205,8 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	if m, ok := diagMsg["method"].(string); !ok || m != "textDocument/publishDiagnostics" {
 		t.Fatalf("expected publishDiagnostics, got: %v", diagMsg)
 	}
+
+    // didClose は後で検証する（hoverのためにドキュメントを保持する）
 
 	// 3) hover request over identifier x (line 0, near position of x)
 	// Find position of 'x' in UTF-16 units

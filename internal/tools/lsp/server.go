@@ -104,9 +104,13 @@ func (s *Server) Run() error {
 		}
 		switch req.Method {
 		case "initialize":
-			// Advertise minimal capabilities including hover support
-			s.reply(req.ID, map[string]any{"capabilities": map[string]any{
-				"textDocumentSync": 1,
+			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
+			caps := map[string]any{
+				"positionEncoding": "utf-16",
+				"textDocumentSync": map[string]any{
+					"openClose": true,
+					"change":    1, // TextDocumentSyncKind: Incremental(2) not yet; use Full(1)
+				},
 				"completionProvider": map[string]any{
 					"triggerCharacters": []string{".", ":", ",", "(", "[", " "},
 				},
@@ -125,9 +129,21 @@ func (s *Server) Run() error {
 				"foldingRangeProvider":      true,
 				"renameProvider":            true,
 				"workspaceSymbolProvider":   true,
-			}})
+			}
+			result := map[string]any{
+				"capabilities": caps,
+				"serverInfo": map[string]any{
+					"name":    "orizon-lsp",
+					"version": "dev",
+				},
+			}
+			s.reply(req.ID, result)
 		case "initialized":
-			s.reply(req.ID, nil)
+			// This is a notification; do not send a response.
+			if len(req.ID) > 0 {
+				// Only reply if the client incorrectly sent an id
+				s.reply(req.ID, nil)
+			}
 		case "shutdown":
 			s.reply(req.ID, nil)
 		case "exit":
