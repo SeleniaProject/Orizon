@@ -663,6 +663,11 @@
   - [ ] プロトコル準拠チェック
 - **依存関係**: 2.5.3, 3.1.1
 - **推定工数**: 大（25日）
+ - **進捗**:
+   - [x] 最小JSON-RPC 2.0フレーム実装（Content-Length framing、initialize/shutdown/exit対応）: `internal/tools/lsp/server.go`
+   - [x] stdioエントリポイント: `cmd/lsp-server/main.go`（ビルド通過）
+   - [ ] textDocument/diagnostic, completion, hover 等の実装
+   - [ ] プロトコル準拠テスト、バリデータ連携
 
 #### 4.1.2 リアルタイム解析
 - [ ] **目的**: 入力と同時の静的解析とエラー検出
