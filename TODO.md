@@ -623,6 +623,7 @@
   - ゼロコピーI/Oはヘルパー（`internal/runtime/asyncio/zerocopy.go`）を追加済み。OS固有の真のゼロコピー経路は次段で対応
   - バッファプール（`internal/runtime/asyncio/buffer_pool.go`）を追加し、I/Oバッファの再利用でGC圧力を低減
   - アクター統合のベースラインを提供（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent` メッセージ配送、`IOWatchOptions` による指数バックオフ）
+  - Windowsは `TransmitFile` 試行と `io.Copy` フォールバックを実装（完全対応は未）
   - `go test ./...` は緑を維持
 
 #### 3.4.2 ファイルシステム抽象化 ✅ 完了
@@ -658,15 +659,23 @@
 - [ ] **目的**: エディタ非依存の開発支援システム
 - **関連ドキュメント**: design.md「Language Server」
 - **成果物**:
-  - [ ] `lsp_server.go` LSP実装
-  - [ ] JSON-RPC通信レイヤー
+  - [x] `internal/tools/lsp/server.go` 実装（stdioサーバー・JSON-RPC 2.0フレーミング）
+  - [x] JSON-RPC通信レイヤー（Content-Length framing/エラーハンドリング最小）
   - [ ] プロトコル準拠チェック
 - **依存関係**: 2.5.3, 3.1.1
-- **推定工数**: 大（25日）
- - **進捗**:
-   - [x] 最小JSON-RPC 2.0フレーム実装（Content-Length framing、initialize/shutdown/exit対応）: `internal/tools/lsp/server.go`
-   - [x] stdioエントリポイント: `cmd/lsp-server/main.go`（ビルド通過）
-   - [ ] textDocument/diagnostic, completion, hover 等の実装
+ - **推定工数**: 大（25日）
+  - **進捗**:
+   - [x] initialize/initialized/shutdown/exit 実装
+   - [x] 文書同期: `textDocument/didOpen`/`textDocument/didChange`/`didClose`
+   - [x] 補完: `textDocument/completion`（キーワード詳細・スニペット、識別子頻度ランキング）
+   - [x] 診断: `textDocument/publishDiagnostics`（パーサーエラー＋AST検証の警告）
+   - [x] ホバー: `textDocument/hover`（宣言シグネチャ＋AST要約＋軽量型ヒント）
+   - [x] 定義/参照: `textDocument/definition`/`textDocument/references`
+   - [x] シンボル: `textDocument/documentSymbol`/`workspace/symbol`
+   - [x] ハイライト/折畳み: `textDocument/documentHighlight`/`textDocument/foldingRange`
+   - [x] リネーム: `prepareRename`/`rename`（スコープ限定・競合検出）
+   - [x] フォーマット: `textDocument/formatting`（括弧ベース整形・行末空白除去）
+   - [x] OnType整形: `textDocument/onTypeFormatting`（`}`/`\n`/`)`/`;` 対応）
    - [ ] プロトコル準拠テスト、バリデータ連携
 
 #### 4.1.2 リアルタイム解析
