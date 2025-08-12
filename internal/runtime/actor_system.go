@@ -105,6 +105,9 @@ type Mailbox struct {
 	LastActivity     time.Time             // Last activity
 	BackPressureWait time.Duration         // Maximum wait time when applying back pressure
 	mutex            sync.RWMutex          // Mailbox synchronization
+	// notFull is an edge-triggered notification channel used to wake enqueuers
+	// waiting for capacity under BackPressure policy.
+	notFull chan struct{}
 }
 
 // Message represents communication between actors
@@ -770,6 +773,7 @@ func NewMailbox(mailboxType MailboxType, capacity uint32) (*Mailbox, error) {
 		OverflowPolicy:   DropOldest,
 		LastActivity:     time.Now(),
 		BackPressureWait: time.Millisecond * 100,
+		notFull:          make(chan struct{}, 1),
 	}
 
 	// Initialize priority queue for priority mailboxes
@@ -1385,6 +1389,13 @@ func (m *Mailbox) Dequeue() (Message, bool) {
 		if item, ok := m.PriorityQueue.Pop(); ok {
 			m.Statistics.MessagesDequeued++
 			m.LastActivity = time.Now()
+			// Notify potential waiters that capacity may be available now
+			if m.notFull != nil {
+				select {
+				case m.notFull <- struct{}{}:
+				default:
+				}
+			}
 			return item.Message, true
 		}
 	} else {
@@ -1393,6 +1404,12 @@ func (m *Mailbox) Dequeue() (Message, bool) {
 			m.Messages = m.Messages[1:]
 			m.Statistics.MessagesDequeued++
 			m.LastActivity = time.Now()
+			if m.notFull != nil {
+				select {
+				case m.notFull <- struct{}{}:
+				default:
+				}
+			}
 			return msg, true
 		}
 	}
@@ -1505,17 +1522,46 @@ func (m *Mailbox) handleOverflow(msg Message) error {
 		}
 	case BackPressure:
 		// Apply timed back pressure: wait for room up to BackPressureWait
+		// This uses an edge-triggered notification channel to avoid busy-wait.
 		deadline := time.Now().Add(m.BackPressureWait)
-		for time.Now().Before(deadline) {
+		for {
 			if uint32(len(m.Messages)) < m.Capacity {
 				m.Messages = append(m.Messages, msg)
 				return nil
 			}
+			// Prepare to wait: capture notifier and unlock
+			notifier := m.notFull
+			if notifier == nil {
+				// Safety fallback: initialize on demand
+				notifier = make(chan struct{}, 1)
+				m.notFull = notifier
+			}
 			m.mutex.Unlock()
-			time.Sleep(time.Millisecond * 5)
+			// Wait for either capacity notification or timeout tick
+			now := time.Now()
+			if !now.Before(deadline) {
+				m.mutex.Lock()
+				return fmt.Errorf("mailbox back pressure timeout")
+			}
+			timeout := time.NewTimer(deadline.Sub(now))
+			select {
+			case <-notifier:
+				// Woken up, retry to check capacity
+			case <-timeout.C:
+				// Timed out
+			}
+			if !timeout.Stop() {
+				// Drain if fired
+				select {
+				case <-timeout.C:
+				default:
+				}
+			}
 			m.mutex.Lock()
+			if !time.Now().Before(deadline) {
+				return fmt.Errorf("mailbox back pressure timeout")
+			}
 		}
-		return fmt.Errorf("mailbox back pressure timeout")
 	case DeadLetter:
 		m.DeadLetters = append(m.DeadLetters, msg)
 	}

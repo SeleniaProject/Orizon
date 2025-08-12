@@ -3,8 +3,8 @@ package channels
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync/atomic"
-	"time"
 )
 
 // Channel is a thin, type-safe wrapper that provides convenience APIs
@@ -111,24 +111,26 @@ func SelectRecv[T any](ctx context.Context, chans ...*Channel[T]) (T, int, bool,
 		defer cancel()
 		ctx = c
 	}
-	// Simple round-robin polling with short backoff to avoid reflection-based selects.
-	// This is adequate for runtime tests and avoids unsafe/reflect usage.
-	backoff := time.Microsecond * 50
-	for {
-		for i, ch := range chans {
-			select {
-			case v, ok := <-ch.ch:
-				return v, i, ok, nil
-			default:
-			}
-		}
-		select {
-		case <-ctx.Done():
-			return zero, -1, false, ctx.Err()
-		case <-time.After(backoff):
-		}
-		if backoff < time.Millisecond*5 {
-			backoff *= 2
-		}
+	// Use reflect.Select to avoid active polling across many channels.
+	// Build select cases including a context cancellation case.
+	cases := make([]reflect.SelectCase, 0, len(chans)+1)
+	// Context case
+	doneCh := ctx.Done()
+	cases = append(cases, reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(doneCh)})
+	// Channel cases
+	for _, ch := range chans {
+		cases = append(cases, reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch.ch)})
 	}
+	chosen, recv, ok := reflect.Select(cases)
+	if chosen == 0 {
+		// Context canceled
+		return zero, -1, false, ctx.Err()
+	}
+	// Adjust index since 0 is the context case
+	val := recv.Interface()
+	if !ok {
+		return zero, chosen - 1, false, nil
+	}
+	// Type assertion is safe because underlying channel type is T
+	return val.(T), chosen - 1, true, nil
 }
