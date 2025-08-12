@@ -641,6 +641,8 @@
   - [x] TLSラッパ: `TLSDial`/`TLSServer`（自己署名証明書でのローカル疎通テスト含む）
   - [x] HTTP/3最小実装: `internal/runtime/netstack/http3.go`（`http3.Server`/`Transport`ラッパ、ループバックテスト）
   - [x] TLS 1.3サポート: QUIC経由でTLS 1.3を使用（自己署名でローカル検証）。汎用TLS設定拡張は後続
+  - [x] QUICオプション: `MaxIdleTimeout`/`KeepAlivePeriod`/`0-RTT` の設定APIとテスト
+  - [x] 証明書ユーティリティ: `internal/runtime/netstack/certutil.go`（自己署名生成・ファイル読込）
 - **依存関係**: 3.4.2
 - **推定工数**: 大（35日）
 
