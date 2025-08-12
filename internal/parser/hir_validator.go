@@ -156,8 +156,8 @@ func (validator *HIRValidator) buildSymbolTable(module *HIRModule) {
 	// Register functions
 	for _, function := range module.Functions {
 		if existing, exists := symbolTable.functions[function.Name]; exists {
-			validator.addError(function.Span, fmt.Sprintf("duplicate function declaration: %s", function.Name), ErrorDuplicateDeclaration)
-			validator.addError(existing.Span, fmt.Sprintf("previous declaration here"), ErrorDuplicateDeclaration)
+			validator.addError(function.Span, "duplicate function declaration", ErrorDuplicateDeclaration)
+			validator.addError(existing.Span, "previous declaration here", ErrorDuplicateDeclaration)
 		} else {
 			symbolTable.functions[function.Name] = function
 		}
@@ -166,8 +166,8 @@ func (validator *HIRValidator) buildSymbolTable(module *HIRModule) {
 	// Register global variables
 	for _, variable := range module.Variables {
 		if existing, exists := symbolTable.globals[variable.Name]; exists {
-			validator.addError(variable.Span, fmt.Sprintf("duplicate variable declaration: %s", variable.Name), ErrorDuplicateDeclaration)
-			validator.addError(existing.Span, fmt.Sprintf("previous declaration here"), ErrorDuplicateDeclaration)
+			validator.addError(variable.Span, "duplicate variable declaration", ErrorDuplicateDeclaration)
+			validator.addError(existing.Span, "previous declaration here", ErrorDuplicateDeclaration)
 		} else {
 			symbolTable.globals[variable.Name] = variable
 		}
@@ -176,7 +176,7 @@ func (validator *HIRValidator) buildSymbolTable(module *HIRModule) {
 	// Register types
 	for _, typeDef := range module.Types {
 		if existing, exists := symbolTable.types[typeDef.Name]; existing != nil && exists {
-			validator.addError(typeDef.Span, fmt.Sprintf("duplicate type declaration: %s", typeDef.Name), ErrorDuplicateDeclaration)
+			validator.addError(typeDef.Span, "duplicate type declaration", ErrorDuplicateDeclaration)
 		} else {
 			hirType := NewHIRType(typeDef.Span, HIRTypeStruct, typeDef)
 			symbolTable.types[typeDef.Name] = hirType
@@ -398,7 +398,16 @@ func (validator *HIRValidator) validateExpression(expr *HIRExpression) {
 	case *HIRBinaryExpression:
 		validator.validateExpression(data.Left)
 		validator.validateExpression(data.Right)
-		// TODO: Add type compatibility checking
+		// Basic type compatibility check for binary operations on primitives
+		lt := validator.inferExprType(data.Left)
+		rt := validator.inferExprType(data.Right)
+		if lt != nil && rt != nil {
+			if lt.Kind == HIRTypePrimitive && rt.Kind == HIRTypePrimitive {
+				if !validator.primitiveTypesCompatible(lt, rt) {
+					validator.addError(expr.Span, "type mismatch in binary expression", ErrorInvalidTypeUsage)
+				}
+			}
+		}
 	case *HIRUnaryExpression:
 		validator.validateExpression(data.Operand)
 	case *HIRCallExpression:
@@ -441,6 +450,52 @@ func (validator *HIRValidator) validateType(hirType *HIRType) {
 	default:
 		// Other types would need specific validation logic
 	}
+}
+
+// inferExprType attempts to infer a best-effort type for an expression
+func (validator *HIRValidator) inferExprType(expr *HIRExpression) *HIRType {
+	switch d := expr.Data.(type) {
+	case *HIRVariableExpression:
+		if d.Variable != nil {
+			return d.Variable.Type
+		}
+	case *HIRLiteralExpression:
+		// Map literal kinds from AST literal kinds used in HIR literals
+		switch d.Kind {
+		case LiteralInteger:
+			return &HIRType{Kind: HIRTypePrimitive, Data: "int", Span: expr.Span}
+		case LiteralFloat:
+			return &HIRType{Kind: HIRTypePrimitive, Data: "float", Span: expr.Span}
+		case LiteralBool:
+			return &HIRType{Kind: HIRTypePrimitive, Data: "bool", Span: expr.Span}
+		case LiteralString:
+			return &HIRType{Kind: HIRTypePrimitive, Data: "string", Span: expr.Span}
+		}
+	case *HIRBinaryExpression:
+		// For simple arithmetic/logical ops, prefer left type
+		return validator.inferExprType(d.Left)
+	}
+	return nil
+}
+
+// primitiveTypesCompatible returns true if two primitive HIR types are compatible
+func (validator *HIRValidator) primitiveTypesCompatible(a, b *HIRType) bool {
+	if a == nil || b == nil {
+		return true
+	}
+	// Equal names are compatible
+	if aStr, ok := a.Data.(string); ok {
+		if bStr, ok2 := b.Data.(string); ok2 {
+			if aStr == bStr {
+				return true
+			}
+			// Allow numeric widening int -> float for mixed arithmetic
+			if (aStr == "int" && bStr == "float") || (aStr == "float" && bStr == "int") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // buildControlFlowGraph constructs a control flow graph for a function

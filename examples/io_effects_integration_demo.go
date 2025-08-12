@@ -8,8 +8,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/types"
 )
 
-// This demo has been disabled due to API changes
-// TODO: Update this demo to match the current type system API
+// Updated demo to match the current unified effects API
 func integrationDemo() {
 	fmt.Println("=== 統合効果システムデモ ===")
 
