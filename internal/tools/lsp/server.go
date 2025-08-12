@@ -44,11 +44,11 @@ type Server struct {
 	symIndex map[string]map[string][]SymbolInfo
 	// astCache keeps the last parsed AST per document for tooling features
 	astCache map[string]*parser.Program
-    // docsVer holds the last known version per document URI
-    docsVer map[string]int
-    // Incremental lexing engine and token cache per document
-    incLexer *lexer.IncrementalLexer
-    tokCache map[string][]lexer.Token
+	// docsVer holds the last known version per document URI
+	docsVer map[string]int
+	// Incremental lexing engine and token cache per document
+	incLexer *lexer.IncrementalLexer
+	tokCache map[string][]lexer.Token
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
@@ -58,9 +58,9 @@ func NewServer(r io.Reader, w io.Writer) *Server {
 		docs:     make(map[string]string),
 		symIndex: make(map[string]map[string][]SymbolInfo),
 		astCache: make(map[string]*parser.Program),
-        docsVer:  make(map[string]int),
-        incLexer: lexer.NewIncrementalLexer(),
-        tokCache: make(map[string][]lexer.Token),
+		docsVer:  make(map[string]int),
+		incLexer: lexer.NewIncrementalLexer(),
+		tokCache: make(map[string][]lexer.Token),
 	}
 }
 
@@ -113,20 +113,23 @@ func (s *Server) Run() error {
 		switch req.Method {
 		case "initialize":
 			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
-			caps := map[string]any{
+            caps := map[string]any{
 				"positionEncoding": "utf-16",
 				"textDocumentSync": map[string]any{
 					"openClose": true,
 					"change":    2, // Incremental
 				},
-				"completionProvider": map[string]any{
-					"triggerCharacters": []string{".", ":", ",", "(", "[", " "},
-				},
+                "completionProvider": map[string]any{
+                    "triggerCharacters": []string{".", ":", ",", "(", "[", " "},
+                    "resolveProvider":  true,
+                },
 				"hoverProvider":              true,
 				"definitionProvider":         true,
 				"referencesProvider":         true,
-				"documentSymbolProvider":     true,
-				"codeActionProvider":         true,
+                "documentSymbolProvider":     true,
+                "codeActionProvider": map[string]any{
+                    "codeActionKinds": []string{"quickfix", "refactor", "refactor.extract"},
+                },
 				"documentFormattingProvider": true,
 				"signatureHelpProvider":      map[string]any{"triggerCharacters": []string{"(", ","}},
 				"documentOnTypeFormattingProvider": map[string]any{
@@ -578,16 +581,16 @@ func (s *Server) publishDiagnosticsFor(uri, text string) {
 // updateTokensIncremental updates cached tokens using the incremental lexer.
 // When changes is nil, a full pass is performed.
 func (s *Server) updateTokensIncremental(uri, text string, changes []lexer.Change) {
-    if s.incLexer == nil {
-        return
-    }
-    // For now, call LexIncremental; the API accepts a list of changes but current
-    // implementation may choose to re-lex fully based on hashing.
-    toks, err := s.incLexer.LexIncremental(uri, []byte(text), changes)
-    if err != nil {
-        return
-    }
-    s.tokCache[uri] = toks
+	if s.incLexer == nil {
+		return
+	}
+	// For now, call LexIncremental; the API accepts a list of changes but current
+	// implementation may choose to re-lex fully based on hashing.
+	toks, err := s.incLexer.LexIncremental(uri, []byte(text), changes)
+	if err != nil {
+		return
+	}
+	s.tokCache[uri] = toks
 }
 
 // handleHover returns minimal hover info at the given position.
