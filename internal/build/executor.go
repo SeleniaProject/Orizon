@@ -141,4 +141,69 @@ func (e *Executor) Execute(ctx context.Context, plan *Plan, roots []TargetID) ([
     return results, stats, nil
 }
 
+// ExecuteSelected runs only the selected targets, honoring dependencies among the selection.
+// Dependencies not in the selection are assumed up-to-date and are not executed.
+func (e *Executor) ExecuteSelected(ctx context.Context, plan *Plan, selectedIDs []TargetID) ([]Result, Stats, error) {
+    if plan == nil { return nil, Stats{}, errors.New("nil plan") }
+    selected := make(map[TargetID]bool, len(selectedIDs))
+    for _, id := range selectedIDs { selected[id] = true }
+    // Build induced subgraph over selection
+    indeg := make(map[TargetID]int, len(selected))
+    rev := make(map[TargetID][]TargetID, len(selected))
+    for id := range selected { indeg[id] = 0 }
+    for id := range selected {
+        t := plan.nodes[id]
+        if t == nil { return nil, Stats{}, errors.New("unknown selected target: "+string(id)) }
+        for _, d := range t.Deps {
+            if selected[d] { indeg[id]++; rev[d] = append(rev[d], id) }
+        }
+    }
+    type job struct{ id TargetID }
+    jobs := make(chan job, len(selected))
+    // ready queue: nodes with indeg 0
+    ready := make([]TargetID, 0)
+    for id, deg := range indeg { if deg == 0 { ready = append(ready, id) } }
+    sort.Slice(ready, func(i, j int) bool { return ready[i] < ready[j] })
+
+    var wg sync.WaitGroup
+    var running int64
+    results := make([]Result, 0, len(selected))
+    var resultsMu sync.Mutex
+    var stats Stats
+    stats.TotalTargets = int64(len(selected))
+
+    worker := func() {
+        defer wg.Done()
+        for j := range jobs {
+            t := plan.nodes[j.id]
+            start := time.Now()
+            err := t.Action(DefaultContext{ctx}, *t)
+            took := time.Since(start)
+            atomic.AddInt64(&running, -1)
+            resultsMu.Lock()
+            results = append(results, Result{ ID: j.id, Err: err, Took: took })
+            if err != nil { stats.Failed++ } else { stats.Succeeded++ }
+            resultsMu.Unlock()
+            for _, dep := range rev[j.id] {
+                if indeg[dep] > 0 { indeg[dep]-- }
+                if indeg[dep] == 0 { stats.Enqueued++; jobs <- job{id: dep} }
+            }
+        }
+    }
+    wg.Add(e.workers)
+    for i := 0; i < e.workers; i++ { go worker() }
+    for _, id := range ready { stats.Enqueued++; atomic.AddInt64(&running, 1); if cur := atomic.LoadInt64(&running); cur > stats.MaxParallel { stats.MaxParallel = cur }; jobs <- job{id: id} }
+
+    // Wait for completion
+    for {
+        time.Sleep(1 * time.Millisecond)
+        if int(stats.Succeeded+stats.Failed) == len(selected) { break }
+        if cur := atomic.LoadInt64(&running); cur > stats.MaxParallel { stats.MaxParallel = cur }
+    }
+    close(jobs)
+    wg.Wait()
+    sort.Slice(results, func(i, j int) bool { return results[i].ID < results[j].ID })
+    return results, stats, nil
+}
+
 
