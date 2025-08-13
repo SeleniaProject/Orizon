@@ -740,9 +740,9 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		return act.Config.Priority
 	}
 
-    // Set global reference for metrics exposition convenience
-    globalActorSystem = system
-    return system, nil
+	// Set global reference for metrics exposition convenience
+	globalActorSystem = system
+	return system, nil
 }
 
 // NewActor creates a new actor
@@ -1068,6 +1068,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			if uint32(length) <= opts.ReadLowWatermark && atomic.LoadInt32(&pausedRead) == 1 {
 				_ = p.Register(conn, kinds, handler)
 				atomic.StoreInt32(&pausedRead, 0)
+				atomic.AddUint64(&as.statistics.IOResumesRead, 1)
 			}
 		}
 	}
@@ -1079,6 +1080,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			if uint32(length) <= opts.WriteLowWatermark && atomic.LoadInt32(&pausedWrite) == 1 {
 				_ = p.Register(conn, kinds, handler)
 				atomic.StoreInt32(&pausedWrite, 0)
+				atomic.AddUint64(&as.statistics.IOResumesWrite, 1)
 			}
 		}
 	}
@@ -1168,6 +1170,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 		if err := as.SendMessageWithPriority(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err}, pr); err != nil {
 			// Mailbox overflow/backpressure: either drop or temporarily deregister and retry
 			if opts.DropOnOverflow {
+				atomic.AddUint64(&as.statistics.IOOverflowDrops, 1)
 				return
 			}
 			_ = p.Deregister(conn)
