@@ -372,9 +372,9 @@ type ActorSystemConfig struct {
 	EnableMetrics      bool          // Enable metrics
 	EnableTracing      bool          // Enable tracing
 	EnableDeadLetters  bool          // Enable dead letters
-    // DefaultIOWatchOptions provides system-wide defaults for I/O watcher registration.
-    // Methods like WatchConnWithActorDefault will use these defaults.
-    DefaultIOWatchOptions IOWatchOptions
+	// DefaultIOWatchOptions provides system-wide defaults for I/O watcher registration.
+	// Methods like WatchConnWithActorDefault will use these defaults.
+	DefaultIOWatchOptions IOWatchOptions
 }
 
 // Actor configuration
@@ -612,16 +612,16 @@ var DefaultActorSystemConfig = ActorSystemConfig{
 	EnableMetrics:      true,
 	EnableTracing:      false,
 	EnableDeadLetters:  true,
-    DefaultIOWatchOptions: IOWatchOptions{
-        BackoffInitial:     time.Millisecond * 5,
-        BackoffMax:         time.Millisecond * 100,
-        HighWatermark:      0,
-        LowWatermark:       0,
-        MonitorInterval:    time.Millisecond * 10,
-        ReadEventPriority:  NormalPriority,
-        WriteEventPriority: NormalPriority,
-        ErrorEventPriority: HighPriority,
-    },
+	DefaultIOWatchOptions: IOWatchOptions{
+		BackoffInitial:     time.Millisecond * 5,
+		BackoffMax:         time.Millisecond * 100,
+		HighWatermark:      0,
+		LowWatermark:       0,
+		MonitorInterval:    time.Millisecond * 10,
+		ReadEventPriority:  NormalPriority,
+		WriteEventPriority: NormalPriority,
+		ErrorEventPriority: HighPriority,
+	},
 }
 
 var DefaultActorConfig = ActorConfig{
@@ -905,11 +905,11 @@ func (as *ActorSystem) SetIOPoller(p asyncio.Poller) {
 
 // WatchConnWithActor registers a net.Conn with the attached poller and routes events to target actor.
 func (as *ActorSystem) WatchConnWithActor(conn net.Conn, kinds []asyncio.EventType, target ActorID) error {
-    // Use system defaults when available
-    as.mutex.RLock()
-    def := as.config.DefaultIOWatchOptions
-    as.mutex.RUnlock()
-    return as.WatchConnWithActorOpts(conn, kinds, target, def)
+	// Use system defaults when available
+	as.mutex.RLock()
+	def := as.config.DefaultIOWatchOptions
+	as.mutex.RUnlock()
+	return as.WatchConnWithActorOpts(conn, kinds, target, def)
 }
 
 // IOWatchOptions controls backpressure alignment when delivering I/O events to actors.
