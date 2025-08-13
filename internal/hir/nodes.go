@@ -46,7 +46,9 @@ func (fd *HIRFunctionDeclaration) GetChildren() []HIRNode {
 	for _, param := range fd.Parameters {
 		children = append(children, param)
 	}
-	children = append(children, fd.ReturnType)
+	if fd.ReturnType != nil {
+		children = append(children, fd.ReturnType)
+	}
 	if fd.Body != nil {
 		children = append(children, fd.Body)
 	}
