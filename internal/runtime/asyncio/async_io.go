@@ -51,11 +51,12 @@ type goPoller struct {
 }
 
 type registration struct {
-	kinds    []EventType
-	handler  Handler
-	stop     context.CancelFunc
-	done     chan struct{}
-	disabled uint32 // atomic flag to suppress handler calls after deregister
+    kinds    []EventType
+    handler  Handler
+    stop     context.CancelFunc
+    done     chan struct{}
+    disabled uint32 // atomic flag to suppress handler calls after deregister
+    lastWritableAt time.Time
 }
 
 // NewDefaultPoller returns a goroutine-based poller.
@@ -175,13 +176,17 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 					}
 				}
 			}
-			// Writable: assume always writable for TCP once connected
-			if contains(reg.kinds, Writable) {
-				if atomic.LoadUint32(&reg.disabled) == 0 {
-					reg.handler(Event{Conn: conn, Type: Writable})
-				}
-				activity = true
-			}
+            // Writable: throttle notifications to reduce CPU usage under idle
+            if contains(reg.kinds, Writable) {
+                now := time.Now()
+                if reg.lastWritableAt.IsZero() || now.Sub(reg.lastWritableAt) >= 50*time.Millisecond {
+                    if atomic.LoadUint32(&reg.disabled) == 0 {
+                        reg.handler(Event{Conn: conn, Type: Writable})
+                    }
+                    reg.lastWritableAt = now
+                    activity = true
+                }
+            }
 			// Adapt interval based on activity
 			if activity {
 				idleCount = 0
