@@ -758,11 +758,14 @@
 - **推定工数**: 大（20日）
 
 #### 4.2.4 パッケージ署名システム
-- [ ] **目的**: パッケージの完全性と真正性の保証
+- [x] **目的**: パッケージの完全性と真正性の保証
 - **成果物**:
-  - 暗号学的署名
-  - 信頼チェーン管理
-  - 脆弱性スキャン
+  - [x] 署名: Ed25519によるパッケージ記述子のデタッチ署名（`SignDescriptor`/`VerifyDescriptor`）
+  - [x] 証明書: 軽量JSON証明書（自己署名ルート/中間/リーフ、`SelfSignRoot`/`IssueChild`/`VerifyCertificate`）
+  - [x] 信頼ストア: `TrustStore` とチェーン検証（`VerifyChain`）
+  - [x] 署名保管: インメモリ署名ストア（`InMemorySignatureStore`）と `SignPackage`/`VerifyPackage`
+  - [x] 脆弱性スキャン: 簡易アドバイザリスキャナ（`InMemoryAdvisoryScanner`）と `ValidatePackageSecurity`
+  - [x] テスト: `signature_test.go`（鍵生成→発行→署名→検証→脆弱性検出）
 - **依存関係**: 4.2.3
 - **推定工数**: 大（22日）
 
