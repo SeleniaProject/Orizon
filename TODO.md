@@ -606,6 +606,7 @@
   - [x] Linux: `epoll` ベース実装（`internal/runtime/asyncio/epoll_poller_linux.go`）
   - [x] BSD/macOS: `kqueue` 実装（`internal/runtime/asyncio/kqueue_poller_bsd.go`）
   - [ ] Windows: `IOCP` 実装（現状は互換ポーラ委譲: `internal/runtime/asyncio/iocp_poller_windows.go`）
+  - [x] Windows: ポータブルポーラ強化（Deregisterレース抑止・エラー通知・WritableスロットリングによるCPU削減）
   - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
   - [x] 真のゼロコピーI/O経路（Linux: `sendfile` による file→socket 転送を実装）
   - [x] 真のゼロコピーI/O経路（Linux: `splice` による conn→conn 転送を実装）
@@ -812,7 +813,7 @@
 - **目的**: ソースレベルデバッグのための情報埋め込み
 - **成果物**:
   - [ ] DWARF情報生成
-  - [ ] ソースマップ作成
+  - [x] ソースマップ作成
   - [x] 変数情報保持（HIRベースのパラメータ/ローカル変数、型、スパン）
   - [x] 行テーブル生成（ファイル/行/列の収集・重複排除・安定ソート）
 - **実装内容**:
@@ -820,6 +821,7 @@
   - [x] `internal/debug/dwarf_test.go`: 生成物のJSON妥当性と最小動作検証
   - [ ] 真のDWARFセクション生成と埋め込み（未実装）
   - [ ] コンパイル成果物へのソースマップ出力（未実装）
+  - [x] HIRスパンからのソースマップ生成API（決定的順序・JSONシリアライズ）
 - **依存関係**: Phase 3完了
 - **推定工数**: 大（25日）
 
