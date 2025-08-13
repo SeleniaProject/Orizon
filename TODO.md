@@ -612,10 +612,10 @@
   - [x] 真のゼロコピーI/O経路（Linux: `sendfile` による file→socket 転送を実装）
   - [x] 真のゼロコピーI/O経路（Linux: `splice` による conn→conn 転送を実装）
   - [x] 真のゼロコピーI/O経路（macOS: `sendfile` による file→socket 転送を実装）
-  - [ ] 真のゼロコピーI/O経路（Windows: `TransmitFile` 対応）
+  - [x] 真のゼロコピーI/O経路（Windows: `TransmitFile` 対応）
   - [x] バッファプール・再利用戦略（GC圧力低減）
   - [x] アクターシステム統合（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent`配送）
-  - [ ] バックプレッシャ整合の高度化（優先度制御・水位ベースの自動レジストラ抑制）
+  - [x] バックプレッシャ整合の高度化（優先度制御・水位ベースの自動レジストラ抑制）
 - **依存関係**: 3.3.3
 - **推定工数**: 大（28日）
 - **現状**:
@@ -623,7 +623,9 @@
   - ゼロコピーI/Oはヘルパー（`internal/runtime/asyncio/zerocopy.go`）を追加済み。OS固有の真のゼロコピー経路は次段で対応
   - バッファプール（`internal/runtime/asyncio/buffer_pool.go`）を追加し、I/Oバッファの再利用でGC圧力を低減
   - アクター統合のベースラインを提供（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent` メッセージ配送、`IOWatchOptions` による指数バックオフ）
-  - Windowsは `TransmitFile` 試行と `io.Copy` フォールバックを実装（完全対応は未）
+  - Windowsは `TransmitFile` 試行と `io.Copy` フォールバックを実装（単体テスト追加・安定化）
+  - I/Oバックプレッシャ整合の高度化: `IOWatchOptions` に High/Low ウォーターマーク（グローバル/イベント別/優先度別）、レート制限（読/書・バースト・ドロップ）、優先度マッピングを追加
+  - I/O統計: ドロップ/一時停止/再開/イベント数を `ActorSystemStatistics` に追加し、メトリクスエクスポータから `actor_system_*` として公開
   - `go test ./...` は緑を維持
 
 #### 3.4.2 ファイルシステム抽象化 ✅ 完了
