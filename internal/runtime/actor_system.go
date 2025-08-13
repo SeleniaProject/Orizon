@@ -493,6 +493,9 @@ type ActorSystemStatistics struct {
 	IOPausesWrite      uint64 // Write-side pauses triggered by watermark
 	IOResumesRead      uint64 // Read-side resumes due to low watermark
 	IOResumesWrite     uint64 // Write-side resumes due to low watermark
+	IOEventsReadable   uint64 // Number of readable events emitted to actors
+	IOEventsWritable   uint64 // Number of writable events emitted to actors
+	IOEventsErrors     uint64 // Number of error events emitted to actors
 }
 
 // Actor statistics
@@ -1092,12 +1095,15 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 		case asyncio.Readable:
 			mt = IOReadable
 			pr = opts.ReadEventPriority
+			atomic.AddUint64(&as.statistics.IOEventsReadable, 1)
 		case asyncio.Writable:
 			mt = IOWritable
 			pr = opts.WriteEventPriority
+			atomic.AddUint64(&as.statistics.IOEventsWritable, 1)
 		default:
 			mt = IOErrorEvt
 			pr = opts.ErrorEventPriority
+			atomic.AddUint64(&as.statistics.IOEventsErrors, 1)
 		}
 		// Rate limiting per event type
 		if ev.Type == asyncio.Readable && opts.ReadMaxEventsPerSec > 0 {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/orizon-lang/orizon/internal/runtime/netstack"
 )
+
 // findGlobalActorSystem returns the global actor system if set.
 func findGlobalActorSystem() *ActorSystem { return globalActorSystem }
 
@@ -33,7 +34,7 @@ func StartMetricsServer(addr string, collectors map[string]MetricFunc) (string, 
 			names = append(names, name)
 		}
 		sort.Strings(names)
-        for _, name := range names {
+		for _, name := range names {
 			fn := collectors[name]
 			if fn == nil {
 				continue
@@ -45,34 +46,36 @@ func StartMetricsServer(addr string, collectors map[string]MetricFunc) (string, 
 				keys = append(keys, k)
 			}
 			sort.Strings(keys)
-            for _, k := range keys {
+			for _, k := range keys {
 				v := snapshot[k]
 				// Sanitize names into prometheus-like tokens
 				metricName := sanitizeMetricToken(name + "_" + k)
 				// Example line: runtime_tcp_accept_temp_errors 12
-                fmt.Fprintf(w, "%s %g\n", metricName, v)
+				fmt.Fprintf(w, "%s %g\n", metricName, v)
 			}
 		}
-        // Append actor system I/O statistics when available
-        // Expose under collector "actor_system" with stable keys
-        if sys := findGlobalActorSystem(); sys != nil {
-            st := sys.GetStatistics()
-            ioMetrics := map[string]float64{
-                "io_rate_limited_drops": float64(st.IORateLimitedDrops),
-                "io_overflow_drops":     float64(st.IOOverflowDrops),
-                "io_pauses_read":        float64(st.IOPausesRead),
-                "io_pauses_write":       float64(st.IOPausesWrite),
-                "io_resumes_read":       float64(st.IOResumesRead),
-                "io_resumes_write":      float64(st.IOResumesWrite),
-            }
-            keys := make([]string, 0, len(ioMetrics))
-            for k := range ioMetrics { keys = append(keys, k) }
-            sort.Strings(keys)
-            for _, k := range keys {
-                metricName := sanitizeMetricToken("actor_system_" + k)
-                fmt.Fprintf(w, "%s %g\n", metricName, ioMetrics[k])
-            }
-        }
+		// Append actor system I/O statistics when available
+		// Expose under collector "actor_system" with stable keys
+		if sys := findGlobalActorSystem(); sys != nil {
+			st := sys.GetStatistics()
+			ioMetrics := map[string]float64{
+				"io_rate_limited_drops": float64(st.IORateLimitedDrops),
+				"io_overflow_drops":     float64(st.IOOverflowDrops),
+				"io_pauses_read":        float64(st.IOPausesRead),
+				"io_pauses_write":       float64(st.IOPausesWrite),
+				"io_resumes_read":       float64(st.IOResumesRead),
+				"io_resumes_write":      float64(st.IOResumesWrite),
+			}
+			keys := make([]string, 0, len(ioMetrics))
+			for k := range ioMetrics {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				metricName := sanitizeMetricToken("actor_system_" + k)
+				fmt.Fprintf(w, "%s %g\n", metricName, ioMetrics[k])
+			}
+		}
 	})
 
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 3 * time.Second}
