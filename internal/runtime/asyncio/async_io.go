@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -50,9 +51,11 @@ type goPoller struct {
 }
 
 type registration struct {
-	kinds   []EventType
-	handler Handler
-	stop    context.CancelFunc
+	kinds    []EventType
+	handler  Handler
+	stop     context.CancelFunc
+	done     chan struct{}
+	disabled uint32 // atomic flag to suppress handler calls after deregister
 }
 
 // NewDefaultPoller returns a goroutine-based poller.
@@ -91,7 +94,7 @@ func (p *goPoller) Register(conn net.Conn, kinds []EventType, h Handler) error {
 		return errors.New("already registered")
 	}
 	ctx, cancel := context.WithCancel(p.ctx)
-	reg := &registration{kinds: kinds, handler: h, stop: cancel}
+	reg := &registration{kinds: kinds, handler: h, stop: cancel, done: make(chan struct{})}
 	p.conns[conn] = reg
 	p.mu.Unlock()
 
@@ -103,10 +106,18 @@ func (p *goPoller) Register(conn net.Conn, kinds []EventType, h Handler) error {
 func (p *goPoller) Deregister(conn net.Conn) error {
 	p.mu.Lock()
 	if reg, ok := p.conns[conn]; ok {
+		// Mark as disabled before stopping to avoid racing handler delivery
+		atomic.StoreUint32(&reg.disabled, 1)
 		if reg.stop != nil {
 			reg.stop()
 		}
 		delete(p.conns, conn)
+		done := reg.done
+		p.mu.Unlock()
+		if done != nil {
+			<-done
+		}
+		return nil
 	}
 	p.mu.Unlock()
 	return nil
@@ -133,6 +144,7 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 	for {
 		select {
 		case <-ctx.Done():
+			close(reg.done)
 			return
 		case <-tick.C:
 			activity := false
@@ -140,13 +152,34 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 			if contains(reg.kinds, Readable) {
 				_ = conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
 				if b, err := reader.Peek(1); err == nil && len(b) > 0 {
-					reg.handler(Event{Conn: conn, Type: Readable})
+					if atomic.LoadUint32(&reg.disabled) == 0 {
+						reg.handler(Event{Conn: conn, Type: Readable})
+					}
 					activity = true
+				} else if err != nil {
+					// Report non-timeout errors to the handler and stop watching.
+					if ne, ok := err.(net.Error); ok && ne.Timeout() {
+						// Ignore timeouts; this simply indicates no data right now.
+					} else if errors.Is(err, io.EOF) {
+						if atomic.LoadUint32(&reg.disabled) == 0 {
+							reg.handler(Event{Conn: conn, Type: Error, Err: io.EOF})
+						}
+						close(reg.done)
+						return
+					} else {
+						if atomic.LoadUint32(&reg.disabled) == 0 {
+							reg.handler(Event{Conn: conn, Type: Error, Err: err})
+						}
+						close(reg.done)
+						return
+					}
 				}
 			}
 			// Writable: assume always writable for TCP once connected
 			if contains(reg.kinds, Writable) {
-				reg.handler(Event{Conn: conn, Type: Writable})
+				if atomic.LoadUint32(&reg.disabled) == 0 {
+					reg.handler(Event{Conn: conn, Type: Writable})
+				}
 				activity = true
 			}
 			// Adapt interval based on activity
