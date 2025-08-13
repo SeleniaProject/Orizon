@@ -904,6 +904,27 @@ type IOWatchOptions struct {
 	BackoffInitial time.Duration
 	// BackoffMax is the maximum backoff delay.
 	BackoffMax time.Duration
+	// HighWatermark indicates the mailbox length at or above which I/O events should be paused
+	// by temporary deregistration from the poller. Set to 0 to disable watermark-based pausing.
+	HighWatermark uint32
+	// LowWatermark indicates the mailbox length at or below which I/O events may be resumed.
+	// Must be less than or equal to HighWatermark. Ignored if HighWatermark == 0.
+	LowWatermark uint32
+	// ReadHighWatermark/ReadLowWatermark override per-read event watermarks (fallback to High/Low when zero).
+	ReadHighWatermark uint32
+	ReadLowWatermark  uint32
+	// WriteHighWatermark/WriteLowWatermark override per-write event watermarks (fallback to High/Low when zero).
+	WriteHighWatermark uint32
+	WriteLowWatermark  uint32
+	// MonitorInterval controls how often the watermark resume checker runs while paused.
+	// Defaults to 10ms when zero.
+	MonitorInterval time.Duration
+	// ReadEventPriority maps IOReadable events to a message priority.
+	ReadEventPriority MessagePriority
+	// WriteEventPriority maps IOWritable events to a message priority.
+	WriteEventPriority MessagePriority
+	// ErrorEventPriority maps IOErrorEvt events to a message priority.
+	ErrorEventPriority MessagePriority
 }
 
 // WatchConnWithActorOpts registers with options for backpressure alignment.
@@ -920,19 +941,129 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 	if opts.BackoffMax <= 0 {
 		opts.BackoffMax = time.Millisecond * 100
 	}
+	if opts.MonitorInterval <= 0 {
+		opts.MonitorInterval = time.Millisecond * 10
+	}
+	if opts.LowWatermark > opts.HighWatermark {
+		opts.LowWatermark = opts.HighWatermark
+	}
+	// Normalize per-event watermarks: if not set, inherit global; fix low<=high
+	if opts.ReadHighWatermark == 0 {
+		opts.ReadHighWatermark = opts.HighWatermark
+	}
+	if opts.ReadLowWatermark == 0 {
+		opts.ReadLowWatermark = opts.LowWatermark
+	}
+	if opts.ReadLowWatermark > opts.ReadHighWatermark {
+		opts.ReadLowWatermark = opts.ReadHighWatermark
+	}
+	if opts.WriteHighWatermark == 0 {
+		opts.WriteHighWatermark = opts.HighWatermark
+	}
+	if opts.WriteLowWatermark == 0 {
+		opts.WriteLowWatermark = opts.LowWatermark
+	}
+	if opts.WriteLowWatermark > opts.WriteHighWatermark {
+		opts.WriteLowWatermark = opts.WriteHighWatermark
+	}
+	// Default priorities
+	if opts.ReadEventPriority == 0 {
+		opts.ReadEventPriority = NormalPriority
+	}
+	if opts.WriteEventPriority == 0 {
+		opts.WriteEventPriority = NormalPriority
+	}
+	if opts.ErrorEventPriority == 0 {
+		opts.ErrorEventPriority = HighPriority
+	}
 	backoff := opts.BackoffInitial
+	// paused flags for watermark-based pausing per event class
+	var pausedRead int32  // 0 = false, 1 = true
+	var pausedWrite int32 // 0 = false, 1 = true
 	var handler func(ev asyncio.Event)
+	maybeResumeRead := func() {
+		if opts.ReadHighWatermark == 0 {
+			return
+		}
+		if length, ok := as.GetMailboxLength(target); ok {
+			if uint32(length) <= opts.ReadLowWatermark && atomic.LoadInt32(&pausedRead) == 1 {
+				_ = p.Register(conn, kinds, handler)
+				atomic.StoreInt32(&pausedRead, 0)
+			}
+		}
+	}
+	maybeResumeWrite := func() {
+		if opts.WriteHighWatermark == 0 {
+			return
+		}
+		if length, ok := as.GetMailboxLength(target); ok {
+			if uint32(length) <= opts.WriteLowWatermark && atomic.LoadInt32(&pausedWrite) == 1 {
+				_ = p.Register(conn, kinds, handler)
+				atomic.StoreInt32(&pausedWrite, 0)
+			}
+		}
+	}
+
 	handler = func(ev asyncio.Event) {
 		var mt MessageType
+		var pr MessagePriority
 		switch ev.Type {
 		case asyncio.Readable:
 			mt = IOReadable
+			pr = opts.ReadEventPriority
 		case asyncio.Writable:
 			mt = IOWritable
+			pr = opts.WriteEventPriority
 		default:
 			mt = IOErrorEvt
+			pr = opts.ErrorEventPriority
 		}
-		if err := as.SendMessage(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err}); err != nil {
+		// Watermark-based pausing per event class
+		if ev.Type == asyncio.Readable && opts.ReadHighWatermark > 0 {
+			if length, ok := as.GetMailboxLength(target); ok && uint32(length) >= opts.ReadHighWatermark && atomic.LoadInt32(&pausedRead) == 0 {
+				_ = p.Deregister(conn)
+				atomic.StoreInt32(&pausedRead, 1)
+				go func() {
+					ticker := time.NewTicker(opts.MonitorInterval)
+					defer ticker.Stop()
+					for {
+						if atomic.LoadInt32(&pausedRead) == 0 {
+							return
+						}
+						select {
+						case <-ticker.C:
+							maybeResumeRead()
+						case <-as.ctx.Done():
+							return
+						}
+					}
+				}()
+				return
+			}
+		}
+		if ev.Type == asyncio.Writable && opts.WriteHighWatermark > 0 {
+			if length, ok := as.GetMailboxLength(target); ok && uint32(length) >= opts.WriteHighWatermark && atomic.LoadInt32(&pausedWrite) == 0 {
+				_ = p.Deregister(conn)
+				atomic.StoreInt32(&pausedWrite, 1)
+				go func() {
+					ticker := time.NewTicker(opts.MonitorInterval)
+					defer ticker.Stop()
+					for {
+						if atomic.LoadInt32(&pausedWrite) == 0 {
+							return
+						}
+						select {
+						case <-ticker.C:
+							maybeResumeWrite()
+						case <-as.ctx.Done():
+							return
+						}
+					}
+				}()
+				return
+			}
+		}
+		if err := as.SendMessageWithPriority(0, target, mt, IOEvent{Conn: ev.Conn, Type: ev.Type, Err: ev.Err}, pr); err != nil {
 			// Mailbox overflow/backpressure: either drop or temporarily deregister and retry
 			if opts.DropOnOverflow {
 				return
@@ -956,9 +1087,48 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 		} else {
 			// successful delivery resets backoff
 			backoff = opts.BackoffInitial
+			// Also attempt to resume if previously paused and capacity is available
+			if ev.Type == asyncio.Readable && atomic.LoadInt32(&pausedRead) == 1 {
+				maybeResumeRead()
+			}
+			if ev.Type == asyncio.Writable && atomic.LoadInt32(&pausedWrite) == 1 {
+				maybeResumeWrite()
+			}
 		}
 	}
 	return p.Register(conn, kinds, handler)
+}
+
+// GetMailboxLength returns the current length of an actor's mailbox.
+func (as *ActorSystem) GetMailboxLength(aid ActorID) (int, bool) {
+	as.mutex.RLock()
+	actor := as.actors[aid]
+	as.mutex.RUnlock()
+	if actor == nil || actor.Mailbox == nil {
+		return 0, false
+	}
+	return actor.Mailbox.Len(), true
+}
+
+// SendMessageWithPriority sends a message with an explicit priority.
+func (as *ActorSystem) SendMessageWithPriority(senderID, receiverID ActorID, messageType MessageType, payload interface{}, prio MessagePriority) error {
+	if !as.running {
+		return fmt.Errorf("actor system is not running")
+	}
+	message := Message{
+		ID:         MessageID(atomic.AddUint64(&globalMessageID, 1)),
+		Type:       messageType,
+		Sender:     senderID,
+		Receiver:   receiverID,
+		Payload:    payload,
+		Priority:   prio,
+		Timestamp:  time.Now(),
+		TTL:        time.Minute * 5,
+		Headers:    make(map[string]interface{}),
+		Persistent: false,
+		Delivered:  false,
+	}
+	return as.deliverMessage(message)
 }
 
 // UnwatchConn deregisters a net.Conn from the attached poller.
