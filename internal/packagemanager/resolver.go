@@ -92,8 +92,13 @@ func (r *Resolver) Resolve(reqs []Requirement) (Resolution, error) {
 			return nil, fmt.Errorf("%s: %w", q.Name, err)
 		}
 		if ex, ok := merged[q.Name]; ok {
-			ex = ex.Intersect(c)
-			merged[q.Name] = ex
+			// Masterminds/semver does not expose a direct Intersect API universally,
+			// so we AND-join the textual constraints and re-parse.
+			cc, err := semver.NewConstraint(ex.String() + ", " + c.String())
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", q.Name, err)
+			}
+			merged[q.Name] = cc
 		} else {
 			merged[q.Name] = c
 		}
