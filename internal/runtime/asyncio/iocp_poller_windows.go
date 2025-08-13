@@ -9,10 +9,8 @@ import (
 	"net"
 )
 
-// windowsPoller currently delegates to the portable goroutine-based poller.
-// Rationale: Avoid interfering with Go's internal Windows netpoller (IOCP).
-// A specialized implementation (e.g., IOCP zero-byte WSARecv) can be added later
-// behind the same interface once compatibility considerations are fully vetted.
+// windowsPoller delegates to the portable goroutine-based poller to avoid
+// conflicts with Go's internal netpoller on Windows.
 type windowsPoller struct{ Poller }
 
 func newWindowsPoller() Poller { return &windowsPoller{Poller: NewDefaultPoller()} }
