@@ -621,6 +621,7 @@ var DefaultActorSystemConfig = ActorSystemConfig{
 		ReadEventPriority:  NormalPriority,
 		WriteEventPriority: NormalPriority,
 		ErrorEventPriority: HighPriority,
+		DropOnRateLimit:    true,
 	},
 }
 
@@ -1002,35 +1003,46 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 	if opts.ErrorEventPriority == 0 {
 		opts.ErrorEventPriority = HighPriority
 	}
-    backoff := opts.BackoffInitial
-    // Token buckets for rate limiting (approximate, per watcher)
-    type bucket struct{ tokens int; max int }
-    readBucket := bucket{tokens: opts.ReadBurst, max: opts.ReadBurst}
-    writeBucket := bucket{tokens: opts.WriteBurst, max: opts.WriteBurst}
-    if opts.ReadMaxEventsPerSec > 0 && readBucket.max == 0 { readBucket.max = opts.ReadMaxEventsPerSec }
-    if opts.WriteMaxEventsPerSec > 0 && writeBucket.max == 0 { writeBucket.max = opts.WriteMaxEventsPerSec }
-    // Refill goroutine
-    if opts.ReadMaxEventsPerSec > 0 || opts.WriteMaxEventsPerSec > 0 {
-        go func(){
-            tick := time.NewTicker(time.Second)
-            defer tick.Stop()
-            for {
-                select{
-                case <-as.ctx.Done():
-                    return
-                case <-tick.C:
-                    if opts.ReadMaxEventsPerSec > 0 {
-                        readBucket.tokens += opts.ReadMaxEventsPerSec
-                        if readBucket.tokens > readBucket.max { readBucket.tokens = readBucket.max }
-                    }
-                    if opts.WriteMaxEventsPerSec > 0 {
-                        writeBucket.tokens += opts.WriteMaxEventsPerSec
-                        if writeBucket.tokens > writeBucket.max { writeBucket.tokens = writeBucket.max }
-                    }
-                }
-            }
-        }()
-    }
+	backoff := opts.BackoffInitial
+	// Token buckets for rate limiting (approximate, per watcher)
+	type bucket struct {
+		tokens int
+		max    int
+	}
+	readBucket := bucket{tokens: opts.ReadBurst, max: opts.ReadBurst}
+	writeBucket := bucket{tokens: opts.WriteBurst, max: opts.WriteBurst}
+	if opts.ReadMaxEventsPerSec > 0 && readBucket.max == 0 {
+		readBucket.max = opts.ReadMaxEventsPerSec
+	}
+	if opts.WriteMaxEventsPerSec > 0 && writeBucket.max == 0 {
+		writeBucket.max = opts.WriteMaxEventsPerSec
+	}
+	// Refill goroutine
+	if opts.ReadMaxEventsPerSec > 0 || opts.WriteMaxEventsPerSec > 0 {
+		go func() {
+			tick := time.NewTicker(time.Second)
+			defer tick.Stop()
+			for {
+				select {
+				case <-as.ctx.Done():
+					return
+				case <-tick.C:
+					if opts.ReadMaxEventsPerSec > 0 {
+						readBucket.tokens += opts.ReadMaxEventsPerSec
+						if readBucket.tokens > readBucket.max {
+							readBucket.tokens = readBucket.max
+						}
+					}
+					if opts.WriteMaxEventsPerSec > 0 {
+						writeBucket.tokens += opts.WriteMaxEventsPerSec
+						if writeBucket.tokens > writeBucket.max {
+							writeBucket.tokens = writeBucket.max
+						}
+					}
+				}
+			}
+		}()
+	}
 	// paused flags for watermark-based pausing per event class
 	var pausedRead int32  // 0 = false, 1 = true
 	var pausedWrite int32 // 0 = false, 1 = true
@@ -1072,22 +1084,26 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			mt = IOErrorEvt
 			pr = opts.ErrorEventPriority
 		}
-        // Rate limiting per event type
-        if ev.Type == asyncio.Readable && opts.ReadMaxEventsPerSec > 0 {
-            if readBucket.tokens <= 0 {
-                if opts.DropOnRateLimit { return }
-            } else {
-                readBucket.tokens--
-            }
-        }
-        if ev.Type == asyncio.Writable && opts.WriteMaxEventsPerSec > 0 {
-            if writeBucket.tokens <= 0 {
-                if opts.DropOnRateLimit { return }
-            } else {
-                writeBucket.tokens--
-            }
-        }
-        // Watermark-based pausing per event class
+		// Rate limiting per event type
+		if ev.Type == asyncio.Readable && opts.ReadMaxEventsPerSec > 0 {
+			if readBucket.tokens <= 0 {
+				if opts.DropOnRateLimit {
+					return
+				}
+			} else {
+				readBucket.tokens--
+			}
+		}
+		if ev.Type == asyncio.Writable && opts.WriteMaxEventsPerSec > 0 {
+			if writeBucket.tokens <= 0 {
+				if opts.DropOnRateLimit {
+					return
+				}
+			} else {
+				writeBucket.tokens--
+			}
+		}
+		// Watermark-based pausing per event class
 		if ev.Type == asyncio.Readable && opts.ReadHighWatermark > 0 {
 			if length, ok := as.GetMailboxLength(target); ok && uint32(length) >= opts.ReadHighWatermark && atomic.LoadInt32(&pausedRead) == 0 {
 				_ = p.Deregister(conn)
