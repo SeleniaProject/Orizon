@@ -70,6 +70,10 @@ type ActorSystem struct {
 	ioPoller asyncio.Poller
 }
 
+// globalActorSystem is an optional reference used by metrics exposition to include
+// actor system statistics without introducing a hard dependency on the exporter.
+var globalActorSystem *ActorSystem
+
 // Actor represents an individual actor
 type Actor struct {
 	ID            ActorID            // Actor identifier
@@ -482,6 +486,13 @@ type ActorSystemStatistics struct {
 	Restarts          uint64    // Total restarts
 	Failures          uint64    // Total failures
 	LastReset         time.Time // Last statistics reset
+	// I/O related statistics
+	IORateLimitedDrops uint64 // Events dropped by rate limiter
+	IOOverflowDrops    uint64 // Events dropped due to mailbox overflow
+	IOPausesRead       uint64 // Read-side pauses triggered by watermark
+	IOPausesWrite      uint64 // Write-side pauses triggered by watermark
+	IOResumesRead      uint64 // Read-side resumes due to low watermark
+	IOResumesWrite     uint64 // Write-side resumes due to low watermark
 }
 
 // Actor statistics
@@ -729,7 +740,9 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		return act.Config.Priority
 	}
 
-	return system, nil
+    // Set global reference for metrics exposition convenience
+    globalActorSystem = system
+    return system, nil
 }
 
 // NewActor creates a new actor
@@ -1088,6 +1101,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 		if ev.Type == asyncio.Readable && opts.ReadMaxEventsPerSec > 0 {
 			if readBucket.tokens <= 0 {
 				if opts.DropOnRateLimit {
+					atomic.AddUint64(&as.statistics.IORateLimitedDrops, 1)
 					return
 				}
 			} else {
@@ -1097,6 +1111,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 		if ev.Type == asyncio.Writable && opts.WriteMaxEventsPerSec > 0 {
 			if writeBucket.tokens <= 0 {
 				if opts.DropOnRateLimit {
+					atomic.AddUint64(&as.statistics.IORateLimitedDrops, 1)
 					return
 				}
 			} else {
@@ -1108,6 +1123,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			if length, ok := as.GetMailboxLength(target); ok && uint32(length) >= opts.ReadHighWatermark && atomic.LoadInt32(&pausedRead) == 0 {
 				_ = p.Deregister(conn)
 				atomic.StoreInt32(&pausedRead, 1)
+				atomic.AddUint64(&as.statistics.IOPausesRead, 1)
 				go func() {
 					ticker := time.NewTicker(opts.MonitorInterval)
 					defer ticker.Stop()
@@ -1130,6 +1146,7 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			if length, ok := as.GetMailboxLength(target); ok && uint32(length) >= opts.WriteHighWatermark && atomic.LoadInt32(&pausedWrite) == 0 {
 				_ = p.Deregister(conn)
 				atomic.StoreInt32(&pausedWrite, 1)
+				atomic.AddUint64(&as.statistics.IOPausesWrite, 1)
 				go func() {
 					ticker := time.NewTicker(opts.MonitorInterval)
 					defer ticker.Stop()
@@ -1174,10 +1191,18 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			backoff = opts.BackoffInitial
 			// Also attempt to resume if previously paused and capacity is available
 			if ev.Type == asyncio.Readable && atomic.LoadInt32(&pausedRead) == 1 {
+				before := atomic.LoadInt32(&pausedRead)
 				maybeResumeRead()
+				if atomic.LoadInt32(&pausedRead) == 0 && before == 1 {
+					atomic.AddUint64(&as.statistics.IOResumesRead, 1)
+				}
 			}
 			if ev.Type == asyncio.Writable && atomic.LoadInt32(&pausedWrite) == 1 {
+				before := atomic.LoadInt32(&pausedWrite)
 				maybeResumeWrite()
+				if atomic.LoadInt32(&pausedWrite) == 0 && before == 1 {
+					atomic.AddUint64(&as.statistics.IOResumesWrite, 1)
+				}
 			}
 		}
 	}
