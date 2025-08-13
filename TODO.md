@@ -626,6 +626,7 @@
   - I/Oバックプレッシャ整合の高度化: `IOWatchOptions` に High/Low ウォーターマーク（グローバル/イベント別/優先度別）、レート制限（読/書・バースト・ドロップ）、優先度マッピングを追加
   - I/O統計: ドロップ/一時停止/再開/イベント数を `ActorSystemStatistics` に追加し、メトリクスエクスポータから `actor_system_*` として公開
   - `go test ./...` は緑を維持
+  - テスト: `internal/runtime/asyncio/async_io_test.go` を追加（Readable発火、Deregister後のイベント抑止、Close時のError、OSポーラ経路の検証）
 
 #### 3.4.2 ファイルシステム抽象化 ✅ 完了
 - [x] **目的**: 仮想ファイルシステム実装
@@ -822,6 +823,7 @@
   - [ ] 真のDWARFセクション生成と埋め込み（未実装）
   - [ ] コンパイル成果物へのソースマップ出力（未実装）
   - [x] HIRスパンからのソースマップ生成API（決定的順序・JSONシリアライズ）
+  - [x] `internal/debug/sourcemap.go`/`sourcemap_test.go`: 関数単位のファイル行レンジ抽出・決定的順序化・JSONシリアライズの検証
 - **依存関係**: Phase 3完了
 - **推定工数**: 大（25日）
 
