@@ -292,10 +292,11 @@ func (tb *HIRTypeBuilder) BuildBasicType(name string, span position.Span) *HIRBa
 // BuildArrayType creates an array type HIR node
 func (tb *HIRTypeBuilder) BuildArrayType(elementType HIRType, size HIRExpression, span position.Span) *HIRArrayType {
 	typeInfo := TypeInfo{
-		ID:   TypeID(generateNodeID()),
-		Kind: TypeKindArray,
-		Name: fmt.Sprintf("[]%s", elementType.GetType().Name),
-		Size: -1, // Dynamic size
+		ID:         TypeID(generateNodeID()),
+		Kind:       TypeKindArray,
+		Name:       fmt.Sprintf("[]%s", elementType.GetType().Name),
+		Size:       -1, // Dynamic size
+		Parameters: []TypeInfo{elementType.GetType()},
 		Properties: TypeProperties{
 			Copyable:  elementType.GetType().Properties.Copyable,
 			Movable:   true,
@@ -318,10 +319,11 @@ func (tb *HIRTypeBuilder) BuildArrayType(elementType HIRType, size HIRExpression
 // BuildPointerType creates a pointer type HIR node
 func (tb *HIRTypeBuilder) BuildPointerType(targetType HIRType, mutable bool, span position.Span) *HIRPointerType {
 	typeInfo := TypeInfo{
-		ID:   TypeID(generateNodeID()),
-		Kind: TypeKindPointer,
-		Name: fmt.Sprintf("*%s", targetType.GetType().Name),
-		Size: 8, // Assume 64-bit pointers
+		ID:         TypeID(generateNodeID()),
+		Kind:       TypeKindPointer,
+		Name:       fmt.Sprintf("*%s", targetType.GetType().Name),
+		Size:       8, // Assume 64-bit pointers
+		Parameters: []TypeInfo{targetType.GetType()},
 		Properties: TypeProperties{
 			Copyable:  true,
 			Movable:   true,
@@ -348,6 +350,14 @@ func (tb *HIRTypeBuilder) BuildFunctionType(parameters []HIRType, returnType HIR
 		Kind: TypeKindFunction,
 		Name: fmt.Sprintf("fn(%d) -> %s", len(parameters), returnType.GetType().Name),
 		Size: 8, // Function pointer size
+		Parameters: func() []TypeInfo {
+			out := make([]TypeInfo, 0, len(parameters)+1)
+			for _, p := range parameters {
+				out = append(out, p.GetType())
+			}
+			out = append(out, returnType.GetType())
+			return out
+		}(),
 		Properties: TypeProperties{
 			Copyable:  true,
 			Movable:   true,

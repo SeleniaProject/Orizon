@@ -25,14 +25,17 @@ type VariableInfo struct {
 	Span       position.Span `json:"span"`
 	IsParam    bool          `json:"is_param"`
 	IsCaptured bool          `json:"is_captured"`
+	TypeMeta   *TypeMeta     `json:"type_meta,omitempty"`
 }
 
 // FunctionInfo describes a function for debug.
 type FunctionInfo struct {
-	Name      string         `json:"name"`
-	Span      position.Span  `json:"span"`
-	Lines     []LineEntry    `json:"lines"`
-	Variables []VariableInfo `json:"variables"`
+	Name       string         `json:"name"`
+	Span       position.Span  `json:"span"`
+	Lines      []LineEntry    `json:"lines"`
+	Variables  []VariableInfo `json:"variables"`
+	ReturnType *TypeMeta      `json:"return_type,omitempty"`
+	ParamTypes []TypeMeta     `json:"param_types,omitempty"`
 }
 
 // ModuleDebugInfo aggregates module-level debug info.
@@ -45,6 +48,23 @@ type ModuleDebugInfo struct {
 type ProgramDebugInfo struct {
 	GeneratedAt time.Time         `json:"generated_at"`
 	Modules     []ModuleDebugInfo `json:"modules"`
+}
+
+// TypeMeta provides a lightweight, JSON-serializable snapshot of a type.
+type TypeMeta struct {
+	Kind       string      `json:"kind"`
+	Name       string      `json:"name"`
+	Size       int64       `json:"size"`
+	Alignment  int64       `json:"alignment"`
+	Parameters []TypeMeta  `json:"parameters,omitempty"`
+	Fields     []TypeField `json:"fields,omitempty"`
+}
+
+// TypeField describes a struct/record field.
+type TypeField struct {
+	Name   string   `json:"name"`
+	Offset int64    `json:"offset"`
+	Type   TypeMeta `json:"type"`
 }
 
 // Emitter builds debug information from HIR.
@@ -95,16 +115,43 @@ func (e *Emitter) Emit(p *hir.HIRProgram) (ProgramDebugInfo, error) {
 				})
 				fi.Lines = uniq
 
-				// Variables: parameters only (locals are not modeled as a distinct list in current HIR)
+				// Variables: parameters and locals (collect from function body)
 				vars := make([]VariableInfo, 0, len(fn.Parameters))
 				for _, p := range fn.Parameters {
-					// Resolve TypeInfo string from HIRType
-					typeStr := p.Type.GetType().String()
-					vars = append(vars, VariableInfo{Name: p.Name, Type: typeStr, Location: "param:" + p.Name, Span: p.Span, IsParam: true})
+					// Resolve TypeInfo
+					var typeStr string
+					var tm *TypeMeta
+					if p.Type != nil {
+						ti := p.Type.GetType()
+						typeStr = ti.String()
+						mt := convertTypeInfoToMeta(ti)
+						tm = &mt
+					}
+					vars = append(vars, VariableInfo{Name: p.Name, Type: typeStr, TypeMeta: tm, Location: "param:" + p.Name, Span: p.Span, IsParam: true})
+				}
+				// collect locals from body
+				if fn.Body != nil {
+					locals := make([]VariableInfo, 0)
+					collectLocalsFromNode(fn.Body, &locals)
+					vars = append(vars, locals...)
 				}
 				// Sort variables for determinism
 				sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 				fi.Variables = vars
+				// Basic function type summary (return/params) if available
+				if fn.ReturnType != nil {
+					rt := fn.ReturnType.GetType()
+					mt := convertTypeInfoToMeta(rt)
+					fi.ReturnType = &mt
+				}
+				if len(fn.Parameters) > 0 {
+					fi.ParamTypes = make([]TypeMeta, 0, len(fn.Parameters))
+					for _, p := range fn.Parameters {
+						if p.Type != nil {
+							fi.ParamTypes = append(fi.ParamTypes, convertTypeInfoToMeta(p.Type.GetType()))
+						}
+					}
+				}
 				mdi.Functions = append(mdi.Functions, fi)
 			}
 		}
@@ -118,6 +165,15 @@ func (e *Emitter) Emit(p *hir.HIRProgram) (ProgramDebugInfo, error) {
 // Serialize returns canonical JSON for the debug info.
 func Serialize(info ProgramDebugInfo) ([]byte, error) {
 	return json.MarshalIndent(info, "", "  ")
+}
+
+// Deserialize parses ProgramDebugInfo from JSON.
+func Deserialize(b []byte) (ProgramDebugInfo, error) {
+	var info ProgramDebugInfo
+	if err := json.Unmarshal(b, &info); err != nil {
+		return ProgramDebugInfo{}, err
+	}
+	return info, nil
 }
 
 func itoa(v int) string { return fmtInt(v) }
@@ -147,13 +203,130 @@ func fmtInt(v int) string {
 	return string(buf[i:])
 }
 
+// convertTypeInfoToMeta translates HIR TypeInfo into a serializable TypeMeta tree.
+func convertTypeInfoToMeta(t hir.TypeInfo) TypeMeta {
+	tm := TypeMeta{
+		Kind:      typeKindToString(t.Kind),
+		Name:      t.Name,
+		Size:      t.Size,
+		Alignment: t.Alignment,
+	}
+	if len(t.Parameters) > 0 {
+		tm.Parameters = make([]TypeMeta, len(t.Parameters))
+		for i := range t.Parameters {
+			tm.Parameters[i] = convertTypeInfoToMeta(t.Parameters[i])
+		}
+	}
+	if len(t.Fields) > 0 {
+		tm.Fields = make([]TypeField, len(t.Fields))
+		for i := range t.Fields {
+			tm.Fields[i] = TypeField{
+				Name:   t.Fields[i].Name,
+				Offset: t.Fields[i].Offset,
+				Type:   convertTypeInfoToMeta(t.Fields[i].Type),
+			}
+		}
+	}
+	return tm
+}
+
+func typeKindToString(k hir.TypeKind) string {
+	switch k {
+	case hir.TypeKindUnknown:
+		return "unknown"
+	case hir.TypeKindInvalid:
+		return "invalid"
+	case hir.TypeKindVoid:
+		return "void"
+	case hir.TypeKindBoolean:
+		return "bool"
+	case hir.TypeKindInteger:
+		return "int"
+	case hir.TypeKindFloat:
+		return "float"
+	case hir.TypeKindString:
+		return "string"
+	case hir.TypeKindArray:
+		return "array"
+	case hir.TypeKindSlice:
+		return "slice"
+	case hir.TypeKindPointer:
+		return "pointer"
+	case hir.TypeKindFunction:
+		return "function"
+	case hir.TypeKindStruct:
+		return "struct"
+	case hir.TypeKindInterface:
+		return "interface"
+	case hir.TypeKindGeneric:
+		return "generic"
+	case hir.TypeKindTypeParameter:
+		return "type_parameter"
+	case hir.TypeKindVariable:
+		return "type_variable"
+	case hir.TypeKindTuple:
+		return "tuple"
+	case hir.TypeKindSkolem:
+		return "skolem"
+	case hir.TypeKindHigherRank:
+		return "higher_rank"
+	case hir.TypeKindDependent:
+		return "dependent"
+	case hir.TypeKindEffect:
+		return "effect"
+	case hir.TypeKindLinear:
+		return "linear"
+	case hir.TypeKindRefinement:
+		return "refinement"
+	case hir.TypeKindType:
+		return "type"
+	case hir.TypeKindApplication:
+		return "application"
+	default:
+		return "unknown"
+	}
+}
+
 // collectLinesFromNode traverses node to collect source line entries.
 func collectLinesFromNode(n hir.HIRNode, out *[]LineEntry) {
+	if n == nil {
+		return
+	}
 	sp := n.GetSpan()
 	if sp.IsValid() {
 		*out = append(*out, LineEntry{File: sp.Start.Filename, Line: sp.Start.Line, Column: sp.Start.Column})
 	}
 	for _, ch := range n.GetChildren() {
 		collectLinesFromNode(ch, out)
+	}
+}
+
+// collectLocalsFromNode traverses to collect local variable declarations.
+func collectLocalsFromNode(n hir.HIRNode, out *[]VariableInfo) {
+	if n == nil {
+		return
+	}
+	// Match variable declarations
+	if vd, ok := n.(*hir.HIRVariableDeclaration); ok {
+		typeStr := ""
+		var tm *TypeMeta
+		if vd.Type != nil {
+			ti := vd.Type.GetType()
+			typeStr = ti.String()
+			mt := convertTypeInfoToMeta(ti)
+			tm = &mt
+		}
+		*out = append(*out, VariableInfo{
+			Name:       vd.Name,
+			Type:       typeStr,
+			TypeMeta:   tm,
+			Location:   "local:" + vd.Name,
+			Span:       vd.Span,
+			IsParam:    false,
+			IsCaptured: false,
+		})
+	}
+	for _, ch := range n.GetChildren() {
+		collectLocalsFromNode(ch, out)
 	}
 }
