@@ -605,7 +605,7 @@
   - [x] OS別ポーラの土台: `NewOSPoller()` ファクトリ導入
   - [x] Linux: `epoll` ベース実装（`internal/runtime/asyncio/epoll_poller_linux.go`）
   - [x] BSD/macOS: `kqueue` 実装（`internal/runtime/asyncio/kqueue_poller_bsd.go`）
-  - [ ] Windows: `IOCP` 実装（現状は互換ポーラ委譲: `internal/runtime/asyncio/iocp_poller_windows.go`）
+  - [ ] Windows: `IOCP` 実装（実験タグ版あり: `internal/runtime/asyncio/iocp_experimental_windows.go`。Overlappedにキー保持、`GetQueuedCompletionStatus`完了ディスパッチ、Readableはゼロバイト`WSARecv`＋`Peek`でEOF厳密判定＆即時再アーム、Writableはゼロバイト`WSASend`完了で通知、`CancelIoEx`による停止収束、IOCP不可時のフォールバック監視、タグ付きテスト一式グリーン）
   - [x] Windows: ポータブルポーラ強化（Deregisterレース抑止・エラー通知・WritableスロットリングによるCPU削減）
   - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
   - [x] 真のゼロコピーI/O経路（Linux: `sendfile` による file→socket 転送を実装）
@@ -679,6 +679,8 @@
    - [x] フォーマット: `textDocument/formatting`（括弧ベース整形・行末空白除去）
    - [x] OnType整形: `textDocument/onTypeFormatting`（`}`/`\n`/`)`/`;` 対応）
     - [x] プロトコル準拠テスト、バリデータ連携
+    - [x] typeDefinition: `textDocument/typeDefinition` と `typeDefinitionProvider` を実装
+    - [x] SignatureHelp強化: `parameters` の充実と `documentation` にパラメータ/戻り値サマリを出力
 
 - #### 4.1.2 リアルタイム解析 ✅ 完了
 - [x] **目的**: 入力と同時の静的解析とエラー検出
@@ -704,6 +706,10 @@
   - `completionItem/resolve`でキーワードの`detail`/`documentation`を遅延付与
   - スニペット補完（`func`/`fn`）・ワークスペース索引由来候補の統合
   - 型/シグネチャの簡易推定結果を`hover`に反映（補完整合性の向上）
+  - `completionItem/resolve`でシンボル候補にも対応（AST/索引から署名・型・簡易ドキュメントを付与）
+  - 関数候補にスニペット挿入（`insertTextFormat: Snippet` と `name($0)`）
+  - `detail`が空の候補に型サマリ（構造体の先頭フィールド/配列要素型/関数の戻り値）を自動付与
+  - ワークスペース候補に`data.uris`を付加し、resolve時のAST確保を安定化
 - **依存関係**: 4.1.2
 - **推定工数**: 大（28日）
 
@@ -813,15 +819,17 @@
 #### 4.4.1 デバッグ情報生成 ✅ 一部完了
 - **目的**: ソースレベルデバッグのための情報埋め込み
 - **成果物**:
-  - [ ] DWARF情報生成
+  - [ ] DWARF情報生成（`.debug_line`のファイル/ディレクトリテーブルと行命令、`.debug_info`の関数`decl_file/decl_line`と`formal_parameter`DIEを実装済み。関数の`low_pc`/`high_pc(size)`と`frame_base(exprloc)`、引数の`location(DW_OP_fbreg)`を追加実装済み。型DIE生成を拡張（`base/pointer/struct/member/subroutine/param/array/subrange/tuple/slice/interface`）し、`.debug_str`に名前を格納。ローカル変数のロケーション式詳細化と`typedef/const/volatile`修飾の対応が残）
   - [x] ソースマップ作成
   - [x] 変数情報保持（HIRベースのパラメータ/ローカル変数、型、スパン）
   - [x] 行テーブル生成（ファイル/行/列の収集・重複排除・安定ソート）
 - **実装内容**:
   - [x] `internal/debug/dwarf.go`: HIRから`ProgramDebugInfo`（Modules/Functions/LineEntry/VariableInfo）を生成し、決定的順序でJSONシリアライズ
   - [x] `internal/debug/dwarf_test.go`: 生成物のJSON妥当性と最小動作検証
-  - [ ] 真のDWARFセクション生成と埋め込み（未実装）
-  - [ ] コンパイル成果物へのソースマップ出力（未実装）
+  - [x] 真のDWARFセクション生成（最小: .debug_abbrev/.debug_info/.debug_line/.debug_str を生成・ファイル出力。型DIEのインターン/再利用・構造体メンバの`DW_AT_data_member_location`を符号化）
+  - [x] 生成セクションの実バイナリ埋め込み（ELF/COFF/Mach-O への最小統合: `.debug_*` セクションを持つオブジェクト生成）
+  - [x] CLI統合: `cmd/orizon-compiler` に `--emit-elf/--emit-coff/--emit-macho` を追加し、OSに応じた自動選択（env上書き可）
+  - [x] コンパイル成果物へのソースマップ出力（CLIに`--sourcemap-out`追加・ファイル出力実装済み）
   - [x] HIRスパンからのソースマップ生成API（決定的順序・JSONシリアライズ）
   - [x] `internal/debug/sourcemap.go`/`sourcemap_test.go`: 関数単位のファイル行レンジ抽出・決定的順序化・JSONシリアライズの検証
 - **依存関係**: Phase 3完了
@@ -830,9 +838,21 @@
 #### 4.4.2 GDB/LLDB互換インターフェース
 - [ ] **目的**: 既存デバッガーとの連携
 - **成果物**:
-  - [ ] プロトコル実装
-  - [ ] ブレークポイント管理
+  - [x] プロトコル実装（GDB RSP 最小～拡張）
+  - [x] ブレークポイント管理（Z0/z0 基本対応）
   - [ ] スタックトレース生成
+- **実装内容**:
+  - [x] `internal/debug/gdbserver/server.go`: RSPサーバー実装
+    - セッション/ACK制御: `QStartNoAckMode`、ACK省略
+    - 基本照会: `?`（停止応答S05/T05）、`qSupported`、`qAttached`、`qOffsets`、`H`、`T`、`qC`、`qfThreadInfo`/`qsThreadInfo`
+    - レジスタ/メモリ: `g`/`G`、`p`/`P`、`m`/`M`
+    - 実行制御: `c`/`s`（アドレス指定可）、`vCont?`/`vCont;c`/`vCont;s`、`D`（detach）、`k`（kill）
+    - ブレークポイント: `Z0`/`z0`（内部マップで管理）、`Z1..Z4`/`z1..z4`はOK応答スタブ
+    - qXfer: `features:read`（target.xml静的提供）、`libraries:read`、`memory-map:read`、`auxv:read`
+    - その他: `vMustReplyEmpty`、`qSymbol`（現状OK返答）
+  - [x] `cmd/gdb-rsp-server/main.go`: RSPサーバーCLI（`--debug-json`読込、TCP待受）
+  - [x] `internal/debug/gdbserver/server_test.go`: ユニットテスト一式
+    - NoAck、レジスタ/メモリRW、breakpoint/step/continue、vCont、qXfer（features/libraries/memory-map/auxv）、スレッド照会、T停止応答
 - **依存関係**: 4.4.1
 - **推定工数**: 大（20日）
 
