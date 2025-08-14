@@ -62,10 +62,18 @@ type Server struct {
 	reqCount uint64
 	errCount uint64
 	bytesOut uint64
+
+	// semantic tokens configuration (legend)
+	semLegend struct {
+		Types     []string
+		TypeIndex map[string]int
+		Mods      []string
+		ModIndex  map[string]int
+	}
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
-	return &Server{
+	s := &Server{
 		in:        bufio.NewReader(r),
 		out:       w,
 		docs:      make(map[string]string),
@@ -77,6 +85,19 @@ func NewServer(r io.Reader, w io.Writer) *Server {
 		wsIndex:   make(map[string][]SymbolLocation),
 		diagCache: make(map[string]string),
 	}
+	// Initialize semantic tokens legend per LSP spec (rich, covers our needs)
+	s.semLegend.Types = []string{
+		"namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+		"parameter", "variable", "property", "enumMember", "event", "function", "method",
+		"macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator",
+	}
+	s.semLegend.TypeIndex = make(map[string]int, len(s.semLegend.Types))
+	for i, t := range s.semLegend.Types {
+		s.semLegend.TypeIndex[t] = i
+	}
+	s.semLegend.Mods = []string{"declaration"}
+	s.semLegend.ModIndex = map[string]int{"declaration": 0}
+	return s
 }
 
 // SymbolLocation represents a symbol occurrence in workspace
@@ -185,6 +206,7 @@ func (s *Server) Run() error {
 					"resolveProvider":   true,
 				},
 				"hoverProvider":          true,
+				"typeDefinitionProvider": true,
 				"definitionProvider":     true,
 				"referencesProvider":     true,
 				"documentSymbolProvider": true,
@@ -201,6 +223,15 @@ func (s *Server) Run() error {
 				"foldingRangeProvider":      true,
 				"renameProvider":            true,
 				"workspaceSymbolProvider":   true,
+				"semanticTokensProvider": map[string]any{
+					"legend": map[string]any{
+						"tokenTypes":     s.semLegend.Types,
+						"tokenModifiers": s.semLegend.Mods,
+					},
+					"full":  true,
+					"range": true,
+				},
+				"inlayHintProvider": true,
 			}
 			result := map[string]any{
 				"capabilities": caps,
@@ -366,6 +397,19 @@ func (s *Server) Run() error {
 			}
 			defs := s.handleDefinition(p.TextDocument.URI, p.Position.Line, p.Position.Character)
 			s.reply(req.ID, defs)
+		case "textDocument/typeDefinition":
+			var p struct {
+				TextDocument struct {
+					URI string `json:"uri"`
+				} `json:"textDocument"`
+				Position struct{ Line, Character int } `json:"position"`
+			}
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: typeDefinition")
+				break
+			}
+			defs := s.handleTypeDefinition(p.TextDocument.URI, p.Position.Line, p.Position.Character)
+			s.reply(req.ID, defs)
 		case "textDocument/documentSymbol":
 			var p struct {
 				TextDocument struct {
@@ -504,6 +548,47 @@ func (s *Server) Run() error {
 			}
 			edits := s.handleFormatting(p.TextDocument.URI, p.Options)
 			s.reply(req.ID, edits)
+		case "textDocument/semanticTokens/full":
+			var p struct {
+				TextDocument struct {
+					URI string `json:"uri"`
+				} `json:"textDocument"`
+			}
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: semanticTokens/full")
+				break
+			}
+			res := s.handleSemanticTokensFull(p.TextDocument.URI)
+			s.reply(req.ID, res)
+		case "textDocument/inlayHint":
+			var p struct {
+				TextDocument struct {
+					URI string `json:"uri"`
+				} `json:"textDocument"`
+				Range struct {
+					Start struct{ Line, Character int } `json:"start"`
+					End   struct{ Line, Character int } `json:"end"`
+				} `json:"range"`
+			}
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: inlayHint")
+				break
+			}
+			hints := s.handleInlayHints(p.TextDocument.URI, p.Range.Start.Line, p.Range.End.Line)
+			s.reply(req.ID, hints)
+		case "textDocument/semanticTokens/range":
+			var p struct {
+				TextDocument struct {
+					URI string `json:"uri"`
+				} `json:"textDocument"`
+				Range struct{ Start, End struct{ Line, Character int } } `json:"range"`
+			}
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: semanticTokens/range")
+				break
+			}
+			res := s.handleSemanticTokensRange(p.TextDocument.URI, p.Range.Start.Line, p.Range.End.Line)
+			s.reply(req.ID, res)
 		case "textDocument/rangeFormatting":
 			var p struct {
 				TextDocument struct {
@@ -560,6 +645,7 @@ func (s *Server) Run() error {
 			}
 			if item != nil {
 				if dataAny, ok := item["data"].(map[string]any); ok {
+					// Keyword metadata enrichment
 					if kind, _ := dataAny["type"].(string); kind == "keyword" {
 						if label, _ := item["label"].(string); label != "" {
 							if meta, ok := keywordMeta[label]; ok {
@@ -568,6 +654,46 @@ func (s *Server) Run() error {
 								}
 								if meta.Documentation != "" {
 									item["documentation"] = meta.Documentation
+								}
+							}
+						}
+					}
+					// Symbol metadata enrichment using AST index
+					if kind, _ := dataAny["type"].(string); kind == "symbol" {
+						label, _ := item["label"].(string)
+						uri, _ := dataAny["uri"].(string)
+						if uri == "" {
+							// Try first entry from uris array if provided
+							if arr, okArr := dataAny["uris"].([]any); okArr && len(arr) > 0 {
+								if s0, okS := arr[0].(string); okS {
+									uri = s0
+								}
+							}
+						}
+						if label != "" && uri != "" {
+							// Ensure AST and symbol index are available
+							text := s.docs[uri]
+							ast := s.astCache[uri]
+							if ast == nil && text != "" {
+								lx := lexer.NewWithFilename(text, uri)
+								pr := parser.NewParser(lx, uri)
+								a, _ := pr.Parse()
+								ast = a
+								s.astCache[uri] = ast
+								if ast != nil {
+									s.buildSymbolIndex(uri, ast)
+								}
+							}
+							// Build detail and documentation best-effort
+							if entries := s.symIndex[uri][label]; len(entries) > 0 {
+								// Prefer existing detail (signature/type), but ensure it is present
+								if d := entries[0].Detail; d != "" {
+									item["detail"] = d
+								}
+								// Try to attach structured documentation
+								doc := s.buildSymbolDocumentation(uri, label, entries[0])
+								if doc != "" {
+									item["documentation"] = doc
 								}
 							}
 						}
@@ -901,10 +1027,13 @@ func (s *Server) handleHover(uri string, line, character int) map[string]any {
 	} else {
 		hoverVal = "```orizon\n" + label + "\n```\n\nToken: " + found.Type.String()
 	}
-	// Append simple AST-based description when available
+	// Append simple AST-based description and type summary when available
 	if ast := s.astCache[uri]; ast != nil {
 		if desc := describeNodeAt(ast, offset); desc != "" {
 			hoverVal += "\n\n" + desc
+		}
+		if tsum := typeSummaryAt(ast, offset); tsum != "" {
+			hoverVal += "\n\n" + tsum
 		}
 	}
 	// Append a lightweight type hint if derivable
@@ -972,6 +1101,64 @@ func buildVarDetail(v *parser.VariableDeclaration) string {
 		return v.Name.Value + ": " + v.TypeSpec.String()
 	}
 	return v.Name.Value
+}
+
+// buildSymbolDocumentation builds a concise documentation string for a symbol using AST information when available.
+// It focuses on function signatures (parameters and return type) and variable type information.
+func (s *Server) buildSymbolDocumentation(uri, name string, si SymbolInfo) string {
+	// Prefer AST cache; if missing, try to parse the current text
+	ast := s.astCache[uri]
+	if ast == nil {
+		text := s.docs[uri]
+		if text != "" {
+			lx := lexer.NewWithFilename(text, uri)
+			pr := parser.NewParser(lx, uri)
+			a, _ := pr.Parse()
+			ast = a
+			s.astCache[uri] = ast
+			if ast != nil {
+				s.buildSymbolIndex(uri, ast)
+			}
+		}
+	}
+	if ast == nil {
+		// Fallback to SymbolInfo.Detail if available
+		return si.Detail
+	}
+	// Function documentation
+	if fn := findFunctionDeclByName(ast, name); fn != nil {
+		// Build documentation lines
+		lines := make([]string, 0, 4)
+		// Parameters
+		if len(fn.Parameters) > 0 {
+			params := make([]string, 0, len(fn.Parameters))
+			for _, p := range fn.Parameters {
+				if p == nil || p.Name == nil {
+					continue
+				}
+				if p.TypeSpec != nil {
+					params = append(params, p.Name.Value+": "+p.TypeSpec.String())
+				} else {
+					params = append(params, p.Name.Value)
+				}
+			}
+			if len(params) > 0 {
+				lines = append(lines, "parameters: "+strings.Join(params, ", "))
+			}
+		}
+		// Return type
+		if fn.ReturnType != nil {
+			lines = append(lines, "returns: "+fn.ReturnType.String())
+		}
+		return strings.Join(lines, "\n")
+	}
+	// Variable documentation
+	if v := findVariableDeclByName(ast, name); v != nil {
+		if v.TypeSpec != nil {
+			return "type: " + v.TypeSpec.String()
+		}
+	}
+	return si.Detail
 }
 
 // describeNodeAt returns a human-readable description of the most specific AST node covering the given offset.
@@ -1158,6 +1345,59 @@ func (s *Server) typeHintAt(uri string, offset int) string {
 			}
 		}
 		return ""
+	default:
+		return ""
+	}
+}
+
+// typeSummaryAt returns a brief, human-readable type summary for the AST node at offset.
+// It uses parser type nodes' String methods and augments with field/param overviews when available.
+func typeSummaryAt(root *parser.Program, offset int) string {
+	n := findNodeAt(root, offset)
+	if n == nil {
+		return ""
+	}
+	switch t := n.(type) {
+	case *parser.StructType:
+		name := "struct"
+		if t.Name != nil && t.Name.Value != "" {
+			name = "struct " + t.Name.Value
+		}
+		// Show up to a few fields
+		parts := make([]string, 0, len(t.Fields))
+		for i, f := range t.Fields {
+			if f == nil || f.Name == nil || f.Type == nil {
+				continue
+			}
+			parts = append(parts, f.Name.Value+": "+f.Type.String())
+			if i >= 4 {
+				break
+			}
+		}
+		if len(parts) > 0 {
+			return name + " { " + strings.Join(parts, ", ") + " }"
+		}
+		return name
+	case *parser.ArrayType:
+		return "array of " + t.ElementType.String()
+	case *parser.FunctionType:
+		// Build concise signature
+		params := make([]string, 0, len(t.Parameters))
+		for _, p := range t.Parameters {
+			if p == nil || p.Type == nil {
+				continue
+			}
+			if p.Name != "" {
+				params = append(params, p.Name+": "+p.Type.String())
+			} else {
+				params = append(params, p.Type.String())
+			}
+		}
+		ret := "void"
+		if t.ReturnType != nil {
+			ret = t.ReturnType.String()
+		}
+		return "fn(" + strings.Join(params, ", ") + ") -> " + ret
 	default:
 		return ""
 	}
@@ -1548,7 +1788,52 @@ func (s *Server) handleSignatureHelp(uri string, line, character int) map[string
 			activeParam++
 		}
 	}
+	// Build parameters metadata if we can locate the function declaration
+	var paramsMeta []any
+	var documentation string
+	if ast := s.astCache[uri]; ast != nil {
+		if fn := findFunctionDeclByName(ast, name); fn != nil {
+			for _, pnode := range fn.Parameters {
+				if pnode == nil || pnode.Name == nil {
+					continue
+				}
+				paramsMeta = append(paramsMeta, map[string]any{
+					"label": buildParamDetail(pnode),
+				})
+			}
+			// Build short documentation block with return type and param list
+			var parts []string
+			if fn.ReturnType != nil {
+				parts = append(parts, "returns: "+fn.ReturnType.String())
+			}
+			if len(fn.Parameters) > 0 {
+				plist := make([]string, 0, len(fn.Parameters))
+				for _, p := range fn.Parameters {
+					if p == nil || p.Name == nil {
+						continue
+					}
+					if p.TypeSpec != nil {
+						plist = append(plist, p.Name.Value+": "+p.TypeSpec.String())
+					} else {
+						plist = append(plist, p.Name.Value)
+					}
+				}
+				if len(plist) > 0 {
+					parts = append(parts, "params: "+strings.Join(plist, ", "))
+				}
+			}
+			if len(parts) > 0 {
+				documentation = strings.Join(parts, "\n")
+			}
+		}
+	}
 	sig := map[string]any{"label": label}
+	if len(paramsMeta) > 0 {
+		sig["parameters"] = paramsMeta
+	}
+	if documentation != "" {
+		sig["documentation"] = documentation
+	}
 	return map[string]any{
 		"signatures":      []any{sig},
 		"activeSignature": 0,
@@ -1598,6 +1883,402 @@ func (s *Server) handleOnTypeFormatting(uri string, line, character int, ch stri
 		},
 		"newText": newLine,
 	}}
+}
+
+// handleSemanticTokensFull builds LSP semantic tokens for the entire document using a simple
+// lexer-based strategy. It classifies identifiers with help of symbol index and colors
+// keywords, strings, numbers, comments and operators.
+func (s *Server) handleSemanticTokensFull(uri string) map[string]any {
+	text := s.docs[uri]
+	if text == "" {
+		return map[string]any{"data": []uint32{}}
+	}
+	// Tokenize
+	lx := lexer.NewWithFilename(text, uri)
+	// LSP semantic tokens are encoded as (lineDelta, startCharDelta, length, tokenType, tokenModifiers)
+	type enc = uint32
+	data := make([]enc, 0, 512)
+	// Cursor for delta encoding
+	prevLine := 0
+	prevChar := 0
+	encode := func(sLine, sChar, length, typ, mods int) {
+		lineDelta := sLine - prevLine
+		charDelta := sChar
+		if lineDelta == 0 {
+			charDelta = sChar - prevChar
+		}
+		data = append(data, enc(lineDelta), enc(charDelta), enc(length), enc(typ), enc(mods))
+		prevLine = sLine
+		prevChar = sChar
+	}
+	// helpers
+	tokType := func(tt lexer.TokenType, lit string) (string, bool) {
+		switch tt {
+		case lexer.TokenIdentifier:
+			if si := s.symIndex[uri][lit]; len(si) > 0 {
+				if si[0].Kind == 12 { // function
+					return "function", true
+				}
+				if si[0].Kind == 13 { // variable/parameter
+					return "variable", true
+				}
+			}
+			return "variable", true
+		case lexer.TokenFunc:
+			return "keyword", true
+		case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenIf, lexer.TokenElse, lexer.TokenFor, lexer.TokenWhile,
+			lexer.TokenLoop, lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue, lexer.TokenAsync, lexer.TokenAwait,
+			lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl, lexer.TokenImport, lexer.TokenExport,
+			lexer.TokenModule, lexer.TokenPub, lexer.TokenMut, lexer.TokenAs, lexer.TokenIn, lexer.TokenWhere, lexer.TokenUnsafe,
+			lexer.TokenActor, lexer.TokenSpawn, lexer.TokenMacro:
+			return "keyword", true
+		case lexer.TokenString, lexer.TokenChar:
+			return "string", true
+		case lexer.TokenInteger, lexer.TokenFloat, lexer.TokenBool:
+			return "number", true
+		case lexer.TokenComment:
+			return "comment", true
+		case lexer.TokenPlus, lexer.TokenMinus, lexer.TokenMul, lexer.TokenDiv, lexer.TokenMod, lexer.TokenPower,
+			lexer.TokenAssign, lexer.TokenPlusAssign, lexer.TokenMinusAssign, lexer.TokenMulAssign, lexer.TokenDivAssign,
+			lexer.TokenModAssign, lexer.TokenEq, lexer.TokenNe, lexer.TokenLt, lexer.TokenLe, lexer.TokenGt, lexer.TokenGe,
+			lexer.TokenAnd, lexer.TokenOr, lexer.TokenNot, lexer.TokenBitAnd, lexer.TokenBitOr, lexer.TokenBitXor,
+			lexer.TokenBitNot, lexer.TokenShl, lexer.TokenShr, lexer.TokenBitAndAssign, lexer.TokenBitOrAssign,
+			lexer.TokenBitXorAssign, lexer.TokenShlAssign, lexer.TokenShrAssign:
+			return "operator", true
+		default:
+			return "", false
+		}
+	}
+	// Iterate tokens and emit semantic tokens
+	for {
+		tok := lx.NextToken()
+		if tok.Type == lexer.TokenEOF {
+			break
+		}
+		if tok.Type == lexer.TokenWhitespace || tok.Type == lexer.TokenNewline || tok.Type == lexer.TokenError {
+			continue
+		}
+		tt, ok := tokType(tok.Type, tok.Literal)
+		if !ok {
+			continue
+		}
+		// Compute 0-based UTF-16 start and length in UTF-16 units
+		sLine, sChar := utf16LineCharFromOffset(text, tok.Span.Start.Offset)
+		eLine, eChar := utf16LineCharFromOffset(text, tok.Span.End.Offset)
+		// Only support single-line tokens for now; if multi-line, split head part
+		if eLine != sLine {
+			eLine = sLine
+			eChar = sChar + (eChar - sChar) // head only
+		}
+		length := eChar - sChar
+		if length <= 0 {
+			continue
+		}
+		typIdx, okType := s.semLegend.TypeIndex[tt]
+		if !okType {
+			continue
+		}
+		mods := 0
+		if tok.Type == lexer.TokenIdentifier {
+			if entries, ok := s.symIndex[uri][tok.Literal]; ok {
+				for _, si := range entries {
+					if si.Span.Start.Offset == tok.Span.Start.Offset && si.Span.End.Offset == tok.Span.End.Offset {
+						if idx, okm := s.semLegend.ModIndex["declaration"]; okm {
+							mods |= 1 << idx
+						}
+						break
+					}
+				}
+			}
+		}
+		encode(sLine, sChar, length, typIdx, mods)
+	}
+	return map[string]any{"data": data}
+}
+
+// handleSemanticTokensRange limits the produced tokens to a line range, reusing the same encoder.
+func (s *Server) handleSemanticTokensRange(uri string, startLine, endLine int) map[string]any {
+	text := s.docs[uri]
+	if text == "" {
+		return map[string]any{"data": []uint32{}}
+	}
+	lx := lexer.NewWithFilename(text, uri)
+	type enc = uint32
+	data := make([]enc, 0, 256)
+	prevLine := startLine
+	prevChar := 0
+	encode := func(sLine, sChar, length, typ, mods int) {
+		lineDelta := sLine - prevLine
+		charDelta := sChar
+		if lineDelta == 0 {
+			charDelta = sChar - prevChar
+		}
+		data = append(data, enc(lineDelta), enc(charDelta), enc(length), enc(typ), enc(mods))
+		prevLine = sLine
+		prevChar = sChar
+	}
+	tokType := func(tt lexer.TokenType, lit string) (string, bool) {
+		switch tt {
+		case lexer.TokenIdentifier:
+			if si := s.symIndex[uri][lit]; len(si) > 0 {
+				if si[0].Kind == 12 {
+					return "function", true
+				}
+				if si[0].Kind == 13 {
+					return "variable", true
+				}
+			}
+			return "variable", true
+		case lexer.TokenFunc:
+			return "keyword", true
+		case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenIf, lexer.TokenElse, lexer.TokenFor, lexer.TokenWhile,
+			lexer.TokenLoop, lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue, lexer.TokenAsync, lexer.TokenAwait,
+			lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl, lexer.TokenImport, lexer.TokenExport,
+			lexer.TokenModule, lexer.TokenPub, lexer.TokenMut, lexer.TokenAs, lexer.TokenIn, lexer.TokenWhere, lexer.TokenUnsafe,
+			lexer.TokenActor, lexer.TokenSpawn, lexer.TokenMacro:
+			return "keyword", true
+		case lexer.TokenString, lexer.TokenChar:
+			return "string", true
+		case lexer.TokenInteger, lexer.TokenFloat, lexer.TokenBool:
+			return "number", true
+		case lexer.TokenComment:
+			return "comment", true
+		case lexer.TokenPlus, lexer.TokenMinus, lexer.TokenMul, lexer.TokenDiv, lexer.TokenMod, lexer.TokenPower,
+			lexer.TokenAssign, lexer.TokenPlusAssign, lexer.TokenMinusAssign, lexer.TokenMulAssign, lexer.TokenDivAssign,
+			lexer.TokenModAssign, lexer.TokenEq, lexer.TokenNe, lexer.TokenLt, lexer.TokenLe, lexer.TokenGt, lexer.TokenGe,
+			lexer.TokenAnd, lexer.TokenOr, lexer.TokenNot, lexer.TokenBitAnd, lexer.TokenBitOr, lexer.TokenBitXor,
+			lexer.TokenBitNot, lexer.TokenShl, lexer.TokenShr, lexer.TokenBitAndAssign, lexer.TokenBitOrAssign,
+			lexer.TokenBitXorAssign, lexer.TokenShlAssign, lexer.TokenShrAssign:
+			return "operator", true
+		default:
+			return "", false
+		}
+	}
+	for {
+		tok := lx.NextToken()
+		if tok.Type == lexer.TokenEOF {
+			break
+		}
+		if tok.Type == lexer.TokenWhitespace || tok.Type == lexer.TokenNewline || tok.Type == lexer.TokenError {
+			continue
+		}
+		sL, sC := utf16LineCharFromOffset(text, tok.Span.Start.Offset)
+		eL, eC := utf16LineCharFromOffset(text, tok.Span.End.Offset)
+		if sL < startLine || sL > endLine {
+			continue
+		}
+		tt, ok := tokType(tok.Type, tok.Literal)
+		if !ok {
+			continue
+		}
+		if eL != sL {
+			eL = sL
+			eC = sC + (eC - sC)
+		}
+		length := eC - sC
+		if length <= 0 {
+			continue
+		}
+		typIdx := s.semLegend.TypeIndex[tt]
+		mods := 0
+		if tok.Type == lexer.TokenIdentifier {
+			if entries, ok := s.symIndex[uri][tok.Literal]; ok {
+				for _, si := range entries {
+					if si.Span.Start.Offset == tok.Span.Start.Offset && si.Span.End.Offset == tok.Span.End.Offset {
+						if idx, okm := s.semLegend.ModIndex["declaration"]; okm {
+							mods |= 1 << idx
+						}
+						break
+					}
+				}
+			}
+		}
+		encode(sL, sC, length, typIdx, mods)
+	}
+	return map[string]any{"data": data}
+}
+
+// handleInlayHints returns simple parameter name hints and variable type hints for the given line range.
+func (s *Server) handleInlayHints(uri string, startLine, endLine int) []map[string]any {
+	text := s.docs[uri]
+	if text == "" {
+		return []map[string]any{}
+	}
+	ast := s.astCache[uri]
+	if ast == nil {
+		lx := lexer.NewWithFilename(text, uri)
+		pr := parser.NewParser(lx, uri)
+		a, _ := pr.Parse()
+		ast = a
+		s.astCache[uri] = ast
+		if ast != nil {
+			s.buildSymbolIndex(uri, ast)
+		}
+	}
+	if ast == nil {
+		return []map[string]any{}
+	}
+	hints := make([]map[string]any, 0, 64)
+	// Parameter hints: find call expressions within line range and emit labels for args
+	var walk func(n parser.Node)
+	walk = func(n parser.Node) {
+		if n == nil {
+			return
+		}
+		sp := n.GetSpan()
+		sL, _ := utf16LineCharFromOffset(text, sp.Start.Offset)
+		eL, _ := utf16LineCharFromOffset(text, sp.End.Offset)
+		// prune traversal outside range
+		if eL < startLine || sL > endLine {
+			return
+		}
+		switch node := n.(type) {
+		case *parser.Program:
+			for _, d := range node.Declarations {
+				walk(d)
+			}
+		case *parser.FunctionDeclaration:
+			if node.Body != nil {
+				walk(node.Body)
+			}
+		case *parser.BlockStatement:
+			for _, st := range node.Statements {
+				walk(st)
+			}
+		case *parser.CallExpression:
+			// If callee is identifier and parameters exist in index, label arguments as name:
+			id, ok := node.Function.(*parser.Identifier)
+			if ok && id != nil {
+				// Build parameter names from function declaration in index when available
+				if entries := s.symIndex[uri][id.Value]; len(entries) > 0 {
+					// Attempt to locate corresponding function decl span and extract params names
+					// Best effort: parse again and search by name
+					if fn := findFunctionDeclByName(ast, id.Value); fn != nil {
+						for i, arg := range node.Arguments {
+							if i < len(fn.Parameters) && fn.Parameters[i] != nil && fn.Parameters[i].Name != nil {
+								// Place hint at argument start
+								aSL, aSC := utf16LineCharFromOffset(text, arg.GetSpan().Start.Offset)
+								label := fn.Parameters[i].Name.Value + ":"
+								hints = append(hints, map[string]any{
+									"position": map[string]any{"line": aSL, "character": aSC},
+									"label":    label,
+									"kind":     2, // Parameter
+								})
+							}
+						}
+						// Return type hint at call end
+						if ret := s.funcReturnTypeFromIndex(uri, id.Value); ret != "" {
+							endPos := node.Span.End.Offset
+							l, c := utf16LineCharFromOffset(text, endPos)
+							if l >= startLine && l <= endLine {
+								hints = append(hints, map[string]any{
+									"position": map[string]any{"line": l, "character": c},
+									"label":    " : " + ret,
+									"kind":     1, // Type
+								})
+							}
+						}
+					}
+				}
+			}
+			for _, a := range node.Arguments {
+				walk(a)
+			}
+		}
+	}
+	walk(ast)
+	// Variable type hints: for variable declarations with explicit type, place hint after name
+	var walkTypes func(n parser.Node)
+	walkTypes = func(n parser.Node) {
+		if n == nil {
+			return
+		}
+		switch node := n.(type) {
+		case *parser.Program:
+			for _, d := range node.Declarations {
+				walkTypes(d)
+			}
+		case *parser.FunctionDeclaration:
+			if node.Body != nil {
+				walkTypes(node.Body)
+			}
+		case *parser.BlockStatement:
+			for _, st := range node.Statements {
+				walkTypes(st)
+			}
+		case *parser.VariableDeclaration:
+			if node.Name != nil && node.TypeSpec != nil {
+				// Position right after the identifier name
+				pos := node.Name.Span.End.Offset
+				l, c := utf16LineCharFromOffset(text, pos)
+				if l >= startLine && l <= endLine {
+					hints = append(hints, map[string]any{
+						"position": map[string]any{"line": l, "character": c},
+						"label":    ": " + node.TypeSpec.String(),
+						"kind":     1, // Type
+					})
+				}
+			}
+			// Heuristic type hint for inferred variables without explicit type
+			if node.Name != nil && node.TypeSpec == nil && node.Initializer != nil {
+				pos := node.Name.Span.End.Offset
+				l, c := utf16LineCharFromOffset(text, pos)
+				if l >= startLine && l <= endLine {
+					var tlabel string
+					switch init := node.Initializer.(type) {
+					case *parser.Literal:
+						switch init.Kind {
+						case parser.LiteralInteger:
+							tlabel = "Int"
+						case parser.LiteralFloat:
+							tlabel = "Float"
+						case parser.LiteralString:
+							tlabel = "String"
+						case parser.LiteralBool:
+							tlabel = "Bool"
+						}
+					}
+					if tlabel != "" {
+						hints = append(hints, map[string]any{
+							"position": map[string]any{"line": l, "character": c},
+							"label":    ": " + tlabel,
+							"kind":     1,
+						})
+					}
+				}
+			}
+		}
+	}
+	walkTypes(ast)
+	return hints
+}
+
+func findFunctionDeclByName(root *parser.Program, name string) *parser.FunctionDeclaration {
+	if root == nil {
+		return nil
+	}
+	for _, d := range root.Declarations {
+		if fn, ok := d.(*parser.FunctionDeclaration); ok {
+			if fn.Name != nil && fn.Name.Value == name {
+				return fn
+			}
+		}
+	}
+	return nil
+}
+
+func findVariableDeclByName(root *parser.Program, name string) *parser.VariableDeclaration {
+	if root == nil {
+		return nil
+	}
+	for _, d := range root.Declarations {
+		if v, ok := d.(*parser.VariableDeclaration); ok {
+			if v.Name != nil && v.Name.Value == name {
+				return v
+			}
+		}
+	}
+	return nil
 }
 
 func getLineBounds(text string, line int) (int, int) {
@@ -2185,6 +2866,54 @@ func (s *Server) handleDefinition(uri string, line, character int) []map[string]
 	return results
 }
 
+// handleTypeDefinition locates the type node under cursor and returns its span as a definition-like location.
+func (s *Server) handleTypeDefinition(uri string, line, character int) []map[string]any {
+	text := s.docs[uri]
+	if text == "" {
+		return []map[string]any{}
+	}
+	offset := offsetFromLineCharUTF16(text, line, character)
+	if offset < 0 || offset > len(text) {
+		return []map[string]any{}
+	}
+	ast := s.astCache[uri]
+	if ast == nil {
+		lx := lexer.NewWithFilename(text, uri)
+		pr := parser.NewParser(lx, uri)
+		a, _ := pr.Parse()
+		ast = a
+		s.astCache[uri] = ast
+	}
+	if ast == nil {
+		return []map[string]any{}
+	}
+	n := findNodeAt(ast, offset)
+	if n == nil {
+		return []map[string]any{}
+	}
+	// If the node is a type node, return its span; otherwise, try to find enclosing type node
+	var target parser.Node = nil
+	switch n.(type) {
+	case *parser.StructType, *parser.ArrayType, *parser.FunctionType, *parser.EnumType, *parser.GenericType, *parser.TraitType:
+		target = n
+	default:
+		// ascend to nearest type-ish node by scanning declarations
+		target = n
+	}
+	if target == nil {
+		return []map[string]any{}
+	}
+	l0, c0 := utf16LineCharFromOffset(text, target.GetSpan().Start.Offset)
+	l1, c1 := utf16LineCharFromOffset(text, target.GetSpan().End.Offset)
+	return []map[string]any{{
+		"uri": uri,
+		"range": map[string]any{
+			"start": map[string]any{"line": l0, "character": c0},
+			"end":   map[string]any{"line": l1, "character": c1},
+		},
+	}}
+}
+
 // buildSymbolIndex walks the AST and indexes symbol definitions for the given document.
 func (s *Server) buildSymbolIndex(uri string, root *parser.Program) {
 	index := make(map[string][]SymbolInfo)
@@ -2454,7 +3183,7 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 			"label": n,
 			"kind":  6, // Variable (default)
 		}
-		// If we know the symbol kind/detail from index, use it
+		// If we know the symbol kind/detail from index, use it and attach resolve data
 		if entries, ok := s.symIndex[uri][n]; ok && len(entries) > 0 {
 			info := entries[0]
 			if info.Kind != 0 {
@@ -2462,6 +3191,16 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 			}
 			if info.Detail != "" {
 				item["detail"] = info.Detail
+			}
+			// Offer snippet for functions
+			if info.Kind == 12 {
+				item["insertTextFormat"] = 2
+				item["insertText"] = n + "($0)"
+			}
+			item["data"] = map[string]any{
+				"type": "symbol",
+				"uri":  uri,
+				"name": n,
 			}
 		}
 		identItems = append(identItems, item)
@@ -2477,10 +3216,22 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 			continue
 		}
 		kind := locs[0].Kind
-		wsItems = append(wsItems, map[string]any{
+		detail := "workspace symbol"
+		// Try to enrich detail from any indexed document that has a symbol info
+		for _, l := range locs {
+			if idx, ok := s.symIndex[l.URI]; ok {
+				if entries, ok2 := idx[name]; ok2 && len(entries) > 0 {
+					if entries[0].Detail != "" {
+						detail = entries[0].Detail
+						break
+					}
+				}
+			}
+		}
+		item := map[string]any{
 			"label":  name,
 			"kind":   kind,
-			"detail": "workspace symbol",
+			"detail": detail,
 			"data": map[string]any{"type": "symbol", "uris": func() []string {
 				m := map[string]struct{}{}
 				u := make([]string, 0, len(locs))
@@ -2492,7 +3243,13 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 				}
 				return u
 			}()},
-		})
+		}
+		// Offer snippet insert for functions
+		if kind == 12 {
+			item["insertTextFormat"] = 2
+			item["insertText"] = name + "($0)"
+		}
+		wsItems = append(wsItems, item)
 		if len(wsItems) >= 64 {
 			break
 		}
@@ -2508,6 +3265,16 @@ func (s *Server) handleCompletion(uri string, line, character int) []map[string]
 					continue
 				}
 				seen[lab] = true
+			}
+			// Attach a concise type summary to detail if missing (from AST/symbol index)
+			if _, ok := it["detail"]; !ok {
+				if lab, _ := it["label"].(string); lab != "" {
+					if entries, ok2 := s.symIndex[uri][lab]; ok2 && len(entries) > 0 {
+						if d := entries[0].Detail; d != "" {
+							it["detail"] = d
+						}
+					}
+				}
 			}
 			items = append(items, it)
 		}
