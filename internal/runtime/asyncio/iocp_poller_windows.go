@@ -158,6 +158,35 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 			if contains(kinds, Readable) { p.notifier.armReadable(lite) }
 			if contains(kinds, Writable) { p.notifier.armWritable(lite) }
 		}
+		// Ensure periodic writable notifier is running if requested
+		if contains(kinds, Writable) {
+			wctx, cancel := context.WithCancel(p.ctx)
+			prev := old.stop
+			old.stop = func() {
+				if prev != nil { prev() }
+				cancel()
+			}
+			p.wg.Add(1)
+			go func(r *winReg) {
+				defer p.wg.Done()
+				t := time.NewTicker(getWritableInterval())
+				defer t.Stop()
+				for {
+					select {
+					case <-wctx.Done():
+						return
+					case <-t.C:
+						if r.disabled.Load() != 0 { continue }
+						now := time.Now()
+						last := atomic.LoadInt64(&r.lastWritableUnixNano)
+						if last == 0 || now.Sub(time.Unix(0, last)) >= getWritableInterval() {
+							r.handler(Event{Conn: r.conn, Type: Writable})
+							atomic.StoreInt64(&r.lastWritableUnixNano, now.UnixNano())
+						}
+					}
+				}
+			}(old)
+		}
 		// Notify poll loop of potential event mask change
 		p.wake()
 		return nil
@@ -172,6 +201,36 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 		lite := &winRegLite{sock: s}
 		if contains(kinds, Readable) { p.notifier.armReadable(lite) }
 		if contains(kinds, Writable) { p.notifier.armWritable(lite) }
+	}
+	// If Writable is requested, start a periodic notifier to ensure progress even when WSAPoll doesn't signal OUT frequently.
+	if contains(kinds, Writable) {
+		wctx, cancel := context.WithCancel(p.ctx)
+		// chain cancels: replacing stop to also cancel ticker goroutine
+		prev := reg.stop
+		reg.stop = func() {
+			if prev != nil { prev() }
+			cancel()
+		}
+		p.wg.Add(1)
+		go func(r *winReg) {
+			defer p.wg.Done()
+			t := time.NewTicker(getWritableInterval())
+			defer t.Stop()
+			for {
+				select {
+				case <-wctx.Done():
+					return
+				case <-t.C:
+					if r.disabled.Load() != 0 { continue }
+					now := time.Now()
+					last := atomic.LoadInt64(&r.lastWritableUnixNano)
+					if last == 0 || now.Sub(time.Unix(0, last)) >= getWritableInterval() {
+						r.handler(Event{Conn: r.conn, Type: Writable})
+						atomic.StoreInt64(&r.lastWritableUnixNano, now.UnixNano())
+					}
+				}
+			}
+		}(reg)
 	}
 	// Notify poll loop to rebuild FD set immediately.
 	p.wake()
