@@ -1,7 +1,7 @@
 # Orizon Programming Language - Makefile
 # Phase 0.1.1: 開発環境セットアップの自動化
 
-.PHONY: help build test clean dev docker-dev install-tools fmt lint
+.PHONY: help build test clean dev docker-dev install-tools fmt lint smoke smoke-win smoke-mac
 
 # デフォルトターゲット
 help: ## このヘルプメッセージを表示
@@ -22,15 +22,31 @@ build: ## コンパイラをビルド
 
 fuzz-parser-sample: build ## 簡易パーサーファズ（小コーパス）
 	@echo "🧪 Parser fuzz (sample corpus) ..."
-	@./build/orizon-fuzz --target parser --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covstats
+	@./build/orizon-fuzz --target parser --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covout fuzz.cov --covstats --out crashes.txt --min-on-crash --min-dir crashes_min --min-budget 2s
 
 fuzz-lexer-sample: build ## 簡易レキサーファズ（小コーパス）
 	@echo "🧪 Lexer fuzz (sample corpus) ..."
-	@./build/orizon-fuzz --target lexer --duration 5s --p 2 --corpus corpus/lexer_corpus.txt --covstats
+	@./build/orizon-fuzz --target lexer --duration 5s --p 2 --corpus corpus/lexer_corpus.txt --covstats --per 200ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
 
 fuzz-astbridge-sample: build ## 簡易ASTブリッジファズ（小コーパス）
 	@echo "🧪 AST bridge fuzz (sample corpus) ..."
-	@./build/orizon-fuzz --target astbridge --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats
+	@./build/orizon-fuzz --target astbridge --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+
+fuzz-hir-sample: build ## HIR変換+検証ファズ（小コーパス）
+	@echo "🧪 HIR fuzz (transform + validate) ..."
+	@./build/orizon-fuzz --target hir --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+
+fuzz-astbridge-hir-sample: build ## ASTブリッジ往復後にHIR検証（小コーパス）
+	@echo "🧪 AST bridge + HIR validate fuzz ..."
+	@./build/orizon-fuzz --target astbridge-hir --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+
+repro-last-crash: build ## crashes.txtの最終クラッシュを再現
+	@echo "🔁 Reproduce last crash from crashes.txt ..."
+	@./build/orizon-repro --log crashes.txt --budget 5s --target parser
+
+minimize-last-crash: build ## crashes.txtの最終クラッシュを最小化
+	@echo "🪄 Minimize last crash from crashes.txt ..."
+	@./build/orizon-repro --log crashes.txt --out minimized.bin --budget 5s --target parser
 
 build-release: ## リリース用ビルド（最適化有効）
 	@echo "🚀 リリース用ビルド中..."
@@ -114,6 +130,15 @@ docs: ## ドキュメント生成
 # CI/CDチェック
 ci: install-tools fmt lint test ## CI環境での全チェック実行
 	@echo "🚀 CI/CDチェック完了"
+
+# スモーク（ローカル）
+smoke: ## Linux/macOS 向けスモーク（tests/fuzz/repro 集約）
+	@bash ./scripts/linux/smoke.sh
+
+smoke-win: ## Windows 向けスモーク（PowerShell）
+	@powershell -ExecutionPolicy Bypass -File .\scripts\win\smoke.ps1
+
+smoke-mac: smoke ## macOS 向けスモーク（Linuxと同一スクリプトを利用）
 
 # バージョン情報
 version: ## バージョン情報表示
