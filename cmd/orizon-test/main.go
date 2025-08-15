@@ -13,16 +13,25 @@ import (
 
 func main() {
 	var (
-		pkgs    string
-		runPat  string
-		par     int
-		jsonOut bool
-		short   bool
-		race    bool
-		timeout time.Duration
-		color   bool
-		envList string
-		extra   string
+		pkgs        string
+		runPat      string
+		par         int
+		jsonOut     bool
+		jsonAug     bool
+		short       bool
+		race        bool
+		timeout     time.Duration
+		color       bool
+		envList     string
+		extra       string
+		junit       string
+		retries     int
+		failFast    bool
+		pkgRegex    string
+		summaryJSON string
+		fileRegex   string
+		listOnly    bool
+		failOnFlaky bool
 	)
 	flag.StringVar(&pkgs, "packages", "./...", "comma-separated package patterns (e.g. ./...,./internal/...)")
 	flag.StringVar(&runPat, "run", "", "regex to select tests (forwarded to go test -run)")
@@ -34,6 +43,15 @@ func main() {
 	flag.BoolVar(&color, "color", true, "colorize output")
 	flag.StringVar(&envList, "env", "", "extra env KEY=VAL;KEY2=VAL2")
 	flag.StringVar(&extra, "args", "", "extra args to append to go test (space-separated)")
+	flag.StringVar(&junit, "junit", "", "optional JUnit XML output path")
+	flag.IntVar(&retries, "retries", 0, "re-run failing tests up to N times to detect flakiness")
+	flag.BoolVar(&failFast, "fail-fast", false, "stop at first failing package (cancels remaining)")
+	flag.BoolVar(&jsonAug, "json-augment", false, "when --json is set, add Orizon augment events (attempts/flaky)")
+	flag.StringVar(&pkgRegex, "pkg-regex", "", "optional regex to filter package names after expansion")
+	flag.StringVar(&summaryJSON, "json-summary", "", "optional path to write machine-readable summary JSON (with retry attempts)")
+	flag.StringVar(&fileRegex, "file-regex", "", "optional regex to include only packages that have files matching this regex")
+	flag.BoolVar(&listOnly, "list", false, "list tests without executing (dry run)")
+	flag.BoolVar(&failOnFlaky, "fail-on-flaky", false, "exit non-zero if any test recovered after retries (flaky detected)")
 	flag.Parse()
 
 	pkgsArr := splitNonEmpty(pkgs, ",")
@@ -41,16 +59,25 @@ func main() {
 	extras := splitNonEmpty(extra, " ")
 
 	runner := testrunner.New(testrunner.Options{
-		Packages:   pkgsArr,
-		RunPattern: runPat,
-		Parallel:   par,
-		JSON:       jsonOut,
-		Short:      short,
-		Race:       race,
-		Timeout:    timeout,
-		Env:        env,
-		Color:      color,
-		ExtraArgs:  extras,
+		Packages:     pkgsArr,
+		RunPattern:   runPat,
+		Parallel:     par,
+		JSON:         jsonOut,
+		Short:        short,
+		Race:         race,
+		Timeout:      timeout,
+		Env:          env,
+		Color:        color,
+		ExtraArgs:    extras,
+		JUnitPath:    junit,
+		Retries:      retries,
+		FailFast:     failFast,
+		PackageRegex: pkgRegex,
+		SummaryJSON:  summaryJSON,
+		AugmentJSON:  jsonAug,
+		FileRegex:    fileRegex,
+		ListOnly:     listOnly,
+		FailOnFlaky:  failOnFlaky,
 	})
 	ctx := context.Background()
 	res, err := runner.Run(ctx, os.Stdout)
