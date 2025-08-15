@@ -10,7 +10,7 @@ import (
 // It reduces GC pressure for high-frequency I/O operations.
 type BytePool struct {
 	cfg     BytePoolConfig
-	buckets []bucket
+	buckets []*bucket
 }
 
 type bucket struct {
@@ -37,9 +37,9 @@ func DefaultBytePool() *BytePool {
 func NewBytePool(cfg BytePoolConfig) *BytePool {
 	bs := append([]int(nil), cfg.BucketSizes...)
 	sort.Ints(bs)
-	buckets := make([]bucket, len(bs))
+	buckets := make([]*bucket, len(bs))
 	for i, sz := range bs {
-		b := bucket{size: sz, limit: int64(cfg.MaxPerBucket)}
+		b := &bucket{size: sz, limit: int64(cfg.MaxPerBucket)}
 		b.pool = sync.Pool{New: func() any { return make([]byte, sz) }}
 		buckets[i] = b
 	}
@@ -57,7 +57,7 @@ func (bp *BytePool) Get(n int) []byte {
 	if idx < 0 {
 		return make([]byte, n)
 	}
-	b := &bp.buckets[idx]
+	b := bp.buckets[idx]
 	buf := b.pool.Get().([]byte)
 	atomic.AddInt64(&b.inuse, 1)
 	return buf[:0]
@@ -75,12 +75,12 @@ func (bp *BytePool) Put(buf []byte) {
 		// not a managed size; drop
 		return
 	}
-	b := &bp.buckets[idx]
-	// decrement inuse; if above limit, drop the buffer instead of returning
-	if cur := atomic.AddInt64(&b.inuse, -1); cur >= b.limit {
-		return
-	}
-	b.pool.Put(buf[:capn])
+	b := bp.buckets[idx]
+    // decrement inuse; if above limit, drop the buffer instead of returning
+    if cur := atomic.AddInt64(&b.inuse, -1); cur >= b.limit {
+        return
+    }
+    b.pool.Put(buf[:capn])
 }
 
 // Stats returns current approximate in-use counters per bucket.
