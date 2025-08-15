@@ -1,0 +1,32 @@
+# Binaries and local artifacts
+/*.exe
+/orizon-*.exe
+/gdb-rsp-server.exe
+/numa-test.exe
+
+# Build outputs
+/build/
+/artifacts/
+
+# Test outputs
+/junit.xml
+/junit_summary.json
+/summary.json
+/junit_local.xml
+/output.txt
+
+# Fuzz outputs
+/fuzz.cov
+/crashes.txt
+/crashes_min/
+/seed.txt
+
+# OS/editor
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Temp
+/tmp/
