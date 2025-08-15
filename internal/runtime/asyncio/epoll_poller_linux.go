@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync/atomic"
 	"sync"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -23,10 +25,11 @@ type epollPoller struct {
 }
 
 type epReg struct {
-	fd      int
-	conn    net.Conn
-	kinds   []EventType
-	handler Handler
+	fd              int
+	conn            net.Conn
+	kinds           []EventType
+	handler         Handler
+	lastWritableUnixNano int64
 }
 
 func newEpollPoller() Poller { return &epollPoller{regs: make(map[int]*epReg)} }
@@ -126,7 +129,12 @@ func (p *epollPoller) loop() {
 				reg.handler(Event{Conn: reg.conn, Type: Readable})
 			}
 			if (ev.Events&unix.EPOLLOUT) != 0 && contains(reg.kinds, Writable) {
-				reg.handler(Event{Conn: reg.conn, Type: Writable})
+				now := time.Now()
+				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
+				if last == 0 || now.Sub(time.Unix(0, last)) >= 50*time.Millisecond {
+					reg.handler(Event{Conn: reg.conn, Type: Writable})
+					atomic.StoreInt64(&reg.lastWritableUnixNano, now.UnixNano())
+				}
 			}
 		}
 		p.mu.RUnlock()

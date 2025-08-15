@@ -49,13 +49,29 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24.x'
-      - name: IOCP unit tests (experimental)
+      - name: IOCP unit tests (experimental, extended)
         env:
           ORIZON_WIN_IOCP: "1"
+          ORIZON_WIN_WRITABLE_INTERVAL_MS: "10"
         run: |
-          go test ./internal/runtime/asyncio -tags iocp -run IOCPPoller -v
+          go test -tags iocp ./internal/runtime/asyncio -v
 
-  windows-smoke:
+  windows-wsapoll-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: WSAPoll unit tests (env throttling + deregister robustness)
+        env:
+          ORIZON_WIN_WSAPOLL: "1"
+          ORIZON_WIN_PORTABLE: "0"
+          ORIZON_WIN_IOCP: "0"
+          ORIZON_WIN_WRITABLE_INTERVAL_MS: "10"
+        run: |
+          go test ./internal/runtime/asyncio -run "WSAPoll|WritableThrottling" -v
+
   macos-smoke:
     runs-on: macos-latest
     steps:
@@ -72,6 +88,8 @@ jobs:
         with:
           name: artifacts-macos
           path: artifacts/
+
+  windows-smoke:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

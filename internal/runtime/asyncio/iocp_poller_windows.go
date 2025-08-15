@@ -89,6 +89,11 @@ func (p *windowsPoller) Start(ctx context.Context) error {
 		ctx = context.Background()
 	}
 	p.ctx, p.cancel = context.WithCancel(ctx)
+	// Ensure notifier is initialized (no-op implementation by default).
+	// This prepares future wiring without changing current behavior.
+	if p.notifier == nil {
+		p.notifier = wsapollNotifier{}
+	}
 	// Create UDP-based waker to interrupt WSAPoll waits on updates/Stop.
 	if recv, send, err := newUDPWaker(); err == nil {
 		p.wakeRecv = recv
@@ -270,7 +275,7 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 			if contains(reg.kinds, Writable) {
 				now := time.Now()
 				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
-				if last == 0 || now.Sub(time.Unix(0, last)) >= 50*time.Millisecond {
+				if last == 0 || now.Sub(time.Unix(0, last)) >= getWritableInterval() {
 					if reg.disabled.Load() == 0 {
 						reg.handler(Event{Conn: reg.conn, Type: Writable})
 					}
@@ -365,7 +370,7 @@ func (p *windowsPoller) loop() {
 			if (re&(pollOUT|pollWRNORM|pollWRBAND)) != 0 && contains(reg.kinds, Writable) {
 				now := time.Now()
 				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
-				if last == 0 || now.Sub(time.Unix(0, last)) >= 50*time.Millisecond {
+				if last == 0 || now.Sub(time.Unix(0, last)) >= getWritableInterval() {
 					if reg.disabled.Load() == 0 {
 						reg.handler(Event{Conn: reg.conn, Type: Writable})
 					}

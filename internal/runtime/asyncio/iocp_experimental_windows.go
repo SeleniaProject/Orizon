@@ -173,14 +173,21 @@ func (p *iocpPoller) Stop() error {
 		if r.stopW != nil {
 			r.stopW()
 			if r.closed != nil {
-				<-r.closed
+				select {
+				case <-r.closed:
+				case <-time.After(500 * time.Millisecond):
+					// timeout: continue shutdown
+				}
 			}
 		}
 		if r.watchCancel != nil {
 			r.watchCancel()
 		}
 		if r.watchDone != nil {
-			<-r.watchDone
+			select {
+			case <-r.watchDone:
+			case <-time.After(500 * time.Millisecond):
+			}
 		}
 		// Cancel pending I/O to speed shutdown
 		_ = windows.CancelIoEx(r.sock, nil)
@@ -219,10 +226,13 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 		ctx, cancel := context.WithCancel(p.ctx)
 		reg := &iocpReg{sock: sh, conn: conn, kinds: kinds, handler: h, closed: make(chan struct{}, 1), reader: bufio.NewReader(conn), watchCancel: cancel, watchDone: make(chan struct{})}
 		p.mu.Lock()
-		if _, exists := p.regs[s]; exists {
+		if old, exists := p.regs[s]; exists {
+			// Idempotent update: refresh handler/kinds, keep existing watcher
+			old.kinds = kinds
+			old.handler = h
 			p.mu.Unlock()
 			cancel()
-			return errors.New("already registered")
+			return nil
 		}
 		p.regs[s] = reg
 		p.mu.Unlock()
@@ -275,9 +285,12 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 	}
 	reg := &iocpReg{sock: sh, conn: conn, kinds: kinds, handler: h, closed: make(chan struct{}, 1), reader: bufio.NewReader(conn)}
 	p.mu.Lock()
-	if _, exists := p.regs[s]; exists {
+	if old, exists := p.regs[s]; exists {
+		// Idempotent update: refresh handler/kinds
+		old.kinds = kinds
+		old.handler = h
 		p.mu.Unlock()
-		return errors.New("already registered")
+		return nil
 	}
 	p.regs[s] = reg
 	p.mu.Unlock()
@@ -299,7 +312,7 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 		p.wg.Add(1)
 		go func(r *iocpReg) {
 			defer p.wg.Done()
-			t := time.NewTicker(50 * time.Millisecond)
+			t := time.NewTicker(getWritableInterval())
 			defer t.Stop()
 			for {
 				select {
@@ -323,44 +336,86 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 }
 
 func (p *iocpPoller) Deregister(conn net.Conn) error {
-	type sc interface {
-		SyscallConn() (syscall.RawConn, error)
-	}
-	scc, ok := conn.(sc)
-	if !ok {
-		return nil
-	}
-	rc, err := scc.SyscallConn()
-	if err != nil {
-		return err
-	}
-	var s uintptr
-	if er := rc.Control(func(fd uintptr) { s = fd }); er != nil {
-		return er
-	}
-	p.mu.Lock()
-	if reg, ok := p.regs[s]; ok {
-		reg.disabled.Store(1)
-		if reg.stopW != nil {
-			reg.stopW()
-		}
-		if reg.watchCancel != nil {
-			reg.watchCancel()
-		}
-		// Cancel any pending I/O to expedite shutdown
-		_ = windows.CancelIoEx(reg.sock, nil)
-		delete(p.regs, s)
-		p.mu.Unlock()
-		if reg.stopW != nil && reg.closed != nil {
-			<-reg.closed
-		}
-		if reg.watchDone != nil {
-			<-reg.watchDone
-		}
-		return nil
-	}
-	p.mu.Unlock()
-	return nil
+    type sc interface {
+        SyscallConn() (syscall.RawConn, error)
+    }
+    scc, ok := conn.(sc)
+    // Try fast path by socket key when possible
+    var haveKey bool
+    var s uintptr
+    if ok {
+        if rc, err := scc.SyscallConn(); err == nil {
+            if er := rc.Control(func(fd uintptr) { s = fd }); er == nil {
+                haveKey = true
+            }
+        }
+    }
+    p.mu.Lock()
+    if haveKey {
+        if reg, ok := p.regs[s]; ok {
+            reg.disabled.Store(1)
+            if reg.stopW != nil {
+                reg.stopW()
+            }
+            if reg.watchCancel != nil {
+                reg.watchCancel()
+            }
+            _ = windows.CancelIoEx(reg.sock, nil)
+            delete(p.regs, s)
+            p.mu.Unlock()
+            if reg.stopW != nil && reg.closed != nil {
+                select {
+                case <-reg.closed:
+                case <-time.After(500 * time.Millisecond):
+                }
+            }
+            if reg.watchDone != nil {
+                select {
+                case <-reg.watchDone:
+                case <-time.After(500 * time.Millisecond):
+                }
+            }
+            return nil
+        }
+    }
+    // Fallback: search by connection identity (conn may be closed and key unavailable)
+    var foundKey uintptr
+    var found *iocpReg
+    for k, r := range p.regs {
+        if r.conn == conn {
+            foundKey = k
+            found = r
+            break
+        }
+    }
+    if found != nil {
+        found.disabled.Store(1)
+        if found.stopW != nil {
+            found.stopW()
+        }
+        if found.watchCancel != nil {
+            found.watchCancel()
+        }
+        _ = windows.CancelIoEx(found.sock, nil)
+        delete(p.regs, foundKey)
+        p.mu.Unlock()
+        if found.stopW != nil && found.closed != nil {
+            select {
+            case <-found.closed:
+            case <-time.After(500 * time.Millisecond):
+            }
+        }
+        if found.watchDone != nil {
+            select {
+            case <-found.watchDone:
+            case <-time.After(500 * time.Millisecond):
+            }
+        }
+        return nil
+    }
+    
+    p.mu.Unlock()
+    return nil
 }
 
 func (p *iocpPoller) loop() {

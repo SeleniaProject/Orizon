@@ -597,8 +597,8 @@
 
 ### 3.4 I/Oシステム
 
-#### 3.4.1 非同期I/O抽象化
-- [ ] **目的**: プラットフォーム非依存の高性能I/O
+#### 3.4.1 非同期I/O抽象化 ✅ 完了
+- [x] **目的**: プラットフォーム非依存の高性能I/O
 - **成果物**:
   - [x] `internal/runtime/asyncio/async_io.go`: I/Oランタイム基盤（`Poller`インターフェース、`Event`/`EventType`、`Handler`、`Start`/`Stop`/`Register`/`Deregister`）
   - [x] デフォルト実装: ゴルーチン駆動ポーラ（移植性重視のベースライン）

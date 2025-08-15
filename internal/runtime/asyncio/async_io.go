@@ -190,7 +190,7 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 			// Writable: throttle notifications to reduce CPU usage under idle
 			if contains(kinds, Writable) {
 				now := time.Now()
-				if reg.lastWritableAt.IsZero() || now.Sub(reg.lastWritableAt) >= 50*time.Millisecond {
+				if reg.lastWritableAt.IsZero() || now.Sub(reg.lastWritableAt) >= getWritableInterval() {
 					if atomic.LoadUint32(&reg.disabled) == 0 {
 						handler(Event{Conn: conn, Type: Writable})
 					}

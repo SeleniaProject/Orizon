@@ -23,6 +23,14 @@ Scope: internal/runtime/asyncio
   2) WSAPoll if `ORIZON_WIN_WSAPOLL=1`.
   3) Portable (default) otherwise.
 
+## Configuration
+
+- Writable throttling interval (all pollers):
+  - Env: `ORIZON_WIN_WRITABLE_INTERVAL_MS` (integer, milliseconds)
+  - Default: 50ms
+  - Clamp: [5ms, 5000ms]
+  - Applied via shared helper `getWritableInterval()` in `internal/runtime/asyncio/writable_throttle.go`.
+
 ## API Guarantees
 
 - Register(conn, kinds, handler) is idempotent.
@@ -70,6 +78,8 @@ Scope: internal/runtime/asyncio
 - Windows-specific (optionally `-tags iocp`):
   - Zero-byte recv/send path coverage.
   - CancelIoEx cancellation behavior during Deregister/Stop.
+  - Writable throttling honors env on WSAPoll and IOCP.
+  - No events after Deregister under active traffic (WSAPoll).
 
 ## Migration & Unification Roadmap
 
@@ -80,6 +90,43 @@ Scope: internal/runtime/asyncio
 4) Implement `winNotifier` for IOCP and WSAPoll; select at Start() time.
 5) Gradually retire duplicate paths by delegating to the notifier while keeping maps/handlers unified.
 6) Telemetry & perf validation on high-conn-count workloads.
+
+## Proposed winNotifier Wiring (No-Behavior-Change Step)
+
+Objective: Introduce a minimal wiring layer so both WSAPoll and IOCP can share arming/cancel hooks without changing observable behavior.
+
+Design:
+
+- Selection at Start():
+  - In `windowsPoller.Start()`, set `p.notifier` according to effective Windows mode.
+    - IOCP mode (enabled via build tag + env): `p.notifier = iocpNotifier{}`
+    - Otherwise: `p.notifier = wsapollNotifier{}`
+  - Current implementations are no-op, so this change is safe.
+
+- Hooks in Register/Deregister:
+  - `Register`: after storing/refreshing the registration, call:
+    - `notifier.armReadable(&winRegLite{sock: s})` if `Readable` requested.
+    - `notifier.armWritable(&winRegLite{sock: s})` if `Writable` requested.
+  - `Deregister`: before or immediately after removing from maps, call:
+    - `notifier.cancel(&winRegLite{sock: s})`.
+  - Both are already invoked in the WSAPoll poller with no-op notifiers (kept as-is).
+
+- Dispatch path unchanged:
+  - WSAPoll keeps its `WSAPoll`-driven readiness; IOCP experimental keeps its `GetQueuedCompletionStatus` loop. The notifier only prepares/cancels OS-specific I/O.
+
+Migration Steps:
+
+1) Land the no-op wiring (already present for WSAPoll; select notifier at Start()).
+2) Implement `iocpNotifier` to arm zero-byte `WSARecv/WSASend` and to `CancelIoEx` on cancel.
+3) Switch IOCP path to rely on notifier for arming/cancel while keeping completion loop intact.
+4) Add stress/race tests and CI gates for IOCP mode.
+
+Risks & Mitigations:
+
+- Risk: Conflicts with Go netpoller when arming I/O on sockets managed elsewhere.
+  - Mitigation: Limit IOCP mode to explicitly requested scenarios; test with runtime-owned sockets.
+- Risk: Deregister vs completion race.
+  - Mitigation: Preserve `reg.disabled` checks in dispatch paths; keep cancel ordering as documented.
 
 ## Risks & Mitigations
 
