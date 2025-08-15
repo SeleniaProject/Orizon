@@ -605,7 +605,7 @@
   - [x] OS別ポーラの土台: `NewOSPoller()` ファクトリ導入
   - [x] Linux: `epoll` ベース実装（`internal/runtime/asyncio/epoll_poller_linux.go`）
   - [x] BSD/macOS: `kqueue` 実装（`internal/runtime/asyncio/kqueue_poller_bsd.go`）
-  - [ ] Windows: `IOCP` 実装（実験タグ版あり: `internal/runtime/asyncio/iocp_experimental_windows.go`。Overlappedにキー保持、`GetQueuedCompletionStatus`完了ディスパッチ、Readableはゼロバイト`WSARecv`＋`Peek`でEOF厳密判定＆即時再アーム、Writableはゼロバイト`WSASend`完了で通知、`CancelIoEx`による停止収束、IOCP不可時のフォールバック監視、タグ付きテスト一式グリーン）
+  - [x] Windows: `IOCP` 実装（実験タグ版: `internal/runtime/asyncio/iocp_experimental_windows.go`。Overlappedにキー保持、`GetQueuedCompletionStatus`完了ディスパッチ、Readableはゼロバイト`WSARecv`＋`Peek`でEOF厳密判定＆即時再アーム、Writableはゼロバイト`WSASend`完了で通知、`CancelIoEx`による停止収束、IOCP不可時のフォールバック監視、タグ付きテスト一式グリーン）。本番安定化は後続（既定はポータブル/WSAPoll経路）
   - [x] Windows: ポータブルポーラ強化（Deregisterレース抑止・エラー通知・WritableスロットリングによるCPU削減）
   - [x] ゼロコピーI/Oヘルパー（`CopyPreferZeroCopy`/`CopyConnToConn`/`CopyFileToConn`）
   - [x] 真のゼロコピーI/O経路（Linux: `sendfile` による file→socket 転送を実装）
@@ -626,7 +626,7 @@
   - Windowsは `TransmitFile` 試行と `io.Copy` フォールバックを実装（単体テスト追加・安定化）
   - I/Oバックプレッシャ整合の高度化: `IOWatchOptions` に High/Low ウォーターマーク（グローバル/イベント別/優先度別）、レート制限（読/書・バースト・ドロップ）、優先度マッピングを追加
   - I/O統計: ドロップ/一時停止/再開/イベント数を `ActorSystemStatistics` に追加し、デバッグHTTP（`/actors/metrics`/`/actors/io`/`/actors/mailbox`/`/actors/io/actor`/`/actors/io/top`）とLSPコマンドで可視化
-  - `go test ./...` は緑を維持
+  - `go test ./...` は緑を維持。CIに Windows/macOS/Linux のスモーク（`scripts/win/smoke.ps1` / `scripts/linux/smoke.sh`）と `windows-iocp-tests`（`-tags iocp`）を追加。成果物は `artifacts/` に集約し、Job Summary にテスト/ファズ統計を追記
   - テスト:
     - `internal/runtime/asyncio/async_io_test.go`（Readable発火、Deregister後のイベント抑止、Close時のError、OSポーラ経路の検証）
     - `internal/runtime/asyncio/iocp_experimental_windows_test.go`（`windows,iocp` タグ: Readable/Deregister/Error、Writableスロットリングの検証）
@@ -895,6 +895,7 @@
   - [x] アサーション機能（`internal/testrunner/assert`）
   - [x] モック生成器（`internal/testrunner/mockgen` と CLI `cmd/orizon-mockgen`）
   - 実装: `cmd/orizon-test`（並列/フィルタ/カラー/JSON対応）、`internal/testrunner`
+  - 追加: リトライ（`--retries`）/ フェイルファスト（`--fail-fast`）/ JUnit XML 出力（`--junit`）/ パッケージ正規表現（`--pkg-regex`）/ JSONサマリ（`--json-summary`）/ フレーク回復サマリ（`flaky recovered:`）
 - **依存関係**: 4.1.1
 - **推定工数**: 中（15日）
 
@@ -915,6 +916,14 @@
   - [x] クラッシュ再現（`cmd/orizon-repro`：再現＋`--out`で最小化）
   - [x] 追加ターゲット（`--target lexer`、`--target astbridge`）
   - [x] 最小コーパス同梱（`corpus/parser_corpus.txt`、`corpus/lexer_corpus.txt`、`corpus/astbridge_corpus.txt`）
+  - [x] 更なるターゲット（`--target hir`、`--target astbridge-hir`）と HIR 検証（`TransformASTToHIR` + `ValidateHIR`）
+  - [x] 入力制御・堅牢化（`--per` 入力タイムアウト、`--min-on-crash/--min-dir/--min-budget` 自動最小化）
+  - [x] コーパス拡張（`--corpus-dir` ディレクトリ入力、`--crash-dir` クラッシュ入力の個別保存）
+  - [x] 探索信号強化（`weighted`/`trigram` を含む `--cov-mode` と `ComputeCoverage`）
+  - [x] 統計/再現性（`--stats`/`--json-stats`/`--save-seed`/`--max-execs`）
+  - [x] 変異制御（`--intensity`/`--autotune`、`AdaptiveMutator` 実装）
+  - [x] クラッシュログHEX化と再現（`crashes.txt` は `timestamp\t0xHEX\tmsg`、`orizon-repro --log/--line`）
+  - [x] 安定スモークターゲット（`--target parser-lax`）
 - **依存関係**: 4.5.2
 - **推定工数**: 大（25日）
 
@@ -925,6 +934,7 @@
   - [x] デッドロック検出（`internal/testrunner/concurrency` DeadlockDetector/MonitoredMutex）
   - [x] 実行順序探索（PCT風 `Scheduler` と `Explore`）
   - [x] Windows IOCP 強化テスト（登録/解除レース、キャンセル、EOF境界）
+  - [x] CI 強化（Linux: parser/lexer/astbridge/hir/astbridge-hir のスモーク。Windows: `-tags iocp` IOCP テスト）
 - **依存関係**: 4.5.3
 - **推定工数**: 大（30日）
 
