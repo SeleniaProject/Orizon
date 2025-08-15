@@ -68,6 +68,14 @@ type ActorSystem struct {
 	} // minimal interface to avoid import cycle in runtime package
 	// ioPoller integrates asyncio events with the actor system when attached.
 	ioPoller asyncio.Poller
+	// tracer records recent message traffic for debugging when enabled.
+	tracer *MessageTracer
+	// shuttingDown indicates Stop() has begun and failure handling should not restart actors
+	shuttingDown bool
+	// ioEventsLog is a bounded ring buffer of recent I/O events for time-windowed diagnostics.
+	ioEventsMu  sync.Mutex
+	ioEventsLog []IOEventRecord
+	ioEventsCap int
 }
 
 // globalActorSystem is an optional reference used by metrics exposition to include
@@ -507,6 +515,17 @@ type ActorStatistics struct {
 	AverageProcessingTime time.Duration // Average processing time
 	Restarts              uint32        // Restart count
 	LastActivity          time.Time     // Last activity
+	// I/O related per-actor counters
+	IOEventsReadable uint64 // Number of IOReadable events delivered
+	IOEventsWritable uint64 // Number of IOWritable events delivered
+	IOEventsErrors   uint64 // Number of IOErrorEvt events delivered
+}
+
+// IOEventRecord captures an emitted I/O event with timestamp for diagnostics aggregation.
+type IOEventRecord struct {
+	Timestamp time.Time
+	Actor     ActorID
+	Type      asyncio.EventType
 }
 
 // Mailbox statistics
@@ -684,6 +703,7 @@ func NewActorSystem(config ActorSystemConfig) (*ActorSystem, error) {
 		running:     false,
 		ctx:         ctx,
 		cancel:      cancel,
+		ioEventsCap: 4096,
 	}
 
 	// Initialize registry
@@ -884,32 +904,56 @@ func (as *ActorSystem) Start() error {
 
 // Stop stops the actor system
 func (as *ActorSystem) Stop() error {
+	// Snapshot state under lock, but do not hold the lock while stopping components
 	as.mutex.Lock()
-	defer as.mutex.Unlock()
-
 	if !as.running {
+		as.mutex.Unlock()
 		return nil
 	}
+	// Snapshot references to avoid data races while unlocked
+	ioPoller := as.ioPoller
+	scheduler := as.scheduler
+	dispatcher := as.dispatcher
+	actors := make([]*Actor, 0, len(as.actors))
+	for _, a := range as.actors {
+		actors = append(actors, a)
+	}
+	cancel := as.cancel
+	as.mutex.Unlock()
 
-	// Stop all actors
-	for _, actor := range as.actors {
-		as.stopActor(actor)
+	// Mark shutting down to suppress restarts and escalation storms
+	as.mutex.Lock()
+	as.shuttingDown = true
+	as.mutex.Unlock()
+
+	// Stop I/O poller first to quiesce external event sources
+	if ioPoller != nil {
+		_ = ioPoller.Stop()
+	}
+
+	// Stop all actors (may emit SystemTerminated to watchers)
+	for _, actor := range actors {
+		_ = as.stopActor(actor)
 	}
 
 	// Stop scheduler and dispatcher
-	as.scheduler.Stop()
-	as.dispatcher.Stop()
-
-	// Stop I/O poller if attached
-	if as.ioPoller != nil {
-		_ = as.ioPoller.Stop()
+	if scheduler != nil {
+		scheduler.Stop()
+	}
+	if dispatcher != nil {
+		dispatcher.Stop()
 	}
 
-	// Cancel context
-	as.cancel()
+	// Cancel context to stop maintenance goroutines
+	if cancel != nil {
+		cancel()
+	}
 
+	// Mark not running
+	as.mutex.Lock()
 	as.running = false
-
+	as.shuttingDown = false
+	as.mutex.Unlock()
 	return nil
 }
 
@@ -1105,6 +1149,32 @@ func (as *ActorSystem) WatchConnWithActorOpts(conn net.Conn, kinds []asyncio.Eve
 			pr = opts.ErrorEventPriority
 			atomic.AddUint64(&as.statistics.IOEventsErrors, 1)
 		}
+		// Per-actor I/O counters
+		as.mutex.RLock()
+		act := as.actors[target]
+		as.mutex.RUnlock()
+		if act != nil {
+			switch ev.Type {
+			case asyncio.Readable:
+				atomic.AddUint64(&act.Statistics.IOEventsReadable, 1)
+			case asyncio.Writable:
+				atomic.AddUint64(&act.Statistics.IOEventsWritable, 1)
+			default:
+				atomic.AddUint64(&act.Statistics.IOEventsErrors, 1)
+			}
+		}
+		// Append to system I/O ring buffer
+		as.ioEventsMu.Lock()
+		if as.ioEventsLog == nil {
+			as.ioEventsLog = make([]IOEventRecord, 0, as.ioEventsCap)
+		}
+		if len(as.ioEventsLog) == as.ioEventsCap {
+			// pop front (simple rotate)
+			copy(as.ioEventsLog[0:], as.ioEventsLog[1:])
+			as.ioEventsLog = as.ioEventsLog[:len(as.ioEventsLog)-1]
+		}
+		as.ioEventsLog = append(as.ioEventsLog, IOEventRecord{Timestamp: time.Now(), Actor: target, Type: ev.Type})
+		as.ioEventsMu.Unlock()
 		// Rate limiting per event type
 		if ev.Type == asyncio.Readable && opts.ReadMaxEventsPerSec > 0 {
 			if readBucket.tokens <= 0 {
@@ -1227,6 +1297,40 @@ func (as *ActorSystem) GetMailboxLength(aid ActorID) (int, bool) {
 		return 0, false
 	}
 	return actor.Mailbox.Len(), true
+}
+
+// MailboxStats provides a snapshot of mailbox metrics for external diagnostics.
+type MailboxStats struct {
+	Length        int       `json:"length"`
+	Capacity      uint32    `json:"capacity"`
+	MaxSize       uint32    `json:"maxSize"`
+	OverflowCount uint32    `json:"overflowCount"`
+	LastActivity  time.Time `json:"lastActivity"`
+}
+
+// GetMailboxStats returns the mailbox statistics for a given actor if available.
+func (as *ActorSystem) GetMailboxStats(aid ActorID) (MailboxStats, bool) {
+	as.mutex.RLock()
+	actor := as.actors[aid]
+	as.mutex.RUnlock()
+	if actor == nil || actor.Mailbox == nil {
+		return MailboxStats{}, false
+	}
+	mb := actor.Mailbox
+	mb.mutex.RLock()
+	defer mb.mutex.RUnlock()
+	length := len(mb.Messages)
+	if mb.Type == PriorityMailbox && mb.PriorityQueue != nil {
+		length = mb.PriorityQueue.size
+	}
+	stats := MailboxStats{
+		Length:        length,
+		Capacity:      mb.Capacity,
+		MaxSize:       mb.Statistics.MaxSize,
+		OverflowCount: mb.Statistics.OverflowCount,
+		LastActivity:  mb.LastActivity,
+	}
+	return stats, true
 }
 
 // SendMessageWithPriority sends a message with an explicit priority.
@@ -1478,6 +1582,14 @@ func (a *Actor) Restart(reason error) error {
 
 // handleFailure applies supervisor strategy for a failed actor
 func (as *ActorSystem) handleFailure(failed *Actor, reason error) {
+	// During shutdown, avoid restarts or escalation loops; stop actors instead
+	as.mutex.RLock()
+	shutting := as.shuttingDown
+	as.mutex.RUnlock()
+	if shutting {
+		_ = as.stopActor(failed)
+		return
+	}
 	sup := failed.Supervisor
 	if sup == nil {
 		_ = failed.Restart(reason)
@@ -1774,6 +1886,8 @@ func (as *ActorSystem) deliverMessage(msg Message) error {
 		return as.sendToDeadLetters(msg)
 	}
 
+	// Trace after enqueue for visibility
+	as.traceMessage(msg.Sender, msg.Receiver, msg.Type, msg.Priority, msg.CorrelationID, msg.ID)
 	// Notify scheduler
 	as.scheduler.Schedule(msg.Receiver)
 

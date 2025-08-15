@@ -1,3 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+      - name: Build
+        run: |
+          go build ./...
+      - name: Test
+        run: |
+          go test ./... -count=1
+      - name: Short parser fuzz smoke
+        run: |
+          go build -o orizon-fuzz ./cmd/orizon-fuzz
+          ./orizon-fuzz --target parser --duration 3s --p 2 --corpus corpus/parser_corpus.txt --covstats || true
+      - name: Upload fuzz artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: |
+            fuzz.cov
+            crashes.txt
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go build ./...
+
+      - name: Unit tests
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go test ./... -v
+
+  fuzz-parser:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+
+      - name: Build fuzz tools
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go build -o orizon-fuzz ./cmd/orizon-fuzz
+
+      - name: Run parser fuzz (short)
+        run: |
+          ./orizon-fuzz --target parser --duration 5s --covout fuzz.cov --out crashes.txt || true
+
+      - name: Upload fuzz artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: |
+            fuzz.cov
+            crashes.txt
+
 name: Orizon CI/CD Pipeline
 
 on:

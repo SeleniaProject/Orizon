@@ -618,15 +618,19 @@
 - **依存関係**: 3.3.3
 - **推定工数**: 大（28日）
 - **現状**:
-  - `epoll`/`kqueue` 実装とファクトリ導入によりOS最適ポーラを選択可能。Windowsは今後IOCP実装予定
+  - `epoll`/`kqueue` 実装とファクトリ導入によりOS最適ポーラを選択可能。Windowsは`windows && iocp`ビルドタグ有効時に実験的IOCPを利用可能（通常はポータブル/WSAPoll経路）。`newIOCPIfAvailable`は`iocp`タグ時のみ有効化し、非タグ時は`iocp_stub_windows.go`で`nil`を返すため再宣言衝突は発生しない
+  - Windows工場: `NewOSPoller()` は環境変数で切替可能 — `ORIZON_WIN_PORTABLE=1`（ポータブル）、`ORIZON_WIN_WSAPOLL=1`（WSAPoll）、`ORIZON_WIN_IOCP=1`（IOCP要求・`iocp`タグ時に適用、非タグ時はWSAPollへフォールバック）
   - ゼロコピーI/Oはヘルパー（`internal/runtime/asyncio/zerocopy.go`）を追加済み。OS固有の真のゼロコピー経路は次段で対応
   - バッファプール（`internal/runtime/asyncio/buffer_pool.go`）を追加し、I/Oバッファの再利用でGC圧力を低減
   - アクター統合のベースラインを提供（`ActorSystem.SetIOPoller`/`WatchConnWithActor`/`UnwatchConn`、`IOEvent` メッセージ配送、`IOWatchOptions` による指数バックオフ）
   - Windowsは `TransmitFile` 試行と `io.Copy` フォールバックを実装（単体テスト追加・安定化）
   - I/Oバックプレッシャ整合の高度化: `IOWatchOptions` に High/Low ウォーターマーク（グローバル/イベント別/優先度別）、レート制限（読/書・バースト・ドロップ）、優先度マッピングを追加
-  - I/O統計: ドロップ/一時停止/再開/イベント数を `ActorSystemStatistics` に追加し、メトリクスエクスポータから `actor_system_*` として公開
+  - I/O統計: ドロップ/一時停止/再開/イベント数を `ActorSystemStatistics` に追加し、デバッグHTTP（`/actors/metrics`/`/actors/io`/`/actors/mailbox`/`/actors/io/actor`/`/actors/io/top`）とLSPコマンドで可視化
   - `go test ./...` は緑を維持
-  - テスト: `internal/runtime/asyncio/async_io_test.go` を追加（Readable発火、Deregister後のイベント抑止、Close時のError、OSポーラ経路の検証）
+  - テスト:
+    - `internal/runtime/asyncio/async_io_test.go`（Readable発火、Deregister後のイベント抑止、Close時のError、OSポーラ経路の検証）
+    - `internal/runtime/asyncio/iocp_experimental_windows_test.go`（`windows,iocp` タグ: Readable/Deregister/Error、Writableスロットリングの検証）
+    - `internal/runtime/actor_system_test.go`（I/Oウォーターマークによる一時停止/再開、レート制限ドロップの検証）
 
 #### 3.4.2 ファイルシステム抽象化 ✅ 完了
 - [x] **目的**: 仮想ファイルシステム実装
@@ -680,6 +684,9 @@
    - [x] OnType整形: `textDocument/onTypeFormatting`（`}`/`\n`/`)`/`;` 対応）
     - [x] プロトコル準拠テスト、バリデータ連携
     - [x] typeDefinition: `textDocument/typeDefinition` と `typeDefinitionProvider` を実装
+   - [x] executeCommand: `executeCommandProvider` 公開。`workspace/executeCommand` で `orizon.getActorsSnapshot` / `orizon.getActorMessages` を実装（`initializationOptions.debugHTTP` または環境変数 `ORIZON_DEBUG_HTTP` を使用して `/actors`・`/actors/messages` を取得）
+   - [x] executeCommand（拡張）: `orizon.getActorGraph` / `orizon.getDeadlocks` / `orizon.getCorrelationEvents` / `orizon.getPrettyLocals` / `orizon.getPrettyMemory` / `orizon.getStack` を追加
+   - [x] カスタム通知: `$/orizon.show` を実装（`uriHint` による安定URI・キャッシュによる差分更新・`diff`添付）。Pretty Memoryは `orizon://memory/<addr>.txt` で安定配信
     - [x] SignatureHelp強化: `parameters` の充実と `documentation` にパラメータ/戻り値サマリを出力
 
 - #### 4.1.2 リアルタイム解析 ✅ 完了
@@ -819,7 +826,7 @@
 #### 4.4.1 デバッグ情報生成 ✅ 一部完了
 - **目的**: ソースレベルデバッグのための情報埋め込み
 - **成果物**:
-  - [ ] DWARF情報生成（`.debug_line`のファイル/ディレクトリテーブルと行命令、`.debug_info`の関数`decl_file/decl_line`と`formal_parameter`DIEを実装済み。関数の`low_pc`/`high_pc(size)`と`frame_base(exprloc)`、引数の`location(DW_OP_fbreg)`を追加実装済み。型DIE生成を拡張（`base/pointer/struct/member/subroutine/param/array/subrange/tuple/slice/interface`）し、`.debug_str`に名前を格納。ローカル変数のロケーション式詳細化と`typedef/const/volatile`修飾の対応が残）
+  - [x] DWARF情報生成（`.debug_line`のファイル/ディレクトリテーブルと行命令、`.debug_info`の関数`decl_file/decl_line`と`formal_parameter`DIEを実装済み。関数の`low_pc`/`high_pc(size)`と`frame_base(exprloc)`、引数の`location(DW_OP_fbreg)`を追加実装済み。型DIE生成を拡張（`base/pointer/struct/member/subroutine/param/array/subrange/tuple/slice/interface`）し、`.debug_str`に名前を格納。ローカル変数のロケーション式詳細化と`typedef/const/volatile`修飾を実装）
   - [x] ソースマップ作成
   - [x] 変数情報保持（HIRベースのパラメータ/ローカル変数、型、スパン）
   - [x] 行テーブル生成（ファイル/行/列の収集・重複排除・安定ソート）
@@ -840,7 +847,9 @@
 - **成果物**:
   - [x] プロトコル実装（GDB RSP 最小～拡張）
   - [x] ブレークポイント管理（Z0/z0 基本対応）
-  - [ ] スタックトレース生成
+  - [x] スタックトレース生成（`qXfer:stack:read` 実装、JSONで返却）
+  - [x] 俳優スナップショット配信（`qXfer:actors:read` 実装、JSONチャンク配信）
+  - [x] 俳優メッセージ配信（`qXfer:actors-messages:read` 実装、`actor=<id>,n=<count>` アネックス対応・JSONチャンク配信）
 - **実装内容**:
   - [x] `internal/debug/gdbserver/server.go`: RSPサーバー実装
     - セッション/ACK制御: `QStartNoAckMode`、ACK省略
@@ -848,58 +857,74 @@
     - レジスタ/メモリ: `g`/`G`、`p`/`P`、`m`/`M`
     - 実行制御: `c`/`s`（アドレス指定可）、`vCont?`/`vCont;c`/`vCont;s`、`D`（detach）、`k`（kill）
     - ブレークポイント: `Z0`/`z0`（内部マップで管理）、`Z1..Z4`/`z1..z4`はOK応答スタブ
-    - qXfer: `features:read`（target.xml静的提供）、`libraries:read`、`memory-map:read`、`auxv:read`
+    - qXfer: `features:read`（target.xml静的提供）、`libraries:read`、`memory-map:read`、`auxv:read`、`stack:read`、`actors:read`、`actors-messages:read`、`actors-graph:read`、`deadlocks:read`、`correlation:read`、`locals:read`、`pretty-locals:read`、`pretty-memory:read`
     - その他: `vMustReplyEmpty`、`qSymbol`（現状OK返答）
+    - Pretty表示: 文字列/スライス/配列/構造体/タプル/インターフェース/ポインタ（循環検出）/マップ（最大8組）を型情報（`TypeMeta`）から再帰整形。未初期化領域は`??`で可視化
+    - 拡張プロバイダ: `ActorsGraphJSONProviderEx`/`DeadlocksJSONProviderEx`/`CorrelationJSONProviderEx` を追加し、`annex` の `key=value`（カンマ区切り）フィルタを受け渡し可能に
   - [x] `cmd/gdb-rsp-server/main.go`: RSPサーバーCLI（`--debug-json`読込、TCP待受）
+    - 拡張フラグ: `--actors-json`/`--actors-url`、`--debug-http`、`--actor-id`/`--actor-n`
+    - `--debug-http` 指定時は `ActorSystem` をホストし、`StartDebugHTTPOn` で実バインド。RSPプロバイダをランタイムへ直結
   - [x] `internal/debug/gdbserver/server_test.go`: ユニットテスト一式
-    - NoAck、レジスタ/メモリRW、breakpoint/step/continue、vCont、qXfer（features/libraries/memory-map/auxv）、スレッド照会、T停止応答
+    - NoAck、レジスタ/メモリRW、breakpoint/step/continue、vCont、qXfer（features/libraries/memory-map/auxv、stack、actors、actors-messages）、スレッド照会、T停止応答
 - **依存関係**: 4.4.1
 - **推定工数**: 大（20日）
 
 #### 4.4.3 並行デバッグ支援
 - [ ] **目的**: アクターシステムのデバッグ支援
-- **成果物**:
-  - [ ] アクター状態可視化
-  - [ ] メッセージ追跡
-  - [ ] デッドロック検出
+ - **成果物**:
+   - [x] アクター状態可視化
+   - [x] メッセージ追跡
+   - [x] デッドロック検出
+   - [x] I/O統計可視化（システム/俳優別/時間窓/上位集計）
+   - 実装: デバッグHTTP `/actors/metrics`, `/actors/io`, `/actors/mailbox`, `/actors/io/actor`, `/actors/io/top`, `/actors/lookup`、LSP `executeCommand`（`orizon.getActorMetrics` / `orizon.getIOMetrics` / `orizon.getMailboxStats` / `orizon.getActorIOMetrics` / `orizon.getTopIOMetrics` / `orizon.lookupActorID`）
+- **実装内容**:
+  - [x] HTTPエンドポイント: `/actors/graph`（`limit` フィルタ対応）/`/actors/deadlocks`（`minCycle` フィルタ対応）/`/actors/correlation`（`id`/`n`、将来の `actor/since/until` 受付）
+  - [x] RSP連携: `qXfer:actors-graph:read` / `qXfer:deadlocks:read` / `qXfer:correlation:read`（`annex` 経由のフィルタ対応Exプロバイダ）、`qXfer:locals:read` / `qXfer:pretty-locals:read` / `qXfer:pretty-memory:read`
+  - [x] LSPコマンド: `orizon.getActorGraph` / `orizon.getDeadlocks` / `orizon.getCorrelationEvents` / `orizon.getPrettyLocals` / `orizon.getPrettyMemory` / `orizon.getStack`
+  - [x] LSP通知: カスタム `$/orizon.show`（`uriHint` による安定仮想ドキュメント名、コンテンツ差分`text/x-diff`同梱、初回は `window/showDocument` で自動タブ表示）。メモリダンプは `orizon://memory/<addr>.txt` に安定配信
+  - [x] ランタイム: `MessageTracer` による相関追跡（per-actor/per-correlationリングバッファ）、Tarjan法によるウォッチ依存サイクル検出、`ActorSystem.Stop()` に `shuttingDown` を導入しシャットダウン中の再起動を抑止
 - **依存関係**: 4.4.2
 - **推定工数**: 大（28日）
 
 ### 4.5 テストフレームワーク
 
 #### 4.5.1 単体テストフレームワーク
-- [ ] **目的**: 高機能な単体テスト支援
+- [x] **目的**: 高機能な単体テスト支援
 - **成果物**:
-  - [ ] テストランナー
-  - [ ] アサーション機能
-  - [ ] モック生成器
+  - [x] テストランナー
+  - [x] アサーション機能（`internal/testrunner/assert`）
+  - [x] モック生成器（`internal/testrunner/mockgen` と CLI `cmd/orizon-mockgen`）
+  - 実装: `cmd/orizon-test`（並列/フィルタ/カラー/JSON対応）、`internal/testrunner`
 - **依存関係**: 4.1.1
 - **推定工数**: 中（15日）
 
 #### 4.5.2 Property-Based Testing
-- [ ] **目的**: QuickCheck風のプロパティテスト
+- [x] **目的**: QuickCheck風のプロパティテスト
 - **成果物**:
-  - [ ] ランダムデータ生成
-  - [ ] 反例最小化
-  - [ ] プロパティDSL
-- **依存関係**: 4.5.1
-- **推定工数**: 大（22日）
+  - [x] ランダムデータ生成（`internal/testrunner/prop` Generators）
+  - [x] 反例最小化（Shrinker/自動シュリンク）
+  - [x] プロパティDSL（`ForAll1` ベース、Trials/Seed/Parallel/Size/Timeout制御）
+  - **依存関係**: 4.5.1
+  - **推定工数**: 大（22日）
 
 #### 4.5.3 ファジングテスト統合
-- [ ] **目的**: セキュリティ脆弱性の自動検出
+- [x] **目的**: セキュリティ脆弱性の自動検出
 - **成果物**:
-  - [ ] ファザー統合
-  - [ ] カバレッジ計測
-  - [ ] クラッシュ再現
+  - [x] ファザー統合（`internal/testrunner/fuzz`、CLI `cmd/orizon-fuzz`）
+  - [x] カバレッジ計測（トークンエッジ近似: `fuzz.TokenEdgeCoverage`、`cmd/orizon-fuzz --covout`）
+  - [x] クラッシュ再現（`cmd/orizon-repro`：再現＋`--out`で最小化）
+  - [x] 追加ターゲット（`--target lexer`、`--target astbridge`）
+  - [x] 最小コーパス同梱（`corpus/parser_corpus.txt`、`corpus/lexer_corpus.txt`、`corpus/astbridge_corpus.txt`）
 - **依存関係**: 4.5.2
 - **推定工数**: 大（25日）
 
 #### 4.5.4 並行性テスト
 - **目的**: 並行プログラムの正確性検証
 - **成果物**:
-  - データ競合検出
-  - デッドロック検出
-  - 実行順序探索
+  - [x] データ競合検出（`internal/testrunner/concurrency/race.go` Eraser風ロックセット解析。`Read`/`Write`/`OnLock`/`OnUnlock`、`TrackedMutex`、重複レース抑止、`race_test.go`で検証）
+  - [x] デッドロック検出（`internal/testrunner/concurrency` DeadlockDetector/MonitoredMutex）
+  - [x] 実行順序探索（PCT風 `Scheduler` と `Explore`）
+  - [x] Windows IOCP 強化テスト（登録/解除レース、キャンセル、EOF境界）
 - **依存関係**: 4.5.3
 - **推定工数**: 大（30日）
 

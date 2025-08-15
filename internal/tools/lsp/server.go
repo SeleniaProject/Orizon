@@ -2,8 +2,13 @@ package lsp
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -58,6 +63,14 @@ type Server struct {
 	// diagnostics cache to avoid redundant notifications (hashed JSON of diags)
 	diagCache map[string]string
 
+	// debugHTTPURL holds an optional HTTP endpoint that serves actor snapshots
+	// via `/actors` and `/actors/messages`. When set, custom commands can fetch
+	// live runtime diagnostics directly from a running Orizon runtime.
+	debugHTTPURL string
+
+	// rspAddr holds an optional TCP address of the RSP server for pretty queries
+	rspAddr string
+
 	// lightweight metrics (volatile)
 	reqCount uint64
 	errCount uint64
@@ -70,20 +83,29 @@ type Server struct {
 		Mods      []string
 		ModIndex  map[string]int
 	}
+
+	// vdocCache caches last shown content per uriHint to avoid redundant notifications
+	vdocCache map[string]string
+	// vdocOpened tracks whether a given uriHint has been asked to open
+	vdocOpened map[string]bool
+	// rpcID is a monotonically increasing id for server->client requests
+	rpcID uint64
 }
 
 func NewServer(r io.Reader, w io.Writer) *Server {
 	s := &Server{
-		in:        bufio.NewReader(r),
-		out:       w,
-		docs:      make(map[string]string),
-		symIndex:  make(map[string]map[string][]SymbolInfo),
-		astCache:  make(map[string]*parser.Program),
-		docsVer:   make(map[string]int),
-		incLexer:  lexer.NewIncrementalLexer(),
-		tokCache:  make(map[string][]lexer.Token),
-		wsIndex:   make(map[string][]SymbolLocation),
-		diagCache: make(map[string]string),
+		in:         bufio.NewReader(r),
+		out:        w,
+		docs:       make(map[string]string),
+		symIndex:   make(map[string]map[string][]SymbolInfo),
+		astCache:   make(map[string]*parser.Program),
+		docsVer:    make(map[string]int),
+		incLexer:   lexer.NewIncrementalLexer(),
+		tokCache:   make(map[string][]lexer.Token),
+		wsIndex:    make(map[string][]SymbolLocation),
+		diagCache:  make(map[string]string),
+		vdocCache:  make(map[string]string),
+		vdocOpened: make(map[string]bool),
 	}
 	// Initialize semantic tokens legend per LSP spec (rich, covers our needs)
 	s.semLegend.Types = []string{
@@ -188,13 +210,29 @@ func (s *Server) Run() error {
 			// Advertise capabilities and server info per LSP. Use UTF-16 positions for compatibility.
 			// Capture rootURI if provided
 			var initParams struct {
-				RootURI string `json:"rootUri"`
+				RootURI               string         `json:"rootUri"`
+				InitializationOptions map[string]any `json:"initializationOptions"`
 			}
 			if err := json.Unmarshal(req.Params, &initParams); err != nil {
 				s.replyError(req.ID, -32602, "invalid params: initialize")
 				break
 			}
 			s.rootURI = initParams.RootURI
+			// Configure optional debug HTTP endpoint from initializationOptions or environment
+			if initParams.InitializationOptions != nil {
+				if v, ok := initParams.InitializationOptions["debugHTTP"].(string); ok {
+					s.debugHTTPURL = strings.TrimSpace(v)
+				}
+				if v, ok := initParams.InitializationOptions["rspAddr"].(string); ok {
+					s.rspAddr = strings.TrimSpace(v)
+				}
+			}
+			if s.debugHTTPURL == "" {
+				s.debugHTTPURL = strings.TrimSpace(os.Getenv("ORIZON_DEBUG_HTTP"))
+			}
+			if s.rspAddr == "" {
+				s.rspAddr = strings.TrimSpace(os.Getenv("ORIZON_RSP_ADDR"))
+			}
 			caps := map[string]any{
 				"positionEncoding": "utf-16",
 				"textDocumentSync": map[string]any{
@@ -232,6 +270,24 @@ func (s *Server) Run() error {
 					"range": true,
 				},
 				"inlayHintProvider": true,
+				"executeCommandProvider": map[string]any{
+					"commands": []string{
+						"orizon.getActorsSnapshot",
+						"orizon.getActorMessages",
+						"orizon.getActorGraph",
+						"orizon.getDeadlocks",
+						"orizon.getCorrelationEvents",
+						"orizon.getPrettyLocals",
+						"orizon.getPrettyMemory",
+						"orizon.getStack",
+						"orizon.getActorMetrics",
+						"orizon.getIOMetrics",
+						"orizon.getMailboxStats",
+						"orizon.getActorIOMetrics",
+						"orizon.lookupActorID",
+						"orizon.getTopIOMetrics",
+					},
+				},
 			}
 			result := map[string]any{
 				"capabilities": caps,
@@ -241,6 +297,526 @@ func (s *Server) Run() error {
 				},
 			}
 			s.reply(req.ID, result)
+		case "workspace/executeCommand":
+			var p struct {
+				Command   string `json:"command"`
+				Arguments []any  `json:"arguments"`
+			}
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				s.replyError(req.ID, -32602, "invalid params: executeCommand")
+				break
+			}
+			if p.Command == "orizon.lookupActorID" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				var name string
+				if len(p.Arguments) > 0 {
+					if v, ok := p.Arguments[0].(string); ok {
+						name = v
+					}
+				}
+				if name == "" {
+					s.replyError(req.ID, -32602, "missing name")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/lookup?name=" + name
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to lookup actor id")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Actor Lookup", v)
+				break
+			}
+			if p.Command == "orizon.getStack" {
+				if s.rspAddr == "" {
+					s.replyError(req.ID, -32603, "rspAddr not configured")
+					break
+				}
+				// qXfer:stack:read::off,len
+				data, err := s.rspFetchXfer("stack", "")
+				if err != nil {
+					s.replyError(req.ID, -32603, "failed to fetch stack")
+					break
+				}
+				var v any
+				if err := json.Unmarshal(data, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from RSP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Stack Trace", v)
+				break
+			}
+			if p.Command == "orizon.getActorsSnapshot" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors"
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch actors snapshot")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				// Also emit a lightweight custom notification with pretty JSON for UI extensions
+				s.notifyShow("Actors Snapshot", v)
+				break
+			}
+			if p.Command == "orizon.getActorMessages" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				var aid string
+				var n string
+				// Expect arguments: [id, n] as numbers or strings
+				if len(p.Arguments) > 0 {
+					switch t := p.Arguments[0].(type) {
+					case float64:
+						aid = strconv.FormatUint(uint64(t), 10)
+					case string:
+						aid = t
+					}
+				}
+				if aid == "" {
+					s.replyError(req.ID, -32602, "missing actor id")
+					break
+				}
+				if len(p.Arguments) > 1 {
+					switch t := p.Arguments[1].(type) {
+					case float64:
+						n = strconv.Itoa(int(t))
+					case string:
+						n = t
+					}
+				}
+				if n == "" {
+					n = "100"
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/messages?id=" + aid + "&n=" + n
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch actor messages")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				// Show as a transient view for clients that handle custom notifications
+				s.notifyShow("Actor Messages", v)
+				break
+			}
+			if p.Command == "orizon.getActorGraph" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				qs := ""
+				if len(p.Arguments) > 0 {
+					if m, ok := p.Arguments[0].(map[string]any); ok && len(m) > 0 {
+						first := true
+						for k, vv := range m {
+							val := ""
+							switch t := vv.(type) {
+							case string:
+								val = t
+							case float64:
+								val = strconv.Itoa(int(t))
+							}
+							if val == "" {
+								continue
+							}
+							if first {
+								qs += "?"
+								first = false
+							} else {
+								qs += "&"
+							}
+							qs += k + "=" + val
+						}
+					}
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/graph" + qs
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch actor graph")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				// Pretty-print JSON graph for clients wishing to render
+				s.notifyShow("Actor Graph", v)
+				break
+			}
+			if p.Command == "orizon.getDeadlocks" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				qs := ""
+				if len(p.Arguments) > 0 {
+					if m, ok := p.Arguments[0].(map[string]any); ok && len(m) > 0 {
+						first := true
+						for k, vv := range m {
+							val := ""
+							switch t := vv.(type) {
+							case string:
+								val = t
+							case float64:
+								val = strconv.Itoa(int(t))
+							}
+							if val == "" {
+								continue
+							}
+							if first {
+								qs += "?"
+								first = false
+							} else {
+								qs += "&"
+							}
+							qs += k + "=" + val
+						}
+					}
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/deadlocks" + qs
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch deadlocks")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				// Notify deadlock report
+				s.notifyShow("Deadlocks", v)
+				break
+			}
+			if p.Command == "orizon.getCorrelationEvents" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				qs := ""
+				// Backward compatible forms: [id, n] or [{k:v,...}]
+				if len(p.Arguments) > 0 {
+					switch a0 := p.Arguments[0].(type) {
+					case map[string]any:
+						first := true
+						for k, vv := range a0 {
+							val := ""
+							switch t := vv.(type) {
+							case string:
+								val = t
+							case float64:
+								val = strconv.Itoa(int(t))
+							}
+							if val == "" {
+								continue
+							}
+							if first {
+								qs += "?"
+								first = false
+							} else {
+								qs += "&"
+							}
+							qs += k + "=" + val
+						}
+					case string:
+						cid := a0
+						n := "100"
+						if len(p.Arguments) > 1 {
+							switch t := p.Arguments[1].(type) {
+							case float64:
+								n = strconv.Itoa(int(t))
+							case string:
+								n = t
+							}
+						}
+						qs = "?id=" + cid + "&n=" + n
+					}
+				}
+				if qs == "" {
+					s.replyError(req.ID, -32602, "missing correlation query")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/correlation" + qs
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch correlation events")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				// Show correlation events as pretty JSON
+				s.notifyShow("Correlation Events", v)
+				break
+			}
+			if p.Command == "orizon.getPrettyLocals" {
+				if s.rspAddr == "" {
+					s.replyError(req.ID, -32603, "rspAddr not configured")
+					break
+				}
+				data, err := s.rspFetchXfer("pretty-locals", "")
+				if err != nil {
+					s.replyError(req.ID, -32603, "failed to fetch pretty locals")
+					break
+				}
+				var v any
+				if err := json.Unmarshal(data, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from RSP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Pretty Locals", v)
+				break
+			}
+			if p.Command == "orizon.getPrettyMemory" {
+				if s.rspAddr == "" {
+					s.replyError(req.ID, -32603, "rspAddr not configured")
+					break
+				}
+				if s.rspAddr == "" {
+					s.replyError(req.ID, -32603, "rspAddr not configured")
+					break
+				}
+				// args: [addrHex, len]
+				var addrHex, nHex string
+				if len(p.Arguments) > 0 {
+					if v, ok := p.Arguments[0].(string); ok {
+						addrHex = strings.TrimPrefix(strings.ToLower(v), "0x")
+					}
+				}
+				if len(p.Arguments) > 1 {
+					switch t := p.Arguments[1].(type) {
+					case float64:
+						nHex = strconv.FormatUint(uint64(t), 16)
+					case string:
+						nHex = strings.TrimPrefix(strings.ToLower(t), "0x")
+					}
+				}
+				if addrHex == "" {
+					s.replyError(req.ID, -32602, "missing addr")
+					break
+				}
+				if nHex == "" {
+					nHex = "100"
+				}
+				annex := "addr=" + addrHex + ",len=" + nHex
+				data, err := s.rspFetchXfer("pretty-memory", annex)
+				if err != nil {
+					s.replyError(req.ID, -32603, "failed to fetch pretty memory")
+					break
+				}
+				// Pretty memory is plain text
+				s.reply(req.ID, string(data))
+				// Stable URI per address for virtual document management
+				memURI := "orizon://memory/" + addrHex + ".txt"
+				s.notifyShowText("Pretty Memory 0x"+addrHex, memURI, string(data))
+				break
+			}
+			if p.Command == "orizon.getActorMetrics" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/metrics"
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch actor metrics")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Actor Metrics", v)
+				break
+			}
+			if p.Command == "orizon.getIOMetrics" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/io"
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch io metrics")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("I/O Metrics", v)
+				break
+			}
+			if p.Command == "orizon.getMailboxStats" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				var aid string
+				if len(p.Arguments) > 0 {
+					switch t := p.Arguments[0].(type) {
+					case float64:
+						aid = strconv.FormatUint(uint64(t), 10)
+					case string:
+						aid = t
+					}
+				}
+				if aid == "" {
+					s.replyError(req.ID, -32602, "missing actor id")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/mailbox?id=" + aid
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch mailbox stats")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Mailbox Stats for "+aid, v)
+				break
+			}
+			if p.Command == "orizon.getActorIOMetrics" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				var aid string
+				if len(p.Arguments) > 0 {
+					switch t := p.Arguments[0].(type) {
+					case float64:
+						aid = strconv.FormatUint(uint64(t), 10)
+					case string:
+						aid = t
+					}
+				}
+				if aid == "" {
+					s.replyError(req.ID, -32602, "missing actor id")
+					break
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/io/actor?id=" + aid
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch actor io metrics")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Actor I/O Metrics for "+aid, v)
+				break
+			}
+			if p.Command == "orizon.getTopIOMetrics" {
+				if s.debugHTTPURL == "" {
+					s.replyError(req.ID, -32603, "debugHTTP not configured")
+					break
+				}
+				qs := ""
+				if len(p.Arguments) > 0 {
+					if m, ok := p.Arguments[0].(map[string]any); ok && len(m) > 0 {
+						first := true
+						for k, vv := range m {
+							val := ""
+							switch t := vv.(type) {
+							case string:
+								val = t
+							case float64:
+								val = strconv.Itoa(int(t))
+							}
+							if val == "" {
+								continue
+							}
+							if first {
+								qs += "?"
+								first = false
+							} else {
+								qs += "&"
+							}
+							qs += k + "=" + val
+						}
+					}
+				}
+				url := strings.TrimRight(s.debugHTTPURL, "/") + "/actors/io/top" + qs
+				resp, err := http.Get(url)
+				if err != nil || resp == nil || resp.Body == nil {
+					s.replyError(req.ID, -32603, "failed to fetch top io metrics")
+					break
+				}
+				b, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				var v any
+				if err := json.Unmarshal(b, &v); err != nil {
+					s.replyError(req.ID, -32603, "invalid JSON from debugHTTP")
+					break
+				}
+				s.reply(req.ID, v)
+				s.notifyShow("Top I/O Actors", v)
+				break
+			}
+			s.replyError(req.ID, -32601, "unknown command")
 		case "initialized":
 			// This is a notification; do not send a response.
 			if len(req.ID) > 0 {
@@ -852,6 +1428,255 @@ func (s *Server) notify(method string, params any) {
 		"params":  params,
 	}
 	s.write(msg)
+}
+
+// notifyShow sends a custom notification that conveys a titled JSON payload to display.
+// Clients can optionally render this as a virtual document or panel. The method name uses
+// a $/-prefixed custom channel to avoid conflicts with standard LSP.
+func (s *Server) notifyShow(title string, v any) {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return
+	}
+	uri := "orizon://debug/" + sanitizeTitle(title) + ".json"
+	body := string(b)
+	var diff string
+	if prev, ok := s.vdocCache[uri]; ok {
+		if prev == body {
+			// Skip identical content to avoid flicker and redundant traffic
+			return
+		}
+		diff = computeUnifiedDiff(prev, body)
+	}
+	s.vdocCache[uri] = body
+	payload := map[string]any{
+		"title":   title,
+		"mime":    "application/json",
+		"content": body,
+		// Suggested file-like name for clients that open virtual documents
+		"uriHint": uri,
+	}
+	if diff != "" {
+		payload["diff"] = diff
+		payload["diffMime"] = "text/x-diff"
+	}
+	s.notify("$/orizon.show", payload)
+	// Ask the client to open the virtual document the first time we publish it
+	if !s.vdocOpened[uri] {
+		s.requestShowDocument(uri)
+		s.vdocOpened[uri] = true
+	}
+}
+
+// notifyShowText is a specialized variant to push plain text with explicit uriHint
+func (s *Server) notifyShowText(title, uri, text string) {
+	var diff string
+	if prev, ok := s.vdocCache[uri]; ok {
+		if prev == text {
+			return
+		}
+		diff = computeUnifiedDiff(prev, text)
+	}
+	s.vdocCache[uri] = text
+	payload := map[string]any{
+		"title":   title,
+		"mime":    "text/plain",
+		"content": text,
+		"uriHint": uri,
+	}
+	if diff != "" {
+		payload["diff"] = diff
+		payload["diffMime"] = "text/x-diff"
+	}
+	s.notify("$/orizon.show", payload)
+	if !s.vdocOpened[uri] {
+		s.requestShowDocument(uri)
+		s.vdocOpened[uri] = true
+	}
+}
+
+// computeUnifiedDiff generates a simple unified diff between old and new text.
+// It is line-based and optimized for clarity rather than minimal edits.
+func computeUnifiedDiff(oldText, newText string) string {
+	if oldText == newText {
+		return ""
+	}
+	a := splitLines(oldText)
+	b := splitLines(newText)
+	var buf bytes.Buffer
+	buf.WriteString("--- a\n")
+	buf.WriteString("+++ b\n")
+	// Simple two-pointer scan with fallback additions/removals
+	i, j := 0, 0
+	for i < len(a) || j < len(b) {
+		switch {
+		case i < len(a) && j < len(b) && a[i] == b[j]:
+			// context line (optional)
+			buf.WriteString(" " + a[i] + "\n")
+			i++
+			j++
+		case j < len(b) && (i >= len(a) || !containsAhead(a, b[j], i+1)):
+			buf.WriteString("+" + b[j] + "\n")
+			j++
+		case i < len(a):
+			buf.WriteString("-" + a[i] + "\n")
+			i++
+		default:
+			j++
+		}
+	}
+	return buf.String()
+}
+
+func splitLines(s string) []string {
+	lines := strings.Split(s, "\n")
+	// trim trailing CR if present per line (robust for Windows clients)
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], "\r")
+	}
+	// drop possible last empty line if both end with newline to reduce noise
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
+}
+
+func containsAhead(arr []string, target string, start int) bool {
+	for k := start; k < len(arr) && k < start+16; k++ { // look ahead limited window
+		if arr[k] == target {
+			return true
+		}
+	}
+	return false
+}
+
+// requestShowDocument sends window/showDocument to hint the client to open a tab for our virtual doc
+func (s *Server) requestShowDocument(uri string) {
+	id := atomic.AddUint64(&s.rpcID, 1)
+	req := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"method":  "window/showDocument",
+		"params": map[string]any{
+			"uri":       uri,
+			"external":  false,
+			"takeFocus": true,
+		},
+	}
+	s.write(req)
+}
+
+func sanitizeTitle(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch r {
+		case ' ', '\\', '/', ':', '?', '*', '"', '<', '>', '|':
+			out = append(out, '-')
+		default:
+			if r < 32 {
+				continue
+			}
+			out = append(out, r)
+		}
+	}
+	if len(out) == 0 {
+		return "untitled"
+	}
+	return string(out)
+}
+
+// rspFetchXfer connects to the configured RSP server and performs a qXfer read for the given stream.
+// It returns the fully reassembled payload bytes (already hex-decoded for 'm'/'l' chunks).
+func (s *Server) rspFetchXfer(stream string, annex string) ([]byte, error) {
+	// open TCP
+	conn, err := net.Dial("tcp", s.rspAddr)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	// helper to write an RSP packet
+	writePkt := func(p string) error {
+		sum := byte(0)
+		for i := 0; i < len(p); i++ {
+			sum += p[i]
+		}
+		frame := fmt.Sprintf("$%s#%02x", p, sum)
+		_, err := conn.Write([]byte(frame))
+		return err
+	}
+	// read one RSP reply payload (ignore '+')
+	readPayload := func() (string, error) {
+		r := bufio.NewReader(conn)
+		// optional ack
+		b, err := r.ReadByte()
+		if err != nil {
+			return "", err
+		}
+		if b != '+' {
+			_ = r.UnreadByte()
+		}
+		// '$'
+		for {
+			ch, er := r.ReadByte()
+			if er != nil {
+				return "", er
+			}
+			if ch == '$' {
+				break
+			}
+		}
+		var data []byte
+		for {
+			ch, er := r.ReadByte()
+			if er != nil {
+				return "", er
+			}
+			if ch == '#' {
+				break
+			}
+			data = append(data, ch)
+		}
+		// checksum
+		_, _ = r.ReadByte()
+		_, _ = r.ReadByte()
+		return string(data), nil
+	}
+	// Enter no-ack mode
+	_ = writePkt("QStartNoAckMode")
+	_, _ = readPayload()
+	// qXfer loop: read in chunks
+	var out []byte
+	off := 0
+	for {
+		tail := fmt.Sprintf("%x,%x", off, 0x400)
+		q := "qXfer:" + stream + ":read:"
+		if annex != "" {
+			q += annex + ":"
+		}
+		q += tail
+		if err := writePkt(q); err != nil {
+			return nil, err
+		}
+		payload, err := readPayload()
+		if err != nil {
+			return nil, err
+		}
+		if len(payload) == 0 {
+			break
+		}
+		marker := payload[0]
+		chunkHex := payload[1:]
+		chunk, er := hex.DecodeString(chunkHex)
+		if er != nil {
+			return nil, er
+		}
+		out = append(out, chunk...)
+		off += len(chunk)
+		if marker == 'l' {
+			break
+		}
+	}
+	return out, nil
 }
 
 // publishDiagnosticsFor parses the document and publishes diagnostics.
@@ -1924,11 +2749,15 @@ func (s *Server) handleSemanticTokensFull(uri string) map[string]any {
 				}
 			}
 			return "variable", true
+		case lexer.TokenStruct:
+			return "type", true
+		case lexer.TokenEnum, lexer.TokenTrait:
+			return "type", true
 		case lexer.TokenFunc:
 			return "keyword", true
 		case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenIf, lexer.TokenElse, lexer.TokenFor, lexer.TokenWhile,
 			lexer.TokenLoop, lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue, lexer.TokenAsync, lexer.TokenAwait,
-			lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl, lexer.TokenImport, lexer.TokenExport,
+			lexer.TokenImpl, lexer.TokenImport, lexer.TokenExport,
 			lexer.TokenModule, lexer.TokenPub, lexer.TokenMut, lexer.TokenAs, lexer.TokenIn, lexer.TokenWhere, lexer.TokenUnsafe,
 			lexer.TokenActor, lexer.TokenSpawn, lexer.TokenMacro:
 			return "keyword", true
@@ -2029,11 +2858,15 @@ func (s *Server) handleSemanticTokensRange(uri string, startLine, endLine int) m
 				}
 			}
 			return "variable", true
+		case lexer.TokenStruct:
+			return "type", true
+		case lexer.TokenEnum, lexer.TokenTrait:
+			return "type", true
 		case lexer.TokenFunc:
 			return "keyword", true
 		case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenIf, lexer.TokenElse, lexer.TokenFor, lexer.TokenWhile,
 			lexer.TokenLoop, lexer.TokenReturn, lexer.TokenBreak, lexer.TokenContinue, lexer.TokenAsync, lexer.TokenAwait,
-			lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl, lexer.TokenImport, lexer.TokenExport,
+			lexer.TokenImpl, lexer.TokenImport, lexer.TokenExport,
 			lexer.TokenModule, lexer.TokenPub, lexer.TokenMut, lexer.TokenAs, lexer.TokenIn, lexer.TokenWhere, lexer.TokenUnsafe,
 			lexer.TokenActor, lexer.TokenSpawn, lexer.TokenMacro:
 			return "keyword", true

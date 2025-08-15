@@ -100,6 +100,72 @@ make test
 ./build/orizon-compiler examples/hello.oriz
 ```
 
+### ファジングと再現
+
+```bash
+# パーサーファズ（トークンエッジカバレッジ/ユニーク数収集、興味深い入力の保存）
+./orizon-fuzz --target parser --duration 10s --covout fuzz.cov --covstats --corpus-out corpus_new --out crashes.txt
+
+# レキサーファズ
+./orizon-fuzz --target lexer --duration 10s --covstats --corpus corpus/lexer_corpus.txt
+
+# ASTブリッジ往復（パース成功入力を要求）
+./orizon-fuzz --target astbridge --duration 10s --covstats --corpus corpus/astbridge_corpus.txt
+
+# クラッシュ再現と最小化
+./orizon-repro --in crashes/input_001.oriz --out minimized.oriz --budget 5s
+```
+
+### WindowsでのI/Oポーラ選択（環境変数）
+
+```powershell
+# 既定: ポータブル（goroutineベース）
+$env:ORIZON_WIN_PORTABLE="1"
+
+# WSAPollを強制
+$env:ORIZON_WIN_WSAPOLL="1"
+
+# IOCPを要求（ビルドタグ windows,iocp が必要。未タグ時はWSAPollへフォールバック）
+$env:ORIZON_WIN_IOCP="1"
+```
+
+### Windows IOCP のビルド/テスト（実験）
+
+```powershell
+# IOCP 実装を有効化してビルド（Windows環境でのみ有効）
+go build -tags iocp ./...
+
+# IOCP 経路のユニットテスト（実験タグ）
+go test -tags iocp ./internal/runtime/asyncio -run IOCPPoller -v
+
+# 実行時にIOCPを明示要求（未タグ時はWSAPollへフォールバック）
+$env:ORIZON_WIN_IOCP="1"
+```
+
+### テストランナー
+
+```bash
+# 全パッケージのテストを並列実行（カラー、JSON無効）
+./orizon-test --packages ./... --p 0 --color
+
+# 特定のテスト名にマッチさせる（正規表現）
+./orizon-test --packages ./internal/... --run "TestActorSystem_.*"
+
+# go test の追加引数をそのまま渡す
+./orizon-test --packages ./... --args "-bench=. -benchmem" --json
+```
+
+### モック生成器
+
+```bash
+# 指定パッケージ配下のインターフェースからモックを生成
+./orizon-mockgen --pkg ./internal/runtime --out ./internal/runtime/mocks
+
+# 単一ファイルを入力にして出力先を指定
+./orizon-mockgen --in ./internal/packagemanager/resolver.go --out ./internal/packagemanager/mocks
+```
+
+
 ### VS Code開発
 
 1. 推奨拡張機能をインストール
@@ -113,7 +179,10 @@ orizon/
 ├── cmd/                    # コマンドラインツール
 │   ├── orizon-compiler/    # メインコンパイラ
 │   ├── orizon-lsp/        # Language Server Protocol
-│   └── orizon-fmt/        # コードフォーマッタ
+│   ├── orizon-fmt/        # コードフォーマッタ
+│   ├── orizon-fuzz/       # ファザー（近似カバレッジ対応）
+│   ├── orizon-repro/      # クラッシュ再現・最小化
+│   └── orizon-test/       # Goテストラッパー（カラー/JSON/並列）
 ├── internal/              # 内部実装
 │   ├── lexer/            # 字句解析器
 │   ├── parser/           # 構文解析器

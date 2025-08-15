@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"os"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -62,6 +61,8 @@ type windowsPoller struct {
 	closed atomic.Uint32
 
 	wg sync.WaitGroup
+	// notifier provides Windows-specific arming/cancel hooks (future use).
+	notifier winNotifier
 }
 
 type winReg struct {
@@ -73,11 +74,14 @@ type winReg struct {
 	disabled             atomic.Uint32
 	lastWritableUnixNano int64
 	stop                 context.CancelFunc
-	done                 chan struct{}
 }
 
 func newWindowsPoller() Poller {
-	return &windowsPoller{regs: make(map[uintptr]*winReg), byConn: make(map[net.Conn]*winReg)}
+	return &windowsPoller{
+		regs:     make(map[uintptr]*winReg),
+		byConn:   make(map[net.Conn]*winReg),
+		notifier: wsapollNotifier{},
+	}
 }
 
 func (p *windowsPoller) Start(ctx context.Context) error {
@@ -114,9 +118,6 @@ func (p *windowsPoller) Stop() error {
 		if r.stop != nil {
 			r.stop()
 		}
-		if r.done != nil {
-			<-r.done
-		}
 	}
 	_ = byConn
 	// Close waker endpoints after loop has a chance to drain.
@@ -138,18 +139,35 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithCancel(p.ctx)
-	reg := &winReg{sock: s, conn: conn, kinds: kinds, handler: h, reader: bufio.NewReader(conn), stop: cancel, done: make(chan struct{})}
 	p.mu.Lock()
-	if _, exists := p.regs[s]; exists {
+	if old, exists := p.regs[s]; exists {
+		// Idempotent update: refresh handler and kinds; keep existing reader and control goroutines
+		old.kinds = kinds
+		old.handler = h
+		// refresh byConn mapping in case conn identity changed
+		p.byConn[conn] = old
 		p.mu.Unlock()
-		// Start compatibility watcher alongside WSAPoll to ensure timely readiness on all setups.
-		go p.watch(ctx, reg)
-		return errors.New("already registered")
+		// No-op hooks for future unification.
+		if p.notifier != nil {
+			lite := &winRegLite{sock: s}
+			if contains(kinds, Readable) { p.notifier.armReadable(lite) }
+			if contains(kinds, Writable) { p.notifier.armWritable(lite) }
+		}
+		// Notify poll loop of potential event mask change
+		p.wake()
+		return nil
 	}
+	_, cancel := context.WithCancel(p.ctx)
+	reg := &winReg{sock: s, conn: conn, kinds: kinds, handler: h, reader: bufio.NewReader(conn), stop: cancel}
 	p.regs[s] = reg
 	p.byConn[conn] = reg
 	p.mu.Unlock()
+	// No-op hooks for future unification.
+	if p.notifier != nil {
+		lite := &winRegLite{sock: s}
+		if contains(kinds, Readable) { p.notifier.armReadable(lite) }
+		if contains(kinds, Writable) { p.notifier.armWritable(lite) }
+	}
 	// Notify poll loop to rebuild FD set immediately.
 	p.wake()
 	return nil
@@ -157,10 +175,24 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 
 func (p *windowsPoller) Deregister(conn net.Conn) error {
 	s, err := getSocketFromConn(conn)
-	if err != nil {
-		return err
-	}
 	p.mu.Lock()
+	if err != nil {
+		// Fallback: try lookup by connection identity (may occur after conn.Close())
+		if reg, ok := p.byConn[conn]; ok {
+			reg.disabled.Store(1)
+			if reg.stop != nil {
+				reg.stop()
+			}
+			delete(p.regs, reg.sock)
+			delete(p.byConn, reg.conn)
+			p.mu.Unlock()
+			if p.notifier != nil { p.notifier.cancel(&winRegLite{sock: reg.sock}) }
+			p.wake()
+			return nil
+		}
+		p.mu.Unlock()
+		return nil
+	}
 	if reg, ok := p.regs[s]; ok {
 		reg.disabled.Store(1)
 		if reg.stop != nil {
@@ -168,13 +200,23 @@ func (p *windowsPoller) Deregister(conn net.Conn) error {
 		}
 		delete(p.regs, s)
 		delete(p.byConn, reg.conn)
-		done := reg.done
 		p.mu.Unlock()
 		// Wake the poll loop so it can drop the FD quickly.
+		if p.notifier != nil { p.notifier.cancel(&winRegLite{sock: s}) }
 		p.wake()
-		if done != nil {
-			<-done
+		return nil
+	}
+	// If not found by socket key, fall back to by-conn lookup to be robust.
+	if reg, ok := p.byConn[conn]; ok {
+		reg.disabled.Store(1)
+		if reg.stop != nil {
+			reg.stop()
 		}
+		delete(p.regs, reg.sock)
+		delete(p.byConn, reg.conn)
+		p.mu.Unlock()
+		if p.notifier != nil { p.notifier.cancel(&winRegLite{sock: reg.sock}) }
+		p.wake()
 		return nil
 	}
 	p.mu.Unlock()
@@ -194,7 +236,6 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 	)
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
-	defer close(reg.done)
 	for {
 		select {
 		case <-ctx.Done():
@@ -217,7 +258,7 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 							reg.handler(Event{Conn: reg.conn, Type: Error, Err: io.EOF})
 						}
 						return
-					} else if err != nil && !errors.Is(err, io.EOF) {
+					} else if !errors.Is(err, io.EOF) {
 						if reg.disabled.Load() == 0 {
 							reg.handler(Event{Conn: reg.conn, Type: Error, Err: err})
 						}
@@ -228,11 +269,12 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 			// Writable (throttled)
 			if contains(reg.kinds, Writable) {
 				now := time.Now()
-				if reg.lastWritableUnixNano == 0 || now.Sub(time.Unix(0, reg.lastWritableUnixNano)) >= 50*time.Millisecond {
+				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
+				if last == 0 || now.Sub(time.Unix(0, last)) >= 50*time.Millisecond {
 					if reg.disabled.Load() == 0 {
 						reg.handler(Event{Conn: reg.conn, Type: Writable})
 					}
-					reg.lastWritableUnixNano = now.UnixNano()
+					atomic.StoreInt64(&reg.lastWritableUnixNano, now.UnixNano())
 					activity = true
 				}
 			}
@@ -322,11 +364,12 @@ func (p *windowsPoller) loop() {
 			// Writable (throttled)
 			if (re&(pollOUT|pollWRNORM|pollWRBAND)) != 0 && contains(reg.kinds, Writable) {
 				now := time.Now()
-				if reg.lastWritableUnixNano == 0 || now.Sub(time.Unix(0, reg.lastWritableUnixNano)) >= 50*time.Millisecond {
+				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
+				if last == 0 || now.Sub(time.Unix(0, last)) >= 50*time.Millisecond {
 					if reg.disabled.Load() == 0 {
 						reg.handler(Event{Conn: reg.conn, Type: Writable})
 					}
-					reg.lastWritableUnixNano = now.UnixNano()
+					atomic.StoreInt64(&reg.lastWritableUnixNano, now.UnixNano())
 				}
 			}
 		}
@@ -447,12 +490,4 @@ func wsaPoll(fds []wsaPollFD, timeoutMs int) (int, error) {
 	return n, nil
 }
 
-// NewOSPoller (Windows)
-// For maximum compatibility we default to the portable poller, but allow opting
-// into WSAPoll via environment variable `ORIZON_WIN_WSAPOLL=1`.
-func NewOSPoller() Poller {
-	if v := os.Getenv("ORIZON_WIN_WSAPOLL"); v == "1" || v == "true" || v == "on" {
-		return newWindowsPoller()
-	}
-	return NewDefaultPoller()
-}
+// Note: NewOSPoller is defined in poller_factory_windows.go for Windows.

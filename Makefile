@@ -15,7 +15,22 @@ build: ## コンパイラをビルド
 	@CGO_ENABLED=0 go build -o build/orizon-compiler ./cmd/orizon-compiler
 	@CGO_ENABLED=0 go build -o build/orizon-lsp ./cmd/orizon-lsp
 	@CGO_ENABLED=0 go build -o build/orizon-fmt ./cmd/orizon-fmt
+	@CGO_ENABLED=0 go build -o build/orizon-fuzz ./cmd/orizon-fuzz
+	@CGO_ENABLED=0 go build -o build/orizon-repro ./cmd/orizon-repro
+	@CGO_ENABLED=0 go build -o build/orizon-test ./cmd/orizon-test
 	@echo "✅ ビルド完了"
+
+fuzz-parser-sample: build ## 簡易パーサーファズ（小コーパス）
+	@echo "🧪 Parser fuzz (sample corpus) ..."
+	@./build/orizon-fuzz --target parser --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covstats
+
+fuzz-lexer-sample: build ## 簡易レキサーファズ（小コーパス）
+	@echo "🧪 Lexer fuzz (sample corpus) ..."
+	@./build/orizon-fuzz --target lexer --duration 5s --p 2 --corpus corpus/lexer_corpus.txt --covstats
+
+fuzz-astbridge-sample: build ## 簡易ASTブリッジファズ（小コーパス）
+	@echo "🧪 AST bridge fuzz (sample corpus) ..."
+	@./build/orizon-fuzz --target astbridge --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats
 
 build-release: ## リリース用ビルド（最適化有効）
 	@echo "🚀 リリース用ビルド中..."

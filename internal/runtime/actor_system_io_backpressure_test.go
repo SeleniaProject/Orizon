@@ -69,6 +69,9 @@ func TestIOWatch_WatermarkPause(t *testing.T) {
 	}
 	defer sys.Stop()
 
+	// Stop scheduler to keep the prefilled mailbox from draining before the watermark check.
+	sys.scheduler.Stop()
+
 	blk := make(chan struct{})
 	actor, err := NewActor("ioTarget", UserActor, &slowBehavior{blockCh: blk}, DefaultActorConfig)
 	if err != nil {

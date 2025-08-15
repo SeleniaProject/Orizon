@@ -37,12 +37,14 @@ func TestAsyncIO_ConcurrentDeregisterAndStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Register readable/error handler doing minimal work
+	// Register readable/error handler. Multiple callbacks may arrive depending on poller timing,
+	// but the test only requires that at least one callback can happen without deadlock.
+	// Use a one-shot to avoid negative WaitGroup counts if multiple events are delivered.
 	var wg sync.WaitGroup
 	wg.Add(1)
+	var once sync.Once
 	if err := p.Register(client, []EventType{Readable, Error}, func(ev Event) {
-		// no-op
-		wg.Done()
+		once.Do(func() { wg.Done() })
 	}); err != nil {
 		t.Fatal(err)
 	}

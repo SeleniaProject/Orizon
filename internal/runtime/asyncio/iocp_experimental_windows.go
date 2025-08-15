@@ -139,6 +139,9 @@ func newIOCPPoller() Poller {
 	return &iocpPoller{regs: make(map[uintptr]*iocpReg), pending: make(map[*overlappedOp]struct{})}
 }
 
+// Replace the stub in poller_factory_windows.go when built with the 'iocp' tag.
+func newIOCPIfAvailable() Poller { return NewIOCPPoller() }
+
 func (p *iocpPoller) Start(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()

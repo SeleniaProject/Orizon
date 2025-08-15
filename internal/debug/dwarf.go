@@ -26,6 +26,12 @@ type VariableInfo struct {
 	IsParam    bool          `json:"is_param"`
 	IsCaptured bool          `json:"is_captured"`
 	TypeMeta   *TypeMeta     `json:"type_meta,omitempty"`
+	// AddressBase indicates the addressing base for this variable when available
+	// (e.g., "fbreg" for frame-base relative). Empty when unknown.
+	AddressBase string `json:"address_base,omitempty"`
+	// FrameOffset provides an approximate offset from AddressBase for this variable.
+	// Parameters typically use non-negative offsets, locals negative offsets.
+	FrameOffset int64 `json:"frame_offset,omitempty"`
 }
 
 // FunctionInfo describes a function for debug.
@@ -58,6 +64,10 @@ type TypeMeta struct {
 	Alignment  int64       `json:"alignment"`
 	Parameters []TypeMeta  `json:"parameters,omitempty"`
 	Fields     []TypeField `json:"fields,omitempty"`
+	// Qualifiers carries type qualifiers like "const" or "volatile" for debug emission.
+	Qualifiers []string `json:"qualifiers,omitempty"`
+	// AliasOf represents a typedef-like alias; when non-nil, this type is an alias of the target.
+	AliasOf *TypeMeta `json:"alias_of,omitempty"`
 }
 
 // TypeField describes a struct/record field.
@@ -137,6 +147,23 @@ func (e *Emitter) Emit(p *hir.HIRProgram) (ProgramDebugInfo, error) {
 				}
 				// Sort variables for determinism
 				sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+				// Compute approximate frame offsets from a virtual frame base
+				// Parameters at non-negative increasing offsets; locals at negative offsets
+				var paramOffset int64
+				var localOffset int64
+				for i := range vars {
+					sz := int64(computeVarSlotSize(vars[i]))
+					if vars[i].IsParam {
+						vars[i].AddressBase = "fbreg"
+						vars[i].FrameOffset = paramOffset
+						// advance offset by slot size (8-byte aligned)
+						paramOffset += sz
+					} else {
+						vars[i].AddressBase = "fbreg"
+						localOffset += sz
+						vars[i].FrameOffset = -localOffset
+					}
+				}
 				fi.Variables = vars
 				// Basic function type summary (return/params) if available
 				if fn.ReturnType != nil {
@@ -228,6 +255,28 @@ func convertTypeInfoToMeta(t hir.TypeInfo) TypeMeta {
 		}
 	}
 	return tm
+}
+
+// computeVarSlotSize estimates a stack slot size for a variable for frame offset modeling.
+// It prefers TypeMeta.Size when present; otherwise falls back to common base type sizes.
+func computeVarSlotSize(v VariableInfo) int {
+	if v.TypeMeta != nil && v.TypeMeta.Size > 0 {
+		sz := int(v.TypeMeta.Size)
+		if sz%8 != 0 {
+			sz = ((sz + 7) / 8) * 8
+		}
+		return sz
+	}
+	switch v.Type {
+	case "int64", "uint64", "float64", "i64", "u64", "f64":
+		return 8
+	case "int32", "uint32", "float32", "i32", "u32", "f32":
+		return 4
+	case "bool", "u8", "i8", "byte", "char":
+		return 1
+	default:
+		return 8
+	}
 }
 
 func typeKindToString(k hir.TypeKind) string {

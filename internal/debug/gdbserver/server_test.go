@@ -367,6 +367,252 @@ func TestRSP_QXferMemoryMapAndAuxv(t *testing.T) {
 	}
 }
 
+func TestRSP_QXferStack(t *testing.T) {
+	srv := NewServer(buildDebugInfo(3))
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+
+	// no-ack
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+
+	// stack trace chunk read
+	_, _ = w.Write(encodeRSP("qXfer:stack:read::0,40"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) < 2 {
+		t.Fatalf("short payload: %q", payload)
+	}
+	if payload[0] != 'm' && payload[0] != 'l' {
+		t.Fatalf("expected m/l marker, got %q", payload[0])
+	}
+	data, err := hex.DecodeString(payload[1:])
+	if err != nil {
+		t.Fatalf("invalid hex: %v", err)
+	}
+	if len(data) == 0 || data[0] != '{' {
+		t.Fatalf("expected JSON data, got %q", string(data))
+	}
+}
+
+func TestRSP_QXferActorsAndMessages(t *testing.T) {
+	// Wire a simple provider with deterministic JSON
+	ActorsJSONProvider = func() []byte { return []byte(`{"frames":[{"pc":0}]}`) }
+	srv := NewServer(buildDebugInfo(1))
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+
+	// no-ack
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+
+	// actors read
+	_, _ = w.Write(encodeRSP("qXfer:actors:read::0,20"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad xfer actors: %q", payload)
+	}
+
+	// actors-messages read (reuses provider for now)
+	_, _ = w.Write(encodeRSP("qXfer:actors-messages:read::0,20"))
+	_ = w.Flush()
+	_, payload, err = readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad xfer actors-messages: %q", payload)
+	}
+}
+
+func TestRSP_QXferActorsGraphAndDeadlocks(t *testing.T) {
+	// Provide deterministic JSON providers
+	ActorsJSONProvider = func() []byte { return []byte(`{"actors":[{"id":1}]}`) }
+	ActorsGraphJSONProvider = func() []byte { return []byte(`{"nodes":[],"edges":[]}`) }
+	DeadlocksJSONProvider = func() []byte { return []byte(`[]`) }
+	srv := NewServer(buildDebugInfo(1))
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+
+	// no-ack
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+
+	// actors-graph
+	_, _ = w.Write(encodeRSP("qXfer:actors-graph:read::0,20"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad xfer actors-graph: %q", payload)
+	}
+	if _, err := hex.DecodeString(payload[1:]); err != nil {
+		t.Fatalf("invalid hex: %v", err)
+	}
+
+	// deadlocks
+	_, _ = w.Write(encodeRSP("qXfer:deadlocks:read::0,20"))
+	_ = w.Flush()
+	_, payload, err = readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad xfer deadlocks: %q", payload)
+	}
+	if _, err := hex.DecodeString(payload[1:]); err != nil {
+		t.Fatalf("invalid hex: %v", err)
+	}
+}
+
+func TestRSP_QXferCorrelation(t *testing.T) {
+	// Provide correlation provider
+	CorrelationJSONProvider = func(id string, n int) []byte {
+		if id == "abc" {
+			return []byte(`[{"id":"abc"}]`)
+		}
+		return []byte(`[]`)
+	}
+	srv := NewServer(buildDebugInfo(1))
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+
+	// no-ack
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+
+	// read correlation with annex id=abc,n=10
+	_, _ = w.Write(encodeRSP("qXfer:correlation:read:id=abc,n=10:0,20"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad xfer correlation: %q", payload)
+	}
+	if _, err := hex.DecodeString(payload[1:]); err != nil {
+		t.Fatalf("invalid hex: %v", err)
+	}
+}
+
+func TestRSP_QXferLocals(t *testing.T) {
+	// Provide locals provider returning fixed json
+	LocalsJSONProvider = func(pc uint64) []byte { return []byte(`[{"name":"x","value":1}]`) }
+	srv := NewServer(buildDebugInfo(2))
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+
+	// enter no-ack
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+
+	// request first chunk
+	_, _ = w.Write(encodeRSP("qXfer:locals:read::0,20"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad payload: %q", payload)
+	}
+	if _, err := hex.DecodeString(payload[1:]); err != nil {
+		t.Fatalf("invalid hex: %v", err)
+	}
+}
+
+func TestRSP_QXferPrettyLocals(t *testing.T) {
+	PrettyLocalsJSONProvider = func(pc, fp uint64) []byte { return []byte(`[{"name":"x","type":"int","value":123}]`) }
+	srv := NewServer(buildDebugInfo(1))
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+	_, _ = w.Write(encodeRSP("qXfer:pretty-locals:read::0,40"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad payload: %q", payload)
+	}
+	if _, err := hex.DecodeString(payload[1:]); err != nil {
+		t.Fatalf("invalid hex: %v", err)
+	}
+}
+
+func TestRSP_QXferPrettyMemory(t *testing.T) {
+	srv := NewServer(buildDebugInfo(1))
+	// Seed memory
+	for i := 0; i < 64; i++ {
+		srv.mem[0x100+uint64(i)] = byte(0x41 + (i % 26))
+	}
+	c1, c2 := net.Pipe()
+	defer c1.Close()
+	defer c2.Close()
+	go func() { _ = srv.HandleConn(c1) }()
+	w := bufio.NewWriter(c2)
+	r := bufio.NewReader(c2)
+	_, _ = w.Write(encodeRSP("QStartNoAckMode"))
+	_ = w.Flush()
+	_, _, _ = readReply(r)
+	// Request pretty memory
+	_, _ = w.Write(encodeRSP("qXfer:pretty-memory:read:addr=100,len=40:0,80"))
+	_ = w.Flush()
+	_, payload, err := readReply(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload == "" || (payload[0] != 'm' && payload[0] != 'l') {
+		t.Fatalf("bad payload: %q", payload)
+	}
+	// ensure hex decodes
+	if data, err := hex.DecodeString(payload[1:]); err != nil || len(data) == 0 {
+		t.Fatalf("invalid hex or empty: %v, %d", err, len(data))
+	}
+}
+
 func TestRSP_TStopReply(t *testing.T) {
 	srv := NewServer(buildDebugInfo(2))
 	// Enable T-stop replies

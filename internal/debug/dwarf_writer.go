@@ -259,6 +259,35 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 	uleb128(ab, 0)
 	ab.WriteByte(0)
 
+	// Abbrev 13: typedef, no children; attrs: name(strp), type(ref4)
+	uleb128(ab, 13)
+	uleb128(ab, 0x16) // DW_TAG_typedef
+	ab.WriteByte(0)
+	uleb128(ab, 0x03) // DW_AT_name
+	uleb128(ab, 0x0e) // DW_FORM_strp
+	uleb128(ab, 0x49) // DW_AT_type
+	uleb128(ab, 0x13) // DW_FORM_ref4
+	uleb128(ab, 0)
+	uleb128(ab, 0)
+
+	// Abbrev 14: const_type, no children; attrs: type(ref4)
+	uleb128(ab, 14)
+	uleb128(ab, 0x26) // DW_TAG_const_type
+	ab.WriteByte(0)
+	uleb128(ab, 0x49) // DW_AT_type
+	uleb128(ab, 0x13) // DW_FORM_ref4
+	uleb128(ab, 0)
+	uleb128(ab, 0)
+
+	// Abbrev 15: volatile_type, no children; attrs: type(ref4)
+	uleb128(ab, 15)
+	uleb128(ab, 0x25) // DW_TAG_volatile_type
+	ab.WriteByte(0)
+	uleb128(ab, 0x49) // DW_AT_type
+	uleb128(ab, 0x13) // DW_FORM_ref4
+	uleb128(ab, 0)
+	uleb128(ab, 0)
+
 	// Abbrev 6: pointer_type, no children; attrs: byte_size(data1)
 	uleb128(ab, 6)
 	uleb128(ab, 0x0f) // DW_TAG_pointer_type
@@ -400,6 +429,46 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 					}
 					if off, ok := typeOffsets[sig]; ok {
 						return off
+					}
+					// Handle qualifiers and typedef aliases before kind-specific emission
+					if len(t.Qualifiers) > 0 {
+						// For const/volatile, we wrap the underlying type DIE with const_type/volatile_type
+						// Build the unqualified base first
+						base := t
+						base.Qualifiers = nil
+						baseOff := emitType(base)
+						for _, q := range t.Qualifiers {
+							switch q {
+							case "const":
+								// Abbrev 14: const_type
+								qualifiedSig := sig + ";const"
+								return internType(qualifiedSig, func() {
+									uleb128(cu, 14)
+									binary.Write(cu, binary.LittleEndian, baseOff)
+								})
+							case "volatile":
+								// Abbrev 15: volatile_type
+								qualifiedSig := sig + ";volatile"
+								return internType(qualifiedSig, func() {
+									uleb128(cu, 15)
+									binary.Write(cu, binary.LittleEndian, baseOff)
+								})
+							default:
+								// Unknown qualifier: fall back to base type
+								return baseOff
+							}
+						}
+					}
+					if t.AliasOf != nil {
+						// typedef: refer to underlying type and provide a distinct name
+						uOff := emitType(*t.AliasOf)
+						typedefSig := sig + ";typedef"
+						return internType(typedefSig, func() {
+							uleb128(cu, 13) // typedef
+							no := writeStr(t.Name)
+							binary.Write(cu, binary.LittleEndian, no)
+							binary.Write(cu, binary.LittleEndian, uOff)
+						})
 					}
 					switch t.Kind {
 					case "int", "float", "bool", "string":
@@ -678,7 +747,10 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 				cu.WriteByte(0) // end of subroutine_type children
 			}
 			// formal parameters and locals (params first, then locals)
-			for pi, v := range fn.Variables {
+			// Parameters: compute precise frame-base offsets based on declared sizes when available
+			paramOffset := int64(0)
+			paramIndex := 0
+			for _, v := range fn.Variables {
 				if !v.IsParam {
 					continue
 				}
@@ -694,8 +766,10 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 				binary.Write(cu, binary.LittleEndian, pfileIdx)
 				binary.Write(cu, binary.LittleEndian, uint32(v.Span.Start.Line))
 				// location: DW_OP_fbreg <sleb128 offset>
-				// Assume 8-byte slots for parameters: offset = 8*(pi+1)
-				off := int64(8 * (pi + 1))
+				// Use accumulated slot size to compute a realistic frame-base offset for parameters
+				sz := int64(computeSlotSize(v))
+				// Place parameter at current offset from CFA
+				off := paramOffset + sz
 				// expr length = 1 opcode + sleb128(off)
 				expr := &bytes.Buffer{}
 				expr.WriteByte(0x91) // DW_OP_fbreg
@@ -732,9 +806,11 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 				} else {
 					binary.Write(cu, binary.LittleEndian, uint32(0))
 				}
+				paramOffset += sz
+				paramIndex++
 			}
 			// locals: emit as DW_TAG_variable (abbrev 4) with fbreg negative offsets (stack grows down)
-			localIndex := 0
+			localOffset := int64(0)
 			for _, v := range fn.Variables {
 				if v.IsParam {
 					continue
@@ -750,15 +826,16 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 				}
 				binary.Write(cu, binary.LittleEndian, lfileIdx)
 				binary.Write(cu, binary.LittleEndian, uint32(v.Span.Start.Line))
-				// Assume 8-byte slots below CFA: offset = -8*(localIndex+1)
-				loff := int64(-8 * (localIndex + 1))
+				// Stack grows down: accumulate slot sizes and assign negative offsets from CFA
+				sz := int64(computeSlotSize(v))
+				localOffset += sz
+				loff := -localOffset
 				lexpr := &bytes.Buffer{}
 				lexpr.WriteByte(0x91)
 				sleb128(lexpr, loff)
 				uleb128(cu, uint64(lexpr.Len()))
 				cu.Write(lexpr.Bytes())
 				// type ref (if available)
-				localIndex++
 				if v.TypeMeta != nil {
 					sig := v.TypeMeta.Kind + ":" + v.TypeMeta.Name
 					if len(v.TypeMeta.Parameters) > 0 {
@@ -800,6 +877,32 @@ func BuildDWARF(info ProgramDebugInfo) (DWARFSections, error) {
 	}
 
 	return DWARFSections{Abbrev: ab.Bytes(), Info: inf.Bytes(), Line: line.Bytes(), Str: str.Bytes()}, nil
+}
+
+// computeSlotSize returns a reasonable stack slot size for a variable based on its type metadata/name.
+// This is a best-effort heuristic for accurate DW_OP_fbreg offsets in the absence of concrete layout.
+func computeSlotSize(v VariableInfo) int {
+	// Prefer structured type metadata sizes
+	if v.TypeMeta != nil && v.TypeMeta.Size > 0 {
+		// Round up to 8-byte slot alignment for 64-bit targets
+		sz := int(v.TypeMeta.Size)
+		if sz%8 != 0 {
+			sz = ((sz + 7) / 8) * 8
+		}
+		return sz
+	}
+	// Fallback to common base types inferred from name strings
+	switch v.Type {
+	case "int64", "uint64", "float64", "i64", "u64", "f64":
+		return 8
+	case "int32", "uint32", "float32", "i32", "u32", "f32":
+		return 4
+	case "bool", "u8", "i8", "byte", "char":
+		return 1
+	default:
+		// Default conservative slot size: 8 bytes
+		return 8
+	}
 }
 
 // mapBaseType returns DWARF base type encoding and size for a given simple type name.

@@ -1,0 +1,5 @@
+let a = 1
+"string with escapes\\n"
+/* block comment */
+1.23 45 .67 8.9.0
+!m(x)
