@@ -51,6 +51,7 @@ type goPoller struct {
 }
 
 type registration struct {
+    mu       sync.RWMutex
     kinds    []EventType
     handler  Handler
     stop     context.CancelFunc
@@ -90,9 +91,14 @@ func (p *goPoller) Register(conn net.Conn, kinds []EventType, h Handler) error {
 		return errors.New("invalid registration")
 	}
 	p.mu.Lock()
-	if _, exists := p.conns[conn]; exists {
+	if reg, exists := p.conns[conn]; exists {
+		// Idempotent re-register: update kinds and handler; keep existing watcher.
+		reg.mu.Lock()
+		reg.kinds = kinds
+		reg.handler = h
+		reg.mu.Unlock()
 		p.mu.Unlock()
-		return errors.New("already registered")
+		return nil
 	}
 	ctx, cancel := context.WithCancel(p.ctx)
 	reg := &registration{kinds: kinds, handler: h, stop: cancel, done: make(chan struct{})}
@@ -149,12 +155,17 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 			return
 		case <-tick.C:
 			activity := false
+			// Snapshot current kinds and handler under lock for safe concurrent updates.
+			reg.mu.RLock()
+			kinds := reg.kinds
+			handler := reg.handler
+			reg.mu.RUnlock()
 			// Readable
-			if contains(reg.kinds, Readable) {
+			if contains(kinds, Readable) {
 				_ = conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
 				if b, err := reader.Peek(1); err == nil && len(b) > 0 {
 					if atomic.LoadUint32(&reg.disabled) == 0 {
-						reg.handler(Event{Conn: conn, Type: Readable})
+						handler(Event{Conn: conn, Type: Readable})
 					}
 					activity = true
 				} else if err != nil {
@@ -163,30 +174,30 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 						// Ignore timeouts; this simply indicates no data right now.
 					} else if errors.Is(err, io.EOF) {
 						if atomic.LoadUint32(&reg.disabled) == 0 {
-							reg.handler(Event{Conn: conn, Type: Error, Err: io.EOF})
+							handler(Event{Conn: conn, Type: Error, Err: io.EOF})
 						}
 						close(reg.done)
 						return
 					} else {
 						if atomic.LoadUint32(&reg.disabled) == 0 {
-							reg.handler(Event{Conn: conn, Type: Error, Err: err})
+							handler(Event{Conn: conn, Type: Error, Err: err})
 						}
 						close(reg.done)
 						return
 					}
 				}
 			}
-            // Writable: throttle notifications to reduce CPU usage under idle
-            if contains(reg.kinds, Writable) {
-                now := time.Now()
-                if reg.lastWritableAt.IsZero() || now.Sub(reg.lastWritableAt) >= 50*time.Millisecond {
-                    if atomic.LoadUint32(&reg.disabled) == 0 {
-                        reg.handler(Event{Conn: conn, Type: Writable})
-                    }
-                    reg.lastWritableAt = now
-                    activity = true
-                }
-            }
+			// Writable: throttle notifications to reduce CPU usage under idle
+			if contains(kinds, Writable) {
+				now := time.Now()
+				if reg.lastWritableAt.IsZero() || now.Sub(reg.lastWritableAt) >= 50*time.Millisecond {
+					if atomic.LoadUint32(&reg.disabled) == 0 {
+						handler(Event{Conn: conn, Type: Writable})
+					}
+					reg.lastWritableAt = now
+					activity = true
+				}
+			}
 			// Adapt interval based on activity
 			if activity {
 				idleCount = 0
