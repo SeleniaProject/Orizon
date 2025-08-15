@@ -13,262 +13,77 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21.x'
-      - name: Build
+          go-version: '1.24.x'
+      - name: Linux smoke (tests/fuzz/repro/summary)
         run: |
-          go build ./...
-      - name: Test
-        run: |
-          go test ./... -count=1
-      - name: Short parser fuzz smoke
-        run: |
-          go build -o orizon-fuzz ./cmd/orizon-fuzz
-          ./orizon-fuzz --target parser --duration 3s --p 2 --corpus corpus/parser_corpus.txt --covstats || true
-      - name: Upload fuzz artifacts
+          bash ./scripts/linux/smoke.sh
+      - name: Upload artifacts directory
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-artifacts
-          path: |
-            fuzz.cov
-            crashes.txt
-name: CI
+          name: artifacts
+          path: artifacts/
+      - name: Publish JUnit test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: artifacts/junit.xml
+      - name: Append stats and summary to job summary
+        if: always()
+        run: |
+          {
+            echo "### Fuzz stats (parser)";
+            if [ -f artifacts/stats_parser.json ]; then cat artifacts/stats_parser.json; else echo "(no stats_parser.json)"; fi;
+            echo;
+            echo "### Fuzz stats (parser-lax)";
+            if [ -f artifacts/stats_parser_lax.json ]; then cat artifacts/stats_parser_lax.json; else echo "(no stats_parser_lax.json)"; fi;
+            echo;
+            echo "### Test summary (flaky recovered)";
+            if [ -f artifacts/junit_summary.json ]; then cat artifacts/junit_summary.json; else echo "(no junit_summary.json)"; fi;
+          } >> "$GITHUB_STEP_SUMMARY"
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-
-jobs:
-  build-test:
-    runs-on: ubuntu-latest
+  windows-iocp-tests:
+    runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: '1.21.x'
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Build
+          go-version: '1.24.x'
+      - name: IOCP unit tests (experimental)
         env:
-          CGO_ENABLED: 0
+          ORIZON_WIN_IOCP: "1"
         run: |
-          go build ./...
+          go test ./internal/runtime/asyncio -tags iocp -run IOCPPoller -v
 
-      - name: Unit tests
-        env:
-          CGO_ENABLED: 0
-        run: |
-          go test ./... -v
-
-  fuzz-parser:
-    runs-on: ubuntu-latest
-    needs: build-test
+  windows-smoke:
+  macos-smoke:
+    runs-on: macos-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: '1.21.x'
-
-      - name: Build fuzz tools
-        env:
-          CGO_ENABLED: 0
+          go-version: '1.24.x'
+      - name: macOS smoke (tests/fuzz/repro)
         run: |
-          go build -o orizon-fuzz ./cmd/orizon-fuzz
-
-      - name: Run parser fuzz (short)
-        run: |
-          ./orizon-fuzz --target parser --duration 5s --covout fuzz.cov --out crashes.txt || true
-
-      - name: Upload fuzz artifacts
+          bash ./scripts/linux/smoke.sh
+      - name: Upload artifacts directory (macOS)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-artifacts
-          path: |
-            fuzz.cov
-            crashes.txt
-
-name: Orizon CI/CD Pipeline
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-
-env:
-  GO_VERSION: '1.21'
-  CGO_ENABLED: 0
-
-jobs:
-  # コード品質チェック
-  quality:
-    runs-on: ubuntu-latest
+          name: artifacts-macos
+          path: artifacts/
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-    
-    - name: Install dependencies
-      run: go mod download
-    
-    - name: Format check
-      run: |
-        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-          echo "Code needs formatting:"
-          gofmt -s -l .
-          exit 1
-        fi
-    
-    - name: Lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        version: latest
-        args: --timeout=5m
-
-  # テスト実行
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.21', '1.22']
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.go-version }}
-    
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
-    
-    - name: Install dependencies
-      run: go mod download
-    
-    - name: Run tests
-      run: go test -race -coverprofile=coverage.out ./...
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.out
-
-  # ビルドテスト
-  build:
-    runs-on: ubuntu-latest
-    needs: [quality, test]
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    
-    - name: Build compiler
-      run: |
-        make build
-        ./build/orizon-compiler --version
-    
-    - name: Build release artifacts
-      run: make build-release
-    
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: orizon-compiler-${{ github.sha }}
-        path: build/
-
-  # マルチプラットフォームビルド
-  cross-compile:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: [build]
-    
-    strategy:
-      matrix:
-        goos: [linux, windows, darwin]
-        goarch: [amd64, arm64]
-        exclude:
-          - goos: windows
-            goarch: arm64
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    
-    - name: Build for ${{ matrix.goos }}-${{ matrix.goarch }}
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-      run: |
-        export BINARY_NAME="orizon-compiler"
-        if [ "$GOOS" = "windows" ]; then
-          export BINARY_NAME="orizon-compiler.exe"
-        fi
-        go build -ldflags="-s -w" -o build/$BINARY_NAME ./cmd/orizon-compiler
-    
-    - name: Upload cross-compiled artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: orizon-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: build/
-
-  # リリース作成（タグ時のみ）
-  release:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [cross-compile]
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          orizon-*/orizon-compiler*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Windows smoke (tests/fuzz/repro/IOCP)
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\win\smoke.ps1
+      - name: Upload artifacts directory (Windows)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-windows
+          path: artifacts/
