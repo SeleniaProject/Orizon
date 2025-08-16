@@ -155,15 +155,21 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 		// No-op hooks for future unification.
 		if p.notifier != nil {
 			lite := &winRegLite{sock: s}
-			if contains(kinds, Readable) { p.notifier.armReadable(lite) }
-			if contains(kinds, Writable) { p.notifier.armWritable(lite) }
+			if contains(kinds, Readable) {
+				p.notifier.armReadable(lite)
+			}
+			if contains(kinds, Writable) {
+				p.notifier.armWritable(lite)
+			}
 		}
 		// Ensure periodic writable notifier is running if requested
 		if contains(kinds, Writable) {
 			wctx, cancel := context.WithCancel(p.ctx)
 			prev := old.stop
 			old.stop = func() {
-				if prev != nil { prev() }
+				if prev != nil {
+					prev()
+				}
 				cancel()
 			}
 			p.wg.Add(1)
@@ -176,7 +182,9 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 					case <-wctx.Done():
 						return
 					case <-t.C:
-						if r.disabled.Load() != 0 { continue }
+						if r.disabled.Load() != 0 {
+							continue
+						}
 						now := time.Now()
 						last := atomic.LoadInt64(&r.lastWritableUnixNano)
 						if last == 0 || now.Sub(time.Unix(0, last)) >= getWritableInterval() {
@@ -199,8 +207,12 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 	// No-op hooks for future unification.
 	if p.notifier != nil {
 		lite := &winRegLite{sock: s}
-		if contains(kinds, Readable) { p.notifier.armReadable(lite) }
-		if contains(kinds, Writable) { p.notifier.armWritable(lite) }
+		if contains(kinds, Readable) {
+			p.notifier.armReadable(lite)
+		}
+		if contains(kinds, Writable) {
+			p.notifier.armWritable(lite)
+		}
 	}
 	// If Writable is requested, start a periodic notifier to ensure progress even when WSAPoll doesn't signal OUT frequently.
 	if contains(kinds, Writable) {
@@ -208,7 +220,9 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 		// chain cancels: replacing stop to also cancel ticker goroutine
 		prev := reg.stop
 		reg.stop = func() {
-			if prev != nil { prev() }
+			if prev != nil {
+				prev()
+			}
 			cancel()
 		}
 		p.wg.Add(1)
@@ -221,7 +235,9 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 				case <-wctx.Done():
 					return
 				case <-t.C:
-					if r.disabled.Load() != 0 { continue }
+					if r.disabled.Load() != 0 {
+						continue
+					}
 					now := time.Now()
 					last := atomic.LoadInt64(&r.lastWritableUnixNano)
 					if last == 0 || now.Sub(time.Unix(0, last)) >= getWritableInterval() {
@@ -250,7 +266,9 @@ func (p *windowsPoller) Deregister(conn net.Conn) error {
 			delete(p.regs, reg.sock)
 			delete(p.byConn, reg.conn)
 			p.mu.Unlock()
-			if p.notifier != nil { p.notifier.cancel(&winRegLite{sock: reg.sock}) }
+			if p.notifier != nil {
+				p.notifier.cancel(&winRegLite{sock: reg.sock})
+			}
 			p.wake()
 			return nil
 		}
@@ -266,7 +284,9 @@ func (p *windowsPoller) Deregister(conn net.Conn) error {
 		delete(p.byConn, reg.conn)
 		p.mu.Unlock()
 		// Wake the poll loop so it can drop the FD quickly.
-		if p.notifier != nil { p.notifier.cancel(&winRegLite{sock: s}) }
+		if p.notifier != nil {
+			p.notifier.cancel(&winRegLite{sock: s})
+		}
 		p.wake()
 		return nil
 	}
@@ -279,7 +299,9 @@ func (p *windowsPoller) Deregister(conn net.Conn) error {
 		delete(p.regs, reg.sock)
 		delete(p.byConn, reg.conn)
 		p.mu.Unlock()
-		if p.notifier != nil { p.notifier.cancel(&winRegLite{sock: reg.sock}) }
+		if p.notifier != nil {
+			p.notifier.cancel(&winRegLite{sock: reg.sock})
+		}
 		p.wake()
 		return nil
 	}

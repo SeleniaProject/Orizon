@@ -21,8 +21,8 @@ func TestTypeInfoEqualsBasic(t *testing.T) {
 func TestTypeInfoEqualsArray(t *testing.T) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int"}
 	arrayInt := TypeInfo{Kind: TypeKindArray, Name: "[]int", Parameters: []TypeInfo{intType}}
-	arrayInt2 := TypeInfo{Kind: TypeKindArray, Name: "[]int", Parameters: []TypeInfo{TypeInfo{Kind: TypeKindInteger, Name: "int"}}}
-	arrayFloat := TypeInfo{Kind: TypeKindArray, Name: "[]float", Parameters: []TypeInfo{TypeInfo{Kind: TypeKindFloat, Name: "float"}}}
+	arrayInt2 := TypeInfo{Kind: TypeKindArray, Name: "[]int", Parameters: []TypeInfo{{Kind: TypeKindInteger, Name: "int"}}}
+	arrayFloat := TypeInfo{Kind: TypeKindArray, Name: "[]float", Parameters: []TypeInfo{{Kind: TypeKindFloat, Name: "float"}}}
 
 	if !arrayInt.Equals(arrayInt2) {
 		t.Error("int配列型等価性失敗")

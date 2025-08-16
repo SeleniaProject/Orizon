@@ -36,4 +36,3 @@ func TestComputeCoverage_Modes(t *testing.T) {
 		}
 	}
 }
-

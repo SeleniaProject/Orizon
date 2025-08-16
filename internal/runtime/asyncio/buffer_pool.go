@@ -76,11 +76,11 @@ func (bp *BytePool) Put(buf []byte) {
 		return
 	}
 	b := bp.buckets[idx]
-    // decrement inuse; if above limit, drop the buffer instead of returning
-    if cur := atomic.AddInt64(&b.inuse, -1); cur >= b.limit {
-        return
-    }
-    b.pool.Put(buf[:capn])
+	// decrement inuse; if above limit, drop the buffer instead of returning
+	if cur := atomic.AddInt64(&b.inuse, -1); cur >= b.limit {
+		return
+	}
+	b.pool.Put(buf[:capn])
 }
 
 // Stats returns current approximate in-use counters per bucket.

@@ -19,6 +19,7 @@ func (fsys *OSFS) Open(name string) (File, error)               { return os.Open
 func (fsys *OSFS) Create(name string) (File, error)             { return os.Create(name) }
 func (fsys *OSFS) Mkdir(name string, perm fs.FileMode) error    { return os.Mkdir(name, perm) }
 func (fsys *OSFS) MkdirAll(name string, perm fs.FileMode) error { return os.MkdirAll(name, perm) }
+func (fsys *OSFS) Rename(oldpath, newpath string) error         { return os.Rename(oldpath, newpath) }
 func (fsys *OSFS) Remove(name string) error                     { return os.Remove(name) }
 func (fsys *OSFS) RemoveAll(name string) error                  { return os.RemoveAll(name) }
 func (fsys *OSFS) Stat(name string) (fs.FileInfo, error)        { return os.Stat(name) }

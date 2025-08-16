@@ -336,86 +336,86 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 }
 
 func (p *iocpPoller) Deregister(conn net.Conn) error {
-    type sc interface {
-        SyscallConn() (syscall.RawConn, error)
-    }
-    scc, ok := conn.(sc)
-    // Try fast path by socket key when possible
-    var haveKey bool
-    var s uintptr
-    if ok {
-        if rc, err := scc.SyscallConn(); err == nil {
-            if er := rc.Control(func(fd uintptr) { s = fd }); er == nil {
-                haveKey = true
-            }
-        }
-    }
-    p.mu.Lock()
-    if haveKey {
-        if reg, ok := p.regs[s]; ok {
-            reg.disabled.Store(1)
-            if reg.stopW != nil {
-                reg.stopW()
-            }
-            if reg.watchCancel != nil {
-                reg.watchCancel()
-            }
-            _ = windows.CancelIoEx(reg.sock, nil)
-            delete(p.regs, s)
-            p.mu.Unlock()
-            if reg.stopW != nil && reg.closed != nil {
-                select {
-                case <-reg.closed:
-                case <-time.After(500 * time.Millisecond):
-                }
-            }
-            if reg.watchDone != nil {
-                select {
-                case <-reg.watchDone:
-                case <-time.After(500 * time.Millisecond):
-                }
-            }
-            return nil
-        }
-    }
-    // Fallback: search by connection identity (conn may be closed and key unavailable)
-    var foundKey uintptr
-    var found *iocpReg
-    for k, r := range p.regs {
-        if r.conn == conn {
-            foundKey = k
-            found = r
-            break
-        }
-    }
-    if found != nil {
-        found.disabled.Store(1)
-        if found.stopW != nil {
-            found.stopW()
-        }
-        if found.watchCancel != nil {
-            found.watchCancel()
-        }
-        _ = windows.CancelIoEx(found.sock, nil)
-        delete(p.regs, foundKey)
-        p.mu.Unlock()
-        if found.stopW != nil && found.closed != nil {
-            select {
-            case <-found.closed:
-            case <-time.After(500 * time.Millisecond):
-            }
-        }
-        if found.watchDone != nil {
-            select {
-            case <-found.watchDone:
-            case <-time.After(500 * time.Millisecond):
-            }
-        }
-        return nil
-    }
-    
-    p.mu.Unlock()
-    return nil
+	type sc interface {
+		SyscallConn() (syscall.RawConn, error)
+	}
+	scc, ok := conn.(sc)
+	// Try fast path by socket key when possible
+	var haveKey bool
+	var s uintptr
+	if ok {
+		if rc, err := scc.SyscallConn(); err == nil {
+			if er := rc.Control(func(fd uintptr) { s = fd }); er == nil {
+				haveKey = true
+			}
+		}
+	}
+	p.mu.Lock()
+	if haveKey {
+		if reg, ok := p.regs[s]; ok {
+			reg.disabled.Store(1)
+			if reg.stopW != nil {
+				reg.stopW()
+			}
+			if reg.watchCancel != nil {
+				reg.watchCancel()
+			}
+			_ = windows.CancelIoEx(reg.sock, nil)
+			delete(p.regs, s)
+			p.mu.Unlock()
+			if reg.stopW != nil && reg.closed != nil {
+				select {
+				case <-reg.closed:
+				case <-time.After(500 * time.Millisecond):
+				}
+			}
+			if reg.watchDone != nil {
+				select {
+				case <-reg.watchDone:
+				case <-time.After(500 * time.Millisecond):
+				}
+			}
+			return nil
+		}
+	}
+	// Fallback: search by connection identity (conn may be closed and key unavailable)
+	var foundKey uintptr
+	var found *iocpReg
+	for k, r := range p.regs {
+		if r.conn == conn {
+			foundKey = k
+			found = r
+			break
+		}
+	}
+	if found != nil {
+		found.disabled.Store(1)
+		if found.stopW != nil {
+			found.stopW()
+		}
+		if found.watchCancel != nil {
+			found.watchCancel()
+		}
+		_ = windows.CancelIoEx(found.sock, nil)
+		delete(p.regs, foundKey)
+		p.mu.Unlock()
+		if found.stopW != nil && found.closed != nil {
+			select {
+			case <-found.closed:
+			case <-time.After(500 * time.Millisecond):
+			}
+		}
+		if found.watchDone != nil {
+			select {
+			case <-found.watchDone:
+			case <-time.After(500 * time.Millisecond):
+			}
+		}
+		return nil
+	}
+
+	p.mu.Unlock()
+	return nil
 }
 
 func (p *iocpPoller) loop() {

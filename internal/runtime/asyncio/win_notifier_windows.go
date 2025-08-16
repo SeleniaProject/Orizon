@@ -22,8 +22,8 @@ type winNotifier interface {
 // without importing full structs to keep the boundary narrow.
 
 type winRegLite struct {
-	sock     uintptr   // Windows SOCKET as uintptr to avoid imports
-	disabled *uint32   // minimal disabled flag placeholder
+	sock     uintptr // Windows SOCKET as uintptr to avoid imports
+	disabled *uint32 // minimal disabled flag placeholder
 }
 
 // iocpNotifier/wsapollNotifier will implement winNotifier in follow-up changes.

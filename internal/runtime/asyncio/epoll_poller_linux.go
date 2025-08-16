@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync/atomic"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -25,10 +25,10 @@ type epollPoller struct {
 }
 
 type epReg struct {
-	fd              int
-	conn            net.Conn
-	kinds           []EventType
-	handler         Handler
+	fd                   int
+	conn                 net.Conn
+	kinds                []EventType
+	handler              Handler
 	lastWritableUnixNano int64
 }
 

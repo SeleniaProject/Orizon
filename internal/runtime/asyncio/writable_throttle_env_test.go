@@ -14,14 +14,23 @@ func TestWritableThrottling_EnvInterval(t *testing.T) {
 	t.Setenv("ORIZON_WIN_WRITABLE_INTERVAL_MS", "10")
 
 	p := NewDefaultPoller()
-	if err := p.Start(context.Background()); err != nil { t.Fatal(err) }
+	if err := p.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	defer p.Stop()
 
 	c1, c2 := net.Pipe()
-	defer c1.Close(); defer c2.Close()
+	defer c1.Close()
+	defer c2.Close()
 
 	var cnt int32
-	if err := p.Register(c1, []EventType{Writable}, func(ev Event){ if ev.Type==Writable { atomic.AddInt32(&cnt,1) } }); err != nil { t.Fatal(err) }
+	if err := p.Register(c1, []EventType{Writable}, func(ev Event) {
+		if ev.Type == Writable {
+			atomic.AddInt32(&cnt, 1)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Observe for 200ms; with ~10ms throttle we expect multiple events.
 	// Allow generous slack on CI/Windows scheduling.

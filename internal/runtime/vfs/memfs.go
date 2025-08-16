@@ -181,6 +181,36 @@ func (m *MemFS) RemoveAll(name string) error {
 	}
 	return nil
 }
+func (m *MemFS) Rename(oldpath, newpath string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	oldk := norm(oldpath)
+	newk := norm(newpath)
+	e, ok := m.ents[oldk]
+	if !ok {
+		return fs.ErrNotExist
+	}
+	// Move the entry
+	delete(m.ents, oldk)
+	m.ensureDir(path.Dir(newk))
+	m.ents[newk] = e
+	// Update nested paths when moving a directory
+	if e.dir {
+		prefix := oldk + "/"
+		var updates = make(map[string]*memEnt)
+		for k, v := range m.ents {
+			if strings.HasPrefix(k, prefix) {
+				rest := strings.TrimPrefix(k, prefix)
+				updates[path.Join(newk, rest)] = v
+				delete(m.ents, k)
+			}
+		}
+		for k, v := range updates {
+			m.ents[k] = v
+		}
+	}
+	return nil
+}
 func (m *MemFS) Stat(name string) (fs.FileInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

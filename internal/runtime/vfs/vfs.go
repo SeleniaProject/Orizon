@@ -26,6 +26,7 @@ type FileSystem interface {
 	Create(name string) (File, error)
 	Mkdir(name string, perm fs.FileMode) error
 	MkdirAll(name string, perm fs.FileMode) error
+	Rename(oldpath, newpath string) error
 	Remove(name string) error
 	RemoveAll(name string) error
 	Stat(name string) (fs.FileInfo, error)

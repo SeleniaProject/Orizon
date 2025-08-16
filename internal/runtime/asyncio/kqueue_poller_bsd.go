@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync/atomic"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -23,10 +23,10 @@ type kqueuePoller struct {
 }
 
 type kqReg struct {
-	fd             int
-	conn           net.Conn
-	kinds          []EventType
-	handler        Handler
+	fd                   int
+	conn                 net.Conn
+	kinds                []EventType
+	handler              Handler
 	lastWritableUnixNano int64
 }
 

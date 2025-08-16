@@ -31,19 +31,19 @@ const (
 
 // raceVar stores per-variable access information and candidate lockset.
 type raceVar struct {
-	seenByThread map[int64]accessKind   // thread -> last observed access kind(s)
-	lockset      map[int64]struct{}     // intersection of locks held across all accesses
-	reportedEdge map[string]struct{}     // to deduplicate reports per (t1,t2,kind)
+	seenByThread map[int64]accessKind // thread -> last observed access kind(s)
+	lockset      map[int64]struct{}   // intersection of locks held across all accesses
+	reportedEdge map[string]struct{}  // to deduplicate reports per (t1,t2,kind)
 }
 
 // RaceDetector implements a lightweight dynamic race detector using a lockset
 // analysis similar to Eraser. It is designed for use in tests and requires
 // cooperative instrumentation at read/write and lock/unlock points.
 type RaceDetector struct {
-	mu          sync.Mutex
-	locksHeld   map[int64]map[int64]struct{} // thread -> set of lock IDs held
-	vars        map[uintptr]*raceVar         // address -> state
-	races       []Race                       // recorded races
+	mu        sync.Mutex
+	locksHeld map[int64]map[int64]struct{} // thread -> set of lock IDs held
+	vars      map[uintptr]*raceVar         // address -> state
+	races     []Race                       // recorded races
 }
 
 // NewRaceDetector creates a new detector instance.
@@ -227,7 +227,9 @@ type TrackedMutex struct {
 }
 
 // NewTrackedMutex creates a mutex with a stable logical ID associated with the detector.
-func NewTrackedMutex(id int64, det *RaceDetector) *TrackedMutex { return &TrackedMutex{id: id, det: det} }
+func NewTrackedMutex(id int64, det *RaceDetector) *TrackedMutex {
+	return &TrackedMutex{id: id, det: det}
+}
 
 // Lock records the attempt by gid and acquires the underlying mutex.
 func (m *TrackedMutex) Lock(gid int64) {
@@ -244,6 +246,3 @@ func (m *TrackedMutex) Unlock(gid int64) {
 		m.det.OnUnlock(gid, m.id)
 	}
 }
-
-
-

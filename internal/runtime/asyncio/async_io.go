@@ -51,13 +51,13 @@ type goPoller struct {
 }
 
 type registration struct {
-    mu       sync.RWMutex
-    kinds    []EventType
-    handler  Handler
-    stop     context.CancelFunc
-    done     chan struct{}
-    disabled uint32 // atomic flag to suppress handler calls after deregister
-    lastWritableAt time.Time
+	mu             sync.RWMutex
+	kinds          []EventType
+	handler        Handler
+	stop           context.CancelFunc
+	done           chan struct{}
+	disabled       uint32 // atomic flag to suppress handler calls after deregister
+	lastWritableAt time.Time
 }
 
 // NewDefaultPoller returns a goroutine-based poller.

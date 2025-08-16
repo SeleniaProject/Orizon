@@ -50,6 +50,17 @@ func NewTCPServer(addr string) *TCPServer {
 	return &TCPServer{addr: addr, closed: make(chan struct{})}
 }
 
+// Addr returns the current bound address if listening, otherwise the configured address.
+func (s *TCPServer) Addr() string {
+	if s == nil {
+		return ""
+	}
+	if s.ln != nil {
+		return s.ln.Addr().String()
+	}
+	return s.addr
+}
+
 // Start begins accepting connections and invokes handler per connection.
 func (s *TCPServer) Start(ctx context.Context, handler func(conn net.Conn)) error {
 	if ctx == nil {

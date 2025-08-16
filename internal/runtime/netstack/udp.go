@@ -36,6 +36,14 @@ func DialUDP(addr string) (*UDPEndpoint, error) {
 
 func (e *UDPEndpoint) Close() error { return e.conn.Close() }
 
+// LocalAddr returns the local address of the UDP endpoint, or empty if nil.
+func (e *UDPEndpoint) LocalAddr() string {
+	if e == nil || e.conn == nil {
+		return ""
+	}
+	return e.conn.LocalAddr().String()
+}
+
 func (e *UDPEndpoint) SetDeadline(t time.Time) error      { return e.conn.SetDeadline(t) }
 func (e *UDPEndpoint) SetReadDeadline(t time.Time) error  { return e.conn.SetReadDeadline(t) }
 func (e *UDPEndpoint) SetWriteDeadline(t time.Time) error { return e.conn.SetWriteDeadline(t) }
@@ -54,3 +62,6 @@ func (e *UDPEndpoint) ReadFrom(b []byte) (int, *net.UDPAddr, error) {
 func (e *UDPEndpoint) WriteTo(b []byte, addr *net.UDPAddr) (int, error) {
 	return e.conn.WriteToUDP(b, addr)
 }
+
+// LocalAddr string form helper for convenience.
+func (e *UDPEndpoint) String() string { return e.LocalAddr() }
