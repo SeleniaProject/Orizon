@@ -44,44 +44,56 @@ type CommandSpec struct {
 
 // GoToolchain provides commands for building Go packages for different platforms.
 type GoToolchain struct {
-	DefaultFlags   []string   // e.g. ["-trimpath"]
-	DefaultLdFlags []string   // e.g. ["-s", "-w"]
+	DefaultFlags   []string // e.g. ["-trimpath"]
+	DefaultLdFlags []string // e.g. ["-s", "-w"]
 }
 
 // BuildPackage creates a CommandSpec that builds the given package path for target platform.
 // output should be a path to the resulting binary or library.
 func (tc GoToolchain) BuildPackage(target Platform, packagePath string, output string, extraFlags []string, extraLdFlags []string) (CommandSpec, error) {
-	if err := target.Validate(); err != nil { return CommandSpec{}, err }
+	if err := target.Validate(); err != nil {
+		return CommandSpec{}, err
+	}
 	args := []string{"build", "-o", output}
 	// Flags
-	for _, f := range tc.DefaultFlags { args = append(args, f) }
-	for _, f := range extraFlags { args = append(args, f) }
+	for _, f := range tc.DefaultFlags {
+		args = append(args, f)
+	}
+	for _, f := range extraFlags {
+		args = append(args, f)
+	}
 	// ldflags are space-separated after -ldflags
 	var ldflags string
 	if len(tc.DefaultLdFlags) > 0 {
 		for i, lf := range tc.DefaultLdFlags {
-			if i > 0 { ldflags += " " }
+			if i > 0 {
+				ldflags += " "
+			}
 			ldflags += lf
 		}
 	}
 	if len(extraLdFlags) > 0 {
-		if ldflags != "" { ldflags += " " }
+		if ldflags != "" {
+			ldflags += " "
+		}
 		for i, lf := range extraLdFlags {
-			if i > 0 { ldflags += " " }
+			if i > 0 {
+				ldflags += " "
+			}
 			ldflags += lf
 		}
 	}
-	if ldflags != "" { args = append(args, "-ldflags", ldflags) }
+	if ldflags != "" {
+		args = append(args, "-ldflags", ldflags)
+	}
 	args = append(args, packagePath)
 
 	env := map[string]string{
 		"GOOS":   target.GOOS,
 		"GOARCH": target.GOARCH,
 	}
-	return CommandSpec{ Cmd: "go", Args: args, Env: env }, nil
+	return CommandSpec{Cmd: "go", Args: args, Env: env}, nil
 }
 
 // HostPlatform returns the current runtime's GOOS/GOARCH.
-func HostPlatform() Platform { return Platform{ GOOS: runtime.GOOS, GOARCH: runtime.GOARCH } }
-
-
+func HostPlatform() Platform { return Platform{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH} }
