@@ -873,9 +873,22 @@ func (es *ExceptionStatistics) IncrementAnalysis() {
 	es.TotalAnalyses++
 }
 
-// GetStats returns a copy of current statistics
-func (es *ExceptionStatistics) GetStats() ExceptionStatistics {
+// ExceptionStatsSnapshot is a read-only snapshot of ExceptionStatistics without locks.
+type ExceptionStatsSnapshot struct {
+	TotalAnalyses      int64
+	ExceptionsAnalyzed int64
+	SafetyViolations   int64
+	PathsCovered       int64
+}
+
+// GetStats returns a lock-free snapshot of current statistics
+func (es *ExceptionStatistics) GetStats() ExceptionStatsSnapshot {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
-	return *es
+	return ExceptionStatsSnapshot{
+		TotalAnalyses:      es.TotalAnalyses,
+		ExceptionsAnalyzed: es.ExceptionsAnalyzed,
+		SafetyViolations:   es.SafetyViolations,
+		PathsCovered:       es.PathsCovered,
+	}
 }

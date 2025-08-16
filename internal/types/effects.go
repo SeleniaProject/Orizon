@@ -713,11 +713,28 @@ func (es *EffectStatistics) IncrementCacheMiss() {
 	es.CacheMisses++
 }
 
-// GetStats returns a copy of current statistics
-func (es *EffectStatistics) GetStats() EffectStatistics {
+// EffectStatsSnapshot is a read-only snapshot of EffectStatistics without locks.
+type EffectStatsSnapshot struct {
+	InferenceCalls       int64
+	CompositionCalls     int64
+	CacheHits            int64
+	CacheMisses          int64
+	ConstraintViolations int64
+	EffectMaskings       int64
+}
+
+// GetStats returns a lock-free snapshot of current statistics
+func (es *EffectStatistics) GetStats() EffectStatsSnapshot {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
-	return *es
+	return EffectStatsSnapshot{
+		InferenceCalls:       es.InferenceCalls,
+		CompositionCalls:     es.CompositionCalls,
+		CacheHits:            es.CacheHits,
+		CacheMisses:          es.CacheMisses,
+		ConstraintViolations: es.ConstraintViolations,
+		EffectMaskings:       es.EffectMaskings,
+	}
 }
 
 // String returns the string representation of statistics

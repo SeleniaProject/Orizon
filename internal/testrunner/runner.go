@@ -74,9 +74,9 @@ type Options struct {
 	PackageRegex string        // optional regex to filter package names after go list expansion
 	SummaryJSON  string        // optional JSON summary output path
 	AugmentJSON  bool          // when JSON is enabled, emit additional Orizon events (package attempts, flaky recovered)
-    FileRegex    string        // optional regex to include only packages that have files matching this regex
-    ListOnly     bool          // list test names (per package) without executing them
-    FailOnFlaky  bool          // return non-zero if any test recovered from fail to pass after retries
+	FileRegex    string        // optional regex to include only packages that have files matching this regex
+	ListOnly     bool          // list test names (per package) without executing them
+	FailOnFlaky  bool          // return non-zero if any test recovered from fail to pass after retries
 }
 
 // Runner executes `go test -json` per package with concurrency and aggregates results.
@@ -113,7 +113,7 @@ func (r *Runner) Run(ctx context.Context, out io.Writer) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-    // Optional package regex filter
+	// Optional package regex filter
 	if strings.TrimSpace(r.opts.PackageRegex) != "" {
 		re, e := regexp.Compile(r.opts.PackageRegex)
 		if e != nil {
@@ -127,18 +127,22 @@ func (r *Runner) Run(ctx context.Context, out io.Writer) (Result, error) {
 		}
 		expanded = filtered
 	}
-    // Optional file regex filter (keep only packages that contain a file path matching regex)
-    if strings.TrimSpace(r.opts.FileRegex) != "" {
-        re, e := regexp.Compile(r.opts.FileRegex)
-        if e != nil { return Result{}, e }
-        keep := make([]string, 0, len(expanded))
-        for _, p := range expanded {
-            // Query files via `go list -f` for this package
-            ok, _ := r.packageHasMatchingFile(ctx, p, re)
-            if ok { keep = append(keep, p) }
-        }
-        expanded = keep
-    }
+	// Optional file regex filter (keep only packages that contain a file path matching regex)
+	if strings.TrimSpace(r.opts.FileRegex) != "" {
+		re, e := regexp.Compile(r.opts.FileRegex)
+		if e != nil {
+			return Result{}, e
+		}
+		keep := make([]string, 0, len(expanded))
+		for _, p := range expanded {
+			// Query files via `go list -f` for this package
+			ok, _ := r.packageHasMatchingFile(ctx, p, re)
+			if ok {
+				keep = append(keep, p)
+			}
+		}
+		expanded = keep
+	}
 	sort.Strings(expanded)
 	type item struct {
 		pkg string
@@ -154,12 +158,12 @@ func (r *Runner) Run(ctx context.Context, out io.Writer) (Result, error) {
 		go func() {
 			defer wg.Done()
 			for p := range workCh {
-                if r.opts.ListOnly {
-                    r.listTests(ctx, p, out)
-                    resCh <- item{pkg: p, res: PackageResult{Name: p}, err: nil}
-                    continue
-                }
-                pr, er := r.runOne(ctx, p, out)
+				if r.opts.ListOnly {
+					r.listTests(ctx, p, out)
+					resCh <- item{pkg: p, res: PackageResult{Name: p}, err: nil}
+					continue
+				}
+				pr, er := r.runOne(ctx, p, out)
 				resCh <- item{pkg: p, res: pr, err: er}
 			}
 		}()
@@ -257,23 +261,35 @@ func (r *Runner) Run(ctx context.Context, out io.Writer) (Result, error) {
 	if !r.opts.JSON && out != nil {
 		r.writeSummary(out, results)
 	}
-    if results.Failed > 0 {
-        return results, errors.New("test failures")
-    }
-    if r.opts.FailOnFlaky {
-        // detect any test with fail then pass in attempts
-        flaky := false
-        for _, p := range results.Packages {
-            for _, ats := range p.Tests {
-                sawFail := false
-                final := ""
-                for _, a := range ats { if a.Outcome == "fail" { sawFail = true }; final = a.Outcome }
-                if sawFail && final == "pass" { flaky = true; break }
-            }
-            if flaky { break }
-        }
-        if flaky { return results, errors.New("flaky tests detected") }
-    }
+	if results.Failed > 0 {
+		return results, errors.New("test failures")
+	}
+	if r.opts.FailOnFlaky {
+		// detect any test with fail then pass in attempts
+		flaky := false
+		for _, p := range results.Packages {
+			for _, ats := range p.Tests {
+				sawFail := false
+				final := ""
+				for _, a := range ats {
+					if a.Outcome == "fail" {
+						sawFail = true
+					}
+					final = a.Outcome
+				}
+				if sawFail && final == "pass" {
+					flaky = true
+					break
+				}
+			}
+			if flaky {
+				break
+			}
+		}
+		if flaky {
+			return results, errors.New("flaky tests detected")
+		}
+	}
 	return results, nil
 }
 
@@ -463,45 +479,46 @@ func (r *Runner) goList(ctx context.Context, patterns []string) ([]string, error
 // packageHasMatchingFile reports whether `go list -json` for the package includes
 // any file path matching the given regex.
 func (r *Runner) packageHasMatchingFile(ctx context.Context, pkg string, re *regexp.Regexp) (bool, error) {
-    cmd := exec.CommandContext(ctx, "go", "list", "-json", pkg)
-    b, err := cmd.Output()
-    if err != nil {
-        return false, err
-    }
-    // Lightweight search to avoid introducing JSON struct definitions: just scan lines
-    lines := strings.Split(string(b), "\n")
-    for _, l := range lines {
-        l = strings.TrimSpace(l)
-        // Look through GoFiles, TestGoFiles, XTestGoFiles and other path-like lines
-        if strings.HasPrefix(l, "\"") && strings.HasSuffix(l, "\",") {
-            // strip quotes and trailing comma
-            path := strings.TrimSuffix(strings.TrimPrefix(l, "\""), "\",")
-            if re.MatchString(path) {
-                return true, nil
-            }
-        }
-        if re.MatchString(l) {
-            return true, nil
-        }
-    }
-    return false, nil
+	cmd := exec.CommandContext(ctx, "go", "list", "-json", pkg)
+	b, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	// Lightweight search to avoid introducing JSON struct definitions: just scan lines
+	lines := strings.Split(string(b), "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		// Look through GoFiles, TestGoFiles, XTestGoFiles and other path-like lines
+		if strings.HasPrefix(l, "\"") && strings.HasSuffix(l, "\",") {
+			// strip quotes and trailing comma
+			path := strings.TrimSuffix(strings.TrimPrefix(l, "\""), "\",")
+			if re.MatchString(path) {
+				return true, nil
+			}
+		}
+		if re.MatchString(l) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // listTests prints the list of tests in a package without executing them.
 func (r *Runner) listTests(ctx context.Context, pkg string, out io.Writer) {
-    args := []string{"test", "-list", ".", pkg}
-    cmd := exec.CommandContext(ctx, "go", args...)
-    b, err := cmd.CombinedOutput()
-    if err != nil {
-        if out != nil {
-            _, _ = out.Write(b)
-        }
-        return
-    }
-    if out != nil {
-        _, _ = out.Write(b)
-    }
+	args := []string{"test", "-list", ".", pkg}
+	cmd := exec.CommandContext(ctx, "go", args...)
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		if out != nil {
+			_, _ = out.Write(b)
+		}
+		return
+	}
+	if out != nil {
+		_, _ = out.Write(b)
+	}
 }
+
 // jsonEventDecoder reads newline-delimited JSON events from go test.
 type jsonEventDecoder struct {
 	r   *bufio.Reader
