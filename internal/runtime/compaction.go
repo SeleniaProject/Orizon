@@ -527,12 +527,12 @@ func (msc *MarkAndSweepCompactor) sweepAndCompact(region *Region, blocks []*Comp
 func (msc *MarkAndSweepCompactor) moveBlock(block *CompactionBlock, newAddress uintptr) {
 	// Copy block data
 	oldData := block.Data
-	newData := unsafe.Pointer(newAddress + uintptr(BlockHeaderSize))
+	newData := unsafe.Add(block.Data, int(newAddress-uintptr(block.Data)+uintptr(BlockHeaderSize)))
 
 	// Copy the data
 	size := int(block.Size)
-	oldSlice := (*[1 << 30]byte)(oldData)[:size:size]
-	newSlice := (*[1 << 30]byte)(newData)[:size:size]
+	oldSlice := unsafe.Slice((*byte)(oldData), size)
+	newSlice := unsafe.Slice((*byte)(newData), size)
 	copy(newSlice, oldSlice)
 
 	// Update block pointer

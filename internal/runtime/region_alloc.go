@@ -61,6 +61,7 @@ type RegionHeader struct {
 type Region struct {
 	Header    *RegionHeader    // Region metadata
 	Data      unsafe.Pointer   // Raw memory data
+	backing   []byte           // Backing slice to keep memory alive
 	Mutex     sync.RWMutex     // Thread-safe access
 	Stats     *RegionStats     // Performance statistics
 	Policy    *RegionPolicy    // Allocation policy
@@ -410,7 +411,7 @@ func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPoli
 	id := RegionID(atomic.AddUint64(&ra.nextID, 1))
 
 	// Allocate memory using direct system call (platform-specific)
-	data, err := ra.allocateSystemMemory(size)
+	backingSlice, offset, err := ra.allocateSystemMemory(size)
 	if err != nil {
 		return nil, fmt.Errorf("system memory allocation failed: %v", err)
 	}
@@ -456,7 +457,8 @@ func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPoli
 	// Create region
 	region := &Region{
 		Header:    header,
-		Data:      data,
+		Data:      unsafe.Add(unsafe.Pointer(unsafe.SliceData(backingSlice)), int(offset)),
+		backing:   backingSlice,
 		Stats:     stats,
 		Policy:    policy,
 		Observers: make([]RegionObserver, 0),
@@ -573,7 +575,9 @@ func getCurrentTimestamp() int64 {
 }
 
 // allocateSystemMemory allocates memory using direct system calls
-func (ra *RegionAllocator) allocateSystemMemory(size RegionSize) (unsafe.Pointer, error) {
+// allocateSystemMemory allocates a backing byte slice and returns it along with an aligned offset
+// into the slice where the usable region begins. The caller must keep the slice alive.
+func (ra *RegionAllocator) allocateSystemMemory(size RegionSize) ([]byte, uintptr, error) {
 	// Platform-specific implementation would go here
 	// For now, use Go's memory allocation as placeholder
 	// In production, this would use mmap() on Unix or VirtualAlloc() on Windows
@@ -584,11 +588,11 @@ func (ra *RegionAllocator) allocateSystemMemory(size RegionSize) (unsafe.Pointer
 
 	// Simulate system call allocation
 	mem := make([]byte, actualSize)
-	ptr := unsafe.Pointer(&mem[0])
+	base := uintptr(unsafe.Pointer(unsafe.SliceData(mem)))
 
 	// Align pointer
-	aligned := (uintptr(ptr) + alignment - 1) &^ (alignment - 1)
-	return unsafe.Pointer(aligned), nil
+	aligned := (base + alignment - 1) &^ (alignment - 1)
+	return mem, aligned - base, nil
 }
 
 // FreeRegion frees a memory region
@@ -682,7 +686,7 @@ func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignme
 	regionID := RegionID(atomic.AddUint64(&ra.nextID, 1))
 
 	// Allocate system memory
-	data, err := ra.allocateSystemMemory(size)
+	backingSlice, offset, err := ra.allocateSystemMemory(size)
 	if err != nil {
 		return nil, err
 	}
@@ -720,7 +724,8 @@ func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignme
 	// Create region
 	region := &Region{
 		Header:    header,
-		Data:      data,
+		Data:      unsafe.Add(unsafe.Pointer(unsafe.SliceData(backingSlice)), int(offset)),
+		backing:   backingSlice,
 		Stats:     &RegionStats{},
 		Policy:    &RegionPolicy{}, // Use default region policy
 		Observers: make([]RegionObserver, 0),
@@ -750,7 +755,7 @@ func (ra *RegionAllocator) DestroyRegion(regionID RegionID) error {
 	}
 
 	// Free system memory (mock implementation)
-	_, err := ra.allocateSystemMemory(0) // Mock implementation
+	_, _, err := ra.allocateSystemMemory(0) // Mock call to satisfy vet; ignored result
 	if err != nil {
 		return err
 	}
