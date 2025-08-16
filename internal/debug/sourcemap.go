@@ -25,11 +25,11 @@ type FunctionRanges struct {
 
 // FileLineRange is an inclusive line range within a specific file.
 type FileLineRange struct {
-	File       string `json:"file"`
-	StartLine  int    `json:"start_line"`
-	StartCol   int    `json:"start_col"`
-	EndLine    int    `json:"end_line"`
-	EndCol     int    `json:"end_col"`
+	File      string `json:"file"`
+	StartLine int    `json:"start_line"`
+	StartCol  int    `json:"start_col"`
+	EndLine   int    `json:"end_line"`
+	EndCol    int    `json:"end_col"`
 }
 
 // GenerateSourceMap builds a SourceMap from a HIR program by traversing its spans.
@@ -81,17 +81,23 @@ func GenerateSourceMap(p *hir.HIRProgram) (SourceMap, error) {
 			}
 			// Materialize deterministic list of file ranges
 			files := make([]string, 0, len(byFile))
-			for f := range byFile { files = append(files, f) }
+			for f := range byFile {
+				files = append(files, f)
+			}
 			sort.Strings(files)
 			maps := make([]FileLineRange, 0, len(files))
-			for _, f := range files { maps = append(maps, byFile[f]) }
-			out.Functions = append(out.Functions, FunctionRanges{ Module: m.Name, Name: fn.Name, Mappings: maps })
+			for _, f := range files {
+				maps = append(maps, byFile[f])
+			}
+			out.Functions = append(out.Functions, FunctionRanges{Module: m.Name, Name: fn.Name, Mappings: maps})
 		}
 	}
 
 	// Files array in stable order
 	files := make([]string, 0, len(filesSet))
-	for f := range filesSet { files = append(files, f) }
+	for f := range filesSet {
+		files = append(files, f)
+	}
 	sort.Strings(files)
 	out.Files = files
 	return out, nil
@@ -101,5 +107,3 @@ func GenerateSourceMap(p *hir.HIRProgram) (SourceMap, error) {
 func SerializeSourceMap(sm SourceMap) ([]byte, error) {
 	return json.MarshalIndent(sm, "", "  ")
 }
-
-
