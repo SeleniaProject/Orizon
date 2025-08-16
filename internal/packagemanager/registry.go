@@ -40,10 +40,10 @@ type Registry interface {
 	Fetch(ctx context.Context, id CID) (PackageBlob, error)
 	// Find locates a package version satisfying the constraint and returns its CID and manifest.
 	Find(ctx context.Context, name PackageID, constraint *semver.Constraints) (CID, PackageManifest, error)
-    // List returns all manifests for a given package name known to the registry cluster.
-    List(ctx context.Context, name PackageID) ([]PackageManifest, error)
-    // All returns all manifests known to the registry cluster.
-    All(ctx context.Context) ([]PackageManifest, error)
+	// List returns all manifests for a given package name known to the registry cluster.
+	List(ctx context.Context, name PackageID) ([]PackageManifest, error)
+	// All returns all manifests known to the registry cluster.
+	All(ctx context.Context) ([]PackageManifest, error)
 }
 
 var (
@@ -240,83 +240,103 @@ func (r *InMemoryRegistry) Find(ctx context.Context, name PackageID, constraint 
 
 // List returns all manifests for the specified package name from local index then peers.
 func (r *InMemoryRegistry) List(ctx context.Context, name PackageID) ([]PackageManifest, error) {
-    out := make([]PackageManifest, 0)
-    r.mu.RLock()
-    local := append([]PackageVersion(nil), r.index[name]...)
-    blobs := make(map[CID]PackageBlob, len(r.blobs))
-    for k, v := range r.blobs { blobs[k] = v }
-    peers := append([]*InMemoryRegistry(nil), r.peers...)
-    r.mu.RUnlock()
+	out := make([]PackageManifest, 0)
+	r.mu.RLock()
+	local := append([]PackageVersion(nil), r.index[name]...)
+	blobs := make(map[CID]PackageBlob, len(r.blobs))
+	for k, v := range r.blobs {
+		blobs[k] = v
+	}
+	peers := append([]*InMemoryRegistry(nil), r.peers...)
+	r.mu.RUnlock()
 
-    appendFrom := func(list []PackageVersion, sourceBlobs map[CID]PackageBlob) {
-        for _, pv := range list {
-            // Try to reconstruct manifest directly
-            out = append(out, PackageManifest{ Name: pv.Name, Version: pv.Version, Dependencies: pv.Dependencies })
-        }
-    }
-    appendFrom(local, blobs)
+	appendFrom := func(list []PackageVersion, sourceBlobs map[CID]PackageBlob) {
+		for _, pv := range list {
+			// Try to reconstruct manifest directly
+			out = append(out, PackageManifest{Name: pv.Name, Version: pv.Version, Dependencies: pv.Dependencies})
+		}
+	}
+	appendFrom(local, blobs)
 
-    for _, p := range peers {
-        select { case <-ctx.Done(): return nil, ctx.Err(); default: }
-        p.mu.RLock()
-        for _, pv := range p.index[name] {
-            out = append(out, PackageManifest{ Name: pv.Name, Version: pv.Version, Dependencies: pv.Dependencies })
-        }
-        p.mu.RUnlock()
-    }
-    // De-duplicate by name+version
-    seen := make(map[string]bool, len(out))
-    uniq := out[:0]
-    for _, m := range out {
-        key := string(m.Name)+"@"+string(m.Version)
-        if !seen[key] { seen[key] = true; uniq = append(uniq, m) }
-    }
-    // Sort by version ascending for determinism
-    sort.Slice(uniq, func(i, j int) bool {
-        if uniq[i].Name != uniq[j].Name { return uniq[i].Name < uniq[j].Name }
-        vi := mustSemver(uniq[i].Version)
-        vj := mustSemver(uniq[j].Version)
-        return vi.LessThan(vj)
-    })
-    return uniq, nil
+	for _, p := range peers {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		p.mu.RLock()
+		for _, pv := range p.index[name] {
+			out = append(out, PackageManifest{Name: pv.Name, Version: pv.Version, Dependencies: pv.Dependencies})
+		}
+		p.mu.RUnlock()
+	}
+	// De-duplicate by name+version
+	seen := make(map[string]bool, len(out))
+	uniq := out[:0]
+	for _, m := range out {
+		key := string(m.Name) + "@" + string(m.Version)
+		if !seen[key] {
+			seen[key] = true
+			uniq = append(uniq, m)
+		}
+	}
+	// Sort by version ascending for determinism
+	sort.Slice(uniq, func(i, j int) bool {
+		if uniq[i].Name != uniq[j].Name {
+			return uniq[i].Name < uniq[j].Name
+		}
+		vi := mustSemver(uniq[i].Version)
+		vj := mustSemver(uniq[j].Version)
+		return vi.LessThan(vj)
+	})
+	return uniq, nil
 }
 
 // All returns every manifest across local and peer registries.
 func (r *InMemoryRegistry) All(ctx context.Context) ([]PackageManifest, error) {
-    r.mu.RLock()
-    // collect local manifests
-    out := make([]PackageManifest, 0)
-    for name, vers := range r.index {
-        for _, pv := range vers {
-            out = append(out, PackageManifest{ Name: name, Version: pv.Version, Dependencies: pv.Dependencies })
-        }
-    }
-    peers := append([]*InMemoryRegistry(nil), r.peers...)
-    r.mu.RUnlock()
+	r.mu.RLock()
+	// collect local manifests
+	out := make([]PackageManifest, 0)
+	for name, vers := range r.index {
+		for _, pv := range vers {
+			out = append(out, PackageManifest{Name: name, Version: pv.Version, Dependencies: pv.Dependencies})
+		}
+	}
+	peers := append([]*InMemoryRegistry(nil), r.peers...)
+	r.mu.RUnlock()
 
-    for _, p := range peers {
-        select { case <-ctx.Done(): return nil, ctx.Err(); default: }
-        p.mu.RLock()
-        for name, vers := range p.index {
-            for _, pv := range vers {
-                out = append(out, PackageManifest{ Name: name, Version: pv.Version, Dependencies: pv.Dependencies })
-            }
-        }
-        p.mu.RUnlock()
-    }
-    // De-duplicate
-    seen := make(map[string]bool, len(out))
-    uniq := out[:0]
-    for _, m := range out {
-        key := string(m.Name)+"@"+string(m.Version)
-        if !seen[key] { seen[key] = true; uniq = append(uniq, m) }
-    }
-    // Sort by name then version
-    sort.Slice(uniq, func(i, j int) bool {
-        if uniq[i].Name != uniq[j].Name { return uniq[i].Name < uniq[j].Name }
-        vi := mustSemver(uniq[i].Version)
-        vj := mustSemver(uniq[j].Version)
-        return vi.LessThan(vj)
-    })
-    return uniq, nil
+	for _, p := range peers {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		p.mu.RLock()
+		for name, vers := range p.index {
+			for _, pv := range vers {
+				out = append(out, PackageManifest{Name: name, Version: pv.Version, Dependencies: pv.Dependencies})
+			}
+		}
+		p.mu.RUnlock()
+	}
+	// De-duplicate
+	seen := make(map[string]bool, len(out))
+	uniq := out[:0]
+	for _, m := range out {
+		key := string(m.Name) + "@" + string(m.Version)
+		if !seen[key] {
+			seen[key] = true
+			uniq = append(uniq, m)
+		}
+	}
+	// Sort by name then version
+	sort.Slice(uniq, func(i, j int) bool {
+		if uniq[i].Name != uniq[j].Name {
+			return uniq[i].Name < uniq[j].Name
+		}
+		vi := mustSemver(uniq[i].Version)
+		vj := mustSemver(uniq[j].Version)
+		return vi.LessThan(vj)
+	})
+	return uniq, nil
 }
