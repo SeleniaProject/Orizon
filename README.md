@@ -293,6 +293,115 @@ bash ./scripts/linux/smoke.sh
 2. `Ctrl+Shift+P` → "Remote-Containers: Reopen in Container"
 3. ターミナルで `make dev` 実行
 
+## 統合CLI（cargo風）
+
+Orizon は単一バイナリ `orizon` に各種ツールを統合しています。
+
+- build: `orizon-compiler` への委譲ビルド
+- run: ソースをコンパイルして即実行
+- test: Orizon 拡張付きの Go テストラッパ（フォールバックあり）
+- fmt, fuzz, mockgen, summary, lsp: それぞれ対応ツールに委譲
+- pkg: パッケージ管理（ローカル/リモート/署名/可視化）
+
+PowerShell の例（Windows）:
+
+```powershell
+# ビルド/テスト
+./build/orizon.exe build; ./build/orizon.exe test
+
+# 実行
+./build/orizon.exe run .\examples\hello.oriz
+
+# LSP サーバ
+./build/orizon.exe lsp
+```
+
+## パッケージ管理（pkg）
+
+最小の操作例（ローカルファイルレジストリ）:
+
+```powershell
+# マニフェスト初期化（orizon.json を作成）
+./build/orizon.exe pkg init
+
+# 依存を追加（例: foo に ^1.2.0 を要求）
+./build/orizon.exe pkg add --dep foo@^1.2.0
+
+# 依存解決とロックファイル作成
+./build/orizon.exe pkg lock
+
+# オフライン用にベンダリング
+./build/orizon.exe pkg vendor
+```
+
+依存グラフの可視化（Graphviz DOT）:
+
+```powershell
+./build/orizon.exe pkg graph --dot > deps.dot
+# 任意: Graphviz で画像化
+# dot -Tpng deps.dot -o deps.png
+```
+
+リモートレジストリの利用と認証:
+
+```powershell
+# リモートURLを指定（http/https）
+$env:ORIZON_REGISTRY = "http://localhost:9321"
+# Bearer トークン（サーバが要求する場合）。通常は credentials.json を使うので不要。
+# $env:ORIZON_REGISTRY_TOKEN = "mysecret"
+
+# リストや公開/取得
+./build/orizon.exe pkg list
+./build/orizon.exe pkg publish --name foo --version 1.0.0 --file .\dist\foo-1.0.0.tar
+./build/orizon.exe pkg fetch foo@^1
+```
+
+レジストリのホスティング（ローカル → HTTP/HTTPS 公開）:
+
+```powershell
+# ローカルファイルレジストリをHTTPで配信（:9321）。--token でBearer を有効化
+./build/orizon.exe pkg serve --addr :9321 --token mysecret
+
+# HTTPS で配信（本番向け）
+./build/orizon.exe pkg serve --addr :9321 --tls-cert .\.certs\server.crt --tls-key .\.certs\server.key --token mysecret
+
+# 認証モード（既定: write = 書込のみ保護 / readwrite = 全エンドポイント保護）
+$env:ORIZON_REGISTRY_AUTH_MODE = "write"    # 既定（省略可）
+# $env:ORIZON_REGISTRY_AUTH_MODE = "readwrite" # 読取も保護したいとき
+```
+
+環境変数と選択ルール:
+
+- ORIZON_REGISTRY
+  - 未設定: `.\ .orizon\registry`（ローカルファイルレジストリ）
+  - `http://` or `https://` で始まる場合: HTTPレジストリ
+- ORIZON_REGISTRY_TOKEN
+  - HTTPクライアントは `Authorization: Bearer <token>` を自動付与
+  - サーバ側は設定されている場合に限り認証を強制
+  - 認証モードは `ORIZON_REGISTRY_AUTH_MODE` で制御（write/readwrite）
+
+資格情報の自動利用（推奨）:
+
+```powershell
+# 初回だけ資格情報を登録（以降は自動利用される）
+./build/orizon.exe pkg auth login --registry http://localhost:9321 --token mysecret
+
+# これで ORIZON_REGISTRY_TOKEN を毎回設定する必要はありません
+./build/orizon.exe pkg list
+```
+
+`credentials.json` は `.orizon/credentials.json` に保存され、以下の形式です:
+
+```json
+{
+  "registries": {
+    "http://localhost:9321": { "token": "mysecret" }
+  }
+}
+```
+
+詳細なコマンド解説やトラブルシュートは「[パッケージ管理 詳細ガイド](./docs/package_manager.md)」「[レジストリ認証ガイド](./docs/auth.md)」を参照してください。
+
 ## プロジェクト構造
 
 ```
