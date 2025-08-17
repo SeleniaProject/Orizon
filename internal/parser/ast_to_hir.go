@@ -1127,7 +1127,7 @@ func (transformer *ASTToHIRTransformer) transformArrayType(arrayType *ArrayType)
 	} else {
 		elementType = NewHIRType(arrayType.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
 	}
-	
+
 	// Convert size expression to constant if possible
 	var size int
 	if arrayType.Size != nil {
@@ -1135,7 +1135,7 @@ func (transformer *ASTToHIRTransformer) transformArrayType(arrayType *ArrayType)
 		// For now, default to unknown size
 		size = 0
 	}
-	
+
 	return NewHIRType(
 		arrayType.Span,
 		HIRTypeArray,
@@ -1154,7 +1154,7 @@ func (transformer *ASTToHIRTransformer) transformPointerType(pointerType *Pointe
 	} else {
 		pointeeType = NewHIRType(pointerType.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
 	}
-	
+
 	return NewHIRType(
 		pointerType.Span,
 		HIRTypePointer,
@@ -1173,7 +1173,7 @@ func (transformer *ASTToHIRTransformer) transformReferenceType(referenceType *Re
 	} else {
 		referentType = NewHIRType(referenceType.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
 	}
-	
+
 	return NewHIRType(
 		referenceType.Span,
 		HIRTypeReference,
@@ -1195,14 +1195,14 @@ func (transformer *ASTToHIRTransformer) transformFunctionType(functionType *Func
 			paramTypes = append(paramTypes, NewHIRType(param.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"}))
 		}
 	}
-	
+
 	var returnType *HIRType
 	if functionType.ReturnType != nil {
 		returnType = transformer.transformType(functionType.ReturnType)
 	} else {
 		returnType = NewHIRType(functionType.Span, HIRTypePrimitive, &HIRPrimitiveType{Name: "void", Size: 0})
 	}
-	
+
 	return NewHIRType(
 		functionType.Span,
 		HIRTypeFunction,

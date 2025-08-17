@@ -2,7 +2,7 @@ package parser
 
 import (
 	"testing"
-	
+
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
@@ -44,7 +44,7 @@ func TestHIRConversion_StructDeclaration(t *testing.T) {
 	l := lexer.New(source)
 	parser := NewParser(l, "test.oriz")
 	ast, err := parser.Parse()
-	
+
 	if err != nil && len(err) > 0 {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestHIRConversion_ComplexTypes(t *testing.T) {
 			source: `let arr: [i32; 5];`,
 		},
 		{
-			name:   "Pointer type", 
+			name:   "Pointer type",
 			source: `let ptr: *i32;`,
 		},
 		{
@@ -104,7 +104,7 @@ func TestHIRConversion_ComplexTypes(t *testing.T) {
 			l := lexer.New(tt.source)
 			parser := NewParser(l, "test.oriz")
 			ast, err := parser.Parse()
-			
+
 			if err != nil && len(err) > 0 {
 				t.Fatalf("Parse failed: %v", err)
 			}
