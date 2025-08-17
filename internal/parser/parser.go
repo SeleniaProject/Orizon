@@ -24,6 +24,13 @@ type Parser struct {
 	suggestionEngine *SuggestionEngine
 	suggestions      []Suggestion
 	recoveryMode     ErrorRecoveryMode
+
+	// Memory guards: cap error/suggestion accumulation to avoid unbounded growth on pathological inputs
+	maxErrors           int
+	maxSuggestionsTotal int
+	// internal flags for truncation (could be exposed later if needed)
+	errorsTruncated      bool
+	suggestionsTruncated bool
 }
 
 // ParseError represents a parsing error with context
@@ -87,6 +94,9 @@ func NewParser(l *lexer.Lexer, filename string) *Parser {
 		errors:       make([]error, 0),
 		suggestions:  make([]Suggestion, 0),
 		recoveryMode: PhraseLevel, // Default to phrase-level recovery
+	// Set conservative yet safe caps to prevent runaway memory usage
+	maxErrors:           5000,
+	maxSuggestionsTotal: 5000,
 	}
 
 	// Initialize suggestion engine with phrase-level recovery
@@ -183,6 +193,13 @@ func (p *Parser) peekError(expected lexer.TokenType) {
 
 // addError adds an error to the parser's error list
 func (p *Parser) addError(pos Position, message, context string) {
+	// Respect error cap to limit memory under heavy error conditions
+	if p.maxErrors > 0 && len(p.errors) >= p.maxErrors {
+		p.errorsTruncated = true
+		// Also stop generating suggestions to save memory/CPU
+		p.suggestionEngine = nil
+		return
+	}
 	pos.File = p.filename
 	parseErr := &ParseError{
 		Position: pos,
@@ -193,13 +210,33 @@ func (p *Parser) addError(pos Position, message, context string) {
 
 	// Generate suggestions using the error recovery system (Phase 1.2.4)
 	if p.suggestionEngine != nil {
-		newSuggestions := p.suggestionEngine.RecoverFromError(p, parseErr)
-		p.suggestions = append(p.suggestions, newSuggestions...)
+		// Respect suggestions cap
+		if p.maxSuggestionsTotal > 0 && len(p.suggestions) >= p.maxSuggestionsTotal {
+			p.suggestionsTruncated = true
+			p.suggestionEngine = nil
+		} else {
+			newSuggestions := p.suggestionEngine.RecoverFromError(p, parseErr)
+			// Ensure we don't exceed the cap even if engine returns up to max per call
+			if p.maxSuggestionsTotal > 0 && len(p.suggestions)+len(newSuggestions) > p.maxSuggestionsTotal {
+				remain := p.maxSuggestionsTotal - len(p.suggestions)
+				if remain > 0 {
+					p.suggestions = append(p.suggestions, newSuggestions[:remain]...)
+				}
+				p.suggestionsTruncated = true
+				p.suggestionEngine = nil
+			} else {
+				p.suggestions = append(p.suggestions, newSuggestions...)
+			}
+		}
 	}
 }
 
 // addErrorWithSuggestion adds an error with manual suggestions
 func (p *Parser) addErrorWithSuggestion(pos Position, message, context string, suggestions []Suggestion) {
+	if p.maxErrors > 0 && len(p.errors) >= p.maxErrors {
+		p.errorsTruncated = true
+		return
+	}
 	pos.File = p.filename
 	parseErr := &ParseError{
 		Position: pos,
@@ -207,11 +244,27 @@ func (p *Parser) addErrorWithSuggestion(pos Position, message, context string, s
 		Context:  context,
 	}
 	p.errors = append(p.errors, parseErr)
+	if p.maxSuggestionsTotal > 0 {
+		space := p.maxSuggestionsTotal - len(p.suggestions)
+		if space <= 0 {
+			p.suggestionsTruncated = true
+			return
+		}
+		if len(suggestions) > space {
+			p.suggestions = append(p.suggestions, suggestions[:space]...)
+			p.suggestionsTruncated = true
+			return
+		}
+	}
 	p.suggestions = append(p.suggestions, suggestions...)
 }
 
 // addErrorSilent adds an error without invoking the suggestion engine
 func (p *Parser) addErrorSilent(pos Position, message, context string) {
+	if p.maxErrors > 0 && len(p.errors) >= p.maxErrors {
+		p.errorsTruncated = true
+		return
+	}
 	pos.File = p.filename
 	parseErr := &ParseError{
 		Position: pos,
@@ -265,6 +318,21 @@ func (p *Parser) SetRecoveryMode(mode ErrorRecoveryMode) {
 	if p.suggestionEngine != nil {
 		p.suggestionEngine.mode = mode
 	}
+}
+
+// SetErrorLimit sets a maximum number of errors to retain; 0 or negative disables the cap
+func (p *Parser) SetErrorLimit(n int) {
+	p.maxErrors = n
+}
+
+// SetSuggestionLimit sets a maximum number of suggestions to retain; 0 or negative disables the cap
+func (p *Parser) SetSuggestionLimit(n int) {
+	p.maxSuggestionsTotal = n
+}
+
+// DisableSuggestions turns off the suggestion engine entirely (saves memory/CPU)
+func (p *Parser) DisableSuggestions() {
+	p.suggestionEngine = nil
 }
 
 // skipTo skips tokens until one of the given types is found
