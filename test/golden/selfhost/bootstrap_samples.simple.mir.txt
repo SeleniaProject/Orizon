@@ -1,0 +1,22 @@
+module main
+func add(a, b) {
+entry:
+  %a.addr = alloca a
+  store %a.addr, a
+  %b.addr = alloca b
+  store %b.addr, b
+  %t0 = load %a.addr
+  %t1 = load %b.addr
+  %t2 = add %t0, %t1
+  ret %t2
+cont_t3:
+  ret
+}
+
+func main() {
+entry:
+  ret
+cont_t0:
+  ret
+}
+

@@ -442,6 +442,18 @@ orizon/
 - ⏳ 依存型システム
 - ⏳ 効果システム
 
+### Phase 5: 運用準備（計画と設計ドキュメント）
+以下のドキュメントに詳細を集約しています:
+- docs/self_hosting_design.md（自己参照コンパイラ設計）
+- docs/self_hosting_partial.md（部分的Self-Hosting計画）
+- docs/self_hosting_full.md（完全Self-Hosting計画）
+- docs/community_portal.md（コミュニティ/ポータル）
+- docs/package_ecosystem.md（パッケージエコシステム）
+- docs/enterprise_adoption.md（企業採用支援）
+- docs/testing_strategy.md（包括的テスト戦略）
+- docs/interoperability_plan.md（相互運用性テスト計画）
+- docs/release_preparation.md（リリース準備）
+
 ## 貢献方法
 
 Orizonは世界中の開発者コミュニティによって構築されています：

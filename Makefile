@@ -1,7 +1,23 @@
 # Orizon Programming Language - Makefile
 # Phase 0.1.1: 開発環境セットアップの自動化
 
-.PHONY: help build test clean dev docker-dev install-tools fmt lint smoke smoke-win smoke-mac
+.PHONY: help build test clean dev docker-dev install-tools fmt lint smoke smoke-win smoke-mac bootstrap bootstrap-golden bootstrap-verify
+
+# Cross-platform env prefix for disabling CGO per command
+ifeq ($(OS),Windows_NT)
+	SETCGO := set CGO_ENABLED=0 &&
+	EXE := .exe
+else
+	SETCGO := CGO_ENABLED=0
+	EXE :=
+endif
+
+# Self-host snapshot対象（現時点で安定してパースできる最小セット）
+SELFHOST_EXAMPLES := \
+	bootstrap_samples \
+	examples/hello.oriz \
+	examples/simple.oriz \
+	examples/macro_example.oriz
 
 # デフォルトターゲット
 help: ## このヘルプメッセージを表示
@@ -12,69 +28,82 @@ help: ## このヘルプメッセージを表示
 # ビルド関連
 build: ## コンパイラをビルド
 	@echo "🔨 Orizonコンパイラをビルド中..."
-	@CGO_ENABLED=0 go build -o build/orizon-compiler ./cmd/orizon-compiler
-	@CGO_ENABLED=0 go build -o build/orizon-lsp ./cmd/orizon-lsp
-	@CGO_ENABLED=0 go build -o build/orizon-fmt ./cmd/orizon-fmt
-	@CGO_ENABLED=0 go build -o build/orizon-fuzz ./cmd/orizon-fuzz
-	@CGO_ENABLED=0 go build -o build/orizon-repro ./cmd/orizon-repro
-	@CGO_ENABLED=0 go build -o build/orizon-test ./cmd/orizon-test
+	@$(SETCGO) go build -o build/orizon-compiler$(EXE) ./cmd/orizon-compiler
+	@$(SETCGO) go build -o build/orizon-lsp$(EXE) ./cmd/orizon-lsp
+	@$(SETCGO) go build -o build/orizon-fmt$(EXE) ./cmd/orizon-fmt
+	@$(SETCGO) go build -o build/orizon-fuzz$(EXE) ./cmd/orizon-fuzz
+	@$(SETCGO) go build -o build/orizon-repro$(EXE) ./cmd/orizon-repro
+	@$(SETCGO) go build -o build/orizon-test$(EXE) ./cmd/orizon-test
 	@echo "✅ ビルド完了"
 
+bootstrap: ## ブートストラップ補助ツールをビルド
+	@echo "🔨 orizon-bootstrap をビルド中..."
+	@$(SETCGO) go build -o build/orizon-bootstrap$(EXE) ./cmd/orizon-bootstrap
+	@echo "✅ orizon-bootstrap ビルド完了"
+
+bootstrap-golden: bootstrap ## SELFHOST_EXAMPLES からスナップショット生成→ゴールデン更新
+	@echo "📸 ゴールデン更新中..."
+	@./build/orizon-bootstrap$(EXE) --out-dir artifacts/selfhost --golden-dir test/golden/selfhost --update-golden $(SELFHOST_EXAMPLES)
+	@echo "✅ ゴールデン更新完了"
+
+bootstrap-verify: bootstrap ## 生成物とゴールデンの差分検証
+	@./build/orizon-bootstrap$(EXE) --out-dir artifacts/selfhost --golden-dir test/golden/selfhost $(SELFHOST_EXAMPLES)
+	@echo "✅ bootstrap verify OK"
 fuzz-parser-sample: build ## 簡易パーサーファズ（小コーパス）
 	@echo "🧪 Parser fuzz (sample corpus) ..."
-	@./build/orizon-fuzz --target parser --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covout fuzz.cov --covstats --out crashes.txt --min-on-crash --min-dir crashes_min --min-budget 2s
+	@./build/orizon-fuzz$(EXE) --target parser --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covout fuzz.cov --covstats --out crashes.txt --min-on-crash --min-dir crashes_min --min-budget 2s
 
 fuzz-lexer-sample: build ## 簡易レキサーファズ（小コーパス）
 	@echo "🧪 Lexer fuzz (sample corpus) ..."
-	@./build/orizon-fuzz --target lexer --duration 5s --p 2 --corpus corpus/lexer_corpus.txt --covstats --per 200ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+	@./build/orizon-fuzz$(EXE) --target lexer --duration 5s --p 2 --corpus corpus/lexer_corpus.txt --covstats --per 200ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
 
 fuzz-astbridge-sample: build ## 簡易ASTブリッジファズ（小コーパス）
 	@echo "🧪 AST bridge fuzz (sample corpus) ..."
-	@./build/orizon-fuzz --target astbridge --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+	@./build/orizon-fuzz$(EXE) --target astbridge --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
 
 fuzz-hir-sample: build ## HIR変換+検証ファズ（小コーパス）
 	@echo "🧪 HIR fuzz (transform + validate) ..."
-	@./build/orizon-fuzz --target hir --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+	@./build/orizon-fuzz$(EXE) --target hir --duration 5s --p 2 --corpus corpus/parser_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
 
 fuzz-astbridge-hir-sample: build ## ASTブリッジ往復後にHIR検証（小コーパス）
 	@echo "🧪 AST bridge + HIR validate fuzz ..."
-	@./build/orizon-fuzz --target astbridge-hir --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
+	@./build/orizon-fuzz$(EXE) --target astbridge-hir --duration 5s --p 2 --corpus corpus/astbridge_corpus.txt --covstats --per 300ms --min-on-crash --min-dir crashes_min --min-budget 2s --out crashes.txt
 
 repro-last-crash: build ## crashes.txtの最終クラッシュを再現
 	@echo "🔁 Reproduce last crash from crashes.txt ..."
-	@./build/orizon-repro --log crashes.txt --budget 5s --target parser
+	@./build/orizon-repro$(EXE) --log crashes.txt --budget 5s --target parser
 
 minimize-last-crash: build ## crashes.txtの最終クラッシュを最小化
 	@echo "🪄 Minimize last crash from crashes.txt ..."
-	@./build/orizon-repro --log crashes.txt --out minimized.bin --budget 5s --target parser
+	@./build/orizon-repro$(EXE) --log crashes.txt --out minimized.bin --budget 5s --target parser
 
 build-release: ## リリース用ビルド（最適化有効）
 	@echo "🚀 リリース用ビルド中..."
-	@CGO_ENABLED=0 go build -ldflags="-s -w" -o build/orizon-compiler ./cmd/orizon-compiler
-	@CGO_ENABLED=0 go build -ldflags="-s -w" -o build/orizon-lsp ./cmd/orizon-lsp
-	@CGO_ENABLED=0 go build -ldflags="-s -w" -o build/orizon-fmt ./cmd/orizon-fmt
+	@$(SETCGO) go build -ldflags="-s -w" -o build/orizon-compiler$(EXE) ./cmd/orizon-compiler
+	@$(SETCGO) go build -ldflags="-s -w" -o build/orizon-lsp$(EXE) ./cmd/orizon-lsp
+	@$(SETCGO) go build -ldflags="-s -w" -o build/orizon-fmt$(EXE) ./cmd/orizon-fmt
 	@echo "✅ リリースビルド完了"
 
 # テスト関連
 test: ## 全テストを実行
 	@echo "🧪 テスト実行中..."
-	@CGO_ENABLED=0 go test -v ./...
+	@$(SETCGO) go test -v ./...
 	@echo "✅ テスト完了"
 
 test-coverage: ## カバレッジ付きテスト実行
 	@echo "📊 カバレッジテスト実行中..."
-	@CGO_ENABLED=0 go test -coverprofile=coverage.out ./...
+	@$(SETCGO) go test -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "✅ カバレッジレポート生成: coverage.html"
 
 benchmark: ## ベンチマークテスト実行
 	@echo "⚡ ベンチマーク実行中..."
-	@CGO_ENABLED=0 go test -bench=. -benchmem ./...
+	@$(SETCGO) go test -bench=. -benchmem ./...
 
 # 開発環境
 dev: ## 開発モードでコンパイラを起動
 	@echo "🔄 開発モード起動中..."
-	@CGO_ENABLED=0 go run ./cmd/orizon-compiler --help
+	@$(SETCGO) go run ./cmd/orizon-compiler --help
 
 docker-dev: ## Docker開発環境を起動
 	@echo "🐳 Docker開発環境起動中..."
@@ -118,7 +147,7 @@ clean: ## ビルド成果物をクリーンアップ
 # サンプル実行
 examples: build ## サンプルコードを実行
 	@echo "📝 サンプル実行中..."
-	@./build/orizon-compiler examples/hello.oriz
+	@./build/orizon-compiler$(EXE) examples/hello.oriz
 	@echo "✅ サンプル実行完了"
 
 # ドキュメント生成

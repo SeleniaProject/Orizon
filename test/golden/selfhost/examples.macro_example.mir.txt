@@ -1,0 +1,13 @@
+module main
+func main() {
+entry:
+  ret 0
+cont_t0:
+  ret
+}
+
+func demo_advanced_macros() {
+entry:
+  ret
+}
+

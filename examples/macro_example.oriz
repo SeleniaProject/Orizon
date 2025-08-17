@@ -3,18 +3,20 @@
 
 // Simple expression macro
 macro double(x) {
-    x * 2
+    _ -> x * 2
 }
 
 // Macro with multiple parameters and default values
 macro greet(name = "World", prefix = "Hello") {
-    println!(prefix + ", " + name + "!")
+    _ -> println!(prefix + ", " + name + "!")
 }
 
 // Block macro with multiple statements
 macro debug_trace(value, message = "Debug") {
-    println!("[DEBUG] " + message + ": " + value);
-    return value;
+    _ -> {
+        println!("[DEBUG] " + message + ": " + value);
+        return value;
+    }
 }
 
 // Pattern matching macro (advanced feature)
@@ -36,17 +38,20 @@ macro safe_divide(a, b) {
 }
 
 // Variadic macro (conceptual - for future implementation)
-macro println_multi(args...) {
-    for arg in args {
-        println!(arg);
-    }
-}
+// Disabled for now: parser doesn't support 'for-in' yet
+// macro println_multi(args...) {
+//     _ -> {
+//         // for arg in args { println!(arg); }
+//     }
+// }
 
 // Hygienic macro demonstration
 macro swap(a, b) {
-    let temp = a;
-    a = b;
-    b = temp;
+    _ -> {
+        let temp = a;
+        a = b;
+        b = temp;
+    }
 }
 
 // Macro using compile-time computation
@@ -104,28 +109,34 @@ macro assert(condition, message = "Assertion failed") {
 
 // Macro for repetitive code generation
 macro define_getter_setter(type_name, field_name) {
-    func get_field() -> int {
-        return this.field_value;
-    }
-    
-    func set_field(value: int) {
-        this.field_value = value;
+    _ -> {
+        func get_field() -> int {
+            return this.field_value;
+        }
+        
+        func set_field(value: int) {
+            this.field_value = value;
+        }
     }
 }
 
 // Simple timing macro for performance measurement
 macro time_execution(code_block) {
-    let start_time = 0;
-    code_block;
-    let end_time = 1;
-    println!("Execution completed");
+    _ -> {
+        let start_time = 0;
+        code_block;
+        let end_time = 1;
+        println!("Execution completed");
+    }
 }
 
 // Simple test case macro  
 macro test_case(name, test_function) {
-    func test_basic() {
-        println!("Running test");
-        test_function;
+    _ -> {
+        func test_basic() {
+            println!("Running test");
+            test_function;
+        }
     }
 }
 
