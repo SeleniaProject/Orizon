@@ -159,6 +159,126 @@ func fromParserDecl(d p.Declaration) (ast.Declaration, error) {
 			IsAlias:    false,
 			IsExported: n.IsPublic,
 		}, nil
+	case *p.StructDeclaration:
+		fields := make([]*ast.StructField, 0, len(n.Fields))
+		for _, f := range n.Fields {
+			var name *ast.Identifier
+			if f.Name != nil {
+				name = &ast.Identifier{Span: fromParserSpan(f.Name.Span), Value: f.Name.Value}
+			}
+			ft, err := fromParserType(f.Type)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, &ast.StructField{Span: fromParserSpan(f.Span), Name: name, Type: ft, IsPublic: f.IsPublic})
+		}
+		gens := make([]*ast.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, fromParserGeneric(g))
+		}
+		return &ast.StructDeclaration{Span: fromParserSpan(n.Span), Name: &ast.Identifier{Span: fromParserSpan(n.Name.Span), Value: n.Name.Value}, Fields: fields, IsExported: n.IsPublic, Generics: gens}, nil
+	case *p.EnumDeclaration:
+		vars := make([]*ast.EnumVariant, 0, len(n.Variants))
+		for _, v := range n.Variants {
+			fields := make([]*ast.StructField, 0, len(v.Fields))
+			for _, f := range v.Fields {
+				var name *ast.Identifier
+				if f.Name != nil {
+					name = &ast.Identifier{Span: fromParserSpan(f.Name.Span), Value: f.Name.Value}
+				}
+				ft, err := fromParserType(f.Type)
+				if err != nil {
+					return nil, err
+				}
+				fields = append(fields, &ast.StructField{Span: fromParserSpan(f.Span), Name: name, Type: ft})
+			}
+			var val ast.Expression
+			if v.Value != nil {
+				var err error
+				val, err = fromParserExpr(v.Value)
+				if err != nil {
+					return nil, err
+				}
+			}
+			vars = append(vars, &ast.EnumVariant{Span: fromParserSpan(v.Span), Name: &ast.Identifier{Span: fromParserSpan(v.Name.Span), Value: v.Name.Value}, Fields: fields, Value: val})
+		}
+		gens := make([]*ast.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, fromParserGeneric(g))
+		}
+		return &ast.EnumDeclaration{Span: fromParserSpan(n.Span), Name: &ast.Identifier{Span: fromParserSpan(n.Name.Span), Value: n.Name.Value}, Variants: vars, IsExported: n.IsPublic, Generics: gens}, nil
+	case *p.TraitDeclaration:
+		methods := make([]*ast.TraitMethod, 0, len(n.Methods))
+		for _, m := range n.Methods {
+			params := make([]*ast.Parameter, 0, len(m.Parameters))
+			for _, pp := range m.Parameters {
+				t, err := fromParserType(pp.TypeSpec)
+				if err != nil {
+					return nil, err
+				}
+				params = append(params, &ast.Parameter{Span: fromParserSpan(pp.Span), Name: &ast.Identifier{Span: fromParserSpan(pp.Name.Span), Value: pp.Name.Value}, Type: t})
+			}
+			var ret ast.Type
+			if m.ReturnType != nil {
+				var err error
+				ret, err = fromParserType(m.ReturnType)
+				if err != nil {
+					return nil, err
+				}
+			}
+			gens := make([]*ast.GenericParameter, 0, len(m.Generics))
+			for _, g := range m.Generics {
+				gens = append(gens, fromParserGeneric(g))
+			}
+			methods = append(methods, &ast.TraitMethod{Span: fromParserSpan(m.Span), Name: &ast.Identifier{Span: fromParserSpan(m.Name.Span), Value: m.Name.Value}, Parameters: params, ReturnType: ret, IsAsync: m.IsAsync, Generics: gens})
+		}
+		assoc := make([]*ast.AssociatedType, 0, len(n.AssociatedTypes))
+		for _, a := range n.AssociatedTypes {
+			bounds := make([]ast.Type, 0, len(a.Bounds))
+			for _, b := range a.Bounds {
+				bt, err := fromParserType(b)
+				if err != nil {
+					return nil, err
+				}
+				bounds = append(bounds, bt)
+			}
+			assoc = append(assoc, &ast.AssociatedType{Span: fromParserSpan(a.Span), Name: &ast.Identifier{Span: fromParserSpan(a.Name.Span), Value: a.Name.Value}, Bounds: bounds})
+		}
+		gens := make([]*ast.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, fromParserGeneric(g))
+		}
+		return &ast.TraitDeclaration{Span: fromParserSpan(n.Span), Name: &ast.Identifier{Span: fromParserSpan(n.Name.Span), Value: n.Name.Value}, Methods: methods, IsExported: n.IsPublic, Generics: gens, AssociatedTypes: assoc}, nil
+	case *p.ImplBlock:
+		var tr ast.Type
+		if n.Trait != nil {
+			var err error
+			tr, err = fromParserType(n.Trait)
+			if err != nil {
+				return nil, err
+			}
+		}
+		ft, err := fromParserType(n.ForType)
+		if err != nil {
+			return nil, err
+		}
+		methods := make([]*ast.FunctionDeclaration, 0, len(n.Items))
+		for _, it := range n.Items {
+			m, err := fromParserFunc(it)
+			if err != nil {
+				return nil, err
+			}
+			methods = append(methods, m)
+		}
+		gens := make([]*ast.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, fromParserGeneric(g))
+		}
+		wh := make([]*ast.WherePredicate, 0, len(n.WhereClauses))
+		for _, wp := range n.WhereClauses {
+			wh = append(wh, fromParserWhere(wp))
+		}
+		return &ast.ImplDeclaration{Span: fromParserSpan(n.Span), Trait: tr, ForType: ft, Methods: methods, Generics: gens, WhereClauses: wh}, nil
 	case *p.ImportDeclaration:
 		// Map parser ImportDeclaration to core AST ImportDeclaration
 		path := make([]*ast.Identifier, 0, len(n.Path))
@@ -247,9 +367,233 @@ func toParserDecl(d ast.Declaration) (p.Declaration, error) {
 			items = append(items, &p.ExportItem{Span: toParserSpan(it.Span), Name: &p.Identifier{Span: toParserSpan(it.Name.Span), Value: it.Name.Value}, Alias: alias})
 		}
 		return &p.ExportDeclaration{Span: toParserSpan(n.Span), Items: items}, nil
+	case *ast.StructDeclaration:
+		fields := make([]*p.StructField, 0, len(n.Fields))
+		for _, f := range n.Fields {
+			var name *p.Identifier
+			if f.Name != nil {
+				name = &p.Identifier{Span: toParserSpan(f.Name.Span), Value: f.Name.Value}
+			}
+			pt, err := toParserType(f.Type)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, &p.StructField{Span: toParserSpan(f.Span), Name: name, Type: pt, IsPublic: f.IsPublic})
+		}
+		gens := make([]*p.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, toParserGeneric(g))
+		}
+		return &p.StructDeclaration{Span: toParserSpan(n.Span), Name: &p.Identifier{Span: toParserSpan(n.Name.Span), Value: n.Name.Value}, Fields: fields, IsPublic: n.IsExported, Generics: gens}, nil
+	case *ast.EnumDeclaration:
+		vars := make([]*p.EnumVariant, 0, len(n.Variants))
+		for _, v := range n.Variants {
+			fields := make([]*p.StructField, 0, len(v.Fields))
+			for _, f := range v.Fields {
+				var name *p.Identifier
+				if f.Name != nil {
+					name = &p.Identifier{Span: toParserSpan(f.Name.Span), Value: f.Name.Value}
+				}
+				pt, err := toParserType(f.Type)
+				if err != nil {
+					return nil, err
+				}
+				fields = append(fields, &p.StructField{Span: toParserSpan(f.Span), Name: name, Type: pt})
+			}
+			var val p.Expression
+			if v.Value != nil {
+				val = toParserExprOrNil(v.Value)
+			}
+			vars = append(vars, &p.EnumVariant{Span: toParserSpan(v.Span), Name: &p.Identifier{Span: toParserSpan(v.Name.Span), Value: v.Name.Value}, Fields: fields, Value: val})
+		}
+		gens := make([]*p.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, toParserGeneric(g))
+		}
+		return &p.EnumDeclaration{Span: toParserSpan(n.Span), Name: &p.Identifier{Span: toParserSpan(n.Name.Span), Value: n.Name.Value}, Variants: vars, IsPublic: n.IsExported, Generics: gens}, nil
+	case *ast.TraitDeclaration:
+		methods := make([]*p.TraitMethod, 0, len(n.Methods))
+		for _, m := range n.Methods {
+			params := make([]*p.Parameter, 0, len(m.Parameters))
+			for _, ap := range m.Parameters {
+				pt, err := toParserType(ap.Type)
+				if err != nil {
+					return nil, err
+				}
+				params = append(params, &p.Parameter{Span: toParserSpan(ap.Span), Name: &p.Identifier{Span: toParserSpan(ap.Name.Span), Value: ap.Name.Value}, TypeSpec: pt})
+			}
+			var ret p.Type
+			var err error
+			if m.ReturnType != nil {
+				ret, err = toParserType(m.ReturnType)
+				if err != nil {
+					return nil, err
+				}
+			}
+			gens := make([]*p.GenericParameter, 0, len(m.Generics))
+			for _, g := range m.Generics {
+				gens = append(gens, toParserGeneric(g))
+			}
+			methods = append(methods, &p.TraitMethod{Span: toParserSpan(m.Span), Name: &p.Identifier{Span: toParserSpan(m.Name.Span), Value: m.Name.Value}, Parameters: params, ReturnType: ret, IsAsync: m.IsAsync, Generics: gens})
+		}
+		assoc := make([]*p.AssociatedType, 0, len(n.AssociatedTypes))
+		for _, a := range n.AssociatedTypes {
+			bounds := make([]p.Type, 0, len(a.Bounds))
+			for _, b := range a.Bounds {
+				bt, err := toParserType(b)
+				if err != nil {
+					return nil, err
+				}
+				bounds = append(bounds, bt)
+			}
+			assoc = append(assoc, &p.AssociatedType{Span: toParserSpan(a.Span), Name: &p.Identifier{Span: toParserSpan(a.Name.Span), Value: a.Name.Value}, Bounds: bounds})
+		}
+		gens := make([]*p.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, toParserGeneric(g))
+		}
+		return &p.TraitDeclaration{Span: toParserSpan(n.Span), Name: &p.Identifier{Span: toParserSpan(n.Name.Span), Value: n.Name.Value}, Methods: methods, IsPublic: n.IsExported, Generics: gens, AssociatedTypes: assoc}, nil
+	case *ast.ImplDeclaration:
+		var tr p.Type
+		if n.Trait != nil {
+			var err error
+			tr, err = toParserType(n.Trait)
+			if err != nil {
+				return nil, err
+			}
+		}
+		ft, err := toParserType(n.ForType)
+		if err != nil {
+			return nil, err
+		}
+		items := make([]*p.FunctionDeclaration, 0, len(n.Methods))
+		for _, m := range n.Methods {
+			mf, err := toParserFunc(m)
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, mf)
+		}
+		gens := make([]*p.GenericParameter, 0, len(n.Generics))
+		for _, g := range n.Generics {
+			gens = append(gens, toParserGeneric(g))
+		}
+		wh := make([]*p.WherePredicate, 0, len(n.WhereClauses))
+		for _, wp := range n.WhereClauses {
+			wh = append(wh, toParserWhere(wp))
+		}
+		return &p.ImplBlock{Span: toParserSpan(n.Span), Trait: tr, ForType: ft, Items: items, Generics: gens, WhereClauses: wh}, nil
 	default:
 		return nil, fmt.Errorf("unsupported ast declaration type %T", d)
 	}
+}
+
+// ===== Generics / Where helpers =====
+
+func fromParserGeneric(g *p.GenericParameter) *ast.GenericParameter {
+	if g == nil {
+		return nil
+	}
+	out := &ast.GenericParameter{Span: fromParserSpan(g.Span)}
+	switch g.Kind {
+	case p.GenericParamType:
+		out.Kind = ast.GenericParamType
+		if g.Name != nil {
+			out.Name = &ast.Identifier{Span: fromParserSpan(g.Name.Span), Value: g.Name.Value}
+		}
+		out.Bounds = make([]ast.Type, 0, len(g.Bounds))
+		for _, b := range g.Bounds {
+			if b != nil {
+				bt, _ := fromParserType(b)
+				out.Bounds = append(out.Bounds, bt)
+			}
+		}
+	case p.GenericParamConst:
+		out.Kind = ast.GenericParamConst
+		if g.Name != nil {
+			out.Name = &ast.Identifier{Span: fromParserSpan(g.Name.Span), Value: g.Name.Value}
+		}
+		if g.ConstType != nil {
+			ct, _ := fromParserType(g.ConstType)
+			out.ConstType = ct
+		}
+	case p.GenericParamLifetime:
+		out.Kind = ast.GenericParamLifetime
+		out.Lifetime = g.Lifetime
+	}
+	return out
+}
+
+func toParserGeneric(g *ast.GenericParameter) *p.GenericParameter {
+	if g == nil {
+		return nil
+	}
+	out := &p.GenericParameter{Span: toParserSpan(g.Span)}
+	switch g.Kind {
+	case ast.GenericParamType:
+		out.Kind = p.GenericParamType
+		if g.Name != nil {
+			out.Name = &p.Identifier{Span: toParserSpan(g.Name.Span), Value: g.Name.Value}
+		}
+		out.Bounds = make([]p.Type, 0, len(g.Bounds))
+		for _, b := range g.Bounds {
+			if b != nil {
+				bt, _ := toParserType(b)
+				out.Bounds = append(out.Bounds, bt)
+			}
+		}
+	case ast.GenericParamConst:
+		out.Kind = p.GenericParamConst
+		if g.Name != nil {
+			out.Name = &p.Identifier{Span: toParserSpan(g.Name.Span), Value: g.Name.Value}
+		}
+		if g.ConstType != nil {
+			ct, _ := toParserType(g.ConstType)
+			out.ConstType = ct
+		}
+	case ast.GenericParamLifetime:
+		out.Kind = p.GenericParamLifetime
+		out.Lifetime = g.Lifetime
+	}
+	return out
+}
+
+func fromParserWhere(wp *p.WherePredicate) *ast.WherePredicate {
+	if wp == nil {
+		return nil
+	}
+	out := &ast.WherePredicate{Span: fromParserSpan(wp.Span)}
+	if wp.Target != nil {
+		t, _ := fromParserType(wp.Target)
+		out.Target = t
+	}
+	out.Bounds = make([]ast.Type, 0, len(wp.Bounds))
+	for _, b := range wp.Bounds {
+		if b != nil {
+			bt, _ := fromParserType(b)
+			out.Bounds = append(out.Bounds, bt)
+		}
+	}
+	return out
+}
+
+func toParserWhere(wp *ast.WherePredicate) *p.WherePredicate {
+	if wp == nil {
+		return nil
+	}
+	out := &p.WherePredicate{Span: toParserSpan(wp.Span)}
+	if wp.Target != nil {
+		t, _ := toParserType(wp.Target)
+		out.Target = t
+	}
+	out.Bounds = make([]p.Type, 0, len(wp.Bounds))
+	for _, b := range wp.Bounds {
+		if b != nil {
+			bt, _ := toParserType(b)
+			out.Bounds = append(out.Bounds, bt)
+		}
+	}
+	return out
 }
 
 func fromParserFunc(fn *p.FunctionDeclaration) (*ast.FunctionDeclaration, error) {
@@ -259,7 +603,8 @@ func fromParserFunc(fn *p.FunctionDeclaration) (*ast.FunctionDeclaration, error)
 		if err != nil {
 			return nil, err
 		}
-		params = append(params, &ast.Parameter{Span: fromParserSpan(pp.Span), Name: &ast.Identifier{Span: fromParserSpan(pp.Span), Value: pp.Name.Value}, Type: t})
+		// Preserve precise span information: parameter span from pp.Span, name span from pp.Name.Span
+		params = append(params, &ast.Parameter{Span: fromParserSpan(pp.Span), Name: &ast.Identifier{Span: fromParserSpan(pp.Name.Span), Value: pp.Name.Value}, Type: t})
 	}
 	var ret ast.Type
 	var err error
