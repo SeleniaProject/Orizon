@@ -240,6 +240,61 @@ func (t *TypeDeclaration) String() string {
 }
 func (t *TypeDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitTypeDeclaration(t) }
 
+// ImportDeclaration represents an import statement at top level
+type ImportDeclaration struct {
+	Span       position.Span // Source span
+	Path       []*Identifier // Module path segments
+	Alias      *Identifier   // Optional alias
+	IsExported bool          // Whether this import is re-exported (pub import)
+}
+
+func (d *ImportDeclaration) GetSpan() position.Span { return d.Span }
+func (d *ImportDeclaration) declarationNode()       {}
+func (d *ImportDeclaration) String() string {
+	var segs []string
+	for _, s := range d.Path {
+		segs = append(segs, s.String())
+	}
+	alias := ""
+	if d.Alias != nil {
+		alias = " as " + d.Alias.String()
+	}
+	exported := ""
+	if d.IsExported {
+		exported = "pub "
+	}
+	return fmt.Sprintf("%simport %s%s", exported, strings.Join(segs, "::"), alias)
+}
+func (d *ImportDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitImportDeclaration(d) }
+
+// ExportItem represents a single exported symbol with optional alias
+type ExportItem struct {
+	Span  position.Span
+	Name  *Identifier
+	Alias *Identifier // optional
+}
+
+func (e *ExportItem) GetSpan() position.Span             { return e.Span }
+func (e *ExportItem) String() string                     { if e.Alias != nil { return fmt.Sprintf("%s as %s", e.Name.String(), e.Alias.String()) }; return e.Name.String() }
+func (e *ExportItem) Accept(visitor Visitor) interface{} { return visitor.VisitExportItem(e) }
+
+// ExportDeclaration represents an export statement: export { a, b as c }
+type ExportDeclaration struct {
+	Span  position.Span
+	Items []*ExportItem
+}
+
+func (d *ExportDeclaration) GetSpan() position.Span { return d.Span }
+func (d *ExportDeclaration) declarationNode()       {}
+func (d *ExportDeclaration) String() string {
+	parts := make([]string, 0, len(d.Items))
+	for _, it := range d.Items {
+		parts = append(parts, it.String())
+	}
+	return fmt.Sprintf("export { %s }", strings.Join(parts, ", "))
+}
+func (d *ExportDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitExportDeclaration(d) }
+
 // ===== Statements =====
 
 // BlockStatement represents a block of statements enclosed in braces

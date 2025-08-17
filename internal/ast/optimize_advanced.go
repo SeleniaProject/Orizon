@@ -58,6 +58,22 @@ type deadCodeVisitor struct {
 	stats *OptimizationStats
 }
 
+// New nodes support: Import/Export declarations and items
+func (dcv *deadCodeVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+
+func (dcv *deadCodeVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+
+func (dcv *deadCodeVisitor) VisitExportItem(node *ExportItem) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+
 // VisitBlockStatement removes unreachable statements after return/break/continue
 func (dcv *deadCodeVisitor) VisitBlockStatement(node *BlockStatement) interface{} {
 	dcv.stats.NodesVisited++
@@ -425,6 +441,22 @@ func (ssrp *SyntaxSugarRemovalPass) Apply(node Node) (Node, *OptimizationStats, 
 type syntaxSugarVisitor struct {
 	pass  *SyntaxSugarRemovalPass
 	stats *OptimizationStats
+}
+
+// New nodes support: Import/Export declarations and items
+func (ssv *syntaxSugarVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+
+func (ssv *syntaxSugarVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+
+func (ssv *syntaxSugarVisitor) VisitExportItem(node *ExportItem) interface{} {
+	ssv.stats.NodesVisited++
+	return node
 }
 
 // VisitBinaryExpression simplifies certain binary expressions

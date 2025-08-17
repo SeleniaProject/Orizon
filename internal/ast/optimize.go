@@ -656,3 +656,22 @@ func (cfv *constantFoldingVisitor) VisitAttribute(node *Attribute) interface{} {
 	cfv.stats.NodesVisited++
 	return node
 }
+
+// New nodes support: Import/Export declarations and items
+func (cfv *constantFoldingVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	cfv.stats.NodesVisited++
+	// Nothing to fold here; just return node
+	return node
+}
+
+func (cfv *constantFoldingVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	cfv.stats.NodesVisited++
+	// Nothing to fold here; just return node
+	return node
+}
+
+func (cfv *constantFoldingVisitor) VisitExportItem(node *ExportItem) interface{} {
+	cfv.stats.NodesVisited++
+	// Nothing to fold here; just return node
+	return node
+}

@@ -171,3 +171,6 @@ func (m *MockVisitor) VisitCallExpression(node *CallExpression) interface{}     
 func (m *MockVisitor) VisitBasicType(node *BasicType) interface{}                     { return node }
 func (m *MockVisitor) VisitIdentifierType(node *IdentifierType) interface{}           { return node }
 func (m *MockVisitor) VisitAttribute(node *Attribute) interface{}                     { return node }
+func (m *MockVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{}     { return node }
+func (m *MockVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{}     { return node }
+func (m *MockVisitor) VisitExportItem(node *ExportItem) interface{}                   { return node }

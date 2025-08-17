@@ -22,6 +22,9 @@ type Visitor interface {
 	VisitParameter(node *Parameter) interface{}
 	VisitVariableDeclaration(node *VariableDeclaration) interface{}
 	VisitTypeDeclaration(node *TypeDeclaration) interface{}
+	VisitImportDeclaration(node *ImportDeclaration) interface{}
+	VisitExportDeclaration(node *ExportDeclaration) interface{}
+	VisitExportItem(node *ExportItem) interface{}
 
 	// Statement visitors
 	VisitBlockStatement(node *BlockStatement) interface{}
@@ -56,6 +59,9 @@ func (v *BaseVisitor) VisitFunctionDeclaration(node *FunctionDeclaration) interf
 func (v *BaseVisitor) VisitParameter(node *Parameter) interface{}                     { return nil }
 func (v *BaseVisitor) VisitVariableDeclaration(node *VariableDeclaration) interface{} { return nil }
 func (v *BaseVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{}         { return nil }
+func (v *BaseVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{}     { return nil }
+func (v *BaseVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{}     { return nil }
+func (v *BaseVisitor) VisitExportItem(node *ExportItem) interface{}                   { return nil }
 func (v *BaseVisitor) VisitBlockStatement(node *BlockStatement) interface{}           { return nil }
 func (v *BaseVisitor) VisitExpressionStatement(node *ExpressionStatement) interface{} { return nil }
 func (v *BaseVisitor) VisitReturnStatement(node *ReturnStatement) interface{}         { return nil }
@@ -202,6 +208,33 @@ func (w *WalkingVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{}
 		node.Type.Accept(w)
 	}
 
+	return result
+}
+
+// VisitImportDeclaration walks through import components
+func (w *WalkingVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	result := w.visitor.VisitImportDeclaration(node)
+	for _, seg := range node.Path {
+		if seg != nil { seg.Accept(w) }
+	}
+	if node.Alias != nil { node.Alias.Accept(w) }
+	return result
+}
+
+// VisitExportDeclaration walks through export items
+func (w *WalkingVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	result := w.visitor.VisitExportDeclaration(node)
+	for _, it := range node.Items {
+		if it != nil { it.Accept(w) }
+	}
+	return result
+}
+
+// VisitExportItem walks through export item parts
+func (w *WalkingVisitor) VisitExportItem(node *ExportItem) interface{} {
+	result := w.visitor.VisitExportItem(node)
+	if node.Name != nil { node.Name.Accept(w) }
+	if node.Alias != nil { node.Alias.Accept(w) }
 	return result
 }
 
@@ -449,6 +482,16 @@ func (p *PrettyPrintVisitor) VisitFunctionDeclaration(node *FunctionDeclaration)
 	return result
 }
 
+func (p *PrettyPrintVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	return node.String()
+}
+
+func (p *PrettyPrintVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	return node.String()
+}
+
+func (p *PrettyPrintVisitor) VisitExportItem(node *ExportItem) interface{} { return node.String() }
+
 func (p *PrettyPrintVisitor) VisitBlockStatement(node *BlockStatement) interface{} {
 	result := "Block"
 	p.indent++
@@ -509,6 +552,9 @@ func (n *NodeCountVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface
 	n.count++
 	return nil
 }
+func (n *NodeCountVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} { n.count++; return nil }
+func (n *NodeCountVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} { n.count++; return nil }
+func (n *NodeCountVisitor) VisitExportItem(node *ExportItem) interface{}               { n.count++; return nil }
 func (n *NodeCountVisitor) VisitBlockStatement(node *BlockStatement) interface{} {
 	n.count++
 	return nil
