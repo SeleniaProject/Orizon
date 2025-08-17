@@ -136,13 +136,17 @@ func (p *Parser) expectPeek(tokenType lexer.TokenType) bool {
 
 	// Attempt error recovery if enabled (Phase 1.2.4)
 	if p.recoveryMode != PanicMode && p.suggestionEngine != nil {
-		recovered := p.recoverFromError(fmt.Sprintf("expecting %s", tokenType.String()))
-		if recovered {
-			// Check if we can continue after recovery
-			if p.peekTokenIs(tokenType) {
-				p.nextToken()
-				return true
-			}
+		// Track current token to detect lack of progress
+		before := p.current
+		_ = p.recoverFromError(fmt.Sprintf("expecting %s", tokenType.String()))
+		// If recovery positioned the peek at expected, consume it
+		if p.peekTokenIs(tokenType) {
+			p.nextToken()
+			return true
+		}
+		// If nothing changed, advance one token to avoid infinite loops
+		if p.current == before && p.current.Type != lexer.TokenEOF {
+			p.nextToken()
 		}
 	}
 
@@ -319,12 +323,31 @@ func (p *Parser) skipToNextTopLevelDecl() {
 			p.peekTokenIs(lexer.TokenConst) || p.peekTokenIs(lexer.TokenMacro) || p.peekTokenIs(lexer.TokenStruct) ||
 			p.peekTokenIs(lexer.TokenEnum) || p.peekTokenIs(lexer.TokenTrait) || p.peekTokenIs(lexer.TokenImpl) ||
 			p.peekTokenIs(lexer.TokenImport) || p.peekTokenIs(lexer.TokenExport) ||
-			(p.peekTokenIs(lexer.TokenIdentifier) && p.peek.Literal == "type") ||
-			p.peekTokenIs(lexer.TokenEOF) {
+			(p.peekTokenIs(lexer.TokenIdentifier) && p.peek.Literal == "type") {
+			// Advance onto the declaration start to ensure forward progress
+			p.nextToken()
+			return
+		}
+		if p.peekTokenIs(lexer.TokenEOF) {
+			// Advance to EOF to guarantee forward progress
+			p.nextToken()
 			return
 		}
 		p.nextToken()
 	}
+}
+
+// isTopLevelStart reports whether a token starts a top-level declaration (used for resynchronization).
+func (p *Parser) isTopLevelStart(tok lexer.Token) bool {
+	if tok.Type == lexer.TokenFunc || tok.Type == lexer.TokenLet || tok.Type == lexer.TokenVar || tok.Type == lexer.TokenConst ||
+		tok.Type == lexer.TokenMacro || tok.Type == lexer.TokenStruct || tok.Type == lexer.TokenEnum || tok.Type == lexer.TokenTrait ||
+		tok.Type == lexer.TokenImpl || tok.Type == lexer.TokenImport || tok.Type == lexer.TokenExport {
+		return true
+	}
+	if tok.Type == lexer.TokenIdentifier && (tok.Literal == "type" || tok.Literal == "newtype" || tok.Literal == "fn") {
+		return true
+	}
+	return false
 }
 
 // ====== Grammar Rules ======
@@ -348,18 +371,11 @@ func (p *Parser) parseProgram() *Program {
 			// Advance once to move past it and continue
 			p.nextToken()
 		} else {
-			// Resynchronize to the next statement/declaration start
-			// Consume until a sensible synchronization point: semicolon, newline, or EOF
-			for !p.currentTokenIs(lexer.TokenEOF) && !p.currentTokenIs(lexer.TokenNewline) && !p.currentTokenIs(lexer.TokenSemicolon) {
-				p.nextToken()
-			}
-			// If we stopped at a semicolon, advance past it to allow same-line continuation
-			if p.currentTokenIs(lexer.TokenSemicolon) {
-				p.nextToken()
-			}
-			// Skip any trivia (newlines/whitespace/comments)
-			for p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) {
-				p.nextToken()
+			// Declaration failed. Prefer declaration-level resynchronization to avoid swallowing following items.
+			// If we're already at a top-level start token, don't consume it; retry parsing it on next loop.
+			if !p.isTopLevelStart(p.current) {
+				// Move to the next top-level declaration keyword or EOF.
+				p.skipToNextTopLevelDecl()
 			}
 			continue
 		}
@@ -397,8 +413,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		if fn == nil {
 			// Let parseProgram handle synchronization to avoid double skipping
 			p.addError(TokenToPosition(p.current), "failed to parse function declaration", "declaration parsing")
-			// Resync to next top-level decl start
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		decl = fn
@@ -406,7 +420,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		vd := p.parseVariableDeclaration()
 		if vd == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse variable declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		decl = vd
@@ -414,7 +427,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		md := p.parseMacroDeclaration()
 		if md == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse macro declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		decl = md
@@ -422,7 +434,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		id := p.parseImportDeclaration()
 		if id == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse import declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		id.IsPublic = isPublic
@@ -431,7 +442,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		ed := p.parseExportDeclaration()
 		if ed == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse export declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		decl = ed
@@ -439,7 +449,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		sd := p.parseStructDeclaration()
 		if sd == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse struct declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		sd.IsPublic = isPublic
@@ -448,7 +457,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		ed := p.parseEnumDeclaration()
 		if ed == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse enum declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		ed.IsPublic = isPublic
@@ -457,7 +465,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		td := p.parseTraitDeclaration()
 		if td == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse trait declaration", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		td.IsPublic = isPublic
@@ -466,7 +473,6 @@ func (p *Parser) parseDeclaration() Declaration {
 		ib := p.parseImplBlock()
 		if ib == nil {
 			p.addError(TokenToPosition(p.current), "failed to parse impl block", "declaration parsing")
-			p.skipToNextTopLevelDecl()
 			return nil
 		}
 		decl = ib
@@ -476,11 +482,21 @@ func (p *Parser) parseDeclaration() Declaration {
 			td := p.parseTypeAliasDeclaration()
 			if td == nil {
 				p.addError(TokenToPosition(p.current), "failed to parse type alias", "declaration parsing")
-				p.skipToNextTopLevelDecl()
 				return nil
 			}
 			td.IsPublic = isPublic
 			decl = td
+			break
+		}
+		// Support 'newtype' nominal wrapper declaration (identifier literal)
+		if p.current.Type == lexer.TokenIdentifier && p.current.Literal == "newtype" {
+			nd := p.parseNewtypeDeclaration()
+			if nd == nil {
+				p.addError(TokenToPosition(p.current), "failed to parse newtype", "declaration parsing")
+				return nil
+			}
+			nd.IsPublic = isPublic
+			decl = nd
 			break
 		}
 		// Allow top-level expression statements via Pratt parser
@@ -556,11 +572,43 @@ func (p *Parser) parseTypeAliasDeclaration() *TypeAliasDeclaration {
 	return &TypeAliasDeclaration{Span: SpanBetween(start, end), Name: name, Aliased: aliased}
 }
 
+// parseNewtypeDeclaration parses: newtype Name = Type ;
+func (p *Parser) parseNewtypeDeclaration() *NewtypeDeclaration {
+	start := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	if !p.expectPeek(lexer.TokenAssign) {
+		return nil
+	}
+	p.nextToken()
+	base := p.parseType()
+	// optional semicolon
+	if p.peekTokenIs(lexer.TokenSemicolon) {
+		p.nextToken()
+	}
+	end := TokenToPosition(p.current)
+	return &NewtypeDeclaration{Span: SpanBetween(start, end), Name: name, Base: base}
+}
+
 // parseImportDeclaration: import path [as alias] ;? (semicolon optional)
 func (p *Parser) parseImportDeclaration() *ImportDeclaration {
 	start := TokenToPosition(p.current)
 	// Parse path segments: ident { :: ident }
-	if !p.expectPeek(lexer.TokenIdentifier) {
+	if !p.expectPeekRaw(lexer.TokenIdentifier) {
+		// Local recovery: malformed import head. Sync to ';' or next top-level start and bail.
+		p.addErrorSilent(TokenToPosition(p.peek), "expected module path after 'import'", "import parsing")
+		p.skipToBefore(
+			lexer.TokenSemicolon,
+			lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst,
+			lexer.TokenMacro, lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl,
+			lexer.TokenImport, lexer.TokenExport,
+		)
+		// Optionally consume semicolon if present to finish the bad import
+		if p.peekTokenIs(lexer.TokenSemicolon) {
+			p.nextToken()
+		}
 		return nil
 	}
 	path := []*Identifier{NewIdentifier(TokenToSpan(p.current), p.current.Literal)}
@@ -574,7 +622,19 @@ func (p *Parser) parseImportDeclaration() *ImportDeclaration {
 			p.nextToken() // consume '*'
 			break         // stop extending the path; wildcard ends the path
 		}
-		if !p.expectPeek(lexer.TokenIdentifier) {
+		if !p.expectPeekRaw(lexer.TokenIdentifier) {
+			// Malformed segment after '::'. Report and sync locally, then bail to let outer loop recover.
+			p.addErrorSilent(TokenToPosition(p.peek), "expected identifier after '::' in import path", "import parsing")
+			// Sync to ';' or before the next top-level start so we don't swallow following declarations
+			p.skipToBefore(
+				lexer.TokenSemicolon,
+				lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst,
+				lexer.TokenMacro, lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl,
+				lexer.TokenImport, lexer.TokenExport,
+			)
+			if p.peekTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+			}
 			return nil
 		}
 		path = append(path, NewIdentifier(TokenToSpan(p.current), p.current.Literal))
@@ -583,7 +643,18 @@ func (p *Parser) parseImportDeclaration() *ImportDeclaration {
 	var alias *Identifier
 	if p.peekTokenIs(lexer.TokenAs) {
 		p.nextToken() // move to 'as'
-		if !p.expectPeek(lexer.TokenIdentifier) {
+		if !p.expectPeekRaw(lexer.TokenIdentifier) {
+			// Recover: missing alias name, sync to end of import and bail
+			p.addErrorSilent(TokenToPosition(p.peek), "expected identifier after 'as' in import", "import parsing")
+			p.skipToBefore(
+				lexer.TokenSemicolon,
+				lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst,
+				lexer.TokenMacro, lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl,
+				lexer.TokenImport, lexer.TokenExport,
+			)
+			if p.peekTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+			}
 			return nil
 		}
 		alias = NewIdentifier(TokenToSpan(p.current), p.current.Literal)
@@ -670,15 +741,27 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 		return nil
 	}
 	fields := make([]*StructField, 0)
+	closed := false
 	// Parse zero or more field declarations until '}'
 	for {
 		p.nextToken()
-		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+		if p.currentTokenIs(lexer.TokenRBrace) {
+			closed = true
 			break
+		}
+		if p.currentTokenIs(lexer.TokenEOF) {
+			// EOF hit before closing brace
+			p.addErrorSilent(TokenToPosition(p.current), "missing '}' to close struct block", "struct parsing")
+			return nil
 		}
 		// Skip trivia
 		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
 			continue
+		}
+		// If we see a token that starts a new top-level declaration, assume the struct block was not closed and bail.
+		if p.isTopLevelStart(p.current) {
+			p.addErrorSilent(TokenToPosition(p.current), "unexpected top-level declaration inside struct; missing '}'?", "struct parsing")
+			return nil
 		}
 		// Optional 'pub'
 		isPub := false
@@ -687,7 +770,7 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 			p.nextToken()
 		}
 		if !p.currentTokenIs(lexer.TokenIdentifier) {
-			p.addError(TokenToPosition(p.current), "expected field name", "struct field parsing")
+			p.addErrorSilent(TokenToPosition(p.current), "expected field name", "struct field parsing")
 			// try skip to next comma or '}'
 			for !p.currentTokenIs(lexer.TokenComma) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
 				p.nextToken()
@@ -696,13 +779,25 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 				continue
 			}
 			if p.currentTokenIs(lexer.TokenRBrace) {
+				closed = true
 				break
 			}
 			continue
 		}
 		fname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
-		if !p.expectPeek(lexer.TokenColon) {
-			return nil
+		if !p.expectPeekRaw(lexer.TokenColon) {
+			// Improve block-level recovery: report and sync to next field or end of struct
+			p.addErrorSilent(TokenToPosition(p.peek), "expected ':' after struct field name", "struct field parsing")
+			p.skipTo(lexer.TokenComma, lexer.TokenRBrace)
+			if p.currentTokenIs(lexer.TokenRBrace) {
+				closed = true
+				break
+			}
+			// If we landed on a comma, continue to next field
+			if p.currentTokenIs(lexer.TokenComma) {
+				continue
+			}
+			continue
 		}
 		p.nextToken()
 		ftype := p.parseType()
@@ -715,6 +810,7 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 		}
 		if p.peekTokenIs(lexer.TokenRBrace) {
 			p.nextToken()
+			closed = true
 			break
 		}
 		// tolerate newline
@@ -722,6 +818,11 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 			p.nextToken()
 			continue
 		}
+	}
+	if !closed {
+		// As a safety, if we somehow exited without marking closed, report and fail
+		p.addErrorSilent(TokenToPosition(p.current), "unterminated struct declaration", "struct parsing")
+		return nil
 	}
 	end := TokenToPosition(p.current)
 	return &StructDeclaration{Span: SpanBetween(start, end), Name: name, Fields: fields, Generics: gens}
@@ -740,16 +841,26 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 		return nil
 	}
 	variants := make([]*EnumVariant, 0)
+	closed := false
 	for {
 		p.nextToken()
-		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+		if p.currentTokenIs(lexer.TokenRBrace) {
+			closed = true
 			break
+		}
+		if p.currentTokenIs(lexer.TokenEOF) {
+			p.addErrorSilent(TokenToPosition(p.current), "missing '}' to close enum block", "enum parsing")
+			return nil
 		}
 		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
 			continue
 		}
+		if p.isTopLevelStart(p.current) {
+			p.addErrorSilent(TokenToPosition(p.current), "unexpected top-level declaration inside enum; missing '}'?", "enum parsing")
+			return nil
+		}
 		if !p.currentTokenIs(lexer.TokenIdentifier) {
-			p.addError(TokenToPosition(p.current), "expected variant name", "enum variant parsing")
+			p.addErrorSilent(TokenToPosition(p.current), "expected variant name", "enum variant parsing")
 			// attempt to sync
 			for !p.currentTokenIs(lexer.TokenComma) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
 				p.nextToken()
@@ -758,6 +869,7 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 				continue
 			}
 			if p.currentTokenIs(lexer.TokenRBrace) {
+				closed = true
 				break
 			}
 			continue
@@ -802,12 +914,21 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 					p.nextToken()
 				}
 				if !p.currentTokenIs(lexer.TokenIdentifier) {
-					p.addError(TokenToPosition(p.current), "expected field name", "enum variant struct fields")
+					p.addErrorSilent(TokenToPosition(p.current), "expected field name", "enum variant struct fields")
 					break
 				}
 				fn := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
-				if !p.expectPeek(lexer.TokenColon) {
-					return nil
+				if !p.expectPeekRaw(lexer.TokenColon) {
+					// Recover within variant field list
+					p.addErrorSilent(TokenToPosition(p.peek), "expected ':' after variant field name", "enum variant struct fields")
+					p.skipTo(lexer.TokenComma, lexer.TokenRBrace)
+					if p.currentTokenIs(lexer.TokenRBrace) {
+						break
+					}
+					if p.currentTokenIs(lexer.TokenComma) {
+						continue
+					}
+					continue
 				}
 				p.nextToken()
 				ft := p.parseType()
@@ -818,6 +939,19 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 				}
 				if p.peekTokenIs(lexer.TokenRBrace) {
 					p.nextToken()
+					closed = true
+					break
+				}
+				// tolerate newline and other trivia; otherwise try to resync
+				if p.peekTokenIs(lexer.TokenNewline) || p.peekTokenIs(lexer.TokenWhitespace) || p.peekTokenIs(lexer.TokenComment) {
+					p.nextToken()
+					continue
+				}
+				// Unexpected token: resync to next field or end
+				p.addErrorSilent(TokenToPosition(p.peek), "expected ',' or '}' in enum variant struct fields", "enum variant struct fields")
+				p.skipTo(lexer.TokenComma, lexer.TokenRBrace)
+				if p.currentTokenIs(lexer.TokenRBrace) {
+					closed = true
 					break
 				}
 			}
@@ -831,8 +965,13 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 		}
 		if p.peekTokenIs(lexer.TokenRBrace) {
 			p.nextToken()
+			closed = true
 			break
 		}
+	}
+	if !closed {
+		p.addErrorSilent(TokenToPosition(p.current), "unterminated enum declaration", "enum parsing")
+		return nil
 	}
 	end := TokenToPosition(p.current)
 	return &EnumDeclaration{Span: SpanBetween(start, end), Name: name, Variants: variants, Generics: gens}
@@ -858,19 +997,33 @@ func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
 	}
 	methods := make([]*TraitMethod, 0)
 	assocTypes := make([]*AssociatedType, 0)
+	closed := false
 	for {
 		p.nextToken()
-		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+		if p.currentTokenIs(lexer.TokenRBrace) {
+			closed = true
 			break
+		}
+		if p.currentTokenIs(lexer.TokenEOF) {
+			p.addErrorSilent(TokenToPosition(p.current), "missing '}' to close trait body", "trait parsing")
+			return nil
 		}
 		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
 			continue
 		}
+		// Disallow unrelated top-level starts inside trait, but allow valid trait items: 'func' and associated 'type'
+		if p.isTopLevelStart(p.current) && !(p.current.Type == lexer.TokenFunc || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "type")) {
+			p.addErrorSilent(TokenToPosition(p.current), "unexpected top-level declaration inside trait; missing '}'?", "trait parsing")
+			return nil
+		}
 		// Associated type: 'type' identifier [ : bounds ] ;
 		// Lexer doesn't have a dedicated 'type' token yet; detect identifier literal "type".
 		if p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "type" {
-			if !p.expectPeek(lexer.TokenIdentifier) {
-				return nil
+			if !p.expectPeekRaw(lexer.TokenIdentifier) {
+				// Recover to ';' or '}' to continue parsing remaining items
+				p.addErrorSilent(TokenToPosition(p.peek), "expected associated type name after 'type'", "trait parsing")
+				p.skipTo(lexer.TokenSemicolon, lexer.TokenRBrace)
+				continue
 			}
 			aname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
 			bounds := []Type{}
@@ -887,18 +1040,24 @@ func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
 		}
 		// method signature: func name [<T,...>](params) [-> type] ;
 		if p.currentTokenIs(lexer.TokenFunc) {
-			if !p.expectPeek(lexer.TokenIdentifier) {
-				return nil
+			if !p.expectPeekRaw(lexer.TokenIdentifier) {
+				p.addErrorSilent(TokenToPosition(p.peek), "expected method name after 'func'", "trait parsing")
+				p.skipTo(lexer.TokenSemicolon, lexer.TokenRBrace)
+				continue
 			}
 			mname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
 			// Optional method-level generics
 			gens := p.parseOptionalGenericParameters()
-			if !p.expectPeek(lexer.TokenLParen) {
-				return nil
+			if !p.expectPeekRaw(lexer.TokenLParen) {
+				p.addErrorSilent(TokenToPosition(p.peek), "expected '(' after method name", "trait parsing")
+				p.skipTo(lexer.TokenSemicolon, lexer.TokenRBrace)
+				continue
 			}
 			params := p.parseParameterList()
-			if !p.expectPeek(lexer.TokenRParen) {
-				return nil
+			if !p.expectPeekRaw(lexer.TokenRParen) {
+				p.addErrorSilent(TokenToPosition(p.peek), "expected ')' after method parameters", "trait parsing")
+				p.skipTo(lexer.TokenSemicolon, lexer.TokenRBrace)
+				continue
 			}
 			// Optional return type
 			var ret Type
@@ -917,11 +1076,15 @@ func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
 			methods = append(methods, &TraitMethod{Span: mname.Span, Name: mname, Parameters: params, ReturnType: ret, Generics: gens})
 			continue
 		}
-		p.addError(TokenToPosition(p.current), "expected 'func' or 'type' in trait body", "trait parsing")
+		p.addErrorSilent(TokenToPosition(p.current), "expected 'func' or 'type' in trait body", "trait parsing")
 		// sync to next possible item
 		for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
 			p.nextToken()
 		}
+	}
+	if !closed {
+		p.addErrorSilent(TokenToPosition(p.current), "unterminated trait declaration", "trait parsing")
+		return nil
 	}
 	end := TokenToPosition(p.current)
 	return &TraitDeclaration{Span: SpanBetween(start, end), Name: name, Methods: methods, Generics: gens, AssociatedTypes: assocTypes}
@@ -962,33 +1125,45 @@ func (p *Parser) parseImplBlock() *ImplBlock {
 		return nil
 	}
 	items := make([]*FunctionDeclaration, 0)
+	closed := false
 	for {
 		p.nextToken()
-		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+		if p.currentTokenIs(lexer.TokenRBrace) {
+			closed = true
 			break
+		}
+		if p.currentTokenIs(lexer.TokenEOF) {
+			p.addErrorSilent(TokenToPosition(p.current), "missing '}' to close impl block", "impl parsing")
+			return nil
 		}
 		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
 			continue
 		}
+		// Inside impl, we only accept function items; any other token is treated as an unexpected item and skipped locally.
 		// Expect function declarations only for MVP
 		if p.currentTokenIs(lexer.TokenFunc) || (p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "fn") {
 			fn := p.parseFunctionDeclaration()
 			if fn != nil {
 				items = append(items, fn)
 			}
-		} else {
-			// skip unknown item until next '}' or 'func'
-			p.addError(TokenToPosition(p.current), "unexpected item in impl block", "impl parsing")
-			for !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenFunc) && !p.currentTokenIs(lexer.TokenEOF) {
-				p.nextToken()
-			}
-			if p.currentTokenIs(lexer.TokenFunc) {
-				fn := p.parseFunctionDeclaration()
-				if fn != nil {
-					items = append(items, fn)
-				}
+			continue
+		}
+		// skip unknown item until next '}' or 'func'
+		p.addErrorSilent(TokenToPosition(p.current), "unexpected item in impl block", "impl parsing")
+		for !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenFunc) && !p.currentTokenIs(lexer.TokenEOF) && !p.peekTokenIs(lexer.TokenRBrace) {
+			p.nextToken()
+		}
+		if p.currentTokenIs(lexer.TokenFunc) {
+			fn := p.parseFunctionDeclaration()
+			if fn != nil {
+				items = append(items, fn)
 			}
 		}
+		// If we stopped because '}' is next, the outer loop will handle it on next iteration
+	}
+	if !closed {
+		p.addErrorSilent(TokenToPosition(p.current), "unterminated impl block", "impl parsing")
+		return nil
 	}
 	end := TokenToPosition(p.current)
 	return &ImplBlock{Span: SpanBetween(start, end), Trait: trait, ForType: forType, Items: items, Generics: gens, WhereClauses: where}

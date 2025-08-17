@@ -489,6 +489,24 @@ func (d *TypeAliasDeclaration) Accept(visitor Visitor) interface{} {
 func (d *TypeAliasDeclaration) statementNode()   {}
 func (d *TypeAliasDeclaration) declarationNode() {}
 
+// NewtypeDeclaration represents: newtype Name = Type ;
+// Semantically distinct from alias: creates a nominal type wrapping the base type.
+type NewtypeDeclaration struct {
+	Span     Span
+	Name     *Identifier
+	Base     Type
+	IsPublic bool
+}
+
+func (d *NewtypeDeclaration) GetSpan() Span  { return d.Span }
+func (d *NewtypeDeclaration) String() string { return "newtype" }
+func (d *NewtypeDeclaration) Accept(visitor Visitor) interface{} {
+	// No visitor usage yet
+	return nil
+}
+func (d *NewtypeDeclaration) statementNode()   {}
+func (d *NewtypeDeclaration) declarationNode() {}
+
 // MacroParameter represents a macro parameter with optional type constraints
 type MacroParameter struct {
 	Span         Span

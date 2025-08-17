@@ -314,6 +314,99 @@ func TestDeclarationParsingAndHIR(t *testing.T) {
 	}
 }
 
+// New tests: block-level error recovery inside declaration bodies
+func TestRecovery_StructFieldMissingColon_AllowsFollowingFields(t *testing.T) {
+	src := "struct S { a int, b: int, c: int }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 decl, got %d", len(prog.Declarations))
+	}
+	if len(errs) == 0 {
+		t.Fatalf("expected parse error for missing ':' in struct field")
+	}
+	sd, ok := prog.Declarations[0].(*StructDeclaration)
+	if !ok {
+		t.Fatalf("expected StructDeclaration, got %T", prog.Declarations[0])
+	}
+	// We should still have parsed at least the valid trailing fields
+	if len(sd.Fields) < 2 {
+		t.Fatalf("expected to recover and parse following fields, got %d", len(sd.Fields))
+	}
+}
+
+func TestRecovery_EnumVariantStructFieldMissingColon_AllowsFollowing(t *testing.T) {
+	src := "enum E { V{ x int, y: int } }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) == 0 {
+		t.Fatalf("expected parse error for missing ':' in enum variant field")
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 decl, got %d", len(prog.Declarations))
+	}
+	ed, ok := prog.Declarations[0].(*EnumDeclaration)
+	if !ok {
+		t.Fatalf("expected EnumDeclaration, got %T", prog.Declarations[0])
+	}
+	if len(ed.Variants) != 1 {
+		t.Fatalf("expected 1 variant, got %d", len(ed.Variants))
+	}
+	// Should still capture at least the valid field 'y'
+	foundValid := false
+	for _, f := range ed.Variants[0].Fields {
+		if f.Name != nil && f.Name.Value == "y" {
+			foundValid = true
+			break
+		}
+	}
+	if !foundValid {
+		t.Fatalf("expected to recover and parse valid field after error")
+	}
+}
+
+func TestRecovery_TraitItemErrors_DoNotPreventSubsequentItems(t *testing.T) {
+	src := "trait T { type ; func f(x: int); func g() -> int; }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) == 0 {
+		t.Fatalf("expected errors in malformed trait items")
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 decl, got %d", len(prog.Declarations))
+	}
+	td, ok := prog.Declarations[0].(*TraitDeclaration)
+	if !ok {
+		t.Fatalf("expected TraitDeclaration, got %T", prog.Declarations[0])
+	}
+	// associated type malformed should be skipped; methods f and g should parse
+	if len(td.Methods) < 2 {
+		t.Fatalf("expected to recover and parse subsequent methods, got %d", len(td.Methods))
+	}
+}
+
+func TestRecovery_ImplBlock_UnexpectedItem_SkipsToNextFunc(t *testing.T) {
+	src := "impl S { let x = 1; func ok() { return; } }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 decl, got %d", len(prog.Declarations))
+	}
+	if len(errs) == 0 {
+		t.Fatalf("expected error for unexpected item in impl block")
+	}
+	ib, ok := prog.Declarations[0].(*ImplBlock)
+	if !ok {
+		t.Fatalf("expected ImplBlock, got %T", prog.Declarations[0])
+	}
+	if len(ib.Items) != 1 || ib.Items[0].Name.Value != "ok" {
+		t.Fatalf("expected to recover and parse following function in impl block")
+	}
+}
 func TestNewtypeParseErrorRecovery(t *testing.T) {
 	// malformed newtype should produce error but parser should continue on next decl
 	src := "newtype = i32;\ntrait T { }"
