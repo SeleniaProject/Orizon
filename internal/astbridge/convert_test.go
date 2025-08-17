@@ -191,3 +191,68 @@ func TestDeclarations_TypeAlias_And_Newtype_RoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestFromParserType_DynamicArray_And_AsyncFn_Pretty(t *testing.T) {
+	// Dynamic array [T]
+	{
+		prog := &p.Program{Declarations: []p.Declaration{
+			&p.VariableDeclaration{Name: &p.Identifier{Value: "arr"}, TypeSpec: &p.ArrayType{ElementType: &p.BasicType{Name: "int"}, IsDynamic: true}},
+		}}
+		ap, err := FromParserProgram(prog)
+		if err != nil { t.Fatalf("FromParserProgram error: %v", err) }
+		v, _ := ap.Declarations[0].(*aast.VariableDeclaration)
+		if id, ok := v.Type.(*aast.IdentifierType); !ok || id.Name.Value != "[int]" {
+			t.Fatalf("expected '[int]', got %T %#v", v.Type, v.Type)
+		}
+	}
+
+	// async function type with unnamed param: async (int) -> void
+	{
+		ft := &p.FunctionType{IsAsync: true, Parameters: []*p.FunctionTypeParameter{{Name: "", Type: &p.BasicType{Name: "int"}}}, ReturnType: nil}
+		prog := &p.Program{Declarations: []p.Declaration{
+			&p.VariableDeclaration{Name: &p.Identifier{Value: "f"}, TypeSpec: ft},
+		}}
+		ap, err := FromParserProgram(prog)
+		if err != nil { t.Fatalf("FromParserProgram error: %v", err) }
+		v, _ := ap.Declarations[0].(*aast.VariableDeclaration)
+		if id, ok := v.Type.(*aast.IdentifierType); !ok || id.Name.Value != "async (int) -> void" {
+			t.Fatalf("expected 'async (int) -> void', got %T %#v", v.Type, v.Type)
+		}
+	}
+}
+
+func TestToParserType_GenericAndArray_RoundTrip(t *testing.T) {
+	// Generic Vec<Result<int, string>>
+	{
+		astProg := &aast.Program{Declarations: []aast.Declaration{
+			&aast.VariableDeclaration{Name: &aast.Identifier{Value: "v"}, Type: &aast.IdentifierType{Name: &aast.Identifier{Value: "Vec<Result<int, string>>"}}},
+		}}
+		pprog, err := ToParserProgram(astProg)
+		if err != nil { t.Fatalf("ToParserProgram error: %v", err) }
+		v, _ := pprog.Declarations[0].(*p.VariableDeclaration)
+		if gt, ok := v.TypeSpec.(*p.GenericType); !ok {
+			t.Fatalf("expected parser.GenericType, got %T", v.TypeSpec)
+		} else {
+			// base should be BasicType("Vec") and first param GenericType base BasicType("Result")
+			if b, ok := gt.BaseType.(*p.BasicType); !ok || b.Name != "Vec" {
+				t.Fatalf("expected base Vec, got %#v", gt.BaseType)
+			}
+			if len(gt.TypeParameters) != 1 {
+				t.Fatalf("expected 1 type param, got %d", len(gt.TypeParameters))
+			}
+		}
+	}
+
+	// Dynamic array [float]
+	{
+		astProg := &aast.Program{Declarations: []aast.Declaration{
+			&aast.VariableDeclaration{Name: &aast.Identifier{Value: "a"}, Type: &aast.IdentifierType{Name: &aast.Identifier{Value: "[float]"}}},
+		}}
+		pprog, err := ToParserProgram(astProg)
+		if err != nil { t.Fatalf("ToParserProgram error: %v", err) }
+		v, _ := pprog.Declarations[0].(*p.VariableDeclaration)
+		if at, ok := v.TypeSpec.(*p.ArrayType); !ok || !at.IsDynamic {
+			t.Fatalf("expected dynamic parser.ArrayType, got %T %#v", v.TypeSpec, v.TypeSpec)
+		}
+	}
+}
