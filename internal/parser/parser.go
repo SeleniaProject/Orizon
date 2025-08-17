@@ -94,9 +94,9 @@ func NewParser(l *lexer.Lexer, filename string) *Parser {
 		errors:       make([]error, 0),
 		suggestions:  make([]Suggestion, 0),
 		recoveryMode: PhraseLevel, // Default to phrase-level recovery
-	// Set conservative yet safe caps to prevent runaway memory usage
-	maxErrors:           5000,
-	maxSuggestionsTotal: 5000,
+		// Set conservative yet safe caps to prevent runaway memory usage
+		maxErrors:           5000,
+		maxSuggestionsTotal: 5000,
 	}
 
 	// Initialize suggestion engine with phrase-level recovery
