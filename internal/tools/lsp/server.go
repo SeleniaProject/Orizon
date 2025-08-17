@@ -18,6 +18,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/orizon-lang/orizon/internal/format"
 	"github.com/orizon-lang/orizon/internal/lexer"
 	"github.com/orizon-lang/orizon/internal/parser"
 )
@@ -2350,51 +2351,12 @@ func findNodeAt(root *parser.Program, offset int) parser.Node {
 
 // handleFormatting applies a simple formatting by re-printing the AST or falling back to trimming whitespace.
 func (s *Server) handleFormatting(uri string, options map[string]any) []map[string]any {
-	// Lightweight, safe formatter: trim trailing spaces and re-indent braces-based blocks
+	// Delegate to shared formatter for consistency with CLI
 	text := s.docs[uri]
 	if text == "" {
 		return []map[string]any{}
 	}
-	lines := strings.Split(text, "\n")
-	indent := 0
-	indentUnit := "  " // default 2 spaces
-	if ws, ok := options["insertSpaces"].(bool); ok && !ws {
-		indentUnit = "\t"
-	} else if size, ok := options["tabSize"].(float64); ok && size > 0 {
-		indentUnit = strings.Repeat(" ", int(size))
-	}
-	for i, line := range lines {
-		// Remove trailing whitespace
-		raw := strings.TrimRight(line, " \t\r")
-
-		// Compute delta for current line: if it starts with '}', outdent first
-		trimmedLeft := strings.TrimLeft(raw, " \t")
-		leadingClose := strings.HasPrefix(trimmedLeft, "}")
-		// Adjust indent before applying
-		if leadingClose && indent > 0 {
-			indent--
-		}
-		// Apply indent
-		lines[i] = strings.Repeat(indentUnit, indent) + trimmedLeft
-
-		// Update indent for next line based on braces balance of this line
-		open := strings.Count(trimmedLeft, "{")
-		close := strings.Count(trimmedLeft, "}")
-		indent += open
-		if indent < 0 {
-			indent = 0
-		}
-		if close > open {
-			// If more closing braces, reduce indent but not below zero
-			diff := close - open
-			if indent >= diff {
-				indent -= diff
-			} else {
-				indent = 0
-			}
-		}
-	}
-	formatted := strings.Join(lines, "\n")
+	formatted := format.FormatText(text, format.Options{PreserveNewlineStyle: true})
 	if formatted == text {
 		return []map[string]any{}
 	}
