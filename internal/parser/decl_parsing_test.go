@@ -14,6 +14,38 @@ func TestDeclarationParsingAndHIR(t *testing.T) {
 		check  func(t *testing.T, prog *Program, hir *HIRModule)
 	}{
 		{
+			name:   "Import wildcard (public)",
+			source: "pub import core::io::*;",
+			check: func(t *testing.T, prog *Program, hir *HIRModule) {
+				if len(prog.Declarations) != 1 {
+					t.Fatalf("expected 1 decl, got %d", len(prog.Declarations))
+				}
+				imp, ok := prog.Declarations[0].(*ImportDeclaration)
+				if !ok {
+					t.Fatalf("expected ImportDeclaration, got %T", prog.Declarations[0])
+				}
+				if !imp.IsPublic {
+					t.Fatalf("expected import IsPublic=true")
+				}
+				if len(imp.Path) != 2 || imp.Path[0].Value != "core" || imp.Path[1].Value != "io" {
+					t.Fatalf("unexpected path: %+v", imp.Path)
+				}
+				if imp.Alias != nil {
+					t.Fatalf("did not expect alias for wildcard import")
+				}
+				if hir == nil {
+					t.Fatalf("expected HIR module")
+				}
+				if len(hir.Imports) != 1 {
+					t.Fatalf("expected 1 HIR import, got %d", len(hir.Imports))
+				}
+				hi := hir.Imports[0]
+				if hi.ModuleName != "core::io" || !hi.IsPublic {
+					t.Fatalf("unexpected HIR import: %+v", hi)
+				}
+			},
+		},
+		{
 			name:   "Import with alias (public)",
 			source: "pub import core::io as cio;",
 			check: func(t *testing.T, prog *Program, hir *HIRModule) {
@@ -239,5 +271,220 @@ func TestDeclarationParsingAndHIR(t *testing.T) {
 			}
 			tc.check(t, prog, hir)
 		})
+	}
+}
+
+func TestParserRecoverySyncPoints_TraitAfterBadImport(t *testing.T) {
+	// Malformed import followed by a trait; parser should recover and parse the trait.
+	src := "import core::; trait T { }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if prog == nil {
+		t.Fatalf("expected program, got nil")
+	}
+	if len(errs) == 0 {
+		t.Fatalf("expected parse errors due to malformed import, got none")
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 decl (trait) after recovery, got %d", len(prog.Declarations))
+	}
+	if _, ok := prog.Declarations[0].(*TraitDeclaration); !ok {
+		t.Fatalf("expected TraitDeclaration after recovery, got %T", prog.Declarations[0])
+	}
+}
+
+func TestParseStructWithGenerics_ASTOnly(t *testing.T) {
+	src := "struct S<T> { x: T, }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) != 0 {
+		t.Fatalf("unexpected parse errors: %v", errs)
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(prog.Declarations))
+	}
+	sd, ok := prog.Declarations[0].(*StructDeclaration)
+	if !ok {
+		t.Fatalf("expected StructDeclaration, got %T", prog.Declarations[0])
+	}
+	if len(sd.Generics) != 1 || sd.Generics[0].Kind != GenericParamType || sd.Generics[0].Name.Value != "T" {
+		t.Fatalf("unexpected generics: %+v", sd.Generics)
+	}
+	if len(sd.Fields) != 1 {
+		t.Fatalf("expected 1 field, got %d", len(sd.Fields))
+	}
+}
+
+func TestParseTraitWithAssocType_ASTOnly(t *testing.T) {
+	src := "trait Tr<T> { type Item; func f(x: T); }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) != 0 {
+		t.Fatalf("unexpected parse errors: %v", errs)
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(prog.Declarations))
+	}
+	td, ok := prog.Declarations[0].(*TraitDeclaration)
+	if !ok {
+		t.Fatalf("expected TraitDeclaration, got %T", prog.Declarations[0])
+	}
+	if len(td.Generics) != 1 || td.Generics[0].Name.Value != "T" {
+		t.Fatalf("unexpected generics: %+v", td.Generics)
+	}
+	if len(td.AssociatedTypes) != 1 || td.AssociatedTypes[0].Name.Value != "Item" {
+		t.Fatalf("expected one associated type 'Item', got %+v", td.AssociatedTypes)
+	}
+	if len(td.Methods) != 1 || td.Methods[0].Name.Value != "f" {
+		t.Fatalf("expected one method 'f', got %+v", td.Methods)
+	}
+}
+
+func TestParseImplWithWhere_ASTOnly(t *testing.T) {
+	src := "impl<T> S<T> where T: Eq { }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) != 0 {
+		t.Fatalf("unexpected parse errors: %v", errs)
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(prog.Declarations))
+	}
+	ib, ok := prog.Declarations[0].(*ImplBlock)
+	if !ok {
+		t.Fatalf("expected ImplBlock, got %T", prog.Declarations[0])
+	}
+	if len(ib.Generics) != 1 || ib.Generics[0].Name.Value != "T" {
+		t.Fatalf("unexpected generics: %+v", ib.Generics)
+	}
+	if len(ib.WhereClauses) != 1 {
+		t.Fatalf("expected 1 where clause, got %d", len(ib.WhereClauses))
+	}
+}
+
+func TestParseTypeAlias_ASTOnly(t *testing.T) {
+	src := "type MyInt = i32;"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) != 0 {
+		t.Fatalf("unexpected parse errors: %v", errs)
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(prog.Declarations))
+	}
+	td, ok := prog.Declarations[0].(*TypeAliasDeclaration)
+	if !ok {
+		t.Fatalf("expected TypeAliasDeclaration, got %T", prog.Declarations[0])
+	}
+	if td.Name.Value != "MyInt" {
+		t.Fatalf("unexpected alias name: %s", td.Name.Value)
+	}
+}
+
+func TestParseFunctionWithGenerics_ASTOnly(t *testing.T) {
+	src := "func f<T>(x: T) { }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) != 0 {
+		t.Fatalf("unexpected parse errors: %v", errs)
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(prog.Declarations))
+	}
+	fd, ok := prog.Declarations[0].(*FunctionDeclaration)
+	if !ok {
+		t.Fatalf("expected FunctionDeclaration, got %T", prog.Declarations[0])
+	}
+	if fd.Name.Value != "f" {
+		t.Fatalf("unexpected function name: %s", fd.Name.Value)
+	}
+	if len(fd.Generics) != 1 || fd.Generics[0].Name.Value != "T" {
+		t.Fatalf("unexpected generics on function: %+v", fd.Generics)
+	}
+}
+
+func TestParseTraitMethodWithGenerics_ASTOnly(t *testing.T) {
+	src := "trait Tr { func m<T>(x: T); }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) != 0 {
+		t.Fatalf("unexpected parse errors: %v", errs)
+	}
+	if len(prog.Declarations) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(prog.Declarations))
+	}
+	td, ok := prog.Declarations[0].(*TraitDeclaration)
+	if !ok {
+		t.Fatalf("expected TraitDeclaration, got %T", prog.Declarations[0])
+	}
+	if len(td.Methods) != 1 {
+		t.Fatalf("expected 1 method, got %d", len(td.Methods))
+	}
+	m := td.Methods[0]
+	if m.Name.Value != "m" {
+		t.Fatalf("unexpected method name: %s", m.Name.Value)
+	}
+	if len(m.Generics) != 1 || m.Generics[0].Name.Value != "T" {
+		t.Fatalf("unexpected generics on trait method: %+v", m.Generics)
+	}
+}
+
+func TestHIR_TypeAlias_And_TraitAssoc_Minimal(t *testing.T) {
+	// Type alias
+	{
+		src := "type MyInt = i32;"
+		l := lexer.New(src)
+		p := NewParser(l, "test.oriz")
+		prog, errs := p.Parse()
+		if len(errs) != 0 {
+			t.Fatalf("unexpected parse errors: %v", errs)
+		}
+		tr := NewASTToHIRTransformer()
+		hir, terrs := tr.TransformProgram(prog)
+		if len(terrs) != 0 {
+			t.Fatalf("unexpected transform errors: %v", terrs)
+		}
+		if len(hir.Types) != 1 {
+			t.Fatalf("expected 1 HIR type, got %d", len(hir.Types))
+		}
+		if hir.Types[0].Kind != TypeDefAlias {
+			t.Fatalf("expected TypeDefAlias, got %v", hir.Types[0].Kind)
+		}
+	}
+	// Trait associated type
+	{
+		src := "trait Tr { type Item; }"
+		l := lexer.New(src)
+		p := NewParser(l, "test.oriz")
+		prog, errs := p.Parse()
+		if len(errs) != 0 {
+			t.Fatalf("unexpected parse errors: %v", errs)
+		}
+		tr := NewASTToHIRTransformer()
+		hir, terrs := tr.TransformProgram(prog)
+		if len(terrs) != 0 {
+			t.Fatalf("unexpected transform errors: %v", terrs)
+		}
+		if len(hir.Types) != 1 {
+			t.Fatalf("expected 1 HIR type, got %d", len(hir.Types))
+		}
+		td := hir.Types[0]
+		if td.Kind != TypeDefTrait {
+			t.Fatalf("expected trait type def, got %v", td.Kind)
+		}
+		ht, ok := td.Data.(*HIRTraitType)
+		if !ok {
+			t.Fatalf("expected HIRTraitType, got %T", td.Data)
+		}
+		if len(ht.AssociatedTypes) != 1 || ht.AssociatedTypes[0].Name != "Item" {
+			t.Fatalf("expected one associated type 'Item', got %+v", ht.AssociatedTypes)
+		}
 	}
 }

@@ -388,6 +388,7 @@ type TraitMethod struct {
 	Parameters []*Parameter
 	ReturnType Type
 	IsAsync    bool
+	Generics   []*GenericParameter
 }
 
 func (tt *TraitType) GetSpan() Span { return tt.Span }
@@ -417,6 +418,10 @@ func (tt *TraitType) Clone() TypeSafeNode {
 		methodClone.Parameters = make([]*Parameter, len(method.Parameters))
 		for j, param := range method.Parameters {
 			methodClone.Parameters[j] = param.Clone().(*Parameter)
+		}
+		if method.Generics != nil {
+			methodClone.Generics = make([]*GenericParameter, len(method.Generics))
+			copy(methodClone.Generics, method.Generics)
 		}
 		clone.Methods[i] = &methodClone
 	}

@@ -19,22 +19,24 @@
 - [ ] パーサー: 宣言パースの実装
   - struct 宣言
     - [x] フィールド/可視性
-    - [ ] ジェネリクス
+    - [x] ジェネリクス
   - enum 宣言
     - [x] バリアント（データ付き/無し）
-    - [ ] ジェネリクス
+    - [x] ジェネリクス
   - trait 宣言
     - [x] メソッドシグネチャ
-    - [ ] 関連型
+    - [x] 関連型
   - impl ブロック
     - [x] 単独/trait 実装（構文）
-    - [ ] where 制約
+    - [x] where 制約
     - [ ] HIR への反映
-  - [ ] type alias / newtype（core AST の `TypeDeclaration` と整合）
+  - type alias / newtype（core AST の `TypeDeclaration` と整合）
+    - [x] type alias
+    - [ ] newtype
   - import/export
     - [x] モジュール名/パス
     - [x] 別名
-    - [ ] ワイルドカード（最小）
+    - [x] ワイルドカード（最小）
 - [ ] エラー回復/同期点の拡充
   - [x] 基本的な宣言スキップ復帰
   - [ ] 宣言ブロック単位の同期点/良質な診断

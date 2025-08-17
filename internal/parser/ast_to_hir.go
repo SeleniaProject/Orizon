@@ -47,12 +47,9 @@ type SymbolScope struct {
 
 // Symbol represents a symbol in the symbol table
 type Symbol struct {
-	name     string
-	kind     SymbolKind
-	hirNode  HIRNode
-	declared Span
-	used     []Span
-	data     interface{} // Additional field for compatibility
+	name string
+	kind SymbolKind
+	data interface{} // Additional field for compatibility
 }
 
 // SymbolKind represents different symbol types
@@ -271,6 +268,8 @@ func (transformer *ASTToHIRTransformer) transformDeclaration(decl Declaration) H
 		return transformer.transformEnumDeclaration(d)
 	case *TraitDeclaration:
 		return transformer.transformTraitDeclaration(d)
+	case *TypeAliasDeclaration:
+		return transformer.transformTypeAliasDeclaration(d)
 	case *ImportDeclaration:
 		// Side-effect: register import in module, no HIRNode returned
 		if transformer.currentModule != nil {
@@ -311,7 +310,24 @@ func (transformer *ASTToHIRTransformer) transformStructDeclaration(sd *StructDec
 		fields = append(fields, &HIRFieldType{Name: name, Type: ft})
 	}
 	st := &HIRStructType{Name: sd.Name.Value, Fields: fields}
-	return &HIRTypeDefinition{Span: sd.Span, Name: sd.Name.Value, Kind: TypeDefStruct, Data: st}
+	td := &HIRTypeDefinition{Span: sd.Span, Name: sd.Name.Value, Kind: TypeDefStruct, Data: st}
+	// Map generic parameters (type params only)
+	if len(sd.Generics) > 0 {
+		td.TypeParams = make([]*HIRTypeParameter, 0, len(sd.Generics))
+		for _, gp := range sd.Generics {
+			if gp.Kind == GenericParamType && gp.Name != nil {
+				tp := &HIRTypeParameter{Span: gp.Span, Name: gp.Name.Value}
+				if len(gp.Bounds) > 0 {
+					tp.Bounds = make([]*HIRType, 0, len(gp.Bounds))
+					for _, b := range gp.Bounds {
+						tp.Bounds = append(tp.Bounds, transformer.transformType(b))
+					}
+				}
+				td.TypeParams = append(td.TypeParams, tp)
+			}
+		}
+	}
+	return td
 }
 
 // transformEnumDeclaration converts AST enum to HIR type definition
@@ -331,7 +347,23 @@ func (transformer *ASTToHIRTransformer) transformEnumDeclaration(ed *EnumDeclara
 		variants = append(variants, &HIRVariantType{Name: v.Name.Value, Fields: vtypes})
 	}
 	et := &HIREnumType{Name: ed.Name.Value, Variants: variants}
-	return &HIRTypeDefinition{Span: ed.Span, Name: ed.Name.Value, Kind: TypeDefEnum, Data: et}
+	td := &HIRTypeDefinition{Span: ed.Span, Name: ed.Name.Value, Kind: TypeDefEnum, Data: et}
+	if len(ed.Generics) > 0 {
+		td.TypeParams = make([]*HIRTypeParameter, 0, len(ed.Generics))
+		for _, gp := range ed.Generics {
+			if gp.Kind == GenericParamType && gp.Name != nil {
+				tp := &HIRTypeParameter{Span: gp.Span, Name: gp.Name.Value}
+				if len(gp.Bounds) > 0 {
+					tp.Bounds = make([]*HIRType, 0, len(gp.Bounds))
+					for _, b := range gp.Bounds {
+						tp.Bounds = append(tp.Bounds, transformer.transformType(b))
+					}
+				}
+				td.TypeParams = append(td.TypeParams, tp)
+			}
+		}
+	}
+	return td
 }
 
 // transformTraitDeclaration converts AST trait to HIR type definition
@@ -350,10 +382,67 @@ func (transformer *ASTToHIRTransformer) transformTraitDeclaration(td *TraitDecla
 		if m.ReturnType != nil {
 			ret = transformer.transformType(m.ReturnType)
 		}
-		methods = append(methods, &HIRMethodSignature{Name: m.Name.Value, Parameters: paramTypes, ReturnType: ret})
+		// Map method generics to HIR type parameters (bounds ignored for MVP)
+		tparams := make([]*HIRTypeParameter, 0)
+		if len(m.Generics) > 0 {
+			for _, gp := range m.Generics {
+				if gp.Kind == GenericParamType && gp.Name != nil {
+					tp := &HIRTypeParameter{Span: gp.Span, Name: gp.Name.Value}
+					// bounds to HIR types if any
+					if len(gp.Bounds) > 0 {
+						tp.Bounds = make([]*HIRType, 0, len(gp.Bounds))
+						for _, b := range gp.Bounds {
+							tp.Bounds = append(tp.Bounds, transformer.transformType(b))
+						}
+					}
+					tparams = append(tparams, tp)
+				}
+			}
+		}
+		methods = append(methods, &HIRMethodSignature{Name: m.Name.Value, Parameters: paramTypes, ReturnType: ret, TypeParameters: tparams})
 	}
-	tt := &HIRTraitType{Name: td.Name.Value, Methods: methods}
-	return &HIRTypeDefinition{Span: td.Span, Name: td.Name.Value, Kind: TypeDefTrait, Data: tt}
+	// Associated types
+	assoc := make([]*HIRTraitAssociatedType, 0, len(td.AssociatedTypes))
+	for _, at := range td.AssociatedTypes {
+		item := &HIRTraitAssociatedType{Name: at.Name.Value}
+		if len(at.Bounds) > 0 {
+			item.Bounds = make([]*HIRType, 0, len(at.Bounds))
+			for _, b := range at.Bounds {
+				item.Bounds = append(item.Bounds, transformer.transformType(b))
+			}
+		}
+		assoc = append(assoc, item)
+	}
+	tt := &HIRTraitType{Name: td.Name.Value, Methods: methods, AssociatedTypes: assoc}
+	tdef := &HIRTypeDefinition{Span: td.Span, Name: td.Name.Value, Kind: TypeDefTrait, Data: tt}
+	if len(td.Generics) > 0 {
+		tdef.TypeParams = make([]*HIRTypeParameter, 0, len(td.Generics))
+		for _, gp := range td.Generics {
+			if gp.Kind == GenericParamType && gp.Name != nil {
+				tp := &HIRTypeParameter{Span: gp.Span, Name: gp.Name.Value}
+				if len(gp.Bounds) > 0 {
+					tp.Bounds = make([]*HIRType, 0, len(gp.Bounds))
+					for _, b := range gp.Bounds {
+						tp.Bounds = append(tp.Bounds, transformer.transformType(b))
+					}
+				}
+				tdef.TypeParams = append(tdef.TypeParams, tp)
+			}
+		}
+	}
+	return tdef
+}
+
+// transformTypeAliasDeclaration converts AST type alias to HIR type definition
+func (transformer *ASTToHIRTransformer) transformTypeAliasDeclaration(ta *TypeAliasDeclaration) *HIRTypeDefinition {
+	var target *HIRType
+	if ta.Aliased != nil {
+		target = transformer.transformType(ta.Aliased)
+	} else {
+		target = NewHIRType(ta.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+	}
+	alias := &HIRAliasType{Target: target}
+	return &HIRTypeDefinition{Span: ta.Span, Name: ta.Name.Value, Kind: TypeDefAlias, Data: alias}
 }
 
 // transformImportDeclaration converts AST import to HIR import
@@ -406,6 +495,22 @@ func (transformer *ASTToHIRTransformer) transformFunctionDeclaration(funcDecl *F
 	// Push function scope
 	transformer.pushScope(NewHIRScope(transformer.nextScopeID))
 	transformer.nextScopeID++
+
+	// Transform generic type parameters on function
+	if len(funcDecl.Generics) > 0 {
+		for _, gp := range funcDecl.Generics {
+			if gp.Kind == GenericParamType && gp.Name != nil {
+				tp := &HIRTypeParameter{Span: gp.Span, Name: gp.Name.Value}
+				if len(gp.Bounds) > 0 {
+					tp.Bounds = make([]*HIRType, 0, len(gp.Bounds))
+					for _, b := range gp.Bounds {
+						tp.Bounds = append(tp.Bounds, transformer.transformType(b))
+					}
+				}
+				hirFunc.TypeParameters = append(hirFunc.TypeParameters, tp)
+			}
+		}
+	}
 
 	// Transform parameters
 	for _, param := range funcDecl.Parameters {

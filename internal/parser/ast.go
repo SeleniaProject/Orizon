@@ -99,6 +99,7 @@ type FunctionDeclaration struct {
 	Body       *BlockStatement
 	IsPublic   bool
 	IsAsync    bool
+	Generics   []*GenericParameter
 }
 
 func (f *FunctionDeclaration) GetSpan() Span  { return f.Span }
@@ -336,6 +337,7 @@ type StructDeclaration struct {
 	Name     *Identifier
 	Fields   []*StructField // reuse fields from StructType
 	IsPublic bool
+	Generics []*GenericParameter // optional generic parameters
 }
 
 func (d *StructDeclaration) GetSpan() Span  { return d.Span }
@@ -352,6 +354,7 @@ type EnumDeclaration struct {
 	Name     *Identifier
 	Variants []*EnumVariant // reuse from EnumType
 	IsPublic bool
+	Generics []*GenericParameter
 }
 
 func (d *EnumDeclaration) GetSpan() Span                      { return d.Span }
@@ -362,10 +365,12 @@ func (d *EnumDeclaration) declarationNode()                   {}
 
 // TraitDeclaration represents a trait declaration (method signatures only)
 type TraitDeclaration struct {
-	Span     Span
-	Name     *Identifier
-	Methods  []*TraitMethod // signatures
-	IsPublic bool
+	Span            Span
+	Name            *Identifier
+	Methods         []*TraitMethod // signatures
+	IsPublic        bool
+	Generics        []*GenericParameter
+	AssociatedTypes []*AssociatedType
 }
 
 func (d *TraitDeclaration) GetSpan() Span  { return d.Span }
@@ -378,10 +383,12 @@ func (d *TraitDeclaration) declarationNode() {}
 
 // ImplBlock represents an impl block (optional trait for type)
 type ImplBlock struct {
-	Span    Span
-	Trait   Type                   // optional; nil for inherent impl
-	ForType Type                   // required
-	Items   []*FunctionDeclaration // method implementations
+	Span         Span
+	Trait        Type                   // optional; nil for inherent impl
+	ForType      Type                   // required
+	Items        []*FunctionDeclaration // method implementations
+	Generics     []*GenericParameter
+	WhereClauses []*WherePredicate
 }
 
 func (i *ImplBlock) GetSpan() Span                      { return i.Span }
@@ -426,6 +433,61 @@ func (d *ExportDeclaration) Accept(visitor Visitor) interface{} {
 }
 func (d *ExportDeclaration) statementNode()   {}
 func (d *ExportDeclaration) declarationNode() {}
+
+// ====== Generics / Where / Associated Types ======
+
+// GenericParamKind indicates the kind of generic parameter
+type GenericParamKind int
+
+const (
+	GenericParamType GenericParamKind = iota
+	GenericParamConst
+	GenericParamLifetime
+)
+
+// GenericParameter models a single generic parameter: T, const N: usize, or 'a
+type GenericParameter struct {
+	Span Span
+	Kind GenericParamKind
+	Name *Identifier // for type/const; nil for lifetime
+	// For lifetime parameter
+	Lifetime string // e.g., 'a
+	// For const parameter
+	ConstType Type // type of const parameter
+	// Optional trait bounds for type parameters
+	Bounds []Type
+}
+
+// WherePredicate represents a where-clause predicate: Type : Bound + Bound
+type WherePredicate struct {
+	Span   Span
+	Target Type
+	Bounds []Type
+}
+
+// AssociatedType represents a trait associated type item: type Name [: Bounds] ;
+type AssociatedType struct {
+	Span   Span
+	Name   *Identifier
+	Bounds []Type
+}
+
+// TypeAliasDeclaration represents: type Name = Type ;
+type TypeAliasDeclaration struct {
+	Span     Span
+	Name     *Identifier
+	Aliased  Type
+	IsPublic bool
+}
+
+func (d *TypeAliasDeclaration) GetSpan() Span  { return d.Span }
+func (d *TypeAliasDeclaration) String() string { return "type alias" }
+func (d *TypeAliasDeclaration) Accept(visitor Visitor) interface{} {
+	// No visitor yet; return nil
+	return nil
+}
+func (d *TypeAliasDeclaration) statementNode()   {}
+func (d *TypeAliasDeclaration) declarationNode() {}
 
 // MacroParameter represents a macro parameter with optional type constraints
 type MacroParameter struct {

@@ -5,6 +5,7 @@ package parser
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
@@ -308,13 +309,18 @@ func (p *Parser) skipToNextTopLevelDecl() {
 	for !p.currentTokenIs(lexer.TokenEOF) {
 		if p.current.Type == lexer.TokenFunc || p.current.Type == lexer.TokenLet || p.current.Type == lexer.TokenVar ||
 			p.current.Type == lexer.TokenConst || p.current.Type == lexer.TokenMacro || p.current.Type == lexer.TokenStruct ||
-			p.current.Type == lexer.TokenEnum {
+			p.current.Type == lexer.TokenEnum || p.current.Type == lexer.TokenTrait || p.current.Type == lexer.TokenImpl ||
+			p.current.Type == lexer.TokenImport || p.current.Type == lexer.TokenExport ||
+			p.current.Type == lexer.TokenIdentifier && p.current.Literal == "type" {
 			return
 		}
 		// If the next token is a declaration starter, stop before it
 		if p.peekTokenIs(lexer.TokenFunc) || p.peekTokenIs(lexer.TokenLet) || p.peekTokenIs(lexer.TokenVar) ||
 			p.peekTokenIs(lexer.TokenConst) || p.peekTokenIs(lexer.TokenMacro) || p.peekTokenIs(lexer.TokenStruct) ||
-			p.peekTokenIs(lexer.TokenEnum) || p.peekTokenIs(lexer.TokenEOF) {
+			p.peekTokenIs(lexer.TokenEnum) || p.peekTokenIs(lexer.TokenTrait) || p.peekTokenIs(lexer.TokenImpl) ||
+			p.peekTokenIs(lexer.TokenImport) || p.peekTokenIs(lexer.TokenExport) ||
+			(p.peekTokenIs(lexer.TokenIdentifier) && p.peek.Literal == "type") ||
+			p.peekTokenIs(lexer.TokenEOF) {
 			return
 		}
 		p.nextToken()
@@ -465,6 +471,18 @@ func (p *Parser) parseDeclaration() Declaration {
 		}
 		decl = ib
 	default:
+		// Support 'type' alias declaration (lexer has no TokenType; detect identifier 'type')
+		if p.current.Type == lexer.TokenIdentifier && p.current.Literal == "type" {
+			td := p.parseTypeAliasDeclaration()
+			if td == nil {
+				p.addError(TokenToPosition(p.current), "failed to parse type alias", "declaration parsing")
+				p.skipToNextTopLevelDecl()
+				return nil
+			}
+			td.IsPublic = isPublic
+			decl = td
+			break
+		}
 		// Allow top-level expression statements via Pratt parser
 		if exprStmt := p.parseExpressionStatement(); exprStmt != nil {
 			return exprStmt
@@ -518,6 +536,26 @@ func (p *Parser) parseDeclaration() Declaration {
 	return decl
 }
 
+// parseTypeAliasDeclaration parses: type Name = Type ;
+func (p *Parser) parseTypeAliasDeclaration() *TypeAliasDeclaration {
+	start := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	if !p.expectPeek(lexer.TokenAssign) {
+		return nil
+	}
+	p.nextToken()
+	aliased := p.parseType()
+	// optional semicolon
+	if p.peekTokenIs(lexer.TokenSemicolon) {
+		p.nextToken()
+	}
+	end := TokenToPosition(p.current)
+	return &TypeAliasDeclaration{Span: SpanBetween(start, end), Name: name, Aliased: aliased}
+}
+
 // parseImportDeclaration: import path [as alias] ;? (semicolon optional)
 func (p *Parser) parseImportDeclaration() *ImportDeclaration {
 	start := TokenToPosition(p.current)
@@ -528,6 +566,14 @@ func (p *Parser) parseImportDeclaration() *ImportDeclaration {
 	path := []*Identifier{NewIdentifier(TokenToSpan(p.current), p.current.Literal)}
 	for p.peekTokenIs(lexer.TokenDoubleColon) {
 		p.nextToken() // consume ::
+		// Support minimal wildcard import: module::*
+		// If the next token is '*', consume it and treat as importing all items from the module.
+		// For MVP we don't need to store this in the AST, as HIR import with Items=nil already
+		// represents importing all; we only need to accept the syntax and advance tokens.
+		if p.peekTokenIs(lexer.TokenMul) {
+			p.nextToken() // consume '*'
+			break         // stop extending the path; wildcard ends the path
+		}
 		if !p.expectPeek(lexer.TokenIdentifier) {
 			return nil
 		}
@@ -617,6 +663,8 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 		return nil
 	}
 	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	// Optional generics
+	gens := p.parseOptionalGenericParameters()
 	// Optional body or ';' forward decl; MVP: require body
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
@@ -676,7 +724,7 @@ func (p *Parser) parseStructDeclaration() *StructDeclaration {
 		}
 	}
 	end := TokenToPosition(p.current)
-	return &StructDeclaration{Span: SpanBetween(start, end), Name: name, Fields: fields}
+	return &StructDeclaration{Span: SpanBetween(start, end), Name: name, Fields: fields, Generics: gens}
 }
 
 // parseEnumDeclaration: enum Name { Variants }
@@ -686,6 +734,8 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 		return nil
 	}
 	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	// Optional generics
+	gens := p.parseOptionalGenericParameters()
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
 	}
@@ -785,7 +835,7 @@ func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
 		}
 	}
 	end := TokenToPosition(p.current)
-	return &EnumDeclaration{Span: SpanBetween(start, end), Name: name, Variants: variants}
+	return &EnumDeclaration{Span: SpanBetween(start, end), Name: name, Variants: variants, Generics: gens}
 }
 
 // parseTraitDeclaration: trait Name { method signatures }
@@ -795,10 +845,19 @@ func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
 		return nil
 	}
 	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	// Optional generics
+	gens := p.parseOptionalGenericParameters()
+	// Optional bounds after ':' (not fully used yet)
+	if p.peekTokenIs(lexer.TokenColon) {
+		p.nextToken()
+		p.nextToken()
+		_ = p.parseTraitBounds()
+	}
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
 	}
 	methods := make([]*TraitMethod, 0)
+	assocTypes := make([]*AssociatedType, 0)
 	for {
 		p.nextToken()
 		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
@@ -807,57 +866,81 @@ func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
 		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
 			continue
 		}
-		// method signature: func name(params) [-> type] ;
-		if !p.currentTokenIs(lexer.TokenFunc) {
-			p.addError(TokenToPosition(p.current), "expected 'func' in trait body", "trait parsing")
-			// sync to next possible item
-			for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
+		// Associated type: 'type' identifier [ : bounds ] ;
+		// Lexer doesn't have a dedicated 'type' token yet; detect identifier literal "type".
+		if p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "type" {
+			if !p.expectPeek(lexer.TokenIdentifier) {
+				return nil
+			}
+			aname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+			bounds := []Type{}
+			if p.peekTokenIs(lexer.TokenColon) {
+				p.nextToken()
+				p.nextToken()
+				bounds = p.parseTraitBounds()
+			}
+			if p.peekTokenIs(lexer.TokenSemicolon) {
 				p.nextToken()
 			}
+			assocTypes = append(assocTypes, &AssociatedType{Span: aname.Span, Name: aname, Bounds: bounds})
 			continue
 		}
-		if !p.expectPeek(lexer.TokenIdentifier) {
-			return nil
+		// method signature: func name [<T,...>](params) [-> type] ;
+		if p.currentTokenIs(lexer.TokenFunc) {
+			if !p.expectPeek(lexer.TokenIdentifier) {
+				return nil
+			}
+			mname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+			// Optional method-level generics
+			gens := p.parseOptionalGenericParameters()
+			if !p.expectPeek(lexer.TokenLParen) {
+				return nil
+			}
+			params := p.parseParameterList()
+			if !p.expectPeek(lexer.TokenRParen) {
+				return nil
+			}
+			// Optional return type
+			var ret Type
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			if p.peekTokenIs(lexer.TokenArrow) {
+				p.nextToken()
+				p.nextToken()
+				ret = p.parseType()
+			}
+			// optional semicolon
+			if p.peekTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+			}
+			methods = append(methods, &TraitMethod{Span: mname.Span, Name: mname, Parameters: params, ReturnType: ret, Generics: gens})
+			continue
 		}
-		mname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
-		if !p.expectPeek(lexer.TokenLParen) {
-			return nil
-		}
-		params := p.parseParameterList()
-		if !p.expectPeek(lexer.TokenRParen) {
-			return nil
-		}
-		// Optional return type
-		var ret Type
-		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.addError(TokenToPosition(p.current), "expected 'func' or 'type' in trait body", "trait parsing")
+		// sync to next possible item
+		for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
 			p.nextToken()
 		}
-		if p.peekTokenIs(lexer.TokenArrow) {
-			p.nextToken()
-			p.nextToken()
-			ret = p.parseType()
-		}
-		// optional semicolon
-		if p.peekTokenIs(lexer.TokenSemicolon) {
-			p.nextToken()
-		}
-		methods = append(methods, &TraitMethod{Span: mname.Span, Name: mname, Parameters: params, ReturnType: ret})
 	}
 	end := TokenToPosition(p.current)
-	return &TraitDeclaration{Span: SpanBetween(start, end), Name: name, Methods: methods}
+	return &TraitDeclaration{Span: SpanBetween(start, end), Name: name, Methods: methods, Generics: gens, AssociatedTypes: assocTypes}
 }
 
 // parseImplBlock: impl [Trait for] Type { func ... }
 func (p *Parser) parseImplBlock() *ImplBlock {
 	start := TokenToPosition(p.current)
+	// Optional generics: impl <T, ...>
+	gens := p.parseOptionalGenericParameters()
 	// Two forms: impl Type { ... }  |  impl Trait for Type { ... }
 	// Peek to decide if a trait path appears before 'for'
 	// Move to next token to start type/trait
 	if !p.expectPeek(lexer.TokenIdentifier) {
 		return nil
 	}
-	// Parse a simple path or type name as first part
-	firstType := &BasicType{Span: TokenToSpan(p.current), Name: p.current.Literal}
+	// Parse a simple path or type name as first part, then optional generic suffix
+	firstType := p.parsePathOrBasicType()
+	firstType = p.parseGenericSuffixOn(firstType)
 	var trait Type
 	var forType Type
 	if p.peekTokenIs(lexer.TokenFor) {
@@ -867,11 +950,14 @@ func (p *Parser) parseImplBlock() *ImplBlock {
 		if !p.expectPeek(lexer.TokenIdentifier) {
 			return nil
 		}
-		forType = &BasicType{Span: TokenToSpan(p.current), Name: p.current.Literal}
+		forType = p.parsePathOrBasicType()
+		forType = p.parseGenericSuffixOn(forType)
 	} else {
 		// inherent impl
 		forType = firstType
 	}
+	// Optional where clause
+	where := p.parseOptionalWhereClause()
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
 	}
@@ -905,7 +991,7 @@ func (p *Parser) parseImplBlock() *ImplBlock {
 		}
 	}
 	end := TokenToPosition(p.current)
-	return &ImplBlock{Span: SpanBetween(start, end), Trait: trait, ForType: forType, Items: items}
+	return &ImplBlock{Span: SpanBetween(start, end), Trait: trait, ForType: forType, Items: items, Generics: gens, WhereClauses: where}
 }
 
 func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
@@ -927,6 +1013,9 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 	}
 
 	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	// Optional generics after function name
+	gens := p.parseOptionalGenericParameters()
 
 	if !p.expectPeekRaw(lexer.TokenLParen) {
 		p.addErrorSilent(TokenToPosition(p.peek), "expected '(' after function name", "function declaration")
@@ -982,6 +1071,7 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 		Body:       body,
 		IsPublic:   false,
 		IsAsync:    false,
+		Generics:   gens,
 	}
 }
 
@@ -1188,10 +1278,7 @@ func (p *Parser) parseType() Type {
 				return base
 			}
 		}
-		// current is '>' or the last token of last type; ensure current is '>'
-		if !p.currentTokenIs(lexer.TokenGt) {
-			// We consumed via expectPeekRaw above
-		}
+		// current is now at '>' after expectPeekRaw
 		span := SpanBetween(base.(TypeSafeNode).GetSpan().Start, TokenToSpan(p.current).End)
 		return &GenericType{Span: span, BaseType: base, TypeParameters: typeParams}
 	}
@@ -1241,10 +1328,8 @@ func (p *Parser) parseType() Type {
 		end := TokenToPosition(p.current)
 		return &PointerType{Span: SpanBetween(start, end), Inner: inner, IsMutable: isMut}
 	case lexer.TokenIdentifier:
-		base := &BasicType{
-			Span: TokenToSpan(p.current),
-			Name: p.current.Literal,
-		}
+		// Support path types: A::B::C and apply generic suffix to the tail
+		base := p.parsePathOrBasicType()
 		return parseGenericSuffix(base)
 	case lexer.TokenLBracket:
 		// Array or slice type: [T] (slice) or [T; N] (array)
@@ -1366,6 +1451,239 @@ func (p *Parser) parseType() Type {
 			"type parsing")
 		return nil
 	}
+}
+
+// parsePathOrBasicType parses a possibly qualified path type like A::B and returns a BasicType with joined name for now
+func (p *Parser) parsePathOrBasicType() Type {
+	// current is identifier at head
+	start := TokenToPosition(p.current)
+	parts := []string{p.current.Literal}
+	// Accumulate segments
+	for p.peekTokenIs(lexer.TokenDoubleColon) {
+		p.nextToken() // consume '::'
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			break
+		}
+		parts = append(parts, p.current.Literal)
+	}
+	// For MVP, represent path as BasicType with qualified name (resolution later)
+	bt := &BasicType{Span: SpanBetween(start, TokenToPosition(p.current)), Name: strings.Join(parts, "::")}
+	return bt
+}
+
+// parseGenericSuffixOn applies a generic argument suffix like <T, U> to the given base type if the next token is '<'.
+func (p *Parser) parseGenericSuffixOn(base Type) Type {
+	// Skip trivia
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if !p.peekTokenIs(lexer.TokenLt) {
+		return base
+	}
+	// consume '<'
+	p.nextToken()
+	// move to first type or '>'
+	p.nextToken()
+	typeParams := make([]Type, 0)
+	if !p.currentTokenIs(lexer.TokenGt) {
+		// parse first type
+		tp := p.parseType()
+		if tp != nil {
+			typeParams = append(typeParams, tp)
+		}
+		// parse remaining , type
+		for {
+			// Skip trivia before checking comma or '>'
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			if !p.peekTokenIs(lexer.TokenComma) {
+				break
+			}
+			p.nextToken() // consume comma
+			// Skip trivia then move to next type
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			p.nextToken()
+			tp = p.parseType()
+			if tp != nil {
+				typeParams = append(typeParams, tp)
+			}
+		}
+		// Expect '>'
+		if !p.expectPeekRaw(lexer.TokenGt) {
+			p.addError(TokenToPosition(p.peek), "expected '>' to close generic arguments", "type parsing")
+			return base
+		}
+	}
+	span := SpanBetween(base.(TypeSafeNode).GetSpan().Start, TokenToSpan(p.current).End)
+	return &GenericType{Span: span, BaseType: base, TypeParameters: typeParams}
+}
+
+// ====== Generics / Where / Bounds Parsing ======
+
+// parseOptionalGenericParameters parses '<...>' if present
+func (p *Parser) parseOptionalGenericParameters() []*GenericParameter {
+	gens := []*GenericParameter{}
+	// Skip trivia
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if !p.peekTokenIs(lexer.TokenLt) {
+		return gens
+	}
+	p.nextToken() // move to '<'
+	// Move to first content or '>'
+	p.nextToken()
+	if p.currentTokenIs(lexer.TokenGt) {
+		return gens
+	}
+	// Parse first param
+	gp := p.parseGenericParameter()
+	if gp != nil {
+		gens = append(gens, gp)
+	}
+	// Remaining params
+	for {
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenComma) {
+			break
+		}
+		p.nextToken() // consume ','
+		// Skip trivia then move to next param
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		p.nextToken()
+		gp = p.parseGenericParameter()
+		if gp != nil {
+			gens = append(gens, gp)
+		}
+	}
+	// Expect '>'
+	if !p.expectPeekRaw(lexer.TokenGt) {
+		p.addError(TokenToPosition(p.peek), "expected '>' to close generics", "generics parsing")
+	}
+	return gens
+}
+
+// parseGenericParameter parses one of: identifier [":" bounds] | const identifier ":" type | lifetime
+func (p *Parser) parseGenericParameter() *GenericParameter {
+	start := TokenToPosition(p.current)
+	// Lifetime parameter: TokenLifetime
+	if p.current.Type == lexer.TokenLifetime {
+		return &GenericParameter{Span: SpanBetween(start, TokenToPosition(p.current)), Kind: GenericParamLifetime, Lifetime: p.current.Literal}
+	}
+	// Const parameter: 'const' ident ':' type
+	if p.current.Type == lexer.TokenConst {
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			return nil
+		}
+		name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		if !p.expectPeek(lexer.TokenColon) {
+			return nil
+		}
+		p.nextToken()
+		ctype := p.parseType()
+		return &GenericParameter{Span: SpanBetween(start, TokenToPosition(p.current)), Kind: GenericParamConst, Name: name, ConstType: ctype}
+	}
+	// Type parameter: ident [":" bounds]
+	if p.current.Type == lexer.TokenIdentifier {
+		name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		bounds := []Type{}
+		if p.peekTokenIs(lexer.TokenColon) {
+			p.nextToken()
+			p.nextToken()
+			bounds = p.parseTraitBounds()
+		}
+		return &GenericParameter{Span: SpanBetween(start, TokenToPosition(p.current)), Kind: GenericParamType, Name: name, Bounds: bounds}
+	}
+	p.addError(TokenToPosition(p.current), "invalid generic parameter", "generics parsing")
+	return nil
+}
+
+// parseTraitBounds parses trait_bound { '+' trait_bound }
+func (p *Parser) parseTraitBounds() []Type {
+	bounds := []Type{}
+	// first bound
+	b := p.parseType()
+	if b != nil {
+		bounds = append(bounds, b)
+	}
+	for {
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenPlus) {
+			break
+		}
+		p.nextToken() // consume '+'
+		p.nextToken() // move to next bound
+		b = p.parseType()
+		if b != nil {
+			bounds = append(bounds, b)
+		}
+	}
+	return bounds
+}
+
+// parseOptionalWhereClause parses where_clause if present: 'where' pred {',' pred}
+func (p *Parser) parseOptionalWhereClause() []*WherePredicate {
+	preds := []*WherePredicate{}
+	// Skip trivia
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if !p.peekTokenIs(lexer.TokenWhere) {
+		return preds
+	}
+	p.nextToken() // move to 'where'
+	// Move to first predicate
+	p.nextToken()
+	pred := p.parseWherePredicate()
+	if pred != nil {
+		preds = append(preds, pred)
+	}
+	for {
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenComma) {
+			break
+		}
+		p.nextToken()
+		// Skip trivia then move to next predicate
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		p.nextToken()
+		pred = p.parseWherePredicate()
+		if pred != nil {
+			preds = append(preds, pred)
+		}
+	}
+	return preds
+}
+
+// parseWherePredicate parses: type ':' trait_bounds
+func (p *Parser) parseWherePredicate() *WherePredicate {
+	start := TokenToPosition(p.current)
+	t := p.parseType()
+	if t == nil {
+		return nil
+	}
+	if !p.expectPeek(lexer.TokenColon) {
+		return nil
+	}
+	p.nextToken()
+	bounds := p.parseTraitBounds()
+	return &WherePredicate{Span: SpanBetween(start, TokenToPosition(p.current)), Target: t, Bounds: bounds}
 }
 
 // parseBlockStatement parses a block statement

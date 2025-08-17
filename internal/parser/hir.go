@@ -769,15 +769,28 @@ type HIRVariantType struct {
 
 // HIRTraitType represents trait types
 type HIRTraitType struct {
-	Name    string
-	Methods []*HIRMethodSignature
+	Name            string
+	Methods         []*HIRMethodSignature
+	AssociatedTypes []*HIRTraitAssociatedType
 }
 
 // HIRMethodSignature represents method signatures
 type HIRMethodSignature struct {
-	Name       string
-	Parameters []*HIRType
-	ReturnType *HIRType
+	Name           string
+	Parameters     []*HIRType
+	ReturnType     *HIRType
+	TypeParameters []*HIRTypeParameter
+}
+
+// HIRTraitAssociatedType represents a trait associated type item
+type HIRTraitAssociatedType struct {
+	Name   string
+	Bounds []*HIRType
+}
+
+// HIRAliasType represents a type alias definition
+type HIRAliasType struct {
+	Target *HIRType
 }
 
 // HIRTupleType represents tuple types

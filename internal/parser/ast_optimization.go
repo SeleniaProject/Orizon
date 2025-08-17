@@ -173,6 +173,8 @@ func (ao *ASTOptimizer) VisitFunctionDeclaration(fn *FunctionDeclaration) interf
 		ReturnType: fn.ReturnType,
 		Body:       optimizedBody.(*BlockStatement),
 		IsPublic:   fn.IsPublic,
+		IsAsync:    fn.IsAsync,
+		Generics:   fn.Generics,
 	}
 }
 
