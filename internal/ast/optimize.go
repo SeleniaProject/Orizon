@@ -676,7 +676,9 @@ func (cfv *constantFoldingVisitor) isZeroLiteral(lit *Literal) bool {
 	case LiteralInteger:
 		return cfv.extractIntValue(lit) == 0
 	case LiteralFloat:
-		if v, ok := lit.Value.(float64); ok { return v == 0.0 }
+		if v, ok := lit.Value.(float64); ok {
+			return v == 0.0
+		}
 	}
 	return false
 }
@@ -686,7 +688,9 @@ func (cfv *constantFoldingVisitor) isOneLiteral(lit *Literal) bool {
 	case LiteralInteger:
 		return cfv.extractIntValue(lit) == 1
 	case LiteralFloat:
-		if v, ok := lit.Value.(float64); ok { return v == 1.0 }
+		if v, ok := lit.Value.(float64); ok {
+			return v == 1.0
+		}
 	}
 	return false
 }

@@ -22,7 +22,7 @@
 - [x] パーサーのメモリガード導入（エラー/サジェスト上限、上限到達時にサジェスト停止）
 
 ## 1. フロントエンド（Lexer/Parser）
-- [ ] パーサー: 宣言パースの実装
+- [x] パーサー: 宣言パースの実装
   - struct 宣言
     - [x] フィールド/可視性
     - [x] ジェネリクス
@@ -43,27 +43,30 @@
     - [x] モジュール名/パス
     - [x] 別名
     - [x] ワイルドカード（最小）
-- [ ] エラー回復/同期点の拡充
+- [x] エラー回復/同期点の拡充
   - [x] 基本的な宣言スキップ復帰
   - [x] 宣言ブロック単位の同期点/良質な診断
-- [ ] パース単体テスト
+- [x] パース単体テスト
   - [x] 正常系（宣言/型/マクロ）
   - [x] エラー系/回復系
   - [x] 基本的な回復テスト（malformed import 後の trait、malformed newtype からの復帰）
 
 ## 2. AST/AST ブリッジ
-- [ ] 新規宣言ノード（struct/enum/trait/impl/import/export）を core AST と合意
-  - [ ] 追加するか既存表現へ写像する設計確定（最小侵襲）
+- [x] 新規宣言ノード（struct/enum/trait/impl/import/export）を core AST と合意
+  - [x] 追加するか既存表現へ写像する設計確定（最小侵襲）
   - [x] import/export ノード追加（core AST）
+  - [x] 方針ドキュメント追加: docs/astbridge_declaration_design.md
+    - 要旨: struct/enum/trait/impl は parser/HIR で扱い core AST へは導入しない。type alias/newtype は core AST の TypeDeclaration で表現し、import/export は core AST に追加して往復対応。
 - [ ] パーサー AST ↔ core AST の往復変換を実装（Span/位置情報含む）
   - [x] import/export の往復変換（現状 Span は最小だが往復保持は確認済み）
+  - [x] 対象範囲の明確化: struct/enum/trait/impl は当面対象外（parser→HIR 経由）
 - [ ] 追加ユニットテスト（宣言の保持・変換の完全性）
   - [x] import/export のラウンドトリップテスト
 
 ## 3. 型システム/型検査
 - [ ] 基本型/関数/ジェネリクスの型検査
-- [ ] 参照/ポインタ/ライフタイム整合（借用規則の最小版）
-- [ ] trait 境界/impl 解決（選択/内在化の最小）
+- [ ] 参照/ポインタ/ライフタイム整合（借用規則の最大版）
+- [ ] trait 境界/impl 解決（選択/内在化の最大）
 - [ ] 型推論/単一化（最小スコープ）
 - [ ] 型検査テスト（成功/失敗/診断メッセージ）
 
@@ -73,11 +76,11 @@
   - [x] impl（inherent/trait, generics/where, メソッドメタ/モジュール集約）
 - [ ] MIR 生成（SSA/基本ブロック、最小最適化: const-prop, DCE）
 - [ ] 参照/ライフタイムの低レベル化方針を確立（所有/借用の表現）
-- [x] LIR 生成と x64 emitter 連携（最小・診断用、関数/コール/比較/分岐/メモリ）
+- [x] LIR 生成と x64 emitter 連携（最大・診断用、関数/コール/比較/分岐/メモリ）
 - [ ] 段階テスト（小さな関数から e2e まで）
 
 ## 5. コード生成/ABI
-- [ ] 呼出規約/スタックフレーム/レジスタ割付（最小実装）
+- [ ] 呼出規約/スタックフレーム/レジスタ割付（最大実装）
   - [x] 呼出規約（Win64 風: rcx/rdx/r8/r9, xmm0-3, shadow space）
   - [x] スタックフレーム整列/簡易スロット割当（擬似）
   - [ ] レジスタ割付（本格）
@@ -106,7 +109,7 @@
 
 ## 9. 品質ゲート/CI
 - [x] 単体テストパス（`go test ./...`）
-- [ ] Lint/Format の CI 化（PR ブロッカー）
+- [x] Lint/Format の CI 化（PR ブロッカー）
 - [ ] e2e セルフホストジョブ（夜間/タグ時）
 - [ ] 失敗時のログ/成果物保存
 

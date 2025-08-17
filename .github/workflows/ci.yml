@@ -14,6 +14,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24.x'
+      - name: go vet
+        run: go vet ./...
+      - name: Check formatting (gofmt -s)
+        run: |
+          UNFORMATTED=$(gofmt -s -l . | wc -l)
+          if [ "$UNFORMATTED" -ne 0 ]; then
+            echo "gofmt found unformatted files:";
+            gofmt -s -l .;
+            exit 1;
+          fi
       - name: Linux smoke (tests/fuzz/repro/summary)
         run: |
           bash ./scripts/linux/smoke.sh
