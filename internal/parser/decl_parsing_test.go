@@ -242,12 +242,52 @@ func TestDeclarationParsingAndHIR(t *testing.T) {
 				if ib.ForType == nil || ib.Items == nil || len(ib.Items) != 1 {
 					t.Fatalf("unexpected impl block contents")
 				}
-				// Current transformer ignores impl blocks (methods are not attached yet)
 				if hir == nil {
 					t.Fatalf("expected HIR module")
 				}
-				if len(hir.Functions) != 0 {
-					t.Fatalf("expected no top-level functions in HIR from impl, got %d", len(hir.Functions))
+				// Now impls are represented explicitly in HIR
+				if len(hir.Impls) != 1 {
+					t.Fatalf("expected 1 HIR impl, got %d", len(hir.Impls))
+				}
+				if hir.Impls[0].Kind != HIRImplInherent {
+					t.Fatalf("expected inherent impl kind")
+				}
+				if len(hir.Impls[0].Methods) != 1 || hir.Impls[0].Methods[0].Name != "norm" {
+					t.Fatalf("expected 1 method 'norm' in impl")
+				}
+			},
+		},
+		{
+			name:   "Newtype declaration -> HIR",
+			source: "newtype UserId = i64;",
+			check: func(t *testing.T, prog *Program, hir *HIRModule) {
+				if len(prog.Declarations) != 1 {
+					t.Fatalf("expected 1 decl, got %d", len(prog.Declarations))
+				}
+				nd, ok := prog.Declarations[0].(*NewtypeDeclaration)
+				if !ok {
+					t.Fatalf("expected NewtypeDeclaration, got %T", prog.Declarations[0])
+				}
+				if nd.Name.Value != "UserId" {
+					t.Fatalf("unexpected newtype name: %s", nd.Name.Value)
+				}
+				if hir == nil {
+					t.Fatalf("expected HIR module")
+				}
+				if len(hir.Types) != 1 {
+					t.Fatalf("expected 1 HIR type def, got %d", len(hir.Types))
+				}
+				if hir.Types[0].Kind != TypeDefNewtype {
+					t.Fatalf("expected TypeDefNewtype, got %v", hir.Types[0].Kind)
+				}
+			},
+		},
+		{
+			name:   "Newtype without semicolon is tolerated (optional)",
+			source: "newtype Tag = i32\n",
+			check: func(t *testing.T, prog *Program, hir *HIRModule) {
+				if len(hir.Types) != 1 || hir.Types[0].Kind != TypeDefNewtype {
+					t.Fatalf("expected one newtype in HIR")
 				}
 			},
 		},
@@ -271,6 +311,20 @@ func TestDeclarationParsingAndHIR(t *testing.T) {
 			}
 			tc.check(t, prog, hir)
 		})
+	}
+}
+
+func TestNewtypeParseErrorRecovery(t *testing.T) {
+	// malformed newtype should produce error but parser should continue on next decl
+	src := "newtype = i32;\ntrait T { }"
+	l := lexer.New(src)
+	p := NewParser(l, "test.oriz")
+	prog, errs := p.Parse()
+	if len(errs) == 0 {
+		t.Fatalf("expected errors for malformed newtype")
+	}
+	if len(prog.Declarations) == 0 {
+		t.Fatalf("expected at least one declaration after recovery")
 	}
 }
 
@@ -485,6 +539,69 @@ func TestHIR_TypeAlias_And_TraitAssoc_Minimal(t *testing.T) {
 		}
 		if len(ht.AssociatedTypes) != 1 || ht.AssociatedTypes[0].Name != "Item" {
 			t.Fatalf("expected one associated type 'Item', got %+v", ht.AssociatedTypes)
+		}
+	}
+}
+
+func TestHIR_Impl_Trait_And_Constraints(t *testing.T) {
+	// Trait impl should be represented with HIRImplTrait and method metadata
+	{
+		src := "impl Display for Point { func fmt(x: int) -> int { return 1; } }"
+		l := lexer.New(src)
+		p := NewParser(l, "test.oriz")
+		prog, errs := p.Parse()
+		if len(errs) != 0 {
+			t.Fatalf("unexpected parse errors: %v", errs)
+		}
+		tr := NewASTToHIRTransformer()
+		hir, terrs := tr.TransformProgram(prog)
+		if len(terrs) != 0 {
+			t.Fatalf("unexpected transform errors: %v", terrs)
+		}
+		if len(hir.Impls) != 1 {
+			t.Fatalf("expected 1 HIR impl, got %d", len(hir.Impls))
+		}
+		impl := hir.Impls[0]
+		if impl.Kind != HIRImplTrait {
+			t.Fatalf("expected HIRImplTrait, got %v", impl.Kind)
+		}
+		if impl.Trait == nil || impl.ForType == nil {
+			t.Fatalf("expected both Trait and ForType to be set")
+		}
+		if len(impl.Methods) != 1 || !impl.Methods[0].IsMethod || impl.Methods[0].ImplementedTrait == nil {
+			t.Fatalf("expected one trait method with ImplementedTrait set")
+		}
+	}
+
+	// Impl with generics and where constraints should populate TypeParams and Constraints
+	{
+		src := "impl<T> S where T: Eq { func id(x: int) -> int { return x; } }"
+		l := lexer.New(src)
+		p := NewParser(l, "test.oriz")
+		prog, errs := p.Parse()
+		if len(errs) != 0 {
+			t.Fatalf("unexpected parse errors: %v", errs)
+		}
+		tr := NewASTToHIRTransformer()
+		hir, terrs := tr.TransformProgram(prog)
+		if len(terrs) != 0 {
+			t.Fatalf("unexpected transform errors: %v", terrs)
+		}
+		if len(hir.Impls) != 1 {
+			t.Fatalf("expected 1 HIR impl, got %d", len(hir.Impls))
+		}
+		impl := hir.Impls[0]
+		if impl.Kind != HIRImplInherent {
+			t.Fatalf("expected inherent impl kind, got %v", impl.Kind)
+		}
+		if len(impl.TypeParams) != 1 || impl.TypeParams[0].Name != "T" {
+			t.Fatalf("expected one type parameter T, got %+v", impl.TypeParams)
+		}
+		if len(impl.Constraints) != 1 || impl.Constraints[0].Trait == nil {
+			t.Fatalf("expected one where constraint with trait bound")
+		}
+		if len(impl.Methods) != 1 || !impl.Methods[0].IsMethod || impl.Methods[0].MethodOfType == nil {
+			t.Fatalf("expected one inherent method with receiver type set")
 		}
 	}
 }

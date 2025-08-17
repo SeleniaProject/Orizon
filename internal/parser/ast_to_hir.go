@@ -245,6 +245,8 @@ func (transformer *ASTToHIRTransformer) TransformProgram(program *Program) (*HIR
 				hirModule.Variables = append(hirModule.Variables, hir)
 			case *HIRTypeDefinition:
 				hirModule.Types = append(hirModule.Types, hir)
+			case *HIRImpl:
+				hirModule.Impls = append(hirModule.Impls, hir)
 			}
 		}
 	}
@@ -270,6 +272,8 @@ func (transformer *ASTToHIRTransformer) transformDeclaration(decl Declaration) H
 		return transformer.transformTraitDeclaration(d)
 	case *TypeAliasDeclaration:
 		return transformer.transformTypeAliasDeclaration(d)
+	case *NewtypeDeclaration:
+		return transformer.transformNewtypeDeclaration(d)
 	case *ImportDeclaration:
 		// Side-effect: register import in module, no HIRNode returned
 		if transformer.currentModule != nil {
@@ -445,6 +449,18 @@ func (transformer *ASTToHIRTransformer) transformTypeAliasDeclaration(ta *TypeAl
 	return &HIRTypeDefinition{Span: ta.Span, Name: ta.Name.Value, Kind: TypeDefAlias, Data: alias}
 }
 
+// transformNewtypeDeclaration converts AST newtype to HIR type definition
+func (transformer *ASTToHIRTransformer) transformNewtypeDeclaration(nd *NewtypeDeclaration) *HIRTypeDefinition {
+	var base *HIRType
+	if nd.Base != nil {
+		base = transformer.transformType(nd.Base)
+	} else {
+		base = NewHIRType(nd.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+	}
+	nt := &HIRNewtypeType{Base: base}
+	return &HIRTypeDefinition{Span: nd.Span, Name: nd.Name.Value, Kind: TypeDefNewtype, Data: nt}
+}
+
 // transformImportDeclaration converts AST import to HIR import
 func (transformer *ASTToHIRTransformer) transformImportDeclaration(id *ImportDeclaration) *HIRImport {
 	parts := make([]string, 0, len(id.Path))
@@ -478,8 +494,72 @@ func (transformer *ASTToHIRTransformer) transformExportDeclaration(ed *ExportDec
 
 // transformImplBlock converts impl block; returns nil for now (methods are separate fns)
 func (transformer *ASTToHIRTransformer) transformImplBlock(ib *ImplBlock) HIRNode {
-	// Optionally, attach methods to type or trait in a later phase; here we ignore
-	return nil
+	if ib == nil {
+		return nil
+	}
+	// Build HIRImpl shell
+	hirImpl := &HIRImpl{Span: ib.Span}
+	// Generics -> TypeParameters
+	if len(ib.Generics) > 0 {
+		hirImpl.TypeParams = make([]*HIRTypeParameter, 0, len(ib.Generics))
+		for _, gp := range ib.Generics {
+			if gp.Kind == GenericParamType && gp.Name != nil {
+				tp := &HIRTypeParameter{Span: gp.Span, Name: gp.Name.Value}
+				if len(gp.Bounds) > 0 {
+					tp.Bounds = make([]*HIRType, 0, len(gp.Bounds))
+					for _, b := range gp.Bounds {
+						tp.Bounds = append(tp.Bounds, transformer.transformType(b))
+					}
+				}
+				hirImpl.TypeParams = append(hirImpl.TypeParams, tp)
+			}
+		}
+	}
+	// where -> Constraints (simplified)
+	if len(ib.WhereClauses) > 0 {
+		hirImpl.Constraints = make([]*HIRConstraint, 0, len(ib.WhereClauses))
+		for _, wp := range ib.WhereClauses {
+			c := &HIRConstraint{Span: wp.Span}
+			if wp.Target != nil {
+				c.Type = transformer.transformType(wp.Target)
+			}
+			if len(wp.Bounds) > 0 {
+				// First bound as Trait for MVP; full support could carry multiple
+				c.Trait = transformer.transformType(wp.Bounds[0])
+			}
+			hirImpl.Constraints = append(hirImpl.Constraints, c)
+		}
+	}
+	// ForType / Trait
+	if ib.ForType != nil {
+		hirImpl.ForType = transformer.transformType(ib.ForType)
+	}
+	if ib.Trait != nil {
+		hirImpl.Trait = transformer.transformType(ib.Trait)
+		hirImpl.Kind = HIRImplTrait
+	} else {
+		hirImpl.Kind = HIRImplInherent
+	}
+	// Methods
+	if len(ib.Items) > 0 {
+		hirImpl.Methods = make([]*HIRFunction, 0, len(ib.Items))
+		for _, m := range ib.Items {
+			if m == nil || m.Name == nil {
+				continue
+			}
+			hf := transformer.transformFunctionDeclaration(m)
+			if hf == nil {
+				continue
+			}
+			hf.IsMethod = true
+			hf.MethodOfType = hirImpl.ForType
+			if hirImpl.Kind == HIRImplTrait {
+				hf.ImplementedTrait = hirImpl.Trait
+			}
+			hirImpl.Methods = append(hirImpl.Methods, hf)
+		}
+	}
+	return hirImpl
 }
 
 // transformFunctionDeclaration converts function declarations
@@ -976,6 +1056,19 @@ func (transformer *ASTToHIRTransformer) transformType(typeExpr Type) *HIRType {
 	switch t := typeExpr.(type) {
 	case *BasicType:
 		return transformer.transformBasicType(t)
+	case *StructType:
+		// Use nominal struct type by name if available
+		name := "struct"
+		if t.Name != nil {
+			name = t.Name.Value
+		}
+		return NewHIRType(t.Span, HIRTypeStruct, &HIRStructType{Name: name})
+	case *EnumType:
+		name := "enum"
+		if t.Name != nil {
+			name = t.Name.Value
+		}
+		return NewHIRType(t.Span, HIRTypeEnum, &HIREnumType{Name: name})
 	default:
 		transformer.addError(fmt.Errorf("unsupported type: %T", typeExpr))
 		return nil

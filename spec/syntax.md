@@ -113,6 +113,7 @@ item = function_declaration |
     trait_declaration |
     impl_block |
     type_alias |
+    newtype_declaration |
     const_declaration |
     static_declaration |
     import_declaration |
@@ -127,7 +128,7 @@ import_declaration = "import" , import_path , [ "as" , identifier ] ;
 import_path = identifier , { "::" , identifier } ;
 
 (* エクスポート宣言 *)
-export_declaration = "export" , ( item | "{" , export_list , "}" ) ;
+export_declaration = "export" , ( item | "{" , export_list , "}" ) , [ ";" ] ;
 export_list = identifier , { "," , identifier } ;
 ```
 
@@ -188,6 +189,10 @@ enum_declaration = [ visibility ] , "enum" , identifier ,
 
 variant_declaration = identifier , [ variant_data ] , "," ;
 variant_data = "(" , type_list , ")" | "{" , { field_declaration } , "}" ;
+
+(* newtype 宣言（別名ではなく名義型）*)
+(* 実装ではセミコロンは任意（省略可）*)
+newtype_declaration = [ visibility ] , "newtype" , identifier , "=" , type , [ ";" ] ;
 ```
 
 ### 3. トレイトシステム
@@ -203,7 +208,12 @@ trait_item = function_signature |
              associated_type |
              associated_const ;
 
-function_signature = "func" , identifier , 
+(* 関連型・関連定数（簡易形）*)
+associated_type = "type" , identifier , [ ":" , trait_bounds ] , ";" ;
+associated_const = "const" , identifier , ":" , type , ";" ;
+
+(* 実装では 'func' のほか 'fn' も別名として受理する *)
+function_signature = ( "func" | "fn" ) , identifier , 
                      [ generic_parameters ] ,
                      "(" , [ parameter_list ] , ")" ,
                      [ "->" , type ] , ";" ;
@@ -214,7 +224,13 @@ impl_block = "impl" , [ generic_parameters ] ,
              [ where_clause ] ,
              "{" , { impl_item } , "}" ;
 
+(* impl ブロック内の要素。現行実装では関数宣言のみサポート *)
+impl_item = function_declaration ;
+
 trait_for_type = trait_path , "for" , type ;
+
+(* 簡易的なトレイト参照。フルパスを許容 *)
+trait_path = identifier , { "::" , identifier } ;
 ```
 
 ## 文と式

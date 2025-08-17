@@ -35,6 +35,7 @@ const (
 	HIRKindExpression
 	HIRKindType
 	HIRKindPattern
+	HIRKindImpl
 )
 
 // HIRVisitor defines the visitor pattern for HIR traversal
@@ -47,6 +48,7 @@ type HIRVisitor interface {
 	VisitHIRExpression(*HIRExpression) interface{}
 	VisitHIRType(*HIRType) interface{}
 	VisitHIRPattern(*HIRPattern) interface{}
+	VisitHIRImpl(*HIRImpl) interface{}
 }
 
 // ====== HIR Module Structure ======
@@ -61,6 +63,7 @@ type HIRModule struct {
 	Imports   []*HIRImport
 	Exports   []*HIRExport
 	Metadata  *HIRModuleMetadata
+	Impls     []*HIRImpl
 }
 
 func (m *HIRModule) String() string                        { return fmt.Sprintf("module %s", m.Name) }
@@ -112,6 +115,10 @@ type HIRFunction struct {
 	Attributes      []string
 	LocalVariables  []*HIRVariable
 	ClosureCaptures []*HIRVariable
+	// Method metadata (optional)
+	IsMethod         bool
+	MethodOfType     *HIRType // receiver type for inherent impl
+	ImplementedTrait *HIRType // trait for trait impl methods
 }
 
 func (f *HIRFunction) String() string                        { return fmt.Sprintf("fn %s", f.Name) }
@@ -154,6 +161,45 @@ type HIRConstraint struct {
 	Trait       *HIRType
 	WhereClause string
 }
+
+// ====== HIR Impl System ======
+
+// HIRImplKind distinguishes inherent vs trait impl
+type HIRImplKind int
+
+const (
+	HIRImplInherent HIRImplKind = iota
+	HIRImplTrait
+)
+
+// HIRImpl represents an implementation block
+type HIRImpl struct {
+	Span        Span
+	Kind        HIRImplKind
+	ForType     *HIRType
+	Trait       *HIRType // nil for inherent impl
+	TypeParams  []*HIRTypeParameter
+	Constraints []*HIRConstraint // where predicates converted to constraints
+	Methods     []*HIRFunction   // methods defined in this impl
+}
+
+func (i *HIRImpl) String() string {
+	// Pretty basic representation
+	if i == nil {
+		return "impl <nil>"
+	}
+	switch i.Kind {
+	case HIRImplTrait:
+		return "impl trait"
+	case HIRImplInherent:
+		return "impl"
+	default:
+		return "impl"
+	}
+}
+func (i *HIRImpl) GetSpan() Span                         { return i.Span }
+func (i *HIRImpl) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRImpl(i) }
+func (i *HIRImpl) GetHIRKind() HIRKind                   { return HIRKindImpl }
 
 // ====== HIR Variable Structure ======
 
@@ -793,6 +839,11 @@ type HIRAliasType struct {
 	Target *HIRType
 }
 
+// HIRNewtypeType represents a nominal wrapper around a base type
+type HIRNewtypeType struct {
+	Base *HIRType
+}
+
 // HIRTupleType represents tuple types
 type HIRTupleType struct {
 	Elements []*HIRType
@@ -906,6 +957,7 @@ func NewHIRModule(span Span, name string) *HIRModule {
 		Types:     make([]*HIRTypeDefinition, 0),
 		Imports:   make([]*HIRImport, 0),
 		Exports:   make([]*HIRExport, 0),
+		Impls:     make([]*HIRImpl, 0),
 		Metadata: &HIRModuleMetadata{
 			Dependencies: make(map[string]string),
 			CompileFlags: make([]string, 0),

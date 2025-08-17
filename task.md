@@ -14,6 +14,9 @@
 - [x] 全体テスト: `go test ./...` 緑（現状）
 - [x] MIR/LIR の最小導入と x64 emitter（Win64 風, 診断用）
 - [x] Bootstrap スナップショット/展開の E2E テスト（golden 更新+検証）
+- [x] newtype のエンドツーエンド（AST/Parser/HIR/変換/テスト/仕様）
+- [x] impl の最大表現を HIR に導入（inherent/trait, generics, where, メソッドメタ）+ モジュールに Impls 収集
+- [x] 構文仕様（spec/syntax.md）を実装に整合（fn エイリアス、newtype/export のセミコロン任意、impl_item 定義）
 
 ## 1. フロントエンド（Lexer/Parser）
 - [ ] パーサー: 宣言パースの実装
@@ -29,10 +32,10 @@
   - impl ブロック
     - [x] 単独/trait 実装（構文）
     - [x] where 制約
-    - [ ] HIR への反映
+  - [x] HIR への反映
   - type alias / newtype（core AST の `TypeDeclaration` と整合）
     - [x] type alias
-    - [ ] newtype
+  - [x] newtype
   - import/export
     - [x] モジュール名/パス
     - [x] 別名
@@ -43,6 +46,7 @@
 - [ ] パース単体テスト
   - [x] 正常系（宣言/型/マクロ）
   - [ ] エラー系/回復系
+  - [x] 基本的な回復テスト（malformed import 後の trait、malformed newtype からの復帰）
 
 ## 2. AST/AST ブリッジ
 - [ ] 新規宣言ノード（struct/enum/trait/impl/import/export）を core AST と合意
@@ -59,6 +63,8 @@
 
 ## 4. HIR/MIR/LIR 変換
 - [ ] HIR 変換の網羅（宣言/複合型/ジェネリクス）
+  - [x] newtype の変換
+  - [x] impl（inherent/trait, generics/where, メソッドメタ/モジュール集約）
 - [ ] MIR 生成（SSA/基本ブロック、最小最適化: const-prop, DCE）
 - [ ] 参照/ライフタイムの低レベル化方針を確立（所有/借用の表現）
 - [x] LIR 生成と x64 emitter 連携（最小・診断用、関数/コール/比較/分岐/メモリ）
