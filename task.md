@@ -17,6 +17,8 @@
 - [x] newtype のエンドツーエンド（AST/Parser/HIR/変換/テスト/仕様）
 - [x] impl の最大表現を HIR に導入（inherent/trait, generics, where, メソッドメタ）+ モジュールに Impls 収集
 - [x] 構文仕様（spec/syntax.md）を実装に整合（fn エイリアス、newtype/export のセミコロン任意、impl_item 定義）
+- [x] パーサーの宣言ブロック単位の同期点と局所回復/診断の強化（struct/enum/trait/impl/import）
+- [x] パーサーのメモリガード導入（エラー/サジェスト上限、上限到達時にサジェスト停止）
 
 ## 1. フロントエンド（Lexer/Parser）
 - [ ] パーサー: 宣言パースの実装
@@ -42,10 +44,10 @@
     - [x] ワイルドカード（最小）
 - [ ] エラー回復/同期点の拡充
   - [x] 基本的な宣言スキップ復帰
-  - [ ] 宣言ブロック単位の同期点/良質な診断
+  - [x] 宣言ブロック単位の同期点/良質な診断
 - [ ] パース単体テスト
   - [x] 正常系（宣言/型/マクロ）
-  - [ ] エラー系/回復系
+  - [x] エラー系/回復系
   - [x] 基本的な回復テスト（malformed import 後の trait、malformed newtype からの復帰）
 
 ## 2. AST/AST ブリッジ
