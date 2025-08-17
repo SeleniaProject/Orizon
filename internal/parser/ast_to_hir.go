@@ -1069,6 +1069,16 @@ func (transformer *ASTToHIRTransformer) transformType(typeExpr Type) *HIRType {
 			name = t.Name.Value
 		}
 		return NewHIRType(t.Span, HIRTypeEnum, &HIREnumType{Name: name})
+	case *ArrayType:
+		return transformer.transformArrayType(t)
+	case *PointerType:
+		return transformer.transformPointerType(t)
+	case *ReferenceType:
+		return transformer.transformReferenceType(t)
+	case *FunctionType:
+		return transformer.transformFunctionType(t)
+	case *GenericType:
+		return transformer.transformGenericType(t)
 	default:
 		transformer.addError(fmt.Errorf("unsupported type: %T", typeExpr))
 		return nil
@@ -1105,6 +1115,114 @@ func (transformer *ASTToHIRTransformer) transformBasicType(basicType *BasicType)
 		&HIRPrimitiveType{
 			Name: basicType.Name,
 			Size: size,
+		},
+	)
+}
+
+// transformArrayType converts array types
+func (transformer *ASTToHIRTransformer) transformArrayType(arrayType *ArrayType) *HIRType {
+	var elementType *HIRType
+	if arrayType.ElementType != nil {
+		elementType = transformer.transformType(arrayType.ElementType)
+	} else {
+		elementType = NewHIRType(arrayType.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+	}
+	
+	// Convert size expression to constant if possible
+	var size int
+	if arrayType.Size != nil {
+		// In a full implementation, this would evaluate the size expression
+		// For now, default to unknown size
+		size = 0
+	}
+	
+	return NewHIRType(
+		arrayType.Span,
+		HIRTypeArray,
+		map[string]interface{}{
+			"element_type": elementType,
+			"size":         size,
+		},
+	)
+}
+
+// transformPointerType converts pointer types
+func (transformer *ASTToHIRTransformer) transformPointerType(pointerType *PointerType) *HIRType {
+	var pointeeType *HIRType
+	if pointerType.Inner != nil {
+		pointeeType = transformer.transformType(pointerType.Inner)
+	} else {
+		pointeeType = NewHIRType(pointerType.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+	}
+	
+	return NewHIRType(
+		pointerType.Span,
+		HIRTypePointer,
+		map[string]interface{}{
+			"pointee_type": pointeeType,
+			"is_mutable":   pointerType.IsMutable,
+		},
+	)
+}
+
+// transformReferenceType converts reference types
+func (transformer *ASTToHIRTransformer) transformReferenceType(referenceType *ReferenceType) *HIRType {
+	var referentType *HIRType
+	if referenceType.Inner != nil {
+		referentType = transformer.transformType(referenceType.Inner)
+	} else {
+		referentType = NewHIRType(referenceType.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+	}
+	
+	return NewHIRType(
+		referenceType.Span,
+		HIRTypeReference,
+		map[string]interface{}{
+			"referent_type": referentType,
+			"is_mutable":    referenceType.IsMutable,
+			"lifetime":      referenceType.Lifetime,
+		},
+	)
+}
+
+// transformFunctionType converts function types
+func (transformer *ASTToHIRTransformer) transformFunctionType(functionType *FunctionType) *HIRType {
+	paramTypes := make([]*HIRType, 0, len(functionType.Parameters))
+	for _, param := range functionType.Parameters {
+		if param.Type != nil {
+			paramTypes = append(paramTypes, transformer.transformType(param.Type))
+		} else {
+			paramTypes = append(paramTypes, NewHIRType(param.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"}))
+		}
+	}
+	
+	var returnType *HIRType
+	if functionType.ReturnType != nil {
+		returnType = transformer.transformType(functionType.ReturnType)
+	} else {
+		returnType = NewHIRType(functionType.Span, HIRTypePrimitive, &HIRPrimitiveType{Name: "void", Size: 0})
+	}
+	
+	return NewHIRType(
+		functionType.Span,
+		HIRTypeFunction,
+		&HIRFunctionType{
+			Parameters: paramTypes,
+			ReturnType: returnType,
+			IsAsync:    functionType.IsAsync,
+		},
+	)
+}
+
+// transformGenericType converts generic types
+func (transformer *ASTToHIRTransformer) transformGenericType(genericType *GenericType) *HIRType {
+	// For now, just create a simple generic type
+	// In a full implementation, this would handle generic type instantiation
+	return NewHIRType(
+		genericType.Span,
+		HIRTypeGeneric,
+		&HIRGenericType{
+			Name: "generic_type",
 		},
 	)
 }
