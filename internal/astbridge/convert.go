@@ -174,10 +174,12 @@ func fromParserDecl(d p.Declaration) (ast.Declaration, error) {
 		items := make([]*ast.ExportItem, 0, len(n.Items))
 		for _, it := range n.Items {
 			var alias *ast.Identifier
-			if it.Alias != nil { alias = &ast.Identifier{Span: fromParserSpan(it.Alias.Span), Value: it.Alias.Value} }
+			if it.Alias != nil {
+				alias = &ast.Identifier{Span: fromParserSpan(it.Alias.Span), Value: it.Alias.Value}
+			}
 			items = append(items, &ast.ExportItem{Span: fromParserSpan(it.Span), Name: &ast.Identifier{Span: fromParserSpan(it.Name.Span), Value: it.Name.Value}, Alias: alias})
 		}
-	return &ast.ExportDeclaration{Span: fromParserSpan(n.Span), Items: items}, nil
+		return &ast.ExportDeclaration{Span: fromParserSpan(n.Span), Items: items}, nil
 	case *p.MacroDefinition:
 		// Macros are compile-time only; skip them in AST bridge for now
 		return nil, nil
@@ -239,7 +241,9 @@ func toParserDecl(d ast.Declaration) (p.Declaration, error) {
 		items := make([]*p.ExportItem, 0, len(n.Items))
 		for _, it := range n.Items {
 			var alias *p.Identifier
-			if it.Alias != nil { alias = &p.Identifier{Span: toParserSpan(it.Alias.Span), Value: it.Alias.Value} }
+			if it.Alias != nil {
+				alias = &p.Identifier{Span: toParserSpan(it.Alias.Span), Value: it.Alias.Value}
+			}
 			items = append(items, &p.ExportItem{Span: toParserSpan(it.Span), Name: &p.Identifier{Span: toParserSpan(it.Name.Span), Value: it.Name.Value}, Alias: alias})
 		}
 		return &p.ExportDeclaration{Span: toParserSpan(n.Span), Items: items}, nil

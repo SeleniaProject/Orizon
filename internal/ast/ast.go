@@ -265,7 +265,9 @@ func (d *ImportDeclaration) String() string {
 	}
 	return fmt.Sprintf("%simport %s%s", exported, strings.Join(segs, "::"), alias)
 }
-func (d *ImportDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitImportDeclaration(d) }
+func (d *ImportDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitImportDeclaration(d)
+}
 
 // ExportItem represents a single exported symbol with optional alias
 type ExportItem struct {
@@ -274,8 +276,13 @@ type ExportItem struct {
 	Alias *Identifier // optional
 }
 
-func (e *ExportItem) GetSpan() position.Span             { return e.Span }
-func (e *ExportItem) String() string                     { if e.Alias != nil { return fmt.Sprintf("%s as %s", e.Name.String(), e.Alias.String()) }; return e.Name.String() }
+func (e *ExportItem) GetSpan() position.Span { return e.Span }
+func (e *ExportItem) String() string {
+	if e.Alias != nil {
+		return fmt.Sprintf("%s as %s", e.Name.String(), e.Alias.String())
+	}
+	return e.Name.String()
+}
 func (e *ExportItem) Accept(visitor Visitor) interface{} { return visitor.VisitExportItem(e) }
 
 // ExportDeclaration represents an export statement: export { a, b as c }
@@ -293,7 +300,9 @@ func (d *ExportDeclaration) String() string {
 	}
 	return fmt.Sprintf("export { %s }", strings.Join(parts, ", "))
 }
-func (d *ExportDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitExportDeclaration(d) }
+func (d *ExportDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitExportDeclaration(d)
+}
 
 // ===== Statements =====
 

@@ -15,6 +15,7 @@
 - [x] MIR/LIR の最小導入と x64 emitter（Win64 風, 診断用）
 - [x] Bootstrap スナップショット/展開の E2E テスト（golden 更新+検証）
 - [x] newtype のエンドツーエンド（AST/Parser/HIR/変換/テスト/仕様）
+- [x] core AST に import/export ノードを追加し、AST ブリッジ往復 + ユニットテスト
 - [x] impl の最大表現を HIR に導入（inherent/trait, generics, where, メソッドメタ）+ モジュールに Impls 収集
 - [x] 構文仕様（spec/syntax.md）を実装に整合（fn エイリアス、newtype/export のセミコロン任意、impl_item 定義）
 - [x] パーサーの宣言ブロック単位の同期点と局所回復/診断の強化（struct/enum/trait/impl/import）
@@ -53,8 +54,11 @@
 ## 2. AST/AST ブリッジ
 - [ ] 新規宣言ノード（struct/enum/trait/impl/import/export）を core AST と合意
   - [ ] 追加するか既存表現へ写像する設計確定（最小侵襲）
+  - [x] import/export ノード追加（core AST）
 - [ ] パーサー AST ↔ core AST の往復変換を実装（Span/位置情報含む）
+  - [x] import/export の往復変換（現状 Span は最小だが往復保持は確認済み）
 - [ ] 追加ユニットテスト（宣言の保持・変換の完全性）
+  - [x] import/export のラウンドトリップテスト
 
 ## 3. 型システム/型検査
 - [ ] 基本型/関数/ジェネリクスの型検査

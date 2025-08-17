@@ -267,8 +267,8 @@ func TestToParserType_GenericAndArray_RoundTrip(t *testing.T) {
 
 func TestDeclarations_Import_And_Export_RoundTrip(t *testing.T) {
 	pImport := &p.ImportDeclaration{
-		Path: []*p.Identifier{{Value: "foo"}, {Value: "bar"}},
-		Alias: &p.Identifier{Value: "fb"},
+		Path:     []*p.Identifier{{Value: "foo"}, {Value: "bar"}},
+		Alias:    &p.Identifier{Value: "fb"},
 		IsPublic: true,
 	}
 	pExport := &p.ExportDeclaration{
@@ -279,25 +279,51 @@ func TestDeclarations_Import_And_Export_RoundTrip(t *testing.T) {
 	}
 
 	ad1, err := fromParserDecl(pImport)
-	if err != nil { t.Fatalf("fromParserDecl import err: %v", err) }
+	if err != nil {
+		t.Fatalf("fromParserDecl import err: %v", err)
+	}
 	ad2, err := fromParserDecl(pExport)
-	if err != nil { t.Fatalf("fromParserDecl export err: %v", err) }
+	if err != nil {
+		t.Fatalf("fromParserDecl export err: %v", err)
+	}
 
 	rd1, err := toParserDecl(ad1)
-	if err != nil { t.Fatalf("toParserDecl import err: %v", err) }
+	if err != nil {
+		t.Fatalf("toParserDecl import err: %v", err)
+	}
 	rd2, err := toParserDecl(ad2)
-	if err != nil { t.Fatalf("toParserDecl export err: %v", err) }
+	if err != nil {
+		t.Fatalf("toParserDecl export err: %v", err)
+	}
 
 	ri, ok := rd1.(*p.ImportDeclaration)
-	if !ok { t.Fatalf("expected *ImportDeclaration, got %T", rd1) }
-	if len(ri.Path) != 2 || ri.Path[0].Value != "foo" || ri.Path[1].Value != "bar" { t.Fatalf("import path mismatch: %#v", ri.Path) }
-	if ri.Alias == nil || ri.Alias.Value != "fb" { t.Fatalf("import alias mismatch: %#v", ri.Alias) }
-	if !ri.IsPublic { t.Fatalf("import IsPublic lost") }
+	if !ok {
+		t.Fatalf("expected *ImportDeclaration, got %T", rd1)
+	}
+	if len(ri.Path) != 2 || ri.Path[0].Value != "foo" || ri.Path[1].Value != "bar" {
+		t.Fatalf("import path mismatch: %#v", ri.Path)
+	}
+	if ri.Alias == nil || ri.Alias.Value != "fb" {
+		t.Fatalf("import alias mismatch: %#v", ri.Alias)
+	}
+	if !ri.IsPublic {
+		t.Fatalf("import IsPublic lost")
+	}
 
 	re, ok := rd2.(*p.ExportDeclaration)
-	if !ok { t.Fatalf("expected *ExportDeclaration, got %T", rd2) }
-	if len(re.Items) != 2 { t.Fatalf("export items length mismatch: %d", len(re.Items)) }
-	if re.Items[0].Name.Value != "A" { t.Fatalf("export item0 name mismatch: %s", re.Items[0].Name.Value) }
-	if re.Items[1].Name.Value != "B" { t.Fatalf("export item1 name mismatch: %s", re.Items[1].Name.Value) }
-	if re.Items[1].Alias == nil || re.Items[1].Alias.Value != "Bee" { t.Fatalf("export item1 alias mismatch: %#v", re.Items[1].Alias) }
+	if !ok {
+		t.Fatalf("expected *ExportDeclaration, got %T", rd2)
+	}
+	if len(re.Items) != 2 {
+		t.Fatalf("export items length mismatch: %d", len(re.Items))
+	}
+	if re.Items[0].Name.Value != "A" {
+		t.Fatalf("export item0 name mismatch: %s", re.Items[0].Name.Value)
+	}
+	if re.Items[1].Name.Value != "B" {
+		t.Fatalf("export item1 name mismatch: %s", re.Items[1].Name.Value)
+	}
+	if re.Items[1].Alias == nil || re.Items[1].Alias.Value != "Bee" {
+		t.Fatalf("export item1 alias mismatch: %#v", re.Items[1].Alias)
+	}
 }

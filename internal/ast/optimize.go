@@ -256,6 +256,39 @@ func (cfv *constantFoldingVisitor) VisitBinaryExpression(node *BinaryExpression)
 		}
 	}
 
+	// Identity simplifications with one literal side
+	// expr + 0 => expr, 0 + expr => expr
+	if node.Operator == OpAdd {
+		if leftIsLit && cfv.isZeroLiteral(leftLit) {
+			cfv.stats.NodesTransformed++
+			return node.Right
+		}
+		if rightIsLit && cfv.isZeroLiteral(rightLit) {
+			cfv.stats.NodesTransformed++
+			return node.Left
+		}
+	}
+	// expr * 1 => expr, 1 * expr => expr
+	if node.Operator == OpMul {
+		if leftIsLit && cfv.isOneLiteral(leftLit) {
+			cfv.stats.NodesTransformed++
+			return node.Right
+		}
+		if rightIsLit && cfv.isOneLiteral(rightLit) {
+			cfv.stats.NodesTransformed++
+			return node.Left
+		}
+		// expr * 0 => 0, 0 * expr => 0
+		if leftIsLit && cfv.isZeroLiteral(leftLit) {
+			cfv.stats.NodesTransformed++
+			return leftLit
+		}
+		if rightIsLit && cfv.isZeroLiteral(rightLit) {
+			cfv.stats.NodesTransformed++
+			return rightLit
+		}
+	}
+
 	return node
 }
 
@@ -419,6 +452,50 @@ func (cfv *constantFoldingVisitor) foldComparisonOperations(left *Literal, op Op
 		case OpGe:
 			result := l >= r
 			return &Literal{Span: span, Kind: LiteralBoolean, Value: result, Raw: fmt.Sprintf("%t", result)}
+		}
+	}
+
+	// Handle float comparisons
+	if left.Kind == LiteralFloat && right.Kind == LiteralFloat {
+		lf, ok1 := left.Value.(float64)
+		rf, ok2 := right.Value.(float64)
+		if ok1 && ok2 {
+			switch op {
+			case OpEq:
+				res := lf == rf
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			case OpNe:
+				res := lf != rf
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			case OpLt:
+				res := lf < rf
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			case OpLe:
+				res := lf <= rf
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			case OpGt:
+				res := lf > rf
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			case OpGe:
+				res := lf >= rf
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			}
+		}
+	}
+
+	// Handle string equality/inequality
+	if left.Kind == LiteralString && right.Kind == LiteralString {
+		ls, ok1 := left.Value.(string)
+		rs, ok2 := right.Value.(string)
+		if ok1 && ok2 {
+			switch op {
+			case OpEq:
+				res := ls == rs
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			case OpNe:
+				res := ls != rs
+				return &Literal{Span: span, Kind: LiteralBoolean, Value: res, Raw: fmt.Sprintf("%t", res)}
+			}
 		}
 	}
 
@@ -591,6 +668,27 @@ func (cfv *constantFoldingVisitor) VisitUnaryExpression(node *UnaryExpression) i
 	}
 
 	return node
+}
+
+// helpers for identity simplification
+func (cfv *constantFoldingVisitor) isZeroLiteral(lit *Literal) bool {
+	switch lit.Kind {
+	case LiteralInteger:
+		return cfv.extractIntValue(lit) == 0
+	case LiteralFloat:
+		if v, ok := lit.Value.(float64); ok { return v == 0.0 }
+	}
+	return false
+}
+
+func (cfv *constantFoldingVisitor) isOneLiteral(lit *Literal) bool {
+	switch lit.Kind {
+	case LiteralInteger:
+		return cfv.extractIntValue(lit) == 1
+	case LiteralFloat:
+		if v, ok := lit.Value.(float64); ok { return v == 1.0 }
+	}
+	return false
 }
 
 // tryFoldUnaryExpression attempts to fold unary expressions at compile time

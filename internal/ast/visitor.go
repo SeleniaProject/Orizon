@@ -215,9 +215,13 @@ func (w *WalkingVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{}
 func (w *WalkingVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
 	result := w.visitor.VisitImportDeclaration(node)
 	for _, seg := range node.Path {
-		if seg != nil { seg.Accept(w) }
+		if seg != nil {
+			seg.Accept(w)
+		}
 	}
-	if node.Alias != nil { node.Alias.Accept(w) }
+	if node.Alias != nil {
+		node.Alias.Accept(w)
+	}
 	return result
 }
 
@@ -225,7 +229,9 @@ func (w *WalkingVisitor) VisitImportDeclaration(node *ImportDeclaration) interfa
 func (w *WalkingVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
 	result := w.visitor.VisitExportDeclaration(node)
 	for _, it := range node.Items {
-		if it != nil { it.Accept(w) }
+		if it != nil {
+			it.Accept(w)
+		}
 	}
 	return result
 }
@@ -233,8 +239,12 @@ func (w *WalkingVisitor) VisitExportDeclaration(node *ExportDeclaration) interfa
 // VisitExportItem walks through export item parts
 func (w *WalkingVisitor) VisitExportItem(node *ExportItem) interface{} {
 	result := w.visitor.VisitExportItem(node)
-	if node.Name != nil { node.Name.Accept(w) }
-	if node.Alias != nil { node.Alias.Accept(w) }
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	if node.Alias != nil {
+		node.Alias.Accept(w)
+	}
 	return result
 }
 
@@ -552,9 +562,15 @@ func (n *NodeCountVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface
 	n.count++
 	return nil
 }
-func (n *NodeCountVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} { n.count++; return nil }
-func (n *NodeCountVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} { n.count++; return nil }
-func (n *NodeCountVisitor) VisitExportItem(node *ExportItem) interface{}               { n.count++; return nil }
+func (n *NodeCountVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitExportItem(node *ExportItem) interface{} { n.count++; return nil }
 func (n *NodeCountVisitor) VisitBlockStatement(node *BlockStatement) interface{} {
 	n.count++
 	return nil
