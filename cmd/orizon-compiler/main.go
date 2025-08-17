@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/orizon-lang/orizon/internal/astbridge"
+	"github.com/orizon-lang/orizon/internal/codegen"
 	"github.com/orizon-lang/orizon/internal/debug"
 	"github.com/orizon-lang/orizon/internal/hir"
 	"github.com/orizon-lang/orizon/internal/lexer"
@@ -38,6 +39,11 @@ func main() {
 		outELF      = flag.String("emit-elf", "", "write minimal ELF64 object bundling DWARF to the given path")
 		outCOFF     = flag.String("emit-coff", "", "write minimal COFF object bundling DWARF to the given path")
 		outMachO    = flag.String("emit-macho", "", "write minimal Mach-O object bundling DWARF to the given path")
+		// Diagnostic x64 emission
+		emitX64 = flag.Bool("emit-x64", false, "emit diagnostic x64-like assembly from LIR (stdout)")
+		x64Out  = flag.String("x64-out", "", "write diagnostic x64 assembly to a file instead of stdout")
+		emitMIR = flag.Bool("emit-mir", false, "emit MIR textual dump (stdout)")
+		emitLIR = flag.Bool("emit-lir", false, "emit LIR textual dump (stdout)")
 	)
 
 	flag.Parse()
@@ -61,7 +67,7 @@ func main() {
 	}
 
 	inputFile := args[0]
-	if err := compileFile(inputFile, *debugLexer, *doParse, *optLevel, *emitDebug, *emitSrcMap, *debugOut, *smOut, *dwarfDir, *outELF, *outCOFF, *outMachO); err != nil {
+	if err := compileFile(inputFile, *debugLexer, *doParse, *optLevel, *emitDebug, *emitSrcMap, *debugOut, *smOut, *dwarfDir, *outELF, *outCOFF, *outMachO, *emitMIR, *emitLIR, *emitX64, *x64Out); err != nil {
 		log.Fatalf("Compilation failed: %v", err)
 	}
 }
@@ -85,6 +91,10 @@ func showUsage() {
 	fmt.Println("    --emit-elf       Write minimal ELF64 object bundling DWARF")
 	fmt.Println("    --emit-coff      Write minimal COFF (AMD64) object bundling DWARF")
 	fmt.Println("    --emit-macho     Write minimal Mach-O (x86_64) object bundling DWARF")
+	fmt.Println("    --emit-mir       Emit MIR textual dump")
+	fmt.Println("    --emit-lir       Emit LIR textual dump")
+	fmt.Println("    --emit-x64       Emit diagnostic x64-like assembly text")
+	fmt.Println("    --x64-out PATH   Write diagnostic x64 assembly to PATH")
 	fmt.Println("    env ORIZON_DEBUG_OBJ_OUT, ORIZON_DEBUG_OBJ_FORMAT={auto|elf|coff|macho} can auto-emit when not specified")
 	fmt.Println()
 	fmt.Println("EXAMPLES:")
@@ -93,7 +103,7 @@ func showUsage() {
 	fmt.Println("    orizon-compiler --emit-debug --debug-out dbg.json --dwarf-out-dir out/dwarf hello.oriz")
 }
 
-func compileFile(filename string, debugLexer bool, doParse bool, optLevel string, emitDebug bool, emitSrcMap bool, debugOut string, smOut string, dwarfDir string, outELF string, outCOFF string, outMachO string) error {
+func compileFile(filename string, debugLexer bool, doParse bool, optLevel string, emitDebug bool, emitSrcMap bool, debugOut string, smOut string, dwarfDir string, outELF string, outCOFF string, outMachO string, emitMIR bool, emitLIR bool, emitX64 bool, x64Out string) error {
 	// ファイル存在チェック
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return fmt.Errorf("file not found: %s", filename)
@@ -127,7 +137,7 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 			}
 		}
 		fmt.Println(strings.Repeat("=", 50))
-	} else if !doParse && optLevel == "" {
+	} else if !doParse && optLevel == "" && !(emitDebug || emitSrcMap || emitMIR || emitLIR) {
 		// 通常のコンパイル（現在は字句解析のみ）
 		tokenCount := 0
 		for {
@@ -173,14 +183,42 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 			program = optimized
 		}
 
-		// Convert parser AST -> internal AST -> HIR (once) for debug artifacts
-		if emitDebug || emitSrcMap {
+		// Convert parser AST -> internal AST -> HIR (once) for debug/codegen artifacts
+		if emitDebug || emitSrcMap || emitMIR || emitLIR || emitX64 || (x64Out != "") {
 			astProg, err := astbridge.FromParserProgram(program)
 			if err != nil {
 				return fmt.Errorf("ast bridge failed: %w", err)
 			}
 			conv := hir.NewASTToHIRConverter()
 			hirProg, _ := conv.ConvertProgram(astProg)
+
+			// Optional MIR/LIR/x64 dumps using stub lowering pipeline
+			if emitMIR || emitLIR || emitX64 || (x64Out != "") {
+				mirMod := codegen.LowerToMIR(hirProg)
+				if emitMIR {
+					fmt.Println("--- MIR ---")
+					fmt.Println(mirMod.String())
+				}
+				if emitLIR || emitX64 || (x64Out != "") {
+					lirMod := codegen.SelectToLIR(mirMod)
+					if emitLIR {
+						fmt.Println("--- LIR ---")
+						fmt.Println(lirMod.String())
+					}
+					if emitX64 || (x64Out != "") {
+						asm := codegen.EmitX64(lirMod)
+						if x64Out != "" {
+							if err := os.WriteFile(x64Out, []byte(asm), 0o644); err != nil {
+								return fmt.Errorf("write x64 failed: %w", err)
+							}
+							fmt.Printf("[x64] wrote %s (%d bytes)\n", x64Out, len(asm))
+						} else {
+							fmt.Println("--- X64 (diagnostic) ---")
+							fmt.Println(asm)
+						}
+					}
+				}
+			}
 
 			if emitDebug {
 				em := debug.NewEmitter()

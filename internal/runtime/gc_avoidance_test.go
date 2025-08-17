@@ -236,7 +236,8 @@ func TestIntegration(t *testing.T) {
 	// Stack allocation
 	stackPtr := system.stackManager.AllocateOnStack(64, "stack_var")
 	if stackPtr != 0 {
-		t.Logf("Stack allocation successful: %p", unsafe.Pointer(stackPtr))
+		// Print uintptr directly to avoid potential unsafe.Pointer misuse
+		t.Logf("Stack allocation successful: 0x%x", stackPtr)
 	}
 
 	// Tracked allocation
@@ -244,7 +245,8 @@ func TestIntegration(t *testing.T) {
 	heapPtr := uintptr(unsafe.Pointer(&data[0]))
 	trackingData := system.lifetimeTracker.TrackAllocation(heapPtr, 128, "heap_var")
 	if trackingData != nil {
-		t.Logf("Heap allocation tracked: %p", unsafe.Pointer(heapPtr))
+		// Print uintptr directly to avoid potential unsafe.Pointer misuse
+		t.Logf("Heap allocation tracked: 0x%x", heapPtr)
 	}
 
 	// Reference counting

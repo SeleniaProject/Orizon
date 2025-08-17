@@ -8,6 +8,8 @@ import (
 
 func TestRetryBackoffContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	// Ensure cancel is called in all paths to avoid context leak warnings
+	defer cancel()
 	ch := RetryBackoffContext(ctx, 5*time.Millisecond, 2.0, 20*time.Millisecond, 0)
 	// 2 ticks then cancel
 	count := 0
