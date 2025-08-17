@@ -2,11 +2,84 @@ package astbridge
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	ast "github.com/orizon-lang/orizon/internal/ast"
 	p "github.com/orizon-lang/orizon/internal/parser"
 	"github.com/orizon-lang/orizon/internal/position"
 )
+
+// prettyPrintParserType renders parser types including details missing from their String(),
+// notably lifetimes on ReferenceType. Fallbacks to String() for others.
+func prettyPrintParserType(t p.Type) string {
+	switch n := t.(type) {
+	case *p.ReferenceType:
+		prefix := "&"
+		if n.Lifetime != "" {
+			prefix = "&'" + n.Lifetime + " "
+		}
+		if n.IsMutable {
+			// include mut after potential lifetime
+			if n.Lifetime != "" {
+				prefix += "mut "
+			} else {
+				prefix = "&mut "
+			}
+		}
+		return prefix + prettyPrintParserType(n.Inner)
+	case *p.FunctionType:
+		// [async ](params) -> return
+		params := make([]string, 0, len(n.Parameters))
+		for _, prm := range n.Parameters {
+			pt := prettyPrintParserType(prm.Type)
+			if prm.Name != "" {
+				params = append(params, prm.Name+": "+pt)
+			} else {
+				params = append(params, pt)
+			}
+		}
+		ret := "void"
+		if n.ReturnType != nil {
+			ret = prettyPrintParserType(n.ReturnType)
+		}
+		prefix := ""
+		if n.IsAsync {
+			prefix = "async "
+		}
+		return prefix + "(" + strings.Join(params, ", ") + ") -> " + ret
+	case *p.GenericType:
+		base := prettyPrintParserType(n.BaseType)
+		args := make([]string, 0, len(n.TypeParameters))
+		for _, a := range n.TypeParameters {
+			args = append(args, prettyPrintParserType(a))
+		}
+		return base + "<" + strings.Join(args, ", ") + ">"
+	case *p.PointerType:
+		if n.IsMutable {
+			return "*mut " + prettyPrintParserType(n.Inner)
+		}
+		return "*" + prettyPrintParserType(n.Inner)
+	case *p.ArrayType:
+		elem := prettyPrintParserType(n.ElementType)
+		if n.IsDynamic {
+			return "[" + elem + "]"
+		}
+		// size expression best-effort string
+		sizeStr := "?"
+		if n.Size != nil {
+			if s, ok := any(n.Size).(fmt.Stringer); ok {
+				sizeStr = s.String()
+			}
+		}
+		return "[" + elem + "; " + sizeStr + "]"
+	default:
+		if s, ok := t.(fmt.Stringer); ok {
+			return s.String()
+		}
+		return "<type>"
+	}
+}
 
 // FromParserProgram converts parser.Program to ast.Program.
 func FromParserProgram(src *p.Program) (*ast.Program, error) {
@@ -52,6 +125,9 @@ func fromParserDecl(d p.Declaration) (ast.Declaration, error) {
 		return fromParserFunc(n)
 	case *p.VariableDeclaration:
 		return fromParserVar(n)
+	case *p.MacroDefinition:
+		// Macros are compile-time only; skip them in AST bridge for now
+		return nil, nil
 	case *p.ExpressionStatement:
 		s, err := fromParserStmt(n)
 		if err != nil {
@@ -139,9 +215,12 @@ func fromParserVar(v *p.VariableDeclaration) (*ast.VariableDeclaration, error) {
 			return nil, err
 		}
 	}
-	val, err := fromParserExpr(v.Initializer)
-	if err != nil {
-		return nil, err
+	var val ast.Expression
+	if v.Initializer != nil {
+		val, err = fromParserExpr(v.Initializer)
+		if err != nil {
+			return nil, err
+		}
 	}
 	kind := ast.VarKindLet
 	if v.IsMutable {
@@ -176,6 +255,13 @@ func fromParserStmt(s p.Statement) (ast.Statement, error) {
 			blk.Statements = append(blk.Statements, cs)
 		}
 		return blk, nil
+	case *p.VariableDeclaration:
+		// VariableDeclaration is both a declaration and a statement in the parser AST
+		vd, err := fromParserVar(n)
+		if err != nil {
+			return nil, err
+		}
+		return vd, nil
 	case *p.ExpressionStatement:
 		e, err := fromParserExpr(n.Expression)
 		if err != nil {
@@ -219,6 +305,49 @@ func fromParserStmt(s p.Statement) (ast.Statement, error) {
 			return nil, err
 		}
 		return &ast.WhileStatement{Span: fromParserSpan(n.Span), Condition: cond, Body: ensureBlock(body)}, nil
+	case *p.MatchStatement:
+		// Lower match into a chain of if/else if/else.
+		// Semantics: for each arm (pattern, [guard], body):
+		//   if (scrutinee == pattern) && (guard?) { body }
+		// Note: This is a simplistic lowering; real pattern matching would need richer semantics.
+		scrutinee, err := fromParserExpr(n.Expression)
+		if err != nil {
+			return nil, err
+		}
+		// Build a nested if/else chain
+		var chain ast.Statement
+		// Iterate arms in reverse to nest properly
+		for i := len(n.Arms) - 1; i >= 0; i-- {
+			arm := n.Arms[i]
+			pat, err := fromParserExpr(arm.Pattern)
+			if err != nil {
+				return nil, err
+			}
+			// Build equality: scrutinee == pat
+			eq := &ast.BinaryExpression{Span: fromParserSpan(arm.Span), Left: scrutinee, Operator: ast.OpEq, Right: pat}
+			cond := ast.Expression(eq)
+			if arm.Guard != nil {
+				g, err := fromParserExpr(arm.Guard)
+				if err != nil {
+					return nil, err
+				}
+				cond = &ast.BinaryExpression{Span: fromParserSpan(arm.Span), Left: cond, Operator: ast.OpAnd, Right: g}
+			}
+			bodyStmt, err := fromParserStmt(arm.Body)
+			if err != nil {
+				return nil, err
+			}
+			if chain == nil {
+				chain = &ast.IfStatement{Span: fromParserSpan(arm.Span), Condition: cond, ThenBlock: ensureBlock(bodyStmt), ElseBlock: nil}
+			} else {
+				chain = &ast.IfStatement{Span: fromParserSpan(arm.Span), Condition: cond, ThenBlock: ensureBlock(bodyStmt), ElseBlock: chain}
+			}
+		}
+		if chain == nil {
+			// Empty match; lower to empty block
+			return &ast.BlockStatement{Span: fromParserSpan(n.Span), Statements: nil}, nil
+		}
+		return chain, nil
 	default:
 		return nil, fmt.Errorf("unsupported parser statement type %T", s)
 	}
@@ -284,6 +413,10 @@ func fromParserExpr(e p.Expression) (ast.Expression, error) {
 		return &ast.Identifier{Span: fromParserSpan(n.Span), Value: n.Value}, nil
 	case *p.Literal:
 		return fromParserLiteral(n), nil
+	case *p.MacroInvocation:
+		// Placeholder: no macro expansion in AST bridge yet.
+		// Represent as a benign null literal so downstream passes can proceed.
+		return &ast.Literal{Span: fromParserSpan(n.Span), Kind: ast.LiteralNull, Value: nil, Raw: "null"}, nil
 	case *p.BinaryExpression:
 		left, err := fromParserExpr(n.Left)
 		if err != nil {
@@ -381,8 +514,31 @@ func toParserExpr(e ast.Expression) (p.Expression, error) {
 func fromParserType(t p.Type) (ast.Type, error) {
 	switch n := t.(type) {
 	case *p.BasicType:
-		return &ast.BasicType{Span: fromParserSpan(n.Span), Kind: mapBasicTypeName(n.Name)}, nil
+		// Map well-known basic names to ast.BasicType, otherwise preserve as IdentifierType
+		switch n.Name {
+		case "int", "float", "string", "bool", "char", "void":
+			return &ast.BasicType{Span: fromParserSpan(n.Span), Kind: mapBasicTypeName(n.Name)}, nil
+		default:
+			return &ast.IdentifierType{Span: fromParserSpan(n.Span), Name: &ast.Identifier{Span: fromParserSpan(n.Span), Value: n.Name}}, nil
+		}
+	// For complex parser types that don't have direct equivalents in internal/ast,
+	// preserve their textual form as an IdentifierType to avoid losing information.
+	case *p.ArrayType, *p.FunctionType, *p.StructType, *p.EnumType, *p.TraitType,
+		*p.GenericType, *p.ReferenceType, *p.PointerType:
+		// Preserve textual representation (including lifetime for references).
+		sp := n.(p.Node).GetSpan()
+		return &ast.IdentifierType{Span: fromParserSpan(sp), Name: &ast.Identifier{Span: fromParserSpan(sp), Value: prettyPrintParserType(n)}}, nil
 	default:
+		// Fallback: try String() if available; otherwise, report unsupported
+		if s, ok := t.(fmt.Stringer); ok {
+			// Attempt best-effort carry of the textual type into IdentifierType
+			// Span information: use zero span if node doesn't expose it
+			var sp p.Span
+			if n2, ok2 := t.(p.Node); ok2 {
+				sp = n2.GetSpan()
+			}
+			return &ast.IdentifierType{Span: fromParserSpan(sp), Name: &ast.Identifier{Span: fromParserSpan(sp), Value: s.String()}}, nil
+		}
 		return nil, fmt.Errorf("unsupported parser type %T", t)
 	}
 }
@@ -392,10 +548,350 @@ func toParserType(t ast.Type) (p.Type, error) {
 	case *ast.BasicType:
 		return &p.BasicType{Span: toParserSpan(n.Span), Name: n.String()}, nil
 	case *ast.IdentifierType:
+		// Try to reconstruct structured parser types from textual identifier forms
+		if pt := parseIdentifierTypeStringToParserType(n.String()); pt != nil {
+			return pt, nil
+		}
+		// Fallback: keep as named basic type
 		return &p.BasicType{Span: toParserSpan(n.Span), Name: n.String()}, nil
 	default:
 		return nil, fmt.Errorf("unsupported ast type %T", t)
 	}
+}
+
+// parseIdentifierTypeStringToParserType recognizes simple textual forms like
+//
+//	&T, &mut T, &'a T, &'a mut T, *T, *mut T
+//
+// and converts them into parser structured types. Returns nil if unrecognized.
+func parseIdentifierTypeStringToParserType(s string) p.Type {
+	// lightweight parsing without allocations-heavy regex
+	trim := func(x string) string {
+		i, j := 0, len(x)
+		for i < j && (x[i] == ' ' || x[i] == '\t' || x[i] == '\n' || x[i] == '\r') {
+			i++
+		}
+		for j > i && (x[j-1] == ' ' || x[j-1] == '\t' || x[j-1] == '\n' || x[j-1] == '\r') {
+			j--
+		}
+		return x[i:j]
+	}
+	s = trim(s)
+	if s == "" {
+		return nil
+	}
+
+	// Generic forms: Base<T1, T2, ...>
+	// Detect first '<' at depth 0 and trailing '>'
+	// but avoid mistaking array/function brackets
+	// We'll attempt generic parse before reference/pointer when base doesn't start with '&' or '*'
+	if len(s) > 0 && s[0] != '&' && s[0] != '*' && s[0] != '[' {
+		// find top-level '<'
+		depthAngle, depthSquare, depthParen := 0, 0, 0
+		idx := -1
+		for i := 0; i < len(s); i++ {
+			switch s[i] {
+			case '<':
+				if depthAngle == 0 && depthSquare == 0 && depthParen == 0 {
+					idx = i
+				}
+				depthAngle++
+			case '>':
+				if depthAngle > 0 {
+					depthAngle--
+				}
+			case '[':
+				depthSquare++
+			case ']':
+				if depthSquare > 0 {
+					depthSquare--
+				}
+			case '(':
+				depthParen++
+			case ')':
+				if depthParen > 0 {
+					depthParen--
+				}
+			}
+		}
+		if idx >= 0 && s[len(s)-1] == '>' {
+			baseName := trim(s[:idx])
+			argStr := s[idx+1 : len(s)-1]
+			// split args by commas at top level
+			args := make([]p.Type, 0)
+			depthA, depthS, depthP := 0, 0, 0
+			start := 0
+			addArg := func(end int) {
+				part := trim(argStr[start:end])
+				if part == "" {
+					return
+				}
+				t := parseIdentifierTypeStringToParserType(part)
+				if t == nil {
+					t = &p.BasicType{Name: part}
+				}
+				args = append(args, t)
+			}
+			for i := 0; i < len(argStr); i++ {
+				switch argStr[i] {
+				case '<':
+					depthA++
+				case '>':
+					if depthA > 0 {
+						depthA--
+					}
+				case '[':
+					depthS++
+				case ']':
+					if depthS > 0 {
+						depthS--
+					}
+				case '(':
+					depthP++
+				case ')':
+					if depthP > 0 {
+						depthP--
+					}
+				case ',':
+					if depthA == 0 && depthS == 0 && depthP == 0 {
+						addArg(i)
+						start = i + 1
+					}
+				}
+			}
+			addArg(len(argStr))
+			base := parseIdentifierTypeStringToParserType(baseName)
+			if base == nil {
+				base = &p.BasicType{Name: baseName}
+			}
+			return &p.GenericType{BaseType: base, TypeParameters: args}
+		}
+	}
+
+	// Reference forms
+	if s[0] == '&' {
+		rest := trim(s[1:])
+		lifetime := ""
+		isMut := false
+		// Lifetime like 'a ...
+		if len(rest) > 0 && rest[0] == '\'' {
+			// consume until space
+			k := 1
+			for k < len(rest) && rest[k] != ' ' {
+				k++
+			}
+			lifetime = rest[1:k]
+			rest = trim(rest[k:])
+		}
+		// Optional mut
+		if len(rest) >= 4 && rest[:4] == "mut " {
+			isMut = true
+			rest = trim(rest[4:])
+		}
+		if rest == "" {
+			return nil
+		}
+		// Recurse for inner type
+		inner := parseIdentifierTypeStringToParserType(rest)
+		if inner == nil {
+			inner = &p.BasicType{Name: rest}
+		}
+		return &p.ReferenceType{Inner: inner, IsMutable: isMut, Lifetime: lifetime}
+	}
+
+	// Pointer forms
+	if s[0] == '*' {
+		rest := trim(s[1:])
+		isMut := false
+		if len(rest) >= 4 && rest[:4] == "mut " {
+			isMut = true
+			rest = trim(rest[4:])
+		}
+		if rest == "" {
+			return nil
+		}
+		// Recurse for inner type
+		inner := parseIdentifierTypeStringToParserType(rest)
+		if inner == nil {
+			inner = &p.BasicType{Name: rest}
+		}
+		return &p.PointerType{Inner: inner, IsMutable: isMut}
+	}
+
+	// Array forms: [T] or [T; N]
+	if s[0] == '[' && s[len(s)-1] == ']' {
+		inside := s[1 : len(s)-1]
+		// split on ';' if present (only top-level)
+		elemStr := inside
+		var sizeExpr p.Expression = nil
+		// find top-level ';'
+		depthAngle, depthSquare := 0, 0
+		semiIndex := -1
+		for i := 0; i < len(inside); i++ {
+			switch inside[i] {
+			case '<':
+				depthAngle++
+			case '>':
+				if depthAngle > 0 {
+					depthAngle--
+				}
+			case '[':
+				depthSquare++
+			case ']':
+				if depthSquare > 0 {
+					depthSquare--
+				}
+			case ';':
+				if depthAngle == 0 && depthSquare == 0 {
+					semiIndex = i
+					i = len(inside) // break
+				}
+			}
+		}
+		if semiIndex >= 0 {
+			elemStr = inside[:semiIndex]
+			sz := trim(inside[semiIndex+1:])
+			if sz != "" {
+				// try parse integer size
+				if iv, err := strconv.Atoi(sz); err == nil {
+					sizeExpr = &p.Literal{Value: iv}
+				} else {
+					// fallback: identifier expression
+					sizeExpr = &p.Identifier{Value: sz}
+				}
+			}
+		}
+		elemStr = trim(elemStr)
+		elem := parseIdentifierTypeStringToParserType(elemStr)
+		if elem == nil {
+			elem = &p.BasicType{Name: elemStr}
+		}
+		return &p.ArrayType{ElementType: elem, Size: sizeExpr, IsDynamic: semiIndex < 0}
+	}
+
+	// Function types: [async ](params) -> returnType
+	// Accept optional leading 'async '
+	{
+		isAsync := false
+		rest := s
+		if len(rest) >= 6 && rest[:6] == "async " {
+			isAsync = true
+			rest = trim(rest[6:])
+		}
+		if len(rest) > 0 && rest[0] == '(' {
+			// find matching ')'
+			depth := 0
+			end := -1
+			for i := 0; i < len(rest); i++ {
+				if rest[i] == '(' {
+					depth++
+				}
+				if rest[i] == ')' {
+					depth--
+					if depth == 0 {
+						end = i
+						break
+					}
+				}
+			}
+			if end > 0 {
+				paramsStr := rest[1:end]
+				after := trim(rest[end+1:])
+				if len(after) >= 2 && after[:2] == "->" {
+					retStr := trim(after[2:])
+					// parse params
+					params := []*p.FunctionTypeParameter{}
+					// split by commas at top-level
+					depthA, depthS, depthP := 0, 0, 0
+					start := 0
+					addParam := func(end int) {
+						part := trim(paramsStr[start:end])
+						if part == "" {
+							return
+						}
+						name := ""
+						typStr := part
+						// optional name: type (only split at first ':')
+						// find top-level ':'
+						dA, dS, dP := 0, 0, 0
+						colon := -1
+						for i := 0; i < len(part); i++ {
+							switch part[i] {
+							case '<':
+								dA++
+							case '>':
+								if dA > 0 {
+									dA--
+								}
+							case '[':
+								dS++
+							case ']':
+								if dS > 0 {
+									dS--
+								}
+							case '(':
+								dP++
+							case ')':
+								if dP > 0 {
+									dP--
+								}
+							case ':':
+								if dA == 0 && dS == 0 && dP == 0 {
+									colon = i
+									i = len(part)
+								}
+							}
+						}
+						if colon >= 0 {
+							name = trim(part[:colon])
+							typStr = trim(part[colon+1:])
+						}
+						t := parseIdentifierTypeStringToParserType(typStr)
+						if t == nil {
+							t = &p.BasicType{Name: typStr}
+						}
+						params = append(params, &p.FunctionTypeParameter{Name: name, Type: t})
+					}
+					for i := 0; i < len(paramsStr); i++ {
+						switch paramsStr[i] {
+						case '<':
+							depthA++
+						case '>':
+							if depthA > 0 {
+								depthA--
+							}
+						case '[':
+							depthS++
+						case ']':
+							if depthS > 0 {
+								depthS--
+							}
+						case '(':
+							depthP++
+						case ')':
+							if depthP > 0 {
+								depthP--
+							}
+						case ',':
+							if depthA == 0 && depthS == 0 && depthP == 0 {
+								addParam(i)
+								start = i + 1
+							}
+						}
+					}
+					addParam(len(paramsStr))
+					// return type
+					ret := parseIdentifierTypeStringToParserType(retStr)
+					if ret == nil {
+						ret = &p.BasicType{Name: retStr}
+					}
+					return &p.FunctionType{Parameters: params, ReturnType: ret, IsAsync: isAsync}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // ===== Literals and Operators =====

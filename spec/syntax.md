@@ -92,11 +92,11 @@ delimiter = "(" | ")" | "[" | "]" | "{" | "}" | "," | ";" | "." | ":" ;
 
 ```ebnf
 keyword = "as" | "async" | "await" | "break" | "case" | "const" | "continue" |
-          "default" | "defer" | "else" | "enum" | "export" | "extern" | 
+          "default" | "defer" | "else" | "enum" | "export" | "extern" |
           "false" | "for" | "func" | "if" | "impl" | "import" | "in" |
-          "interface" | "let" | "loop" | "match" | "module" | "mut" |
-          "namespace" | "pub" | "return" | "static" | "struct" | "trait" |
-          "true" | "type" | "union" | "unsafe" | "use" | "var" | "where" |
+          "let" | "loop" | "match" | "mut" |
+          "return" | "static" | "struct" | "trait" |
+          "true" | "type" | "unsafe" | "where" |
           "while" | "yield" ;
 ```
 
@@ -108,31 +108,23 @@ keyword = "as" | "async" | "await" | "break" | "case" | "const" | "continue" |
 program = { item } ;
 
 item = function_declaration |
-       struct_declaration |
-       enum_declaration |
-       trait_declaration |
-       impl_block |
-       type_alias |
-       const_declaration |
-       static_declaration |
-       module_declaration |
-       import_declaration |
-       export_declaration ;
+    struct_declaration |
+    enum_declaration |
+    trait_declaration |
+    impl_block |
+    type_alias |
+    const_declaration |
+    static_declaration |
+    import_declaration |
+    export_declaration ;
 ```
 
 ### 2. モジュールシステム
 
 ```ebnf
-(* モジュール宣言 *)
-module_declaration = "module" , identifier , "{" , { item } , "}" ;
-
-(* インポート宣言 *)
+(* インポート宣言 - 文字列やグループ指定は省略し、識別子パスに統一 *)
 import_declaration = "import" , import_path , [ "as" , identifier ] ;
-import_path = string_literal | 
-              identifier , { "::" , identifier } |
-              "{" , import_list , "}" ;
-import_list = import_item , { "," , import_item } ;
-import_item = identifier , [ "as" , identifier ] ;
+import_path = identifier , { "::" , identifier } ;
 
 (* エクスポート宣言 *)
 export_declaration = "export" , ( item | "{" , export_list , "}" ) ;
@@ -146,15 +138,16 @@ export_list = identifier , { "," , identifier } ;
 ```ebnf
 (* 型表現 *)
 type = basic_type |
-       pointer_type |
-       array_type |
-       slice_type |
-       function_type |
-       struct_type |
-       enum_type |
-       trait_type |
-       generic_type |
-       dependent_type ;
+    reference_type |
+    pointer_type |
+    array_type |
+    slice_type |
+    function_type |
+    struct_type |
+    enum_type |
+    trait_type |
+    generic_type |
+    dependent_type ;
 
 (* 基本型 *)
 basic_type = "i8" | "i16" | "i32" | "i64" | "i128" | "isize" |
@@ -162,8 +155,9 @@ basic_type = "i8" | "i16" | "i32" | "i64" | "i128" | "isize" |
              "f32" | "f64" | "f128" |
              "bool" | "char" | "string" | "unit" | "never" ;
 
-(* ポインタ型 *)
-pointer_type = "&" , [ lifetime ] , [ "mut" ] , type ;
+(* 参照/ポインタ型 *)
+reference_type = "&" , [ lifetime ] , [ "mut" ] , type ;
+pointer_type = "*" , [ "mut" ] , type ;
 lifetime = "'" , identifier ;
 
 (* 配列型 *)
@@ -173,7 +167,7 @@ array_type = "[" , type , ";" , const_expression , "]" ;
 slice_type = "[" , type , "]" ;
 
 (* 関数型 *)
-function_type = "func" , "(" , [ parameter_list ] , ")" , [ "->" , type ] ;
+function_type = "(" , [ parameter_list ] , ")" , [ "->" , type ] ;
 ```
 
 ### 2. 構造体とenum
@@ -413,8 +407,8 @@ guard_pattern = pattern , "if" , expression ;
 (* 所有権注釈 *)
 ownership = "owned" | "borrowed" | "shared" ;
 
-(* 参照型 *)
-reference_type = "&" , [ lifetime ] , [ ownership ] , type ;
+(* 参照型の定義は型システム章の reference_type を参照。
+    所有権注釈は v1 では構文に含めず予約とし、将来 reference_type に付与可能とする。*)
 
 (* ムーブセマンティクス *)
 move_expression = "move" , expression ;

@@ -569,6 +569,7 @@ func (se *SuggestionEngine) performPanicRecovery(p *Parser, err *ParseError) {
 	// Define synchronization tokens where parsing can safely resume
 	syncTokens := []lexer.TokenType{
 		lexer.TokenSemicolon,
+		lexer.TokenNewline,
 		lexer.TokenRBrace,
 		lexer.TokenFunc,
 		lexer.TokenLet,
@@ -596,6 +597,14 @@ func (se *SuggestionEngine) performPhraseRecovery(p *Parser, err *ParseError) {
 	// Try to complete the current phrase intelligently
 	switch p.current.Type {
 	case lexer.TokenIdentifier:
+		// If we're at a top-level declaration head like 'func <ident>' or 'let <ident>',
+		// avoid aggressive scanning that can skip over valid declarations.
+		if len(se.recentTokens) >= 2 {
+			prev := se.recentTokens[len(se.recentTokens)-2]
+			if prev.Type == lexer.TokenFunc || prev.Type == lexer.TokenLet || prev.Type == lexer.TokenVar || prev.Type == lexer.TokenConst || prev.Type == lexer.TokenMacro || prev.Type == lexer.TokenStruct || prev.Type == lexer.TokenEnum {
+				break // fall through to panic recovery below
+			}
+		}
 		// If we have an identifier, try to complete a declaration or expression
 		if len(se.expectedTokens) > 0 {
 			// Skip to the most likely next valid token

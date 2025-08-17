@@ -36,7 +36,7 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("Parse error at %s: %s", e.Position.String(), e.Message)
 }
 
-// NewParser creates a ne// parseInfixExpression parses infix expressions with extended operator support
+// NewParser creates a new parser instance
 func (p *Parser) parseInfixExpression(left Expression) Expression {
 	switch p.current.Type {
 	// Arithmetic operators
@@ -122,6 +122,11 @@ func (p *Parser) peekTokenIs(tokenType lexer.TokenType) bool {
 
 // expectPeek advances if the peek token matches the expected type
 func (p *Parser) expectPeek(tokenType lexer.TokenType) bool {
+	// Skip trivia on the peek side to allow newlines/whitespace/comments between tokens
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+
 	if p.peekTokenIs(tokenType) {
 		p.nextToken()
 		return true
@@ -140,6 +145,22 @@ func (p *Parser) expectPeek(tokenType lexer.TokenType) bool {
 		}
 	}
 
+	return false
+}
+
+// expectPeekNoRecover advances if the peek token matches, without invoking recovery
+func (p *Parser) expectPeekNoRecover(tokenType lexer.TokenType) bool {
+	// Skip trivia on the peek side
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+
+	if p.peekTokenIs(tokenType) {
+		p.nextToken()
+		return true
+	}
+	// Record error but do not attempt recovery here
+	p.peekError(tokenType)
 	return false
 }
 
@@ -182,6 +203,29 @@ func (p *Parser) addErrorWithSuggestion(pos Position, message, context string, s
 	}
 	p.errors = append(p.errors, parseErr)
 	p.suggestions = append(p.suggestions, suggestions...)
+}
+
+// addErrorSilent adds an error without invoking the suggestion engine
+func (p *Parser) addErrorSilent(pos Position, message, context string) {
+	pos.File = p.filename
+	parseErr := &ParseError{
+		Position: pos,
+		Message:  message,
+		Context:  context,
+	}
+	p.errors = append(p.errors, parseErr)
+}
+
+// expectPeekRaw advances if the peek matches; does not record errors or suggestions
+func (p *Parser) expectPeekRaw(tokenType lexer.TokenType) bool {
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if p.peekTokenIs(tokenType) {
+		p.nextToken()
+		return true
+	}
+	return false
 }
 
 // recoverFromError attempts intelligent error recovery
@@ -230,6 +274,53 @@ func (p *Parser) skipTo(tokenTypes ...lexer.TokenType) {
 	}
 }
 
+// skipToBefore advances tokens until the next token (peek) matches one of the given types,
+// leaving current at the token right before the target so outer loops that call nextToken()
+// will land exactly on the target.
+func (p *Parser) skipToBefore(tokenTypes ...lexer.TokenType) {
+	for !p.currentTokenIs(lexer.TokenEOF) {
+		// If the next token is one of the targets, stop here
+		for _, tokenType := range tokenTypes {
+			if p.peekTokenIs(tokenType) {
+				return
+			}
+		}
+		p.nextToken()
+	}
+}
+
+// skipLine advances the parser to the beginning of the next line
+// by consuming tokens until a NEWLINE (inclusive) or EOF is reached.
+func (p *Parser) skipLine() {
+	for !p.currentTokenIs(lexer.TokenEOF) {
+		if p.currentTokenIs(lexer.TokenNewline) {
+			// Move to the first token on the next line
+			p.nextToken()
+			return
+		}
+		p.nextToken()
+	}
+}
+
+// skipToNextTopLevelDecl advances to the next top-level declaration keyword
+// (func/let/var/const/macro/struct/enum) that appears at the start of a line.
+func (p *Parser) skipToNextTopLevelDecl() {
+	for !p.currentTokenIs(lexer.TokenEOF) {
+		if p.current.Type == lexer.TokenFunc || p.current.Type == lexer.TokenLet || p.current.Type == lexer.TokenVar ||
+			p.current.Type == lexer.TokenConst || p.current.Type == lexer.TokenMacro || p.current.Type == lexer.TokenStruct ||
+			p.current.Type == lexer.TokenEnum {
+			return
+		}
+		// If the next token is a declaration starter, stop before it
+		if p.peekTokenIs(lexer.TokenFunc) || p.peekTokenIs(lexer.TokenLet) || p.peekTokenIs(lexer.TokenVar) ||
+			p.peekTokenIs(lexer.TokenConst) || p.peekTokenIs(lexer.TokenMacro) || p.peekTokenIs(lexer.TokenStruct) ||
+			p.peekTokenIs(lexer.TokenEnum) || p.peekTokenIs(lexer.TokenEOF) {
+			return
+		}
+		p.nextToken()
+	}
+}
+
 // ====== Grammar Rules ======
 
 // parseProgram parses the entire program
@@ -239,7 +330,7 @@ func (p *Parser) parseProgram() *Program {
 
 	for !p.currentTokenIs(lexer.TokenEOF) {
 		// Skip whitespace and comments
-		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) {
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) || p.currentTokenIs(lexer.TokenNewline) {
 			p.nextToken()
 			continue
 		}
@@ -247,8 +338,25 @@ func (p *Parser) parseProgram() *Program {
 		// Parse declaration
 		if decl := p.parseDeclaration(); decl != nil {
 			declarations = append(declarations, decl)
+			// After a successful declaration, we're at the closing token of the decl
+			// Advance once to move past it and continue
+			p.nextToken()
+		} else {
+			// Resynchronize to the next statement/declaration start
+			// Consume until a sensible synchronization point: semicolon, newline, or EOF
+			for !p.currentTokenIs(lexer.TokenEOF) && !p.currentTokenIs(lexer.TokenNewline) && !p.currentTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+			}
+			// If we stopped at a semicolon, advance past it to allow same-line continuation
+			if p.currentTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+			}
+			// Skip any trivia (newlines/whitespace/comments)
+			for p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) {
+				p.nextToken()
+			}
+			continue
 		}
-		p.nextToken()
 	}
 
 	endPos := TokenToPosition(p.current)
@@ -279,25 +387,92 @@ func (p *Parser) parseDeclaration() Declaration {
 	var decl Declaration
 	switch p.current.Type {
 	case lexer.TokenFunc:
-		decl = p.parseFunctionDeclaration()
-	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
-		decl = p.parseVariableDeclaration()
-	case lexer.TokenMacro:
-		decl = p.parseMacroDeclaration()
-	default:
-		// Try to parse as expression statement
-		stmt := p.parseExpressionStatement()
-		if stmt != nil {
-			// Modifiers are not allowed for expression statements
-			if isPublic || isAsync {
-				p.addError(TokenToPosition(p.current), "modifiers not allowed for expression statements", "declaration modifiers")
-			}
-			return stmt
+		fn := p.parseFunctionDeclaration()
+		if fn == nil {
+			// Let parseProgram handle synchronization to avoid double skipping
+			p.addError(TokenToPosition(p.current), "failed to parse function declaration", "declaration parsing")
+			// Resync to next top-level decl start
+			p.skipToNextTopLevelDecl()
+			return nil
 		}
+		decl = fn
+	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
+		vd := p.parseVariableDeclaration()
+		if vd == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse variable declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		decl = vd
+	case lexer.TokenMacro:
+		md := p.parseMacroDeclaration()
+		if md == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse macro declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		decl = md
+	case lexer.TokenImport:
+		id := p.parseImportDeclaration()
+		if id == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse import declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		id.IsPublic = isPublic
+		decl = id
+	case lexer.TokenExport:
+		ed := p.parseExportDeclaration()
+		if ed == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse export declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		decl = ed
+	case lexer.TokenStruct:
+		sd := p.parseStructDeclaration()
+		if sd == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse struct declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		sd.IsPublic = isPublic
+		decl = sd
+	case lexer.TokenEnum:
+		ed := p.parseEnumDeclaration()
+		if ed == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse enum declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		ed.IsPublic = isPublic
+		decl = ed
+	case lexer.TokenTrait:
+		td := p.parseTraitDeclaration()
+		if td == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse trait declaration", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		td.IsPublic = isPublic
+		decl = td
+	case lexer.TokenImpl:
+		ib := p.parseImplBlock()
+		if ib == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse impl block", "declaration parsing")
+			p.skipToNextTopLevelDecl()
+			return nil
+		}
+		decl = ib
+	default:
+		// Allow top-level expression statements via Pratt parser
+		if exprStmt := p.parseExpressionStatement(); exprStmt != nil {
+			return exprStmt
+		}
+		// If expression parsing failed, record an error and let parseProgram resynchronize
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("unexpected token %s in declaration", p.current.Type.String()),
 			"declaration parsing")
-		p.skipTo(lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst, lexer.TokenMacro, lexer.TokenStruct, lexer.TokenEnum, lexer.TokenEOF)
 		return nil
 	}
 
@@ -327,41 +502,471 @@ func (p *Parser) parseDeclaration() Declaration {
 		if isAsync {
 			p.addError(TokenToPosition(p.current), "async modifier is not valid for macro declarations", "declaration modifiers")
 		}
+	case *ImportDeclaration:
+		d.IsPublic = isPublic
+	case *ExportDeclaration:
+		// visibility inherent to export list
+	case *StructDeclaration:
+		d.IsPublic = isPublic
+	case *EnumDeclaration:
+		d.IsPublic = isPublic
+	case *TraitDeclaration:
+		d.IsPublic = isPublic
+	case *ImplBlock:
+		// no modifiers applicable
 	}
 	return decl
-} // parseFunctionDeclaration parses a function declaration
+}
+
+// parseImportDeclaration: import path [as alias] ;? (semicolon optional)
+func (p *Parser) parseImportDeclaration() *ImportDeclaration {
+	start := TokenToPosition(p.current)
+	// Parse path segments: ident { :: ident }
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	path := []*Identifier{NewIdentifier(TokenToSpan(p.current), p.current.Literal)}
+	for p.peekTokenIs(lexer.TokenDoubleColon) {
+		p.nextToken() // consume ::
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			return nil
+		}
+		path = append(path, NewIdentifier(TokenToSpan(p.current), p.current.Literal))
+	}
+	// Optional alias: as ident
+	var alias *Identifier
+	if p.peekTokenIs(lexer.TokenAs) {
+		p.nextToken() // move to 'as'
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			return nil
+		}
+		alias = NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	}
+	// Optional semicolon
+	if p.peekTokenIs(lexer.TokenSemicolon) {
+		p.nextToken()
+	}
+	end := TokenToPosition(p.current)
+	return &ImportDeclaration{Span: SpanBetween(start, end), Path: path, Alias: alias}
+}
+
+// parseExportDeclaration: export { id[, id]* } ;?  (for now only list form)
+func (p *Parser) parseExportDeclaration() *ExportDeclaration {
+	start := TokenToPosition(p.current)
+	// Support two forms later: export <item>; and export { a, b }
+	if !p.expectPeek(lexer.TokenLBrace) {
+		// For MVP, allow single identifier: export foo;
+		if p.peekTokenIs(lexer.TokenIdentifier) {
+			p.nextToken()
+			name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+			// Optional alias via 'as' (not in EBNF list form, but keep for future)
+			var alias *Identifier
+			if p.peekTokenIs(lexer.TokenAs) {
+				p.nextToken()
+				if !p.expectPeek(lexer.TokenIdentifier) {
+					return nil
+				}
+				alias = NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+			}
+			if p.peekTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+			}
+			end := TokenToPosition(p.current)
+			return &ExportDeclaration{Span: SpanBetween(start, end), Items: []*ExportItem{{Span: name.Span, Name: name, Alias: alias}}}
+		}
+		p.addError(TokenToPosition(p.peek), "expected '{' or identifier after export", "export parsing")
+		return nil
+	}
+	// parse list
+	items := make([]*ExportItem, 0)
+	for {
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			return nil
+		}
+		name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		items = append(items, &ExportItem{Span: name.Span, Name: name})
+		// trailing comma or closing brace
+		if p.peekTokenIs(lexer.TokenComma) {
+			p.nextToken()
+			continue
+		}
+		if p.peekTokenIs(lexer.TokenRBrace) {
+			p.nextToken()
+			break
+		}
+		// tolerate newlines
+		if p.peekTokenIs(lexer.TokenNewline) {
+			p.nextToken()
+			continue
+		}
+		// otherwise error
+		p.addError(TokenToPosition(p.peek), "expected ',' or '}' in export list", "export parsing")
+		return nil
+	}
+	if p.peekTokenIs(lexer.TokenSemicolon) {
+		p.nextToken()
+	}
+	end := TokenToPosition(p.current)
+	return &ExportDeclaration{Span: SpanBetween(start, end), Items: items}
+}
+
+// parseStructDeclaration: struct Name { fields }
+func (p *Parser) parseStructDeclaration() *StructDeclaration {
+	start := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	// Optional body or ';' forward decl; MVP: require body
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+	fields := make([]*StructField, 0)
+	// Parse zero or more field declarations until '}'
+	for {
+		p.nextToken()
+		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+			break
+		}
+		// Skip trivia
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
+			continue
+		}
+		// Optional 'pub'
+		isPub := false
+		if p.currentTokenIs(lexer.TokenPub) {
+			isPub = true
+			p.nextToken()
+		}
+		if !p.currentTokenIs(lexer.TokenIdentifier) {
+			p.addError(TokenToPosition(p.current), "expected field name", "struct field parsing")
+			// try skip to next comma or '}'
+			for !p.currentTokenIs(lexer.TokenComma) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
+				p.nextToken()
+			}
+			if p.currentTokenIs(lexer.TokenComma) {
+				continue
+			}
+			if p.currentTokenIs(lexer.TokenRBrace) {
+				break
+			}
+			continue
+		}
+		fname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		if !p.expectPeek(lexer.TokenColon) {
+			return nil
+		}
+		p.nextToken()
+		ftype := p.parseType()
+		field := &StructField{Span: SpanBetween(fname.Span.Start, ftype.GetSpan().End), Name: fname, Type: ftype, IsPublic: isPub}
+		fields = append(fields, field)
+		// Expect comma or '}'
+		if p.peekTokenIs(lexer.TokenComma) {
+			p.nextToken()
+			continue
+		}
+		if p.peekTokenIs(lexer.TokenRBrace) {
+			p.nextToken()
+			break
+		}
+		// tolerate newline
+		if p.peekTokenIs(lexer.TokenNewline) {
+			p.nextToken()
+			continue
+		}
+	}
+	end := TokenToPosition(p.current)
+	return &StructDeclaration{Span: SpanBetween(start, end), Name: name, Fields: fields}
+}
+
+// parseEnumDeclaration: enum Name { Variants }
+func (p *Parser) parseEnumDeclaration() *EnumDeclaration {
+	start := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+	variants := make([]*EnumVariant, 0)
+	for {
+		p.nextToken()
+		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+			break
+		}
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
+			continue
+		}
+		if !p.currentTokenIs(lexer.TokenIdentifier) {
+			p.addError(TokenToPosition(p.current), "expected variant name", "enum variant parsing")
+			// attempt to sync
+			for !p.currentTokenIs(lexer.TokenComma) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
+				p.nextToken()
+			}
+			if p.currentTokenIs(lexer.TokenComma) {
+				continue
+			}
+			if p.currentTokenIs(lexer.TokenRBrace) {
+				break
+			}
+			continue
+		}
+		vname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		variant := &EnumVariant{Span: vname.Span, Name: vname}
+		// Optional data: (types) or { fields }
+		if p.peekTokenIs(lexer.TokenLParen) {
+			// tuple-like
+			p.nextToken() // '('
+			fields := make([]*StructField, 0)
+			// parse type list
+			for {
+				p.nextToken()
+				t := p.parseType()
+				fields = append(fields, &StructField{Span: t.GetSpan(), Name: nil, Type: t})
+				if p.peekTokenIs(lexer.TokenComma) {
+					p.nextToken()
+					continue
+				}
+				if p.peekTokenIs(lexer.TokenRParen) {
+					p.nextToken()
+					break
+				}
+			}
+			variant.Fields = fields
+		} else if p.peekTokenIs(lexer.TokenLBrace) {
+			// struct-like
+			p.nextToken()
+			sfields := make([]*StructField, 0)
+			for {
+				p.nextToken()
+				if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+					break
+				}
+				if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
+					continue
+				}
+				isPub := false
+				if p.currentTokenIs(lexer.TokenPub) {
+					isPub = true
+					p.nextToken()
+				}
+				if !p.currentTokenIs(lexer.TokenIdentifier) {
+					p.addError(TokenToPosition(p.current), "expected field name", "enum variant struct fields")
+					break
+				}
+				fn := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+				if !p.expectPeek(lexer.TokenColon) {
+					return nil
+				}
+				p.nextToken()
+				ft := p.parseType()
+				sfields = append(sfields, &StructField{Span: SpanBetween(fn.Span.Start, ft.GetSpan().End), Name: fn, Type: ft, IsPublic: isPub})
+				if p.peekTokenIs(lexer.TokenComma) {
+					p.nextToken()
+					continue
+				}
+				if p.peekTokenIs(lexer.TokenRBrace) {
+					p.nextToken()
+					break
+				}
+			}
+			variant.Fields = sfields
+		}
+		variants = append(variants, variant)
+		// trailing comma or '}'
+		if p.peekTokenIs(lexer.TokenComma) {
+			p.nextToken()
+			continue
+		}
+		if p.peekTokenIs(lexer.TokenRBrace) {
+			p.nextToken()
+			break
+		}
+	}
+	end := TokenToPosition(p.current)
+	return &EnumDeclaration{Span: SpanBetween(start, end), Name: name, Variants: variants}
+}
+
+// parseTraitDeclaration: trait Name { method signatures }
+func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
+	start := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+	methods := make([]*TraitMethod, 0)
+	for {
+		p.nextToken()
+		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+			break
+		}
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
+			continue
+		}
+		// method signature: func name(params) [-> type] ;
+		if !p.currentTokenIs(lexer.TokenFunc) {
+			p.addError(TokenToPosition(p.current), "expected 'func' in trait body", "trait parsing")
+			// sync to next possible item
+			for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
+				p.nextToken()
+			}
+			continue
+		}
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			return nil
+		}
+		mname := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		if !p.expectPeek(lexer.TokenLParen) {
+			return nil
+		}
+		params := p.parseParameterList()
+		if !p.expectPeek(lexer.TokenRParen) {
+			return nil
+		}
+		// Optional return type
+		var ret Type
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if p.peekTokenIs(lexer.TokenArrow) {
+			p.nextToken()
+			p.nextToken()
+			ret = p.parseType()
+		}
+		// optional semicolon
+		if p.peekTokenIs(lexer.TokenSemicolon) {
+			p.nextToken()
+		}
+		methods = append(methods, &TraitMethod{Span: mname.Span, Name: mname, Parameters: params, ReturnType: ret})
+	}
+	end := TokenToPosition(p.current)
+	return &TraitDeclaration{Span: SpanBetween(start, end), Name: name, Methods: methods}
+}
+
+// parseImplBlock: impl [Trait for] Type { func ... }
+func (p *Parser) parseImplBlock() *ImplBlock {
+	start := TokenToPosition(p.current)
+	// Two forms: impl Type { ... }  |  impl Trait for Type { ... }
+	// Peek to decide if a trait path appears before 'for'
+	// Move to next token to start type/trait
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	// Parse a simple path or type name as first part
+	firstType := &BasicType{Span: TokenToSpan(p.current), Name: p.current.Literal}
+	var trait Type
+	var forType Type
+	if p.peekTokenIs(lexer.TokenFor) {
+		// trait for type form
+		trait = firstType
+		p.nextToken() // move to 'for'
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			return nil
+		}
+		forType = &BasicType{Span: TokenToSpan(p.current), Name: p.current.Literal}
+	} else {
+		// inherent impl
+		forType = firstType
+	}
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+	items := make([]*FunctionDeclaration, 0)
+	for {
+		p.nextToken()
+		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+			break
+		}
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
+			continue
+		}
+		// Expect function declarations only for MVP
+		if p.currentTokenIs(lexer.TokenFunc) || (p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "fn") {
+			fn := p.parseFunctionDeclaration()
+			if fn != nil {
+				items = append(items, fn)
+			}
+		} else {
+			// skip unknown item until next '}' or 'func'
+			p.addError(TokenToPosition(p.current), "unexpected item in impl block", "impl parsing")
+			for !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenFunc) && !p.currentTokenIs(lexer.TokenEOF) {
+				p.nextToken()
+			}
+			if p.currentTokenIs(lexer.TokenFunc) {
+				fn := p.parseFunctionDeclaration()
+				if fn != nil {
+					items = append(items, fn)
+				}
+			}
+		}
+	}
+	end := TokenToPosition(p.current)
+	return &ImplBlock{Span: SpanBetween(start, end), Trait: trait, ForType: forType, Items: items}
+}
+
 func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 	startPos := TokenToPosition(p.current)
 
-	if !p.currentTokenIs(lexer.TokenFunc) {
+	// Accept both 'func' keyword and 'fn' identifier as an alias for function declarations
+	isFuncKw := p.currentTokenIs(lexer.TokenFunc) || (p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "fn")
+	if !isFuncKw {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.TokenIdentifier) {
+	if !p.expectPeekRaw(lexer.TokenIdentifier) {
+		p.addErrorSilent(TokenToPosition(p.peek), "expected identifier after 'func'", "function declaration")
+		// consume rest of line to avoid getting stuck at random identifiers
+		for !p.currentTokenIs(lexer.TokenEOF) && !p.currentTokenIs(lexer.TokenNewline) {
+			p.nextToken()
+		}
 		return nil
 	}
 
 	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
 
-	if !p.expectPeek(lexer.TokenLParen) {
+	if !p.expectPeekRaw(lexer.TokenLParen) {
+		p.addErrorSilent(TokenToPosition(p.peek), "expected '(' after function name", "function declaration")
+		for !p.currentTokenIs(lexer.TokenEOF) && !p.currentTokenIs(lexer.TokenNewline) {
+			p.nextToken()
+		}
 		return nil
 	}
 
 	parameters := p.parseParameterList()
 
-	if !p.expectPeek(lexer.TokenRParen) {
+	if !p.expectPeekRaw(lexer.TokenRParen) {
+		p.addErrorSilent(TokenToPosition(p.peek), "expected ')' after parameter list", "function declaration")
+		for !p.currentTokenIs(lexer.TokenEOF) && !p.currentTokenIs(lexer.TokenNewline) {
+			p.nextToken()
+		}
 		return nil
 	}
 
 	// Optional return type
 	var returnType Type
+	// Allow trivia (including newlines) between ')' and '->'
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
 	if p.peekTokenIs(lexer.TokenArrow) {
 		p.nextToken() // consume arrow
 		p.nextToken() // move to type
 		returnType = p.parseType()
 	}
 
-	if !p.expectPeek(lexer.TokenLBrace) {
+	// Allow trivia before function body '{'
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if !p.expectPeekRaw(lexer.TokenLBrace) {
+		p.addErrorSilent(TokenToPosition(p.peek), "expected '{' to start function body", "function declaration")
+		for !p.currentTokenIs(lexer.TokenEOF) && !p.currentTokenIs(lexer.TokenNewline) {
+			p.nextToken()
+		}
 		return nil
 	}
 
@@ -384,10 +989,15 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 func (p *Parser) parseParameterList() []*Parameter {
 	parameters := make([]*Parameter, 0)
 
+	// Allow empty parameter list with intervening trivia
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
 	if p.peekTokenIs(lexer.TokenRParen) {
 		return parameters
 	}
 
+	// Move to first parameter token (skipping trivia already handled above)
 	p.nextToken()
 
 	// Parse first parameter
@@ -397,8 +1007,19 @@ func (p *Parser) parseParameterList() []*Parameter {
 	}
 
 	// Parse remaining parameters
-	for p.peekTokenIs(lexer.TokenComma) {
+	for {
+		// Skip trivia before checking for comma or closing paren
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenComma) {
+			break
+		}
 		p.nextToken() // consume comma
+		// Skip trivia before next parameter
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
 		p.nextToken() // move to next parameter
 		param := p.parseParameter()
 		if param != nil {
@@ -478,9 +1099,25 @@ func (p *Parser) parseVariableDeclaration() *VariableDeclaration {
 		initializer = p.parseExpression(LOWEST)
 	}
 
-	// Expect semicolon
-	if p.peekTokenIs(lexer.TokenSemicolon) {
+	// Expect semicolon (or allow newline with suggestion). Handle cases where semicolon is current.
+	if p.currentTokenIs(lexer.TokenSemicolon) {
+		// already at semicolon (e.g., after recovering), keep as is
+	} else if p.peekTokenIs(lexer.TokenSemicolon) {
 		p.nextToken()
+	} else if p.peekTokenIs(lexer.TokenNewline) {
+		// Provide suggestion to insert semicolon before newline
+		if p.suggestionEngine != nil {
+			pos := TokenToPosition(p.current)
+			pos.File = p.filename
+			p.suggestions = append(p.suggestions, Suggestion{
+				Type:        ErrorFix,
+				Message:     "Insert semicolon before newline",
+				Position:    pos,
+				Replacement: ";",
+				Confidence:  0.8,
+				Category:    SyntaxError,
+			})
+		}
 	}
 
 	endPos := TokenToPosition(p.current)
@@ -499,12 +1136,230 @@ func (p *Parser) parseVariableDeclaration() *VariableDeclaration {
 
 // parseType parses a type specification
 func (p *Parser) parseType() Type {
+	// Skip trivia at type start if present
+	for p.current.Type == lexer.TokenWhitespace || p.current.Type == lexer.TokenComment || p.current.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+
+	// Helper to optionally parse generic arguments after a base type
+	parseGenericSuffix := func(base Type) Type {
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenLt) {
+			return base
+		}
+		// consume '<'
+		p.nextToken()
+		// move to first type or '>'
+		p.nextToken()
+		typeParams := make([]Type, 0)
+		// Allow empty generic arg list is invalid; enforce at least one type
+		if !p.currentTokenIs(lexer.TokenGt) {
+			// parse first type
+			tp := p.parseType()
+			if tp != nil {
+				typeParams = append(typeParams, tp)
+			}
+			// parse remaining , type
+			for {
+				// Skip trivia before checking comma or '>'
+				for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+					p.nextToken()
+				}
+				if !p.peekTokenIs(lexer.TokenComma) {
+					break
+				}
+				p.nextToken() // consume comma
+				// Skip trivia then move to next type
+				for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+					p.nextToken()
+				}
+				p.nextToken()
+				tp = p.parseType()
+				if tp != nil {
+					typeParams = append(typeParams, tp)
+				}
+			}
+			// Expect '>'
+			if !p.expectPeekRaw(lexer.TokenGt) {
+				p.addError(TokenToPosition(p.peek), "expected '>' to close generic arguments", "type parsing")
+				return base
+			}
+		}
+		// current is '>' or the last token of last type; ensure current is '>'
+		if !p.currentTokenIs(lexer.TokenGt) {
+			// We consumed via expectPeekRaw above
+		}
+		span := SpanBetween(base.(TypeSafeNode).GetSpan().Start, TokenToSpan(p.current).End)
+		return &GenericType{Span: span, BaseType: base, TypeParameters: typeParams}
+	}
+
 	switch p.current.Type {
+	case lexer.TokenBitAnd:
+		// reference type: &T, &mut T, &'a T, &'a mut T
+		start := TokenToPosition(p.current)
+		// optional whitespace/comments/newlines after '&'
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		// consume next token (potentially 'mut' or start of type)
+		p.nextToken()
+		// optional lifetime token
+		lifetime := ""
+		if p.current.Type == lexer.TokenLifetime {
+			lifetime = p.current.Literal
+			// skip trivia after lifetime
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+		isMut := false
+		if p.current.Type == lexer.TokenMut {
+			isMut = true
+			// move to the inner type start
+			p.nextToken()
+		}
+		inner := p.parseType()
+		end := TokenToPosition(p.current)
+		return &ReferenceType{Span: SpanBetween(start, end), Inner: inner, IsMutable: isMut, Lifetime: lifetime}
+	case lexer.TokenMul:
+		// pointer type: *T or *mut T
+		start := TokenToPosition(p.current)
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		p.nextToken()
+		isMut := false
+		if p.current.Type == lexer.TokenMut {
+			isMut = true
+			p.nextToken()
+		}
+		inner := p.parseType()
+		end := TokenToPosition(p.current)
+		return &PointerType{Span: SpanBetween(start, end), Inner: inner, IsMutable: isMut}
 	case lexer.TokenIdentifier:
-		return &BasicType{
+		base := &BasicType{
 			Span: TokenToSpan(p.current),
 			Name: p.current.Literal,
 		}
+		return parseGenericSuffix(base)
+	case lexer.TokenLBracket:
+		// Array or slice type: [T] (slice) or [T; N] (array)
+		start := TokenToPosition(p.current)
+		p.nextToken() // move to element type
+		elem := p.parseType()
+		// After element type, allow trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if p.peekTokenIs(lexer.TokenSemicolon) {
+			// static array with size expression
+			p.nextToken() // consume ';'
+			p.nextToken() // move to size expression
+			sizeExpr := p.parseExpression(LOWEST)
+			if !p.expectPeekRaw(lexer.TokenRBracket) {
+				p.addError(TokenToPosition(p.peek), "expected ']' to close array type", "type parsing")
+			}
+			end := TokenToPosition(p.current)
+			return &ArrayType{Span: SpanBetween(start, end), ElementType: elem, Size: sizeExpr, IsDynamic: false}
+		}
+		// Expect ']' for slice type
+		if !p.expectPeekRaw(lexer.TokenRBracket) {
+			p.addError(TokenToPosition(p.peek), "expected ']' to close slice type", "type parsing")
+		}
+		end := TokenToPosition(p.current)
+		return &ArrayType{Span: SpanBetween(start, end), ElementType: elem, Size: nil, IsDynamic: true}
+	case lexer.TokenAsync, lexer.TokenFunc:
+		// function type: [async] func(paramList) [-> type]
+		start := TokenToPosition(p.current)
+		isAsync := false
+		if p.current.Type == lexer.TokenAsync {
+			isAsync = true
+			// ensure 'func' follows
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			if !p.peekTokenIs(lexer.TokenFunc) {
+				p.addError(TokenToPosition(p.current), "expected 'func' after 'async' in type", "type parsing")
+				return nil
+			}
+			p.nextToken() // move to TokenFunc
+		}
+		if !p.expectPeekRaw(lexer.TokenLParen) {
+			p.addError(TokenToPosition(p.peek), "expected '(' after 'func' in type", "type parsing")
+			return nil
+		}
+		params := make([]*FunctionTypeParameter, 0)
+		// Allow empty parameter list
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenRParen) {
+			// Move to first token within params
+			p.nextToken()
+			// parse first param
+			name := ""
+			var pt Type
+			if p.current.Type == lexer.TokenIdentifier && p.peekTokenIs(lexer.TokenColon) {
+				name = p.current.Literal
+				p.nextToken() // consume ':'
+				p.nextToken() // move to type
+				pt = p.parseType()
+			} else {
+				pt = p.parseType()
+			}
+			params = append(params, &FunctionTypeParameter{Span: TokenToSpan(p.current), Name: name, Type: pt})
+			// remaining params
+			for {
+				// Skip trivia before comma or ')'
+				for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+					p.nextToken()
+				}
+				if !p.peekTokenIs(lexer.TokenComma) {
+					break
+				}
+				p.nextToken() // consume ','
+				// Skip trivia then move to next param start
+				for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+					p.nextToken()
+				}
+				p.nextToken()
+				name = ""
+				if p.current.Type == lexer.TokenIdentifier && p.peekTokenIs(lexer.TokenColon) {
+					name = p.current.Literal
+					p.nextToken() // consume ':'
+					p.nextToken() // move to type
+					pt = p.parseType()
+				} else {
+					pt = p.parseType()
+				}
+				params = append(params, &FunctionTypeParameter{Span: TokenToSpan(p.current), Name: name, Type: pt})
+			}
+		}
+		if !p.expectPeekRaw(lexer.TokenRParen) {
+			p.addError(TokenToPosition(p.peek), "expected ')' after function type parameters", "type parsing")
+			return nil
+		}
+		// Optional return type: allow trivia then '->'
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		var ret Type
+		if p.peekTokenIs(lexer.TokenArrow) {
+			p.nextToken() // consume '->'
+			p.nextToken() // move to type
+			ret = p.parseType()
+		} else {
+			// If unspecified, leave nil (interpreted as unit later)
+			ret = nil
+		}
+		end := TokenToPosition(p.current)
+		return &FunctionType{Span: SpanBetween(start, end), Parameters: params, ReturnType: ret, IsAsync: isAsync}
 	default:
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("unexpected token %s in type", p.current.Type.String()),
@@ -522,7 +1377,7 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 
 	for !p.currentTokenIs(lexer.TokenRBrace) && !p.currentTokenIs(lexer.TokenEOF) {
 		// Skip whitespace and comments
-		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) {
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) || p.currentTokenIs(lexer.TokenNewline) {
 			p.nextToken()
 			continue
 		}
@@ -550,6 +1405,10 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 
 // parseStatement parses a statement
 func (p *Parser) parseStatement() Statement {
+	// Allow nested function declarations (e.g., inside macro bodies)
+	if p.current.Type == lexer.TokenFunc || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "fn") {
+		return p.parseFunctionDeclaration()
+	}
 	switch p.current.Type {
 	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
 		return p.parseVariableDeclaration()
@@ -559,6 +1418,18 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseIfStatement()
 	case lexer.TokenWhile:
 		return p.parseWhileStatement()
+	case lexer.TokenLoop:
+		return p.parseLoopStatement()
+	case lexer.TokenMatch:
+		return p.parseMatchStatement()
+	case lexer.TokenFor:
+		return p.parseForStatement()
+	case lexer.TokenBreak:
+		return p.parseBreakStatement()
+	case lexer.TokenContinue:
+		return p.parseContinueStatement()
+	case lexer.TokenDefer:
+		return p.parseDeferStatement()
 	case lexer.TokenLBrace:
 		return p.parseBlockStatement()
 	default:
@@ -573,6 +1444,265 @@ func (p *Parser) parseStatement() Statement {
 			}
 		}
 		return stmt
+	}
+}
+
+// parseMatchStatement parses a match statement of the form:
+// match (expr) { pattern [if guard] => body, ... }
+func (p *Parser) parseMatchStatement() *MatchStatement {
+	startPos := TokenToPosition(p.current)
+
+	// Expect '(' then condition expression then ')'
+	if !p.expectPeek(lexer.TokenLParen) {
+		return nil
+	}
+	p.nextToken()
+	scrutinee := p.parseExpression(LOWEST)
+	if !p.expectPeek(lexer.TokenRParen) {
+		return nil
+	}
+
+	// Expect '{'
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+
+	arms := make([]*MatchArm, 0)
+	// Parse arms until '}'
+	for {
+		// Advance to first token of arm or '}'
+		p.nextToken()
+		if p.currentTokenIs(lexer.TokenRBrace) || p.currentTokenIs(lexer.TokenEOF) {
+			break
+		}
+		// Skip trivia
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenNewline) || p.currentTokenIs(lexer.TokenComment) {
+			continue
+		}
+
+		// Parse pattern as an expression (simple for now)
+		pattern := p.parseExpression(LOWEST)
+
+		// Optional guard: 'if' expr
+		var guard Expression
+		if p.peekTokenIs(lexer.TokenIf) {
+			p.nextToken() // move to 'if'
+			p.nextToken() // move to start of guard expr
+			guard = p.parseExpression(LOWEST)
+		}
+
+		// Expect '=>'
+		if !p.expectPeek(lexer.TokenFatArrow) {
+			// Try to recover to next arrow or end of arm
+			for !p.peekTokenIs(lexer.TokenFatArrow) && !p.peekTokenIs(lexer.TokenComma) && !p.peekTokenIs(lexer.TokenRBrace) && !p.peekTokenIs(lexer.TokenEOF) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(lexer.TokenFatArrow) {
+				p.nextToken()
+			} else {
+				// give up this arm
+				continue
+			}
+		}
+
+		// Body: block statement or single statement/expression
+		var body Statement
+		if p.peekTokenIs(lexer.TokenLBrace) {
+			p.nextToken()
+			body = p.parseBlockStatement()
+		} else {
+			// Parse a single statement as arm body; allow expression statements
+			p.nextToken()
+			body = p.parseStatement()
+			if body == nil && p.current.Type != lexer.TokenRBrace {
+				// Fallback to expression statement
+				expr := p.parseExpression(LOWEST)
+				if expr != nil {
+					body = &ExpressionStatement{Span: TokenToSpan(p.current), Expression: expr}
+				}
+			}
+			// Optional trailing comma or semicolon; do not require
+			if p.peekTokenIs(lexer.TokenSemicolon) || p.peekTokenIs(lexer.TokenComma) {
+				p.nextToken()
+			}
+		}
+
+		arms = append(arms, &MatchArm{Span: TokenToSpan(p.current), Pattern: pattern, Guard: guard, Body: body})
+
+		// If next is '}', end; if comma, continue to next arm
+		if p.peekTokenIs(lexer.TokenRBrace) {
+			p.nextToken()
+			break
+		}
+		// Consume trailing comma if present and continue
+		if p.peekTokenIs(lexer.TokenComma) {
+			p.nextToken()
+			continue
+		}
+		// Otherwise, loop continues; whitespace/newlines will be skipped at top
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+	return &MatchStatement{Span: span, Expression: scrutinee, Arms: arms}
+}
+
+// parseForStatement parses a C-style for loop: for (init; cond; update) { ... }
+// Each of init/cond/update is optional. The body must be a block.
+func (p *Parser) parseForStatement() *ForStatement {
+	startPos := TokenToPosition(p.current)
+
+	// Expect '('
+	if !p.expectPeek(lexer.TokenLParen) {
+		return nil
+	}
+
+	// Parse optional init statement until ';'
+	var init Statement
+	// Move to the first token of init/semicolon
+	p.nextToken()
+	if !p.currentTokenIs(lexer.TokenSemicolon) {
+		init = p.parseSimpleStatementUntilSemicolon()
+	}
+	// Current should be at semicolon; if not, try to recover
+	if !p.currentTokenIs(lexer.TokenSemicolon) {
+		// attempt to sync by skipping to next ';' or ')'
+		for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRParen) && !p.currentTokenIs(lexer.TokenEOF) {
+			p.nextToken()
+		}
+	}
+
+	// Parse optional condition: advance to next token and read until ';'
+	var cond Expression
+	if p.currentTokenIs(lexer.TokenSemicolon) {
+		// move to condition start or next ';'
+		if !p.expectPeekRaw(lexer.TokenRParen) { // peek may be ')' or condition start
+			p.nextToken()
+			if !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRParen) {
+				cond = p.parseExpression(LOWEST)
+			}
+		}
+	}
+	// Ensure we are at the second semicolon (or ')')
+	if !p.currentTokenIs(lexer.TokenSemicolon) {
+		// Try to find semicolon
+		for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenRParen) && !p.currentTokenIs(lexer.TokenEOF) {
+			p.nextToken()
+		}
+	}
+
+	// Parse optional update statement: after second ';' until ')'
+	var update Statement
+	if p.currentTokenIs(lexer.TokenSemicolon) {
+		// move to update start or ')'
+		if !p.expectPeekRaw(lexer.TokenRParen) { // peek may be ')' or start of update
+			p.nextToken()
+			if !p.currentTokenIs(lexer.TokenRParen) {
+				update = p.parseSimpleStatementUntilRParen()
+			}
+		}
+	}
+
+	// We should be at ')'
+	if !p.currentTokenIs(lexer.TokenRParen) {
+		// try to recover: advance to ')'
+		for !p.currentTokenIs(lexer.TokenRParen) && !p.currentTokenIs(lexer.TokenEOF) {
+			p.nextToken()
+		}
+	}
+
+	// Expect body block
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+	body := p.parseBlockStatement()
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &ForStatement{
+		Span:      span,
+		Init:      init,
+		Condition: cond,
+		Update:    update,
+		Body:      body,
+	}
+}
+
+// parseBreakStatement parses a break statement with optional label
+func (p *Parser) parseBreakStatement() *BreakStatement {
+	startPos := TokenToPosition(p.current)
+	var label *Identifier
+	// Optional identifier label before ';' or '}'
+	if p.peekTokenIs(lexer.TokenIdentifier) {
+		p.nextToken()
+		label = NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	}
+	// Optional semicolon
+	if p.peekTokenIs(lexer.TokenSemicolon) {
+		p.nextToken()
+	}
+	endPos := TokenToPosition(p.current)
+	return &BreakStatement{Span: SpanBetween(startPos, endPos), Label: label}
+}
+
+// parseContinueStatement parses a continue statement with optional label
+func (p *Parser) parseContinueStatement() *ContinueStatement {
+	startPos := TokenToPosition(p.current)
+	var label *Identifier
+	if p.peekTokenIs(lexer.TokenIdentifier) {
+		p.nextToken()
+		label = NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	}
+	if p.peekTokenIs(lexer.TokenSemicolon) {
+		p.nextToken()
+	}
+	endPos := TokenToPosition(p.current)
+	return &ContinueStatement{Span: SpanBetween(startPos, endPos), Label: label}
+}
+
+// parseSimpleStatementUntilSemicolon parses a minimal statement used in for-init until reaching ';'
+func (p *Parser) parseSimpleStatementUntilSemicolon() Statement {
+	// Variable declaration or expression statement
+	switch p.current.Type {
+	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
+		stmt := p.parseVariableDeclaration()
+		// Ensure current is at semicolon if present
+		if !p.currentTokenIs(lexer.TokenSemicolon) && p.peekTokenIs(lexer.TokenSemicolon) {
+			p.nextToken()
+		}
+		return stmt
+	default:
+		expr := p.parseExpression(LOWEST)
+		// consume up to semicolon
+		for !p.currentTokenIs(lexer.TokenSemicolon) && !p.currentTokenIs(lexer.TokenEOF) {
+			if p.peekTokenIs(lexer.TokenSemicolon) {
+				p.nextToken()
+				break
+			}
+			p.nextToken()
+		}
+		return &ExpressionStatement{Span: TokenToSpan(p.current), Expression: expr}
+	}
+}
+
+// parseSimpleStatementUntilRParen parses a minimal statement used in for-update until ')'
+func (p *Parser) parseSimpleStatementUntilRParen() Statement {
+	switch p.current.Type {
+	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
+		stmt := p.parseVariableDeclaration()
+		return stmt
+	default:
+		expr := p.parseExpression(LOWEST)
+		// advance until ')'
+		for !p.currentTokenIs(lexer.TokenRParen) && !p.currentTokenIs(lexer.TokenEOF) {
+			if p.peekTokenIs(lexer.TokenRParen) {
+				p.nextToken()
+				break
+			}
+			p.nextToken()
+		}
+		return &ExpressionStatement{Span: TokenToSpan(p.current), Expression: expr}
 	}
 }
 
@@ -674,26 +1804,71 @@ func (p *Parser) parseWhileStatement() *WhileStatement {
 	}
 }
 
+// parseDeferStatement parses: defer { ... } | defer <statement-or-expr> ;
+func (p *Parser) parseDeferStatement() *DeferStatement {
+	startPos := TokenToPosition(p.current)
+	var body Statement
+	if p.peekTokenIs(lexer.TokenLBrace) {
+		p.nextToken()
+		body = p.parseBlockStatement()
+	} else {
+		// Defer a single statement or expression
+		p.nextToken()
+		body = p.parseStatement()
+		if body == nil {
+			// fallback: treat as expression
+			expr := p.parseExpression(LOWEST)
+			if expr != nil {
+				body = &ExpressionStatement{Span: TokenToSpan(p.current), Expression: expr}
+			}
+		}
+		// Optional semicolon
+		if p.peekTokenIs(lexer.TokenSemicolon) {
+			p.nextToken()
+		}
+	}
+	endPos := TokenToPosition(p.current)
+	return &DeferStatement{Span: SpanBetween(startPos, endPos), Body: body}
+}
+
+// parseLoopStatement parses an infinite loop: loop { ... }
+// Lowered to WhileStatement with condition `true`.
+func (p *Parser) parseLoopStatement() *WhileStatement {
+	startPos := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+	body := p.parseBlockStatement()
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+	// Build a boolean literal 'true'
+	cond := NewLiteral(SpanBetween(startPos, startPos), true, LiteralBool)
+	return &WhileStatement{Span: span, Condition: cond, Body: body}
+}
+
 // parseExpressionStatement parses an expression statement
 func (p *Parser) parseExpressionStatement() *ExpressionStatement {
 	startPos := TokenToPosition(p.current)
 
 	expr := p.parseExpression(LOWEST)
+	if expr == nil {
+		return nil
+	}
 
 	// Enhanced semicolon handling with error recovery (Phase 1.2.4)
 	if p.peekTokenIs(lexer.TokenSemicolon) {
 		p.nextToken()
 	} else if p.peekTokenIs(lexer.TokenNewline) {
-		// Missing semicolon before newline - common error
+		// Treat newline as a valid statement terminator; keep suggestion for optional semicolon style
 		if p.suggestionEngine != nil {
 			pos := TokenToPosition(p.current)
 			pos.File = p.filename
 			suggestion := Suggestion{
 				Type:        ErrorFix,
-				Message:     "Insert semicolon before newline",
+				Message:     "Optional semicolon before newline",
 				Position:    pos,
 				Replacement: ";",
-				Confidence:  0.9,
+				Confidence:  0.4,
 				Category:    SyntaxError,
 			}
 			p.suggestions = append(p.suggestions, suggestion)
@@ -838,7 +2013,7 @@ func (p *Parser) parseExpression(precedence Precedence) Expression {
 	}
 
 	// Parse infix expressions with associativity consideration
-	for !p.peekTokenIs(lexer.TokenSemicolon) && p.shouldContinueParsing(precedence) {
+	for !p.peekTokenIs(lexer.TokenSemicolon) && !p.peekTokenIs(lexer.TokenNewline) && p.shouldContinueParsing(precedence) {
 		p.nextToken()
 		left = p.parseInfixExpression(left)
 		if left == nil {
@@ -1027,6 +2202,10 @@ func (p *Parser) parseCallExpression(function Expression) Expression {
 func (p *Parser) parseCallArguments() []Expression {
 	args := make([]Expression, 0)
 
+	// Skip trivia between '(' and first argument or ')'
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
 	if p.peekTokenIs(lexer.TokenRParen) {
 		p.nextToken()
 		return args
@@ -1035,8 +2214,19 @@ func (p *Parser) parseCallArguments() []Expression {
 	p.nextToken()
 	args = append(args, p.parseExpression(LOWEST))
 
-	for p.peekTokenIs(lexer.TokenComma) {
+	for {
+		// Skip trivia before checking for comma or closing paren
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+		if !p.peekTokenIs(lexer.TokenComma) {
+			break
+		}
 		p.nextToken()
+		// Skip trivia before next argument
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
 		p.nextToken()
 		args = append(args, p.parseExpression(LOWEST))
 	}
@@ -1237,6 +2427,16 @@ func (p *Parser) parseMacroParameters() []*MacroParameter {
 			params = append(params, param)
 		}
 
+		// Detect variadic marker '...'
+		dotCount := 0
+		for p.peek.Type == lexer.TokenDot && dotCount < 3 {
+			p.nextToken()
+			dotCount++
+		}
+		if dotCount == 3 && len(params) > 0 {
+			params[len(params)-1].IsVariadic = true
+		}
+
 		if p.peek.Type != lexer.TokenComma {
 			break
 		}
@@ -1282,6 +2482,17 @@ func (p *Parser) parseMacroBody() *MacroBody {
 	p.nextToken() // consume {
 
 	for p.current.Type != lexer.TokenRBrace && p.current.Type != lexer.TokenEOF {
+		// Skip trivia between templates
+		if p.current.Type == lexer.TokenWhitespace || p.current.Type == lexer.TokenComment || p.current.Type == lexer.TokenNewline || p.current.Type == lexer.TokenSemicolon {
+			p.nextToken()
+			continue
+		}
+
+		// Guard again in case we advanced to closing brace via trivia
+		if p.current.Type == lexer.TokenRBrace || p.current.Type == lexer.TokenEOF {
+			break
+		}
+
 		template := p.parseMacroTemplate()
 		if template != nil {
 			templates = append(templates, template)
@@ -1322,12 +2533,15 @@ func (p *Parser) parseMacroTemplate() *MacroTemplate {
 		guard = p.parseExpression(LOWEST)
 	}
 
-	// Parse arrow
-	if !p.expectPeek(lexer.TokenArrow) {
-		return nil
+	// Ensure current token is the arrow '->'; accept if already at arrow,
+	// otherwise require the next token to be arrow.
+	if p.current.Type != lexer.TokenArrow {
+		if !p.expectPeek(lexer.TokenArrow) {
+			return nil
+		}
 	}
 
-	// Parse template body
+	// Move to the start of the template body (token after '->')
 	p.nextToken()
 	var body []Statement
 
@@ -1363,7 +2577,7 @@ func (p *Parser) parseMacroPattern() *MacroPattern {
 	var elements []*MacroPatternElement
 
 	// For now, implement basic pattern parsing
-	for p.current.Type != lexer.TokenArrow && p.current.Type != lexer.TokenIf && p.current.Type != lexer.TokenEOF {
+	for p.current.Type != lexer.TokenArrow && p.current.Type != lexer.TokenIf && p.current.Type != lexer.TokenRBrace && p.current.Type != lexer.TokenEOF {
 		element := p.parseMacroPatternElement()
 		if element != nil {
 			elements = append(elements, element)
@@ -1384,7 +2598,10 @@ func (p *Parser) parseMacroPattern() *MacroPattern {
 func (p *Parser) parseMacroPatternElement() *MacroPatternElement {
 	switch p.current.Type {
 	case lexer.TokenIdentifier:
-		// Parameter pattern
+		// '_' as wildcard; other identifiers as parameter
+		if p.current.Literal == "_" {
+			return &MacroPatternElement{Span: TokenToSpan(p.current), Kind: MacroPatternWildcard}
+		}
 		return &MacroPatternElement{
 			Span:  TokenToSpan(p.current),
 			Kind:  MacroPatternParameter,
@@ -1441,21 +2658,41 @@ func (p *Parser) parseMacroInvocation() *MacroInvocation {
 func (p *Parser) parseMacroArguments() []*MacroArgument {
 	var args []*MacroArgument
 
+	// Skip trivia between '(' and first argument or ')'
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
 	if p.peek.Type == lexer.TokenRParen {
 		return args
 	}
 
 	p.nextToken()
 	for {
-		arg := p.parseMacroArgument()
-		if arg != nil {
-			args = append(args, arg)
+		if p.current.Type == lexer.TokenLBrace {
+			// block literal as macro argument
+			block := p.parseBlockStatement()
+			if block != nil {
+				args = append(args, &MacroArgument{Span: block.Span, Kind: MacroArgBlock, Value: block})
+			}
+		} else {
+			arg := p.parseMacroArgument()
+			if arg != nil {
+				args = append(args, arg)
+			}
 		}
 
+		// Skip trivia before comma or closing paren
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
 		if p.peek.Type != lexer.TokenComma {
 			break
 		}
 		p.nextToken() // consume comma
+		// Skip trivia before next argument
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
 		p.nextToken() // move to next argument
 	}
 

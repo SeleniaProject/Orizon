@@ -11,6 +11,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ====== AST to HIR Transformer ======
@@ -264,10 +265,132 @@ func (transformer *ASTToHIRTransformer) transformDeclaration(decl Declaration) H
 		return transformer.transformFunctionDeclaration(d)
 	case *VariableDeclaration:
 		return transformer.transformVariableDeclaration(d)
+	case *StructDeclaration:
+		return transformer.transformStructDeclaration(d)
+	case *EnumDeclaration:
+		return transformer.transformEnumDeclaration(d)
+	case *TraitDeclaration:
+		return transformer.transformTraitDeclaration(d)
+	case *ImportDeclaration:
+		// Side-effect: register import in module, no HIRNode returned
+		if transformer.currentModule != nil {
+			if hi := transformer.transformImportDeclaration(d); hi != nil {
+				transformer.currentModule.Imports = append(transformer.currentModule.Imports, hi)
+			}
+		}
+		return nil
+	case *ExportDeclaration:
+		// Side-effect: register each export item in module
+		if transformer.currentModule != nil {
+			exports := transformer.transformExportDeclaration(d)
+			transformer.currentModule.Exports = append(transformer.currentModule.Exports, exports...)
+		}
+		return nil
+	case *ImplBlock:
+		return transformer.transformImplBlock(d)
 	default:
 		transformer.addError(fmt.Errorf("unsupported declaration type: %T", decl))
 		return nil
 	}
+}
+
+// transformStructDeclaration converts AST struct to HIR type definition
+func (transformer *ASTToHIRTransformer) transformStructDeclaration(sd *StructDeclaration) *HIRTypeDefinition {
+	fields := make([]*HIRFieldType, 0, len(sd.Fields))
+	for _, f := range sd.Fields {
+		var ft *HIRType
+		if f.Type != nil {
+			ft = transformer.transformType(f.Type)
+		} else {
+			ft = NewHIRType(f.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+		}
+		name := ""
+		if f.Name != nil {
+			name = f.Name.Value
+		}
+		fields = append(fields, &HIRFieldType{Name: name, Type: ft})
+	}
+	st := &HIRStructType{Name: sd.Name.Value, Fields: fields}
+	return &HIRTypeDefinition{Span: sd.Span, Name: sd.Name.Value, Kind: TypeDefStruct, Data: st}
+}
+
+// transformEnumDeclaration converts AST enum to HIR type definition
+func (transformer *ASTToHIRTransformer) transformEnumDeclaration(ed *EnumDeclaration) *HIRTypeDefinition {
+	variants := make([]*HIRVariantType, 0, len(ed.Variants))
+	for _, v := range ed.Variants {
+		vtypes := make([]*HIRType, 0, len(v.Fields))
+		for _, f := range v.Fields {
+			var ft *HIRType
+			if f.Type != nil {
+				ft = transformer.transformType(f.Type)
+			} else {
+				ft = NewHIRType(f.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"})
+			}
+			vtypes = append(vtypes, ft)
+		}
+		variants = append(variants, &HIRVariantType{Name: v.Name.Value, Fields: vtypes})
+	}
+	et := &HIREnumType{Name: ed.Name.Value, Variants: variants}
+	return &HIRTypeDefinition{Span: ed.Span, Name: ed.Name.Value, Kind: TypeDefEnum, Data: et}
+}
+
+// transformTraitDeclaration converts AST trait to HIR type definition
+func (transformer *ASTToHIRTransformer) transformTraitDeclaration(td *TraitDeclaration) *HIRTypeDefinition {
+	methods := make([]*HIRMethodSignature, 0, len(td.Methods))
+	for _, m := range td.Methods {
+		paramTypes := make([]*HIRType, 0, len(m.Parameters))
+		for _, p := range m.Parameters {
+			if p.TypeSpec != nil {
+				paramTypes = append(paramTypes, transformer.transformType(p.TypeSpec))
+			} else {
+				paramTypes = append(paramTypes, NewHIRType(p.Span, HIRTypeGeneric, &HIRGenericType{Name: "inferred"}))
+			}
+		}
+		var ret *HIRType
+		if m.ReturnType != nil {
+			ret = transformer.transformType(m.ReturnType)
+		}
+		methods = append(methods, &HIRMethodSignature{Name: m.Name.Value, Parameters: paramTypes, ReturnType: ret})
+	}
+	tt := &HIRTraitType{Name: td.Name.Value, Methods: methods}
+	return &HIRTypeDefinition{Span: td.Span, Name: td.Name.Value, Kind: TypeDefTrait, Data: tt}
+}
+
+// transformImportDeclaration converts AST import to HIR import
+func (transformer *ASTToHIRTransformer) transformImportDeclaration(id *ImportDeclaration) *HIRImport {
+	parts := make([]string, 0, len(id.Path))
+	for _, seg := range id.Path {
+		parts = append(parts, seg.Value)
+	}
+	module := strings.Join(parts, "::")
+	var alias string
+	if id.Alias != nil {
+		alias = id.Alias.Value
+	}
+	return &HIRImport{Span: id.Span, ModuleName: module, Items: nil, Alias: alias, IsPublic: id.IsPublic}
+}
+
+// transformExportDeclaration converts AST export to HIR export
+func (transformer *ASTToHIRTransformer) transformExportDeclaration(ed *ExportDeclaration) []*HIRExport {
+	exports := make([]*HIRExport, 0, len(ed.Items))
+	for _, it := range ed.Items {
+		name := ""
+		if it.Name != nil {
+			name = it.Name.Value
+		}
+		alias := ""
+		if it.Alias != nil {
+			alias = it.Alias.Value
+		}
+		exports = append(exports, &HIRExport{Span: ed.Span, ItemName: name, Alias: alias, IsDefault: false})
+	}
+	return exports
+}
+
+// transformImplBlock converts impl block; returns nil for now (methods are separate fns)
+func (transformer *ASTToHIRTransformer) transformImplBlock(ib *ImplBlock) HIRNode {
+	// Optionally, attach methods to type or trait in a later phase; here we ignore
+	return nil
 }
 
 // transformFunctionDeclaration converts function declarations

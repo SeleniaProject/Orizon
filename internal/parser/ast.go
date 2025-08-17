@@ -328,6 +328,105 @@ func (m *MacroDefinition) Accept(visitor Visitor) interface{} { return visitor.V
 func (m *MacroDefinition) statementNode()                     {}
 func (m *MacroDefinition) declarationNode()                   {}
 
+// ====== New Declarations: Struct / Enum / Trait / Impl / Import / Export ======
+
+// StructDeclaration represents a struct type declaration
+type StructDeclaration struct {
+	Span     Span
+	Name     *Identifier
+	Fields   []*StructField // reuse fields from StructType
+	IsPublic bool
+}
+
+func (d *StructDeclaration) GetSpan() Span  { return d.Span }
+func (d *StructDeclaration) String() string { return fmt.Sprintf("struct %s", d.Name.Value) }
+func (d *StructDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitStructDeclaration(d)
+}
+func (d *StructDeclaration) statementNode()   {}
+func (d *StructDeclaration) declarationNode() {}
+
+// EnumDeclaration represents an enum type declaration
+type EnumDeclaration struct {
+	Span     Span
+	Name     *Identifier
+	Variants []*EnumVariant // reuse from EnumType
+	IsPublic bool
+}
+
+func (d *EnumDeclaration) GetSpan() Span                      { return d.Span }
+func (d *EnumDeclaration) String() string                     { return fmt.Sprintf("enum %s", d.Name.Value) }
+func (d *EnumDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitEnumDeclaration(d) }
+func (d *EnumDeclaration) statementNode()                     {}
+func (d *EnumDeclaration) declarationNode()                   {}
+
+// TraitDeclaration represents a trait declaration (method signatures only)
+type TraitDeclaration struct {
+	Span     Span
+	Name     *Identifier
+	Methods  []*TraitMethod // signatures
+	IsPublic bool
+}
+
+func (d *TraitDeclaration) GetSpan() Span  { return d.Span }
+func (d *TraitDeclaration) String() string { return fmt.Sprintf("trait %s", d.Name.Value) }
+func (d *TraitDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitTraitDeclaration(d)
+}
+func (d *TraitDeclaration) statementNode()   {}
+func (d *TraitDeclaration) declarationNode() {}
+
+// ImplBlock represents an impl block (optional trait for type)
+type ImplBlock struct {
+	Span    Span
+	Trait   Type                   // optional; nil for inherent impl
+	ForType Type                   // required
+	Items   []*FunctionDeclaration // method implementations
+}
+
+func (i *ImplBlock) GetSpan() Span                      { return i.Span }
+func (i *ImplBlock) String() string                     { return "impl" }
+func (i *ImplBlock) Accept(visitor Visitor) interface{} { return visitor.VisitImplBlock(i) }
+func (i *ImplBlock) statementNode()                     {}
+func (i *ImplBlock) declarationNode()                   {}
+
+// ImportDeclaration represents an import statement
+type ImportDeclaration struct {
+	Span     Span
+	Path     []*Identifier // module path segments
+	Alias    *Identifier   // optional alias
+	IsPublic bool          // re-export import (pub import)
+}
+
+func (d *ImportDeclaration) GetSpan() Span  { return d.Span }
+func (d *ImportDeclaration) String() string { return "import" }
+func (d *ImportDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitImportDeclaration(d)
+}
+func (d *ImportDeclaration) statementNode()   {}
+func (d *ImportDeclaration) declarationNode() {}
+
+// ExportItem represents a single exported item
+type ExportItem struct {
+	Span  Span
+	Name  *Identifier
+	Alias *Identifier // optional alias via "as" (not yet parsed)
+}
+
+// ExportDeclaration represents an export statement
+type ExportDeclaration struct {
+	Span  Span
+	Items []*ExportItem // empty means export of nothing (should be handled by parser)
+}
+
+func (d *ExportDeclaration) GetSpan() Span  { return d.Span }
+func (d *ExportDeclaration) String() string { return "export" }
+func (d *ExportDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitExportDeclaration(d)
+}
+func (d *ExportDeclaration) statementNode()   {}
+func (d *ExportDeclaration) declarationNode() {}
+
 // MacroParameter represents a macro parameter with optional type constraints
 type MacroParameter struct {
 	Span         Span
@@ -567,6 +666,12 @@ type Visitor interface {
 	VisitFunctionDeclaration(*FunctionDeclaration) interface{}
 	VisitParameter(*Parameter) interface{}
 	VisitVariableDeclaration(*VariableDeclaration) interface{}
+	VisitStructDeclaration(*StructDeclaration) interface{}
+	VisitEnumDeclaration(*EnumDeclaration) interface{}
+	VisitTraitDeclaration(*TraitDeclaration) interface{}
+	VisitImplBlock(*ImplBlock) interface{}
+	VisitImportDeclaration(*ImportDeclaration) interface{}
+	VisitExportDeclaration(*ExportDeclaration) interface{}
 	VisitBlockStatement(*BlockStatement) interface{}
 	VisitExpressionStatement(*ExpressionStatement) interface{}
 	VisitReturnStatement(*ReturnStatement) interface{}
@@ -599,6 +704,8 @@ type Visitor interface {
 	VisitEnumType(*EnumType) interface{}
 	VisitTraitType(*TraitType) interface{}
 	VisitGenericType(*GenericType) interface{}
+	VisitReferenceType(*ReferenceType) interface{}
+	VisitPointerType(*PointerType) interface{}
 	// Extended expression and statement visitor methods
 	VisitArrayExpression(*ArrayExpression) interface{}
 	VisitIndexExpression(*IndexExpression) interface{}

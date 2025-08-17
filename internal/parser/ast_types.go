@@ -472,6 +472,119 @@ type GenericType struct {
 	TypeParameters []Type
 }
 
+// ReferenceType represents a reference type like &T or &mut T
+type ReferenceType struct {
+	Span      Span
+	Inner     Type
+	IsMutable bool
+	Lifetime  string // optional, empty if elided
+}
+
+// PointerType represents a raw pointer type like *T or *mut T
+type PointerType struct {
+	Span      Span
+	Inner     Type
+	IsMutable bool
+}
+
+func (pt *PointerType) GetSpan() Span { return pt.Span }
+func (pt *PointerType) String() string {
+	if pt.IsMutable {
+		return "*mut " + pt.Inner.String()
+	}
+	return "*" + pt.Inner.String()
+}
+func (pt *PointerType) Accept(visitor Visitor) interface{} { return visitor.VisitPointerType(pt) }
+func (pt *PointerType) typeNode()                          {}
+func (pt *PointerType) GetNodeKind() NodeKind              { return NodeKindPointerType }
+func (pt *PointerType) Clone() TypeSafeNode {
+	clone := *pt
+	if pt.Inner != nil {
+		clone.Inner = pt.Inner.(TypeSafeNode).Clone().(Type)
+	}
+	return &clone
+}
+func (pt *PointerType) Equals(other TypeSafeNode) bool {
+	if o, ok := other.(*PointerType); ok {
+		if pt.IsMutable != o.IsMutable {
+			return false
+		}
+		if (pt.Inner == nil) != (o.Inner == nil) {
+			return false
+		}
+		if pt.Inner == nil {
+			return true
+		}
+		return pt.Inner.(TypeSafeNode).Equals(o.Inner.(TypeSafeNode))
+	}
+	return false
+}
+func (pt *PointerType) GetChildren() []TypeSafeNode {
+	if pt.Inner == nil {
+		return nil
+	}
+	return []TypeSafeNode{pt.Inner.(TypeSafeNode)}
+}
+func (pt *PointerType) ReplaceChild(index int, newChild TypeSafeNode) error {
+	if index != 0 || pt.Inner == nil {
+		return fmt.Errorf("invalid child index %d for PointerType", index)
+	}
+	if nt, ok := newChild.(Type); ok {
+		pt.Inner = nt
+		return nil
+	}
+	return fmt.Errorf("expected Type, got %T", newChild)
+}
+
+func (rt *ReferenceType) GetSpan() Span { return rt.Span }
+func (rt *ReferenceType) String() string {
+	if rt.IsMutable {
+		return "&mut " + rt.Inner.String()
+	}
+	return "&" + rt.Inner.String()
+}
+func (rt *ReferenceType) Accept(visitor Visitor) interface{} { return visitor.VisitReferenceType(rt) }
+func (rt *ReferenceType) typeNode()                          {}
+func (rt *ReferenceType) GetNodeKind() NodeKind              { return NodeKindReferenceType }
+func (rt *ReferenceType) Clone() TypeSafeNode {
+	clone := *rt
+	if rt.Inner != nil {
+		clone.Inner = rt.Inner.(TypeSafeNode).Clone().(Type)
+	}
+	return &clone
+}
+func (rt *ReferenceType) Equals(other TypeSafeNode) bool {
+	if o, ok := other.(*ReferenceType); ok {
+		if rt.IsMutable != o.IsMutable {
+			return false
+		}
+		if (rt.Inner == nil) != (o.Inner == nil) {
+			return false
+		}
+		if rt.Inner == nil {
+			return true
+		}
+		return rt.Inner.(TypeSafeNode).Equals(o.Inner.(TypeSafeNode))
+	}
+	return false
+}
+func (rt *ReferenceType) GetChildren() []TypeSafeNode {
+	if rt.Inner == nil {
+		return nil
+	}
+	return []TypeSafeNode{rt.Inner.(TypeSafeNode)}
+}
+func (rt *ReferenceType) ReplaceChild(index int, newChild TypeSafeNode) error {
+	if index != 0 || rt.Inner == nil {
+		return fmt.Errorf("invalid child index %d for ReferenceType", index)
+	}
+	if nt, ok := newChild.(Type); ok {
+		rt.Inner = nt
+		return nil
+	}
+	return fmt.Errorf("expected Type, got %T", newChild)
+}
+
 func (gt *GenericType) GetSpan() Span { return gt.Span }
 func (gt *GenericType) String() string {
 	var params []string

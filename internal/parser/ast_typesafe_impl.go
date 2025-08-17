@@ -438,3 +438,370 @@ func (o *Operator) GetChildren() []TypeSafeNode {
 func (o *Operator) ReplaceChild(index int, newChild TypeSafeNode) error {
 	return fmt.Errorf("Operator is a leaf node, no children to replace")
 }
+
+// ====== TypeSafeNode implementations for new declaration nodes ======
+
+// StructDeclaration
+func (d *StructDeclaration) GetNodeKind() NodeKind { return NodeKindStructDeclaration }
+func (d *StructDeclaration) Clone() TypeSafeNode {
+	clone := *d
+	if d.Name != nil {
+		clone.Name = d.Name.Clone().(*Identifier)
+	}
+	clone.Fields = make([]*StructField, len(d.Fields))
+	for i, f := range d.Fields {
+		fc := *f
+		if f.Name != nil {
+			fc.Name = f.Name.Clone().(*Identifier)
+		}
+		if f.Type != nil {
+			fc.Type = f.Type.(TypeSafeNode).Clone().(Type)
+		}
+		if f.Tags != nil {
+			fc.Tags = make(map[string]string)
+			for k, v := range f.Tags {
+				fc.Tags[k] = v
+			}
+		}
+		clone.Fields[i] = &fc
+	}
+	return &clone
+}
+func (d *StructDeclaration) Equals(other TypeSafeNode) bool {
+	od, ok := other.(*StructDeclaration)
+	if !ok {
+		return false
+	}
+	if (d.Name == nil) != (od.Name == nil) {
+		return false
+	}
+	if d.Name != nil && !d.Name.Equals(od.Name) {
+		return false
+	}
+	if len(d.Fields) != len(od.Fields) || d.IsPublic != od.IsPublic {
+		return false
+	}
+	for i := range d.Fields {
+		if !d.Fields[i].Name.Equals(od.Fields[i].Name) {
+			return false
+		}
+		if !d.Fields[i].Type.(TypeSafeNode).Equals(od.Fields[i].Type.(TypeSafeNode)) {
+			return false
+		}
+		if d.Fields[i].IsPublic != od.Fields[i].IsPublic {
+			return false
+		}
+	}
+	return true
+}
+func (d *StructDeclaration) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0, 1+len(d.Fields)*2)
+	if d.Name != nil {
+		children = append(children, d.Name)
+	}
+	for _, f := range d.Fields {
+		if f.Name != nil {
+			children = append(children, f.Name)
+		}
+		if f.Type != nil {
+			children = append(children, f.Type.(TypeSafeNode))
+		}
+	}
+	return children
+}
+func (d *StructDeclaration) ReplaceChild(index int, newChild TypeSafeNode) error {
+	return fmt.Errorf("ReplaceChild not implemented for StructDeclaration")
+}
+
+// EnumDeclaration
+func (d *EnumDeclaration) GetNodeKind() NodeKind { return NodeKindEnumDeclaration }
+func (d *EnumDeclaration) Clone() TypeSafeNode {
+	clone := *d
+	if d.Name != nil {
+		clone.Name = d.Name.Clone().(*Identifier)
+	}
+	clone.Variants = make([]*EnumVariant, len(d.Variants))
+	for i, v := range d.Variants {
+		vc := *v
+		if v.Name != nil {
+			vc.Name = v.Name.Clone().(*Identifier)
+		}
+		if v.Value != nil {
+			vc.Value = v.Value.(TypeSafeNode).Clone().(Expression)
+		}
+		vc.Fields = make([]*StructField, len(v.Fields))
+		for j, f := range v.Fields {
+			fc := *f
+			if f.Name != nil {
+				fc.Name = f.Name.Clone().(*Identifier)
+			}
+			if f.Type != nil {
+				fc.Type = f.Type.(TypeSafeNode).Clone().(Type)
+			}
+			vc.Fields[j] = &fc
+		}
+		clone.Variants[i] = &vc
+	}
+	return &clone
+}
+func (d *EnumDeclaration) Equals(other TypeSafeNode) bool {
+	od, ok := other.(*EnumDeclaration)
+	if !ok {
+		return false
+	}
+	if (d.Name == nil) != (od.Name == nil) {
+		return false
+	}
+	if d.Name != nil && !d.Name.Equals(od.Name) {
+		return false
+	}
+	if len(d.Variants) != len(od.Variants) || d.IsPublic != od.IsPublic {
+		return false
+	}
+	// Shallow compare variant names only for now
+	for i := range d.Variants {
+		if !d.Variants[i].Name.Equals(od.Variants[i].Name) {
+			return false
+		}
+	}
+	return true
+}
+func (d *EnumDeclaration) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0)
+	if d.Name != nil {
+		children = append(children, d.Name)
+	}
+	for _, v := range d.Variants {
+		if v.Name != nil {
+			children = append(children, v.Name)
+		}
+		if v.Value != nil {
+			children = append(children, v.Value.(TypeSafeNode))
+		}
+		for _, f := range v.Fields {
+			if f.Name != nil {
+				children = append(children, f.Name)
+			}
+			if f.Type != nil {
+				children = append(children, f.Type.(TypeSafeNode))
+			}
+		}
+	}
+	return children
+}
+func (d *EnumDeclaration) ReplaceChild(index int, newChild TypeSafeNode) error {
+	return fmt.Errorf("ReplaceChild not implemented for EnumDeclaration")
+}
+
+// TraitDeclaration
+func (d *TraitDeclaration) GetNodeKind() NodeKind { return NodeKindTraitDeclaration }
+func (d *TraitDeclaration) Clone() TypeSafeNode {
+	clone := *d
+	if d.Name != nil {
+		clone.Name = d.Name.Clone().(*Identifier)
+	}
+	clone.Methods = make([]*TraitMethod, len(d.Methods))
+	for i, m := range d.Methods {
+		mc := *m
+		if m.Name != nil {
+			mc.Name = m.Name.Clone().(*Identifier)
+		}
+		mc.Parameters = make([]*Parameter, len(m.Parameters))
+		for j, p := range m.Parameters {
+			mc.Parameters[j] = p.Clone().(*Parameter)
+		}
+		if m.ReturnType != nil {
+			mc.ReturnType = m.ReturnType.(TypeSafeNode).Clone().(Type)
+		}
+		clone.Methods[i] = &mc
+	}
+	return &clone
+}
+func (d *TraitDeclaration) Equals(other TypeSafeNode) bool {
+	od, ok := other.(*TraitDeclaration)
+	if !ok {
+		return false
+	}
+	if (d.Name == nil) != (od.Name == nil) {
+		return false
+	}
+	if d.Name != nil && !d.Name.Equals(od.Name) {
+		return false
+	}
+	if len(d.Methods) != len(od.Methods) || d.IsPublic != od.IsPublic {
+		return false
+	}
+	return true
+}
+func (d *TraitDeclaration) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0)
+	if d.Name != nil {
+		children = append(children, d.Name)
+	}
+	for _, m := range d.Methods {
+		if m.Name != nil {
+			children = append(children, m.Name)
+		}
+		if m.ReturnType != nil {
+			children = append(children, m.ReturnType.(TypeSafeNode))
+		}
+		for _, p := range m.Parameters {
+			children = append(children, p)
+		}
+	}
+	return children
+}
+func (d *TraitDeclaration) ReplaceChild(index int, newChild TypeSafeNode) error {
+	return fmt.Errorf("ReplaceChild not implemented for TraitDeclaration")
+}
+
+// ImplBlock
+func (i *ImplBlock) GetNodeKind() NodeKind { return NodeKindImplBlock }
+func (i *ImplBlock) Clone() TypeSafeNode {
+	clone := *i
+	if i.Trait != nil {
+		clone.Trait = i.Trait.(TypeSafeNode).Clone().(Type)
+	}
+	if i.ForType != nil {
+		clone.ForType = i.ForType.(TypeSafeNode).Clone().(Type)
+	}
+	clone.Items = make([]*FunctionDeclaration, len(i.Items))
+	for idx, it := range i.Items {
+		clone.Items[idx] = it.Clone().(*FunctionDeclaration)
+	}
+	return &clone
+}
+func (i *ImplBlock) Equals(other TypeSafeNode) bool {
+	oi, ok := other.(*ImplBlock)
+	if !ok {
+		return false
+	}
+	if (i.Trait == nil) != (oi.Trait == nil) {
+		return false
+	}
+	if i.Trait != nil && !i.Trait.(TypeSafeNode).Equals(oi.Trait.(TypeSafeNode)) {
+		return false
+	}
+	if (i.ForType == nil) != (oi.ForType == nil) {
+		return false
+	}
+	if i.ForType != nil && !i.ForType.(TypeSafeNode).Equals(oi.ForType.(TypeSafeNode)) {
+		return false
+	}
+	if len(i.Items) != len(oi.Items) {
+		return false
+	}
+	return true
+}
+func (i *ImplBlock) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0)
+	if i.Trait != nil {
+		children = append(children, i.Trait.(TypeSafeNode))
+	}
+	if i.ForType != nil {
+		children = append(children, i.ForType.(TypeSafeNode))
+	}
+	for _, it := range i.Items {
+		children = append(children, it)
+	}
+	return children
+}
+func (i *ImplBlock) ReplaceChild(index int, newChild TypeSafeNode) error {
+	return fmt.Errorf("ReplaceChild not implemented for ImplBlock")
+}
+
+// ImportDeclaration
+func (d *ImportDeclaration) GetNodeKind() NodeKind { return NodeKindImportDeclaration }
+func (d *ImportDeclaration) Clone() TypeSafeNode {
+	clone := *d
+	clone.Path = make([]*Identifier, len(d.Path))
+	for i, seg := range d.Path {
+		clone.Path[i] = seg.Clone().(*Identifier)
+	}
+	if d.Alias != nil {
+		clone.Alias = d.Alias.Clone().(*Identifier)
+	}
+	return &clone
+}
+func (d *ImportDeclaration) Equals(other TypeSafeNode) bool {
+	od, ok := other.(*ImportDeclaration)
+	if !ok {
+		return false
+	}
+	if len(d.Path) != len(od.Path) || d.IsPublic != od.IsPublic {
+		return false
+	}
+	for i := range d.Path {
+		if !d.Path[i].Equals(od.Path[i]) {
+			return false
+		}
+	}
+	if (d.Alias == nil) != (od.Alias == nil) {
+		return false
+	}
+	if d.Alias != nil && !d.Alias.Equals(od.Alias) {
+		return false
+	}
+	return true
+}
+func (d *ImportDeclaration) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0, len(d.Path)+1)
+	for _, seg := range d.Path {
+		children = append(children, seg)
+	}
+	if d.Alias != nil {
+		children = append(children, d.Alias)
+	}
+	return children
+}
+func (d *ImportDeclaration) ReplaceChild(index int, newChild TypeSafeNode) error {
+	return fmt.Errorf("ReplaceChild not implemented for ImportDeclaration")
+}
+
+// ExportDeclaration
+func (d *ExportDeclaration) GetNodeKind() NodeKind { return NodeKindExportDeclaration }
+func (d *ExportDeclaration) Clone() TypeSafeNode {
+	clone := *d
+	clone.Items = make([]*ExportItem, len(d.Items))
+	for i, it := range d.Items {
+		ic := *it
+		if it.Name != nil {
+			ic.Name = it.Name.Clone().(*Identifier)
+		}
+		if it.Alias != nil {
+			ic.Alias = it.Alias.Clone().(*Identifier)
+		}
+		clone.Items[i] = &ic
+	}
+	return &clone
+}
+func (d *ExportDeclaration) Equals(other TypeSafeNode) bool {
+	od, ok := other.(*ExportDeclaration)
+	if !ok {
+		return false
+	}
+	if len(d.Items) != len(od.Items) {
+		return false
+	}
+	for i := range d.Items {
+		if !d.Items[i].Name.Equals(od.Items[i].Name) {
+			return false
+		}
+	}
+	return true
+}
+func (d *ExportDeclaration) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0)
+	for _, it := range d.Items {
+		if it.Name != nil {
+			children = append(children, it.Name)
+		}
+		if it.Alias != nil {
+			children = append(children, it.Alias)
+		}
+	}
+	return children
+}
+func (d *ExportDeclaration) ReplaceChild(index int, newChild TypeSafeNode) error {
+	return fmt.Errorf("ReplaceChild not implemented for ExportDeclaration")
+}

@@ -22,6 +22,12 @@ const (
 	NodeKindVariableDeclaration
 	NodeKindParameter
 	NodeKindMacroDefinition
+	NodeKindStructDeclaration
+	NodeKindEnumDeclaration
+	NodeKindTraitDeclaration
+	NodeKindImplBlock
+	NodeKindImportDeclaration
+	NodeKindExportDeclaration
 
 	// Statement kinds
 	NodeKindBlockStatement
@@ -54,6 +60,8 @@ const (
 	NodeKindEnumType
 	NodeKindTraitType
 	NodeKindGenericType
+	NodeKindReferenceType
+	NodeKindPointerType
 
 	// Macro-specific kinds
 	NodeKindMacroParameter
@@ -85,6 +93,18 @@ func (nk NodeKind) String() string {
 		return "Parameter"
 	case NodeKindMacroDefinition:
 		return "MacroDefinition"
+	case NodeKindStructDeclaration:
+		return "StructDeclaration"
+	case NodeKindEnumDeclaration:
+		return "EnumDeclaration"
+	case NodeKindTraitDeclaration:
+		return "TraitDeclaration"
+	case NodeKindImplBlock:
+		return "ImplBlock"
+	case NodeKindImportDeclaration:
+		return "ImportDeclaration"
+	case NodeKindExportDeclaration:
+		return "ExportDeclaration"
 	case NodeKindBlockStatement:
 		return "BlockStatement"
 	case NodeKindExpressionStatement:
@@ -137,6 +157,10 @@ func (nk NodeKind) String() string {
 		return "TraitType"
 	case NodeKindGenericType:
 		return "GenericType"
+	case NodeKindReferenceType:
+		return "ReferenceType"
+	case NodeKindPointerType:
+		return "PointerType"
 	case NodeKindMacroParameter:
 		return "MacroParameter"
 	case NodeKindMacroBody:
@@ -220,6 +244,8 @@ type TypedVisitor[T any] interface {
 	VisitEnumType(*EnumType) T
 	VisitTraitType(*TraitType) T
 	VisitGenericType(*GenericType) T
+	VisitReferenceType(*ReferenceType) T
+	VisitPointerType(*PointerType) T
 	// Additional expression nodes
 	VisitArrayExpression(*ArrayExpression) T
 	VisitIndexExpression(*IndexExpression) T

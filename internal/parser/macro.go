@@ -14,6 +14,7 @@ type MacroEngine struct {
 	expansionDepth int
 	maxDepth       int
 	hygienicMode   bool
+	builtins       *MacroBuiltins
 }
 
 // NewMacroEngine creates a new macro engine instance
@@ -24,6 +25,7 @@ func NewMacroEngine() *MacroEngine {
 		expansionDepth: 0,
 		maxDepth:       1000, // Prevent infinite recursion
 		hygienicMode:   true,
+		builtins:       NewMacroBuiltins(),
 	}
 }
 
@@ -56,6 +58,14 @@ func (me *MacroEngine) ExpandMacro(invocation *MacroInvocation) ([]Statement, er
 
 	macro, exists := me.GetMacro(invocation.Name.Value)
 	if !exists {
+		// Try builtins before failing
+		if me.builtins != nil {
+			if fn, ok := me.builtins.GetBuiltin(invocation.Name.Value); ok {
+				me.expansionDepth++
+				defer func() { me.expansionDepth-- }()
+				return fn(invocation.Arguments)
+			}
+		}
 		return nil, fmt.Errorf("unknown macro: %s", invocation.Name.Value)
 	}
 

@@ -577,3 +577,15 @@ func (nk NodeKind) StringExtended() string {
 		return nk.String() // Fall back to original String method
 	}
 }
+
+// DeferStatement represents a deferred execution of a statement
+type DeferStatement struct {
+	Span Span
+	Body Statement // either a block or a single expression/statement
+}
+
+func (ds *DeferStatement) GetSpan() Span                      { return ds.Span }
+func (ds *DeferStatement) String() string                     { return "defer ..." }
+func (ds *DeferStatement) Accept(visitor Visitor) interface{} { return nil }
+func (ds *DeferStatement) statementNode()                     {}
+func (ds *DeferStatement) GetNodeKind() NodeKind              { return NodeKindBlockStatement }

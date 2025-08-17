@@ -317,7 +317,17 @@ func (tc *DependentTypeChecker) CheckLiteral(lit *Literal) DependentType {
 	switch lit.Kind {
 	case LiteralInteger:
 		// Create refinement type for integer literals
-		litValue := lit.Value.(string)
+		var litValue string
+		switch v := lit.Value.(type) {
+		case string:
+			litValue = v
+		case int64:
+			litValue = fmt.Sprintf("%d", v)
+		case int:
+			litValue = fmt.Sprintf("%d", v)
+		default:
+			litValue = fmt.Sprintf("%v", v)
+		}
 		return &RefinementType{
 			Span:     lit.Span,
 			BaseType: CreateBasicDependentType(lit.Span, "Int"),

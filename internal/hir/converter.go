@@ -199,8 +199,13 @@ func (c *ASTToHIRConverter) convertFunctionDeclaration(astFunc *ast.FunctionDecl
 	}
 
 	// Add function to symbol table
+	// Build parameter type list from parameters to avoid nil entries
+	paramTypes := make([]HIRType, len(hirParams))
+	for i, p := range hirParams {
+		paramTypes[i] = p.Type
+	}
 	funcType := c.typeBuilder.BuildFunctionType(
-		make([]HIRType, len(hirParams)),
+		paramTypes,
 		hirReturnType,
 		effects,
 		astFunc.GetSpan(),

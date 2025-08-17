@@ -34,6 +34,7 @@ const (
 	TokenFloat
 	TokenString
 	TokenChar
+	TokenLifetime
 	TokenBool
 
 	// キーワード
@@ -54,6 +55,7 @@ const (
 	TokenReturn
 	TokenBreak
 	TokenContinue
+	TokenDefer
 	TokenAsync
 	TokenAwait
 	TokenActor
@@ -180,6 +182,7 @@ var tokenNames = map[TokenType]string{
 	TokenFloat:      "FLOAT",
 	TokenString:     "STRING",
 	TokenChar:       "CHAR",
+	TokenLifetime:   "LIFETIME",
 	TokenBool:       "BOOL",
 
 	TokenFunc:     "FUNC",
@@ -199,6 +202,7 @@ var tokenNames = map[TokenType]string{
 	TokenReturn:   "RETURN",
 	TokenBreak:    "BREAK",
 	TokenContinue: "CONTINUE",
+	TokenDefer:    "DEFER",
 	TokenAsync:    "ASYNC",
 	TokenAwait:    "AWAIT",
 	TokenActor:    "ACTOR",
@@ -299,6 +303,7 @@ var keywords = map[string]TokenType{
 	"return":   TokenReturn,
 	"break":    TokenBreak,
 	"continue": TokenContinue,
+	"defer":    TokenDefer,
 	"async":    TokenAsync,
 	"await":    TokenAwait,
 	"actor":    TokenActor,
@@ -846,8 +851,36 @@ func (l *Lexer) NextToken() Token {
 			tok = l.newTokenFromPosition(TokenString, stringLiteral, startPos)
 		}
 	case '\'':
-		charLiteral := l.readChar2()
-		tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
+		// Disambiguate between lifetime (e.g., 'a) and char literal (e.g., 'x')
+		next := l.peekChar()
+		if isLetter(next) || next == '_' {
+			// Look ahead to see if this is an immediate closing quote => char literal
+			// Otherwise, treat as lifetime token
+			i := l.position + 2 // start after '\'' and first ident char
+			for i < len(l.input) {
+				ch := l.input[i]
+				if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' {
+					i++
+					continue
+				}
+				break
+			}
+			if i < len(l.input) && l.input[i] == '\'' {
+				// It's a char literal like 'a'
+				charLiteral := l.readChar2()
+				tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
+			} else {
+				// It's a lifetime like 'a (no closing quote immediately after ident)
+				l.readChar() // move to first ident char
+				identLiteral := l.readIdentifier()
+				tok = l.newTokenFromPosition(TokenLifetime, identLiteral, startPos)
+				return tok
+			}
+		} else {
+			// Not a lifetime start, parse as char literal (handles escapes)
+			charLiteral := l.readChar2()
+			tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
+		}
 	case '\n':
 		tok = l.newTokenFromChar(TokenNewline, l.ch)
 	case 0:

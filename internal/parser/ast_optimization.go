@@ -176,6 +176,40 @@ func (ao *ASTOptimizer) VisitFunctionDeclaration(fn *FunctionDeclaration) interf
 	}
 }
 
+// VisitStructDeclaration handles struct declarations (no optimization on fields yet)
+func (ao *ASTOptimizer) VisitStructDeclaration(sd *StructDeclaration) interface{} {
+	// Fields/types are not optimized at AST level here; just return as-is
+	return sd
+}
+
+// VisitEnumDeclaration handles enum declarations (no optimization on variants yet)
+func (ao *ASTOptimizer) VisitEnumDeclaration(ed *EnumDeclaration) interface{} {
+	return ed
+}
+
+// VisitTraitDeclaration handles trait declarations
+func (ao *ASTOptimizer) VisitTraitDeclaration(td *TraitDeclaration) interface{} {
+	// Method signatures don't have bodies to optimize here
+	return td
+}
+
+// VisitImplBlock optimizes functions inside impl blocks
+func (ao *ASTOptimizer) VisitImplBlock(ib *ImplBlock) interface{} {
+	optimizedItems := make([]*FunctionDeclaration, 0, len(ib.Items))
+	for _, fn := range ib.Items {
+		if opt := ao.optimizeNode(fn); opt != nil {
+			optimizedItems = append(optimizedItems, opt.(*FunctionDeclaration))
+		}
+	}
+	return &ImplBlock{Span: ib.Span, Trait: ib.Trait, ForType: ib.ForType, Items: optimizedItems}
+}
+
+// VisitImportDeclaration passes through imports
+func (ao *ASTOptimizer) VisitImportDeclaration(id *ImportDeclaration) interface{} { return id }
+
+// VisitExportDeclaration passes through exports
+func (ao *ASTOptimizer) VisitExportDeclaration(ed *ExportDeclaration) interface{} { return ed }
+
 // VisitVariableDeclaration optimizes a variable declaration
 func (ao *ASTOptimizer) VisitVariableDeclaration(vardecl *VariableDeclaration) interface{} {
 	// Optimize initializer if present
@@ -269,6 +303,16 @@ func (ao *ASTOptimizer) VisitIdentifier(id *Identifier) interface{} {
 	}
 
 	return id
+}
+
+// VisitReferenceType provides a default passthrough for reference types
+func (ao *ASTOptimizer) VisitReferenceType(rt *ReferenceType) interface{} {
+	return rt
+}
+
+// VisitPointerType provides a default passthrough for pointer types
+func (ao *ASTOptimizer) VisitPointerType(pt *PointerType) interface{} {
+	return pt
 }
 
 // VisitCallExpression optimizes function calls
