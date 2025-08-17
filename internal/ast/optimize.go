@@ -777,3 +777,45 @@ func (cfv *constantFoldingVisitor) VisitExportItem(node *ExportItem) interface{}
 	// Nothing to fold here; just return node
 	return node
 }
+
+// Structural declarations (no folding)
+func (cfv *constantFoldingVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitStructField(node *StructField) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitEnumVariant(node *EnumVariant) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitTraitMethod(node *TraitMethod) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitGenericParameter(node *GenericParameter) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitWherePredicate(node *WherePredicate) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}
+func (cfv *constantFoldingVisitor) VisitAssociatedType(node *AssociatedType) interface{} {
+	cfv.stats.NodesVisited++
+	return node
+}

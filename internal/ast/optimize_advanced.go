@@ -74,6 +74,48 @@ func (dcv *deadCodeVisitor) VisitExportItem(node *ExportItem) interface{} {
 	return node
 }
 
+// Structural and generic-related nodes (no-op for dead code pass)
+func (dcv *deadCodeVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitStructField(node *StructField) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitEnumVariant(node *EnumVariant) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitTraitMethod(node *TraitMethod) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitGenericParameter(node *GenericParameter) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitWherePredicate(node *WherePredicate) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+func (dcv *deadCodeVisitor) VisitAssociatedType(node *AssociatedType) interface{} {
+	dcv.stats.NodesVisited++
+	return node
+}
+
 // VisitBlockStatement removes unreachable statements after return/break/continue
 func (dcv *deadCodeVisitor) VisitBlockStatement(node *BlockStatement) interface{} {
 	dcv.stats.NodesVisited++
@@ -455,6 +497,48 @@ func (ssv *syntaxSugarVisitor) VisitExportDeclaration(node *ExportDeclaration) i
 }
 
 func (ssv *syntaxSugarVisitor) VisitExportItem(node *ExportItem) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+
+// Structural and generic-related nodes (no-op for syntax sugar pass)
+func (ssv *syntaxSugarVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitStructField(node *StructField) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitEnumVariant(node *EnumVariant) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitTraitMethod(node *TraitMethod) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitGenericParameter(node *GenericParameter) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitWherePredicate(node *WherePredicate) interface{} {
+	ssv.stats.NodesVisited++
+	return node
+}
+func (ssv *syntaxSugarVisitor) VisitAssociatedType(node *AssociatedType) interface{} {
 	ssv.stats.NodesVisited++
 	return node
 }

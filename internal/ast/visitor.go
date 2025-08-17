@@ -22,6 +22,11 @@ type Visitor interface {
 	VisitParameter(node *Parameter) interface{}
 	VisitVariableDeclaration(node *VariableDeclaration) interface{}
 	VisitTypeDeclaration(node *TypeDeclaration) interface{}
+	// New declarations
+	VisitStructDeclaration(node *StructDeclaration) interface{}
+	VisitEnumDeclaration(node *EnumDeclaration) interface{}
+	VisitTraitDeclaration(node *TraitDeclaration) interface{}
+	VisitImplDeclaration(node *ImplDeclaration) interface{}
 	VisitImportDeclaration(node *ImportDeclaration) interface{}
 	VisitExportDeclaration(node *ExportDeclaration) interface{}
 	VisitExportItem(node *ExportItem) interface{}
@@ -43,6 +48,13 @@ type Visitor interface {
 	// Type visitors
 	VisitBasicType(node *BasicType) interface{}
 	VisitIdentifierType(node *IdentifierType) interface{}
+	// New helper/inner nodes
+	VisitStructField(node *StructField) interface{}
+	VisitEnumVariant(node *EnumVariant) interface{}
+	VisitTraitMethod(node *TraitMethod) interface{}
+	VisitGenericParameter(node *GenericParameter) interface{}
+	VisitWherePredicate(node *WherePredicate) interface{}
+	VisitAssociatedType(node *AssociatedType) interface{}
 
 	// Attribute visitors
 	VisitAttribute(node *Attribute) interface{}
@@ -59,6 +71,10 @@ func (v *BaseVisitor) VisitFunctionDeclaration(node *FunctionDeclaration) interf
 func (v *BaseVisitor) VisitParameter(node *Parameter) interface{}                     { return nil }
 func (v *BaseVisitor) VisitVariableDeclaration(node *VariableDeclaration) interface{} { return nil }
 func (v *BaseVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{}         { return nil }
+func (v *BaseVisitor) VisitStructDeclaration(node *StructDeclaration) interface{}     { return nil }
+func (v *BaseVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{}         { return nil }
+func (v *BaseVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{}       { return nil }
+func (v *BaseVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{}         { return nil }
 func (v *BaseVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{}     { return nil }
 func (v *BaseVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{}     { return nil }
 func (v *BaseVisitor) VisitExportItem(node *ExportItem) interface{}                   { return nil }
@@ -74,6 +90,12 @@ func (v *BaseVisitor) VisitUnaryExpression(node *UnaryExpression) interface{}   
 func (v *BaseVisitor) VisitCallExpression(node *CallExpression) interface{}           { return nil }
 func (v *BaseVisitor) VisitBasicType(node *BasicType) interface{}                     { return nil }
 func (v *BaseVisitor) VisitIdentifierType(node *IdentifierType) interface{}           { return nil }
+func (v *BaseVisitor) VisitStructField(node *StructField) interface{}                 { return nil }
+func (v *BaseVisitor) VisitEnumVariant(node *EnumVariant) interface{}                 { return nil }
+func (v *BaseVisitor) VisitTraitMethod(node *TraitMethod) interface{}                 { return nil }
+func (v *BaseVisitor) VisitGenericParameter(node *GenericParameter) interface{}       { return nil }
+func (v *BaseVisitor) VisitWherePredicate(node *WherePredicate) interface{}           { return nil }
+func (v *BaseVisitor) VisitAssociatedType(node *AssociatedType) interface{}           { return nil }
 func (v *BaseVisitor) VisitAttribute(node *Attribute) interface{}                     { return nil }
 
 // WalkingVisitor provides a recursive visitor that automatically traverses
@@ -208,6 +230,185 @@ func (w *WalkingVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface{}
 		node.Type.Accept(w)
 	}
 
+	return result
+}
+
+// VisitStructDeclaration walks through struct components
+func (w *WalkingVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	result := w.visitor.VisitStructDeclaration(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	for _, g := range node.Generics {
+		if g != nil {
+			g.Accept(w)
+		}
+	}
+	for _, f := range node.Fields {
+		if f != nil {
+			f.Accept(w)
+		}
+	}
+	return result
+}
+
+// VisitEnumDeclaration walks through enum components
+func (w *WalkingVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	result := w.visitor.VisitEnumDeclaration(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	for _, g := range node.Generics {
+		if g != nil {
+			g.Accept(w)
+		}
+	}
+	for _, v := range node.Variants {
+		if v != nil {
+			v.Accept(w)
+		}
+	}
+	return result
+}
+
+// VisitTraitDeclaration walks through trait components
+func (w *WalkingVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	result := w.visitor.VisitTraitDeclaration(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	for _, g := range node.Generics {
+		if g != nil {
+			g.Accept(w)
+		}
+	}
+	for _, a := range node.AssociatedTypes {
+		if a != nil {
+			a.Accept(w)
+		}
+	}
+	for _, m := range node.Methods {
+		if m != nil {
+			m.Accept(w)
+		}
+	}
+	return result
+}
+
+// VisitImplDeclaration walks through impl components
+func (w *WalkingVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{} {
+	result := w.visitor.VisitImplDeclaration(node)
+	if node.Trait != nil {
+		node.Trait.Accept(w)
+	}
+	if node.ForType != nil {
+		node.ForType.Accept(w)
+	}
+	for _, g := range node.Generics {
+		if g != nil {
+			g.Accept(w)
+		}
+	}
+	for _, wcl := range node.WhereClauses {
+		if wcl != nil {
+			wcl.Accept(w)
+		}
+	}
+	for _, m := range node.Methods {
+		if m != nil {
+			m.Accept(w)
+		}
+	}
+	return result
+}
+
+func (w *WalkingVisitor) VisitStructField(node *StructField) interface{} {
+	result := w.visitor.VisitStructField(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	if node.Type != nil {
+		node.Type.Accept(w)
+	}
+	return result
+}
+
+func (w *WalkingVisitor) VisitEnumVariant(node *EnumVariant) interface{} {
+	result := w.visitor.VisitEnumVariant(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	for _, f := range node.Fields {
+		if f != nil {
+			f.Accept(w)
+		}
+	}
+	if node.Value != nil {
+		node.Value.Accept(w)
+	}
+	return result
+}
+
+func (w *WalkingVisitor) VisitTraitMethod(node *TraitMethod) interface{} {
+	result := w.visitor.VisitTraitMethod(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	for _, g := range node.Generics {
+		if g != nil {
+			g.Accept(w)
+		}
+	}
+	for _, p := range node.Parameters {
+		if p != nil {
+			p.Accept(w)
+		}
+	}
+	if node.ReturnType != nil {
+		node.ReturnType.Accept(w)
+	}
+	return result
+}
+
+func (w *WalkingVisitor) VisitGenericParameter(node *GenericParameter) interface{} {
+	result := w.visitor.VisitGenericParameter(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	if node.ConstType != nil {
+		node.ConstType.Accept(w)
+	}
+	for _, b := range node.Bounds {
+		if b != nil {
+			b.Accept(w)
+		}
+	}
+	return result
+}
+
+func (w *WalkingVisitor) VisitWherePredicate(node *WherePredicate) interface{} {
+	result := w.visitor.VisitWherePredicate(node)
+	if node.Target != nil {
+		node.Target.Accept(w)
+	}
+	for _, b := range node.Bounds {
+		if b != nil {
+			b.Accept(w)
+		}
+	}
+	return result
+}
+
+func (w *WalkingVisitor) VisitAssociatedType(node *AssociatedType) interface{} {
+	result := w.visitor.VisitAssociatedType(node)
+	if node.Name != nil {
+		node.Name.Accept(w)
+	}
+	for _, b := range node.Bounds {
+		if b != nil {
+			b.Accept(w)
+		}
+	}
 	return result
 }
 
@@ -492,6 +693,30 @@ func (p *PrettyPrintVisitor) VisitFunctionDeclaration(node *FunctionDeclaration)
 	return result
 }
 
+func (p *PrettyPrintVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	return fmt.Sprintf("struct %s", node.Name.Value)
+}
+
+func (p *PrettyPrintVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	return fmt.Sprintf("enum %s", node.Name.Value)
+}
+
+func (p *PrettyPrintVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	return fmt.Sprintf("trait %s", node.Name.Value)
+}
+
+func (p *PrettyPrintVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{} { return "impl" }
+func (p *PrettyPrintVisitor) VisitStructField(node *StructField) interface{}         { return node.String() }
+func (p *PrettyPrintVisitor) VisitEnumVariant(node *EnumVariant) interface{}         { return node.String() }
+func (p *PrettyPrintVisitor) VisitTraitMethod(node *TraitMethod) interface{}         { return node.String() }
+func (p *PrettyPrintVisitor) VisitGenericParameter(node *GenericParameter) interface{} {
+	return "generic"
+}
+func (p *PrettyPrintVisitor) VisitWherePredicate(node *WherePredicate) interface{} { return "where" }
+func (p *PrettyPrintVisitor) VisitAssociatedType(node *AssociatedType) interface{} {
+	return node.String()
+}
+
 func (p *PrettyPrintVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
 	return node.String()
 }
@@ -562,6 +787,22 @@ func (n *NodeCountVisitor) VisitTypeDeclaration(node *TypeDeclaration) interface
 	n.count++
 	return nil
 }
+func (n *NodeCountVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{} {
+	n.count++
+	return nil
+}
 func (n *NodeCountVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{} {
 	n.count++
 	return nil
@@ -607,4 +848,19 @@ func (n *NodeCountVisitor) VisitIdentifierType(node *IdentifierType) interface{}
 	n.count++
 	return nil
 }
-func (n *NodeCountVisitor) VisitAttribute(node *Attribute) interface{} { n.count++; return nil }
+func (n *NodeCountVisitor) VisitAttribute(node *Attribute) interface{}     { n.count++; return nil }
+func (n *NodeCountVisitor) VisitStructField(node *StructField) interface{} { n.count++; return nil }
+func (n *NodeCountVisitor) VisitEnumVariant(node *EnumVariant) interface{} { n.count++; return nil }
+func (n *NodeCountVisitor) VisitTraitMethod(node *TraitMethod) interface{} { n.count++; return nil }
+func (n *NodeCountVisitor) VisitGenericParameter(node *GenericParameter) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitWherePredicate(node *WherePredicate) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitAssociatedType(node *AssociatedType) interface{} {
+	n.count++
+	return nil
+}

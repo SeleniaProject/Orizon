@@ -240,6 +240,164 @@ func (t *TypeDeclaration) String() string {
 }
 func (t *TypeDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitTypeDeclaration(t) }
 
+// ===== New Declarations: Struct / Enum / Trait / Impl =====
+
+// GenericParamKind indicates the kind of generic parameter
+type GenericParamKind int
+
+const (
+	GenericParamType GenericParamKind = iota
+	GenericParamConst
+	GenericParamLifetime
+)
+
+// GenericParameter models a single generic parameter
+type GenericParameter struct {
+	Span      position.Span
+	Kind      GenericParamKind
+	Name      *Identifier // for type/const; nil for lifetime
+	Lifetime  string      // e.g., 'a
+	ConstType Type        // type of const parameter
+	Bounds    []Type      // Optional trait bounds for type parameters
+}
+
+func (g *GenericParameter) GetSpan() position.Span { return g.Span }
+func (g *GenericParameter) String() string         { return "generic" }
+func (g *GenericParameter) Accept(visitor Visitor) interface{} {
+	return visitor.VisitGenericParameter(g)
+}
+
+// WherePredicate represents a where-clause predicate
+type WherePredicate struct {
+	Span   position.Span
+	Target Type
+	Bounds []Type
+}
+
+func (w *WherePredicate) GetSpan() position.Span             { return w.Span }
+func (w *WherePredicate) String() string                     { return "where" }
+func (w *WherePredicate) Accept(visitor Visitor) interface{} { return visitor.VisitWherePredicate(w) }
+
+// StructField represents a field in a struct or enum variant
+type StructField struct {
+	Span     position.Span
+	Name     *Identifier // optional in tuple-like variants
+	Type     Type
+	IsPublic bool // for struct fields
+}
+
+func (sf *StructField) GetSpan() position.Span { return sf.Span }
+func (sf *StructField) String() string {
+	if sf.Name != nil {
+		return fmt.Sprintf("%s: %s", sf.Name.String(), sf.Type.String())
+	}
+	return sf.Type.String()
+}
+func (sf *StructField) Accept(visitor Visitor) interface{} { return visitor.VisitStructField(sf) }
+
+// StructDeclaration represents a struct type declaration
+type StructDeclaration struct {
+	Span       position.Span
+	Name       *Identifier
+	Fields     []*StructField
+	IsExported bool
+	Generics   []*GenericParameter
+}
+
+func (d *StructDeclaration) GetSpan() position.Span { return d.Span }
+func (d *StructDeclaration) String() string         { return fmt.Sprintf("struct %s", d.Name.String()) }
+func (d *StructDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitStructDeclaration(d)
+}
+func (d *StructDeclaration) statementNode()   {}
+func (d *StructDeclaration) declarationNode() {}
+
+// EnumVariant represents a single variant of an enum
+type EnumVariant struct {
+	Span   position.Span
+	Name   *Identifier
+	Fields []*StructField // Optional associated data
+	Value  Expression     // Optional explicit value
+}
+
+func (v *EnumVariant) GetSpan() position.Span             { return v.Span }
+func (v *EnumVariant) String() string                     { return v.Name.String() }
+func (v *EnumVariant) Accept(visitor Visitor) interface{} { return visitor.VisitEnumVariant(v) }
+
+// EnumDeclaration represents an enum type declaration
+type EnumDeclaration struct {
+	Span       position.Span
+	Name       *Identifier
+	Variants   []*EnumVariant
+	IsExported bool
+	Generics   []*GenericParameter
+}
+
+func (d *EnumDeclaration) GetSpan() position.Span             { return d.Span }
+func (d *EnumDeclaration) String() string                     { return fmt.Sprintf("enum %s", d.Name.String()) }
+func (d *EnumDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitEnumDeclaration(d) }
+func (d *EnumDeclaration) statementNode()                     {}
+func (d *EnumDeclaration) declarationNode()                   {}
+
+// TraitMethod represents a trait method signature
+type TraitMethod struct {
+	Span       position.Span
+	Name       *Identifier
+	Parameters []*Parameter
+	ReturnType Type
+	IsAsync    bool
+	Generics   []*GenericParameter
+}
+
+func (m *TraitMethod) GetSpan() position.Span             { return m.Span }
+func (m *TraitMethod) String() string                     { return fmt.Sprintf("fn %s(...)", m.Name.String()) }
+func (m *TraitMethod) Accept(visitor Visitor) interface{} { return visitor.VisitTraitMethod(m) }
+
+// AssociatedType represents a trait associated type item
+type AssociatedType struct {
+	Span   position.Span
+	Name   *Identifier
+	Bounds []Type
+}
+
+func (a *AssociatedType) GetSpan() position.Span             { return a.Span }
+func (a *AssociatedType) String() string                     { return fmt.Sprintf("type %s", a.Name.String()) }
+func (a *AssociatedType) Accept(visitor Visitor) interface{} { return visitor.VisitAssociatedType(a) }
+
+// TraitDeclaration represents a trait declaration (method signatures only)
+type TraitDeclaration struct {
+	Span            position.Span
+	Name            *Identifier
+	Methods         []*TraitMethod
+	IsExported      bool
+	Generics        []*GenericParameter
+	AssociatedTypes []*AssociatedType
+}
+
+func (d *TraitDeclaration) GetSpan() position.Span { return d.Span }
+func (d *TraitDeclaration) String() string         { return fmt.Sprintf("trait %s", d.Name.String()) }
+func (d *TraitDeclaration) Accept(visitor Visitor) interface{} {
+	return visitor.VisitTraitDeclaration(d)
+}
+func (d *TraitDeclaration) statementNode()   {}
+func (d *TraitDeclaration) declarationNode() {}
+
+// ImplDeclaration represents an impl block
+type ImplDeclaration struct {
+	Span         position.Span
+	Trait        Type // optional; nil for inherent impl
+	ForType      Type // required
+	Methods      []*FunctionDeclaration
+	Generics     []*GenericParameter
+	WhereClauses []*WherePredicate
+}
+
+func (i *ImplDeclaration) GetSpan() position.Span             { return i.Span }
+func (i *ImplDeclaration) String() string                     { return "impl" }
+func (i *ImplDeclaration) Accept(visitor Visitor) interface{} { return visitor.VisitImplDeclaration(i) }
+func (i *ImplDeclaration) statementNode()                     {}
+func (i *ImplDeclaration) declarationNode()                   {}
+
 // ImportDeclaration represents an import statement at top level
 type ImportDeclaration struct {
 	Span       position.Span // Source span

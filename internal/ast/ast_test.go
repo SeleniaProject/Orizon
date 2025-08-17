@@ -174,3 +174,15 @@ func (m *MockVisitor) VisitAttribute(node *Attribute) interface{}               
 func (m *MockVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{}     { return node }
 func (m *MockVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{}     { return node }
 func (m *MockVisitor) VisitExportItem(node *ExportItem) interface{}                   { return node }
+
+// New nodes added to Visitor interface
+func (m *MockVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} { return node }
+func (m *MockVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{}     { return node }
+func (m *MockVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{}   { return node }
+func (m *MockVisitor) VisitImplDeclaration(node *ImplDeclaration) interface{}     { return node }
+func (m *MockVisitor) VisitStructField(node *StructField) interface{}             { return node }
+func (m *MockVisitor) VisitEnumVariant(node *EnumVariant) interface{}             { return node }
+func (m *MockVisitor) VisitTraitMethod(node *TraitMethod) interface{}             { return node }
+func (m *MockVisitor) VisitGenericParameter(node *GenericParameter) interface{}   { return node }
+func (m *MockVisitor) VisitWherePredicate(node *WherePredicate) interface{}       { return node }
+func (m *MockVisitor) VisitAssociatedType(node *AssociatedType) interface{}       { return node }
