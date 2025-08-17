@@ -131,3 +131,63 @@ func TestToParserType_PointerMutRoundTrip(t *testing.T) {
 		t.Fatalf("expected parser.PointerType(mut), got %T %#v", v.TypeSpec, v.TypeSpec)
 	}
 }
+
+func TestDeclarations_TypeAlias_And_Newtype_RoundTrip(t *testing.T) {
+	// Parser -> AST(TypeDeclaration alias) -> Parser
+	{
+		pprog := &p.Program{Declarations: []p.Declaration{
+			&p.TypeAliasDeclaration{Name: &p.Identifier{Value: "MyInt"}, Aliased: &p.BasicType{Name: "i32"}, IsPublic: true},
+		}}
+		ap, err := FromParserProgram(pprog)
+		if err != nil {
+			t.Fatalf("FromParserProgram error: %v", err)
+		}
+		if len(ap.Declarations) != 1 {
+			t.Fatalf("expected 1 decl")
+		}
+		td, ok := ap.Declarations[0].(*aast.TypeDeclaration)
+		if !ok || !td.IsAlias || !td.IsExported || td.Name.Value != "MyInt" {
+			t.Fatalf("unexpected TypeDeclaration alias: %#v", ap.Declarations[0])
+		}
+		// back to parser
+		pback, err := ToParserProgram(ap)
+		if err != nil {
+			t.Fatalf("ToParserProgram error: %v", err)
+		}
+		if len(pback.Declarations) != 1 {
+			t.Fatalf("expected 1 decl back")
+		}
+		if _, ok := pback.Declarations[0].(*p.TypeAliasDeclaration); !ok {
+			t.Fatalf("expected TypeAliasDeclaration back, got %T", pback.Declarations[0])
+		}
+	}
+
+	// Parser -> AST(TypeDeclaration newtype) -> Parser
+	{
+		pprog := &p.Program{Declarations: []p.Declaration{
+			&p.NewtypeDeclaration{Name: &p.Identifier{Value: "UserId"}, Base: &p.BasicType{Name: "i64"}},
+		}}
+		ap, err := FromParserProgram(pprog)
+		if err != nil {
+			t.Fatalf("FromParserProgram error: %v", err)
+		}
+		if len(ap.Declarations) != 1 {
+			t.Fatalf("expected 1 decl")
+		}
+		td, ok := ap.Declarations[0].(*aast.TypeDeclaration)
+		if !ok || td.IsAlias || td.Name.Value != "UserId" {
+			t.Fatalf("unexpected TypeDeclaration newtype: %#v", ap.Declarations[0])
+		}
+		// back to parser
+		pback, err := ToParserProgram(ap)
+		if err != nil {
+			t.Fatalf("ToParserProgram error: %v", err)
+		}
+		if len(pback.Declarations) != 1 {
+			t.Fatalf("expected 1 decl back")
+		}
+		if _, ok := pback.Declarations[0].(*p.NewtypeDeclaration); !ok {
+			t.Fatalf("expected NewtypeDeclaration back, got %T", pback.Declarations[0])
+		}
+	}
+}

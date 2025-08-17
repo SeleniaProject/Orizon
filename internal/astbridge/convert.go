@@ -125,6 +125,40 @@ func fromParserDecl(d p.Declaration) (ast.Declaration, error) {
 		return fromParserFunc(n)
 	case *p.VariableDeclaration:
 		return fromParserVar(n)
+	case *p.TypeAliasDeclaration:
+		// Map parser type alias to core AST TypeDeclaration (IsAlias=true)
+		var at ast.Type
+		var err error
+		if n.Aliased != nil {
+			at, err = fromParserType(n.Aliased)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &ast.TypeDeclaration{
+			Span:       fromParserSpan(n.Span),
+			Name:       &ast.Identifier{Span: fromParserSpan(n.Name.Span), Value: n.Name.Value},
+			Type:       at,
+			IsAlias:    true,
+			IsExported: n.IsPublic,
+		}, nil
+	case *p.NewtypeDeclaration:
+		// Map parser newtype to core AST TypeDeclaration (IsAlias=false)
+		var bt ast.Type
+		var err error
+		if n.Base != nil {
+			bt, err = fromParserType(n.Base)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &ast.TypeDeclaration{
+			Span:       fromParserSpan(n.Span),
+			Name:       &ast.Identifier{Span: fromParserSpan(n.Name.Span), Value: n.Name.Value},
+			Type:       bt,
+			IsAlias:    false,
+			IsExported: n.IsPublic,
+		}, nil
 	case *p.MacroDefinition:
 		// Macros are compile-time only; skip them in AST bridge for now
 		return nil, nil
@@ -148,6 +182,30 @@ func toParserDecl(d ast.Declaration) (p.Declaration, error) {
 		return toParserFunc(n)
 	case *ast.VariableDeclaration:
 		return toParserVar(n)
+	case *ast.TypeDeclaration:
+		// Map core AST TypeDeclaration to parser alias/newtype decl
+		var pt p.Type
+		var err error
+		if n.Type != nil {
+			pt, err = toParserType(n.Type)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if n.IsAlias {
+			return &p.TypeAliasDeclaration{
+				Span:     toParserSpan(n.Span),
+				Name:     &p.Identifier{Span: toParserSpan(n.Name.Span), Value: n.Name.Value},
+				Aliased:  pt,
+				IsPublic: n.IsExported,
+			}, nil
+		}
+		return &p.NewtypeDeclaration{
+			Span:     toParserSpan(n.Span),
+			Name:     &p.Identifier{Span: toParserSpan(n.Name.Span), Value: n.Name.Value},
+			Base:     pt,
+			IsPublic: n.IsExported,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported ast declaration type %T", d)
 	}
