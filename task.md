@@ -57,11 +57,15 @@
   - [x] import/export ノード追加（core AST）
   - [x] 方針ドキュメント追加: docs/astbridge_declaration_design.md
     - 要旨: struct/enum/trait/impl は parser/HIR で扱い core AST へは導入しない。type alias/newtype は core AST の TypeDeclaration で表現し、import/export は core AST に追加して往復対応。
-- [ ] パーサー AST ↔ core AST の往復変換を実装（Span/位置情報含む）
-  - [x] import/export の往復変換（現状 Span は最小だが往復保持は確認済み）
-  - [x] 対象範囲の明確化: struct/enum/trait/impl は当面対象外（parser→HIR 経由）
-- [ ] 追加ユニットテスト（宣言の保持・変換の完全性）
+- [x] パーサー AST ↔ core AST の往復変換を実装（Span/位置情報含む）
+  - [x] import/export の往復変換（Span 含む往復保持を確認）
+  - [x] struct/enum/trait/impl/type alias/newtype の往復変換（Span/Generics/Fields/Variants を保持）
+  - [x] 関数パラメータ名など微細な識別子 Span の保持強化
+- [x] 追加ユニットテスト（宣言の保持・変換の完全性）
   - [x] import/export のラウンドトリップテスト
+  - [x] struct フィールド/ジェネリクス Span の往復テスト
+  - [x] enum バリアント名 Span の往復テスト
+  - [x] trait メソッド引数名 Span の往復テスト
 
 ## 3. 型システム/型検査
 - [ ] 基本型/関数/ジェネリクスの型検査
@@ -127,7 +131,7 @@
 
 ## 直近の実装順（推奨）
 1) パーサー宣言群の実装 + テスト
-2) AST ブリッジで宣言の往復対応
+2) AST ブリッジで宣言の往復対応（完了）
 3) HIR 型/宣言対応の拡張
 4) 最小 self-host subset（必要言語機能/標準ライブラリ）のスコープ確定
 5) Stage1 ビルドまでを e2e で通して課題洗い出し
