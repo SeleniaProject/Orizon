@@ -91,6 +91,7 @@ type TypeInfo struct {
 	Constraints []TypeConstraint // Type constraints
 	VariableID  *int             // For type variables in inference (nil for concrete types)
 	StructInfo  *StructLayout    // Extended struct layout information for complex types
+	Effects     EffectSet        // Declared effects for function types (zero-value if unspecified)
 }
 
 // 型等価性判定
@@ -218,6 +219,7 @@ type MethodInfo struct {
 	Receiver  TypeInfo
 	Static    bool
 	Private   bool
+	Effects   EffectSet
 	Span      position.Span
 }
 
@@ -420,6 +422,9 @@ type HIRVisitor interface {
 	VisitBreakStatement(node *HIRBreakStatement) interface{}
 	VisitContinueStatement(node *HIRContinueStatement) interface{}
 	VisitAssignStatement(node *HIRAssignStatement) interface{}
+	// Exception handling
+	VisitThrowStatement(node *HIRThrowStatement) interface{}
+	VisitTryCatchStatement(node *HIRTryCatchStatement) interface{}
 
 	// Expression visits
 	VisitIdentifier(node *HIRIdentifier) interface{}

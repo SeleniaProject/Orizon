@@ -481,6 +481,102 @@ func (as *HIRAssignStatement) String() string {
 	return fmt.Sprintf("HIRAssignStatement{%s %s %s}", as.Target.String(), as.Operator, as.Value.String())
 }
 
+// HIRThrowStatement represents a throw statement in HIR
+type HIRThrowStatement struct {
+	ID       NodeID
+	Value    HIRExpression // Optional thrown value (can be nil for rethrow style)
+	Effects  EffectSet
+	Regions  RegionSet
+	Metadata IRMetadata
+	Span     position.Span
+}
+
+func (ts *HIRThrowStatement) GetID() NodeID          { return ts.ID }
+func (ts *HIRThrowStatement) GetSpan() position.Span { return ts.Span }
+func (ts *HIRThrowStatement) GetType() TypeInfo      { return TypeInfo{Kind: TypeKindVoid, Name: "void"} }
+func (ts *HIRThrowStatement) GetEffects() EffectSet  { return ts.Effects }
+func (ts *HIRThrowStatement) GetRegions() RegionSet  { return ts.Regions }
+func (ts *HIRThrowStatement) Accept(visitor HIRVisitor) interface{} {
+	return visitor.VisitThrowStatement(ts)
+}
+func (ts *HIRThrowStatement) GetChildren() []HIRNode {
+	if ts.Value != nil {
+		return []HIRNode{ts.Value}
+	}
+	return []HIRNode{}
+}
+func (ts *HIRThrowStatement) hirStatementNode() {}
+func (ts *HIRThrowStatement) String() string {
+	if ts.Value != nil {
+		return fmt.Sprintf("HIRThrowStatement{%s}", ts.Value.String())
+	}
+	return "HIRThrowStatement{}"
+}
+
+// HIRCatchClause represents a single catch clause with an optional exception binding
+type HIRCatchClause struct {
+	ID        NodeID
+	Exception TypeInfo     // Type of exception to catch (unknown => catch-all)
+	Binding   string       // Optional variable name
+	Body      HIRStatement // Catch body
+	Metadata  IRMetadata
+	Span      position.Span
+}
+
+// HIRTryCatchStatement represents try { ... } catch (...) { ... } finally { ... }
+type HIRTryCatchStatement struct {
+	ID       NodeID
+	TryBody  HIRStatement
+	Catches  []*HIRCatchClause
+	Finally  HIRStatement // Optional
+	Effects  EffectSet
+	Regions  RegionSet
+	Metadata IRMetadata
+	Span     position.Span
+}
+
+func (ts *HIRCatchClause) GetID() NodeID                         { return ts.ID }
+func (ts *HIRCatchClause) GetSpan() position.Span                { return ts.Span }
+func (ts *HIRCatchClause) GetType() TypeInfo                     { return TypeInfo{Kind: TypeKindVoid, Name: "void"} }
+func (ts *HIRCatchClause) GetEffects() EffectSet                 { return NewEffectSet() }
+func (ts *HIRCatchClause) GetRegions() RegionSet                 { return NewRegionSet() }
+func (ts *HIRCatchClause) Accept(visitor HIRVisitor) interface{} { return nil }
+func (ts *HIRCatchClause) GetChildren() []HIRNode {
+	if ts.Body != nil {
+		return []HIRNode{ts.Body}
+	}
+	return []HIRNode{}
+}
+func (ts *HIRCatchClause) String() string { return "HIRCatchClause{}" }
+
+func (tcs *HIRTryCatchStatement) GetID() NodeID          { return tcs.ID }
+func (tcs *HIRTryCatchStatement) GetSpan() position.Span { return tcs.Span }
+func (tcs *HIRTryCatchStatement) GetType() TypeInfo {
+	return TypeInfo{Kind: TypeKindVoid, Name: "void"}
+}
+func (tcs *HIRTryCatchStatement) GetEffects() EffectSet { return tcs.Effects }
+func (tcs *HIRTryCatchStatement) GetRegions() RegionSet { return tcs.Regions }
+func (tcs *HIRTryCatchStatement) Accept(visitor HIRVisitor) interface{} {
+	return visitor.VisitTryCatchStatement(tcs)
+}
+func (tcs *HIRTryCatchStatement) GetChildren() []HIRNode {
+	children := []HIRNode{}
+	if tcs.TryBody != nil {
+		children = append(children, tcs.TryBody)
+	}
+	for _, c := range tcs.Catches {
+		if c != nil {
+			children = append(children, c)
+		}
+	}
+	if tcs.Finally != nil {
+		children = append(children, tcs.Finally)
+	}
+	return children
+}
+func (tcs *HIRTryCatchStatement) hirStatementNode() {}
+func (tcs *HIRTryCatchStatement) String() string    { return "HIRTryCatchStatement{}" }
+
 // =============================================================================
 // HIR Expressions
 // =============================================================================

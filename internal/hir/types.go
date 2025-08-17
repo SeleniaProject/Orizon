@@ -216,9 +216,12 @@ type HIRGenericType struct {
 	BaseType    HIRType
 	TypeArgs    []HIRType
 	Constraints []TypeConstraint
-	Type        TypeInfo
-	Metadata    IRMetadata
-	Span        position.Span
+	// ParamConstraints holds constraints per type argument (index-aligned with TypeArgs).
+	// If provided and length matches TypeArgs, the type checker applies these instead of the flat Constraints.
+	ParamConstraints [][]TypeConstraint
+	Type             TypeInfo
+	Metadata         IRMetadata
+	Span             position.Span
 }
 
 func (gt *HIRGenericType) GetID() NodeID          { return gt.ID }
@@ -365,6 +368,7 @@ func (tb *HIRTypeBuilder) BuildFunctionType(parameters []HIRType, returnType HIR
 			Send:      effects.Pure,
 			Sync:      effects.Pure,
 		},
+		Effects: effects,
 	}
 
 	return &HIRFunctionType{
@@ -432,6 +436,7 @@ func (tb *HIRTypeBuilder) BuildInterfaceType(name string, methods []HIRInterface
 			Signature: method.Signature.GetType(),
 			Static:    false,
 			Private:   false,
+			Effects:   method.Effects,
 			Span:      method.Span,
 		}
 	}
@@ -479,14 +484,44 @@ func (tb *HIRTypeBuilder) BuildGenericType(name string, baseType HIRType, typeAr
 	}
 
 	return &HIRGenericType{
-		ID:          generateNodeID(),
+		ID:               generateNodeID(),
+		Name:             name,
+		BaseType:         baseType,
+		TypeArgs:         typeArgs,
+		Constraints:      constraints,
+		ParamConstraints: nil,
+		Type:             typeInfo,
+		Metadata:         IRMetadata{},
+		Span:             span,
+	}
+}
+
+// BuildGenericTypeWithParamConstraints creates a generic type HIR node with per-parameter constraints mapping.
+func (tb *HIRTypeBuilder) BuildGenericTypeWithParamConstraints(name string, baseType HIRType, typeArgs []HIRType, perParam [][]TypeConstraint, span position.Span) *HIRGenericType {
+	typeInfo := TypeInfo{
+		ID:          TypeID(generateNodeID()),
+		Kind:        TypeKindGeneric,
 		Name:        name,
-		BaseType:    baseType,
-		TypeArgs:    typeArgs,
-		Constraints: constraints,
-		Type:        typeInfo,
-		Metadata:    IRMetadata{},
-		Span:        span,
+		Size:        -1,
+		Constraints: nil, // use per-parameter constraints instead of flat constraints
+		Properties: TypeProperties{
+			Copyable:  false,
+			Movable:   true,
+			Droppable: true,
+			Send:      false,
+			Sync:      false,
+		},
+	}
+	return &HIRGenericType{
+		ID:               generateNodeID(),
+		Name:             name,
+		BaseType:         baseType,
+		TypeArgs:         typeArgs,
+		Constraints:      nil,
+		ParamConstraints: perParam,
+		Type:             typeInfo,
+		Metadata:         IRMetadata{},
+		Span:             span,
 	}
 }
 
@@ -956,6 +991,7 @@ func CreateFunctionType(signature FunctionSignature) TypeInfo {
 			Movable:   true,
 			Droppable: true,
 		},
+		Effects: signature.Effects,
 	}
 }
 
@@ -984,6 +1020,7 @@ func CreateClosureType(signature FunctionSignature, environment ClosureEnvironme
 			Movable:   true,
 			Droppable: true,
 		},
+		Effects: signature.Effects,
 	}
 }
 
