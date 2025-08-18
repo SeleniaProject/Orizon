@@ -899,6 +899,27 @@ func fromParserExpr(e p.Expression) (ast.Expression, error) {
 			args = append(args, ca)
 		}
 		return &ast.CallExpression{Span: fromParserSpan(n.Span), Function: fn, Arguments: args}, nil
+	case *p.MemberExpression:
+		obj, err := fromParserExpr(n.Object)
+		if err != nil {
+			return nil, err
+		}
+		member := &ast.Identifier{Span: fromParserSpan(n.Member.Span), Value: n.Member.Value}
+		return &ast.MemberExpression{Span: fromParserSpan(n.Span), Object: obj, Member: member}, nil
+	case *p.AssignmentExpression:
+		left, err := fromParserExpr(n.Left)
+		if err != nil {
+			return nil, err
+		}
+		right, err := fromParserExpr(n.Right)
+		if err != nil {
+			return nil, err
+		}
+		op, err := fromParserOperator(n.Operator)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.BinaryExpression{Span: fromParserSpan(n.Span), Left: left, Operator: op, Right: right}, nil
 	default:
 		return nil, fmt.Errorf("unsupported parser expression type %T", e)
 	}
@@ -948,6 +969,13 @@ func toParserExpr(e ast.Expression) (p.Expression, error) {
 			args = append(args, ca)
 		}
 		return &p.CallExpression{Span: toParserSpan(n.Span), Function: f, Arguments: args}, nil
+	case *ast.MemberExpression:
+		obj, err := toParserExpr(n.Object)
+		if err != nil {
+			return nil, err
+		}
+		member := &p.Identifier{Span: toParserSpan(n.Member.Span), Value: n.Member.Value}
+		return &p.MemberExpression{Span: toParserSpan(n.Span), Object: obj, Member: member}, nil
 	default:
 		return nil, fmt.Errorf("unsupported ast expression type %T", e)
 	}
@@ -1418,6 +1446,30 @@ func fromParserOperator(op *p.Operator) (ast.Operator, error) {
 		return ast.OpOr, nil
 	case "!":
 		return ast.OpNot, nil
+	case "=":
+		return ast.OpAssign, nil
+	case "+=":
+		return ast.OpAddAssign, nil
+	case "-=":
+		return ast.OpSubAssign, nil
+	case "*=":
+		return ast.OpMulAssign, nil
+	case "/=":
+		return ast.OpDivAssign, nil
+	case "%=":
+		return ast.OpModAssign, nil
+	case "&":
+		return ast.OpBitAnd, nil
+	case "|":
+		return ast.OpBitOr, nil
+	case "^":
+		return ast.OpBitXor, nil
+	case "~":
+		return ast.OpBitNot, nil
+	case "<<":
+		return ast.OpShl, nil
+	case ">>":
+		return ast.OpShr, nil
 	default:
 		return 0, fmt.Errorf("unsupported operator %q", op.Value)
 	}

@@ -123,42 +123,32 @@ func (mei *MIRExceptionIntegration) AddNullCheckToMIR(block *mir.BasicBlock, ptr
 	}
 
 	// Create null check instructions
-	cmpInst := &mir.Instruction{
-		Type:  mir.InstCmp,
-		Dest:  "temp_null_cmp",
-		Arg1:  ptrVar,
-		Arg2:  "0",
-		Label: checkLabel,
+	cmpInst := mir.Cmp{
+		Dst:  "temp_null_cmp",
+		Pred: mir.CmpEQ,
+		LHS:  mir.Value{Kind: mir.ValRef, Ref: ptrVar},
+		RHS:  mir.Value{Kind: mir.ValConstInt, Int64: 0},
 	}
 
-	branchInst := &mir.Instruction{
-		Type:      mir.InstBranchCond,
-		Condition: "eq",
-		Arg1:      "temp_null_cmp",
-		Target:    errorLabel,
+	branchInst := mir.CondBr{
+		Cond:  mir.Value{Kind: mir.ValRef, Ref: "temp_null_cmp"},
+		True:  errorLabel,
+		False: okLabel,
 	}
 
-	jumpOkInst := &mir.Instruction{
-		Type:   mir.InstJump,
+	jumpOkInst := mir.Br{
 		Target: okLabel,
 	}
 
-	panicInst := &mir.Instruction{
-		Type:  mir.InstCall,
-		Dest:  "",
-		Arg1:  "panic_null_pointer",
-		Args:  []string{ptrName},
-		Label: errorLabel,
-	}
-
-	continueInst := &mir.Instruction{
-		Type:  mir.InstNop,
-		Label: okLabel,
+	panicInst := mir.Call{
+		Dst:    "",
+		Callee: "panic_null_pointer",
+		Args:   []mir.Value{{Kind: mir.ValRef, Ref: ptrName}},
 	}
 
 	// Add instructions to the block
-	block.Instructions = append(block.Instructions,
-		cmpInst, branchInst, jumpOkInst, panicInst, continueInst)
+	block.Instr = append(block.Instr,
+		cmpInst, branchInst, jumpOkInst, panicInst)
 }
 
 // AddDivisionCheckToMIR adds division by zero checking to a MIR basic block
@@ -177,42 +167,37 @@ func (mei *MIRExceptionIntegration) AddDivisionCheckToMIR(block *mir.BasicBlock,
 	}
 
 	// Create division check instructions
-	cmpInst := &mir.Instruction{
-		Type:  mir.InstCmp,
-		Dest:  "temp_div_cmp",
-		Arg1:  divisorVar,
-		Arg2:  "0",
-		Label: checkLabel,
+	cmpInst := mir.Cmp{
+		Dst:  "temp_div_cmp",
+		Pred: mir.CmpEQ,
+		LHS:  mir.Value{Kind: mir.ValRef, Ref: divisorVar},
+		RHS:  mir.Value{Kind: mir.ValConstInt, Int64: 0},
 	}
 
-	branchInst := &mir.Instruction{
-		Type:      mir.InstBranchCond,
-		Condition: "eq",
-		Arg1:      "temp_div_cmp",
-		Target:    errorLabel,
+	branchInst := mir.CondBr{
+		Cond:  mir.Value{Kind: mir.ValRef, Ref: "temp_div_cmp"},
+		True:  errorLabel,
+		False: okLabel,
 	}
 
-	jumpOkInst := &mir.Instruction{
-		Type:   mir.InstJump,
+	jumpOkInst := mir.Br{
 		Target: okLabel,
 	}
 
-	panicInst := &mir.Instruction{
-		Type:  mir.InstCall,
-		Dest:  "",
-		Arg1:  "panic_division_by_zero",
-		Args:  []string{operation},
-		Label: errorLabel,
-	}
-
-	continueInst := &mir.Instruction{
-		Type:  mir.InstNop,
-		Label: okLabel,
+	panicInst := mir.Call{
+		Dst:    "",
+		Callee: "panic_division_by_zero",
+		Args:   []mir.Value{{Kind: mir.ValRef, Ref: operation}},
 	}
 
 	// Add instructions to the block
-	block.Instructions = append(block.Instructions,
-		cmpInst, branchInst, jumpOkInst, panicInst, continueInst)
+	block.Instr = append(block.Instr,
+		cmpInst, branchInst, jumpOkInst, panicInst)
+}
+
+// AddArrayBoundsCheckToMIR adds array bounds checking to a MIR basic block
+func (mei *MIRExceptionIntegration) AddArrayBoundsCheckToMIR(block *mir.BasicBlock, arrayVar, indexVar, lengthVar string) {
+	// Implementation for array bounds checking
 }
 
 // AddAssertToMIR adds assertion checking to a MIR basic block
