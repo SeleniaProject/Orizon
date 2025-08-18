@@ -126,6 +126,7 @@ func (vd *HIRVariableDeclaration) GetChildren() []HIRNode {
 	return children
 }
 func (vd *HIRVariableDeclaration) hirDeclarationNode() {}
+func (vd *HIRVariableDeclaration) hirStatementNode()   {} // Allow variable declarations to be used as statements
 func (vd *HIRVariableDeclaration) String() string {
 	return fmt.Sprintf("HIRVariableDeclaration{%s: %s}", vd.Name, vd.Type.String())
 }

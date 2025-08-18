@@ -5,6 +5,7 @@ package hir
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/orizon-lang/orizon/internal/ast"
 	"github.com/orizon-lang/orizon/internal/position"
@@ -79,11 +80,47 @@ func NewSymbolTable() *SymbolTable {
 		Level:   0,
 	}
 
-	return &SymbolTable{
+	symbolTable := &SymbolTable{
 		scopes:    []*Scope{globalScope},
 		currentID: 1,
 		symbols:   make(map[string]*Symbol),
 	}
+
+	// Add built-in functions to global scope
+	builtinFunctions := []struct {
+		name       string
+		paramTypes []TypeInfo
+		returnType TypeInfo
+	}{
+		{"print", []TypeInfo{{Kind: TypeKindString, Name: "string"}}, TypeInfo{Kind: TypeKindVoid, Name: "void"}},
+		{"println", []TypeInfo{{Kind: TypeKindString, Name: "string"}}, TypeInfo{Kind: TypeKindVoid, Name: "void"}},
+		{"exit", []TypeInfo{{Kind: TypeKindInteger, Name: "int"}}, TypeInfo{Kind: TypeKindVoid, Name: "void"}},
+	}
+
+	for _, builtin := range builtinFunctions {
+		// Include both parameter types and return type in Parameters slice
+		allTypes := make([]TypeInfo, 0, len(builtin.paramTypes)+1)
+		allTypes = append(allTypes, builtin.paramTypes...)
+		allTypes = append(allTypes, builtin.returnType)
+
+		funcType := TypeInfo{
+			Kind:       TypeKindFunction,
+			Name:       builtin.name,
+			Parameters: allTypes,
+		}
+
+		symbol := &Symbol{
+			Name:        builtin.name,
+			Type:        funcType,
+			Declaration: nil, // Built-in, no declaration
+			Used:        false,
+		}
+
+		globalScope.Symbols[builtin.name] = symbol
+		symbolTable.symbols[builtin.name] = symbol
+	}
+
+	return symbolTable
 }
 
 // ConvertProgram converts an AST program to HIR program
@@ -137,7 +174,41 @@ func (c *ASTToHIRConverter) convertDeclaration(astDecl ast.Declaration) HIRDecla
 
 // convertFunctionDeclaration converts an AST function declaration to HIR
 func (c *ASTToHIRConverter) convertFunctionDeclaration(astFunc *ast.FunctionDeclaration) HIRDeclaration {
-	// Enter new scope for function
+	// First, add function to symbol table BEFORE processing body
+	// This allows recursive calls and forward references
+
+	// Convert return type
+	var hirReturnType HIRType
+	if astFunc.ReturnType != nil {
+		hirReturnType = c.convertType(astFunc.ReturnType)
+	} else {
+		hirReturnType = c.typeBuilder.BuildBasicType("void", astFunc.GetSpan())
+	}
+
+	// Build parameter types for function signature
+	paramTypes := make([]HIRType, len(astFunc.Parameters))
+	for i, param := range astFunc.Parameters {
+		paramTypes[i] = c.convertType(param.Type)
+	}
+
+	// Build function type and add to global symbol table
+	funcType := c.typeBuilder.BuildFunctionType(
+		paramTypes,
+		hirReturnType,
+		NewEffectSet(), // Will be updated after analyzing body
+		astFunc.GetSpan(),
+	)
+
+	c.symbolTable.AddSymbol(astFunc.Name.Value, &Symbol{
+		Name:        astFunc.Name.Value,
+		Type:        funcType.GetType(),
+		Declaration: nil, // Will be set after creating HIRFunctionDeclaration
+		Span:        astFunc.GetSpan(),
+		Mutable:     false,
+		Used:        false,
+	})
+
+	// Enter new scope for function body
 	c.symbolTable.PushScope()
 	defer c.symbolTable.PopScope()
 
@@ -145,17 +216,38 @@ func (c *ASTToHIRConverter) convertFunctionDeclaration(astFunc *ast.FunctionDecl
 	hirParams := make([]*HIRParameter, len(astFunc.Parameters))
 	for i, param := range astFunc.Parameters {
 		hirType := c.convertType(param.Type)
+
+		// Convert default value if provided
+		var hirDefault HIRExpression
+		if param.DefaultValue != nil {
+			hirDefault = c.convertExpression(param.DefaultValue)
+			// Type check: default value must be compatible with parameter type
+			if hirDefault != nil {
+				defaultType := hirDefault.GetType()
+				paramType := hirType.GetType()
+				if !c.isTypeCompatible(defaultType, paramType) {
+					c.addError(ConversionError{
+						Message: fmt.Sprintf("default value type %s is not compatible with parameter type %s",
+							defaultType.Name, paramType.Name),
+						Span: param.GetSpan(),
+						Kind: ErrorKindTypeError,
+					})
+					hirDefault = nil
+				}
+			}
+		}
+
 		hirParam := &HIRParameter{
 			ID:       generateNodeID(),
 			Name:     param.Name.Value,
 			Type:     hirType,
-			Default:  nil, // TODO: Handle default values
+			Default:  hirDefault,
 			Metadata: IRMetadata{},
 			Span:     param.GetSpan(),
 		}
 		hirParams[i] = hirParam
 
-		// Add parameter to symbol table
+		// Add parameter to local scope
 		c.symbolTable.AddSymbol(param.Name.Value, &Symbol{
 			Name:        param.Name.Value,
 			Type:        hirType.GetType(),
@@ -164,14 +256,6 @@ func (c *ASTToHIRConverter) convertFunctionDeclaration(astFunc *ast.FunctionDecl
 			Mutable:     param.IsMutable,
 			Used:        false,
 		})
-	}
-
-	// Convert return type
-	var hirReturnType HIRType
-	if astFunc.ReturnType != nil {
-		hirReturnType = c.convertType(astFunc.ReturnType)
-	} else {
-		hirReturnType = c.typeBuilder.BuildBasicType("void", astFunc.GetSpan())
 	}
 
 	// Convert body
@@ -184,43 +268,50 @@ func (c *ASTToHIRConverter) convertFunctionDeclaration(astFunc *ast.FunctionDecl
 	effects := c.analyzeStatementEffects(hirBody)
 	regions := c.analyzeStatementRegions(hirBody)
 
+	// Check for generic type parameters
+	typeParams := make([]TypeInfo, 0)
+	isGeneric := false
+
+	// In a real implementation, you'd parse the AST for type parameter declarations
+	// For now, detect potential generic patterns in the function name or parameters
+	if c.detectGenericPattern(astFunc) {
+		isGeneric = true
+		typeParams = c.extractTypeParameters(astFunc)
+	}
+
 	hirFunc := &HIRFunctionDeclaration{
 		ID:         generateNodeID(),
 		Name:       astFunc.Name.Value,
 		Parameters: hirParams,
 		ReturnType: hirReturnType,
 		Body:       hirBody,
-		Generic:    false, // TODO: Handle generics
-		TypeParams: make([]TypeInfo, 0),
+		Generic:    isGeneric,
+		TypeParams: typeParams,
 		Effects:    effects,
 		Regions:    regions,
 		Metadata:   IRMetadata{},
 		Span:       astFunc.GetSpan(),
 	}
 
-	// Add function to symbol table
-	// Build parameter type list from parameters to avoid nil entries
-	paramTypes := make([]HIRType, len(hirParams))
-	for i, p := range hirParams {
-		paramTypes[i] = p.Type
+	// Update the symbol's declaration reference
+	if symbol := c.symbolTable.LookupSymbol(astFunc.Name.Value); symbol != nil {
+		symbol.Declaration = hirFunc
 	}
-	funcType := c.typeBuilder.BuildFunctionType(
-		paramTypes,
-		hirReturnType,
-		effects,
-		astFunc.GetSpan(),
-	)
-
-	c.symbolTable.AddSymbol(astFunc.Name.Value, &Symbol{
-		Name:        astFunc.Name.Value,
-		Type:        funcType.GetType(),
-		Declaration: hirFunc,
-		Span:        astFunc.GetSpan(),
-		Mutable:     false,
-		Used:        false,
-	})
 
 	return hirFunc
+}
+
+// isTypeCompatible checks if two types are compatible for assignment
+func (c *ASTToHIRConverter) isTypeCompatible(sourceType, targetType TypeInfo) bool {
+	// Exact match
+	if sourceType.Kind == targetType.Kind && sourceType.Name == targetType.Name {
+		return true
+	}
+
+	// Allow implicit conversions for compatible types
+	// For now, be strict and only allow exact matches
+	// TODO: Add more sophisticated type compatibility rules
+	return false
 }
 
 // convertVariableDeclaration converts an AST variable declaration to HIR
@@ -305,8 +396,8 @@ func (c *ASTToHIRConverter) convertTypeDeclaration(astType *ast.TypeDeclaration)
 		ID:       generateNodeID(),
 		Name:     astType.Name.Value,
 		Type:     hirType,
-		Generic:  false, // TODO: Handle generics
-		Params:   make([]TypeInfo, 0),
+		Generic:  c.detectTypeGenericPattern(astType),
+		Params:   c.extractTypeGenericParameters(astType),
 		Metadata: IRMetadata{},
 		Span:     astType.GetSpan(),
 	}
@@ -337,6 +428,17 @@ func (c *ASTToHIRConverter) convertStatement(astStmt ast.Statement) HIRStatement
 		return c.convertIfStatement(stmt)
 	case *ast.WhileStatement:
 		return c.convertWhileStatement(stmt)
+	case *ast.VariableDeclaration:
+		// Variable declarations can appear as statements (let statements)
+		hirDecl := c.convertVariableDeclaration(stmt)
+		if hirDecl == nil {
+			return nil
+		}
+		// Cast the declaration as a statement (it implements both interfaces)
+		if hirVar, ok := hirDecl.(*HIRVariableDeclaration); ok {
+			return hirVar
+		}
+		return nil
 	default:
 		c.addError(ConversionError{
 			Message: fmt.Sprintf("unsupported statement type: %T", stmt),
@@ -676,8 +778,24 @@ func (c *ASTToHIRConverter) convertCallExpression(astCall *ast.CallExpression) H
 	var resultType TypeInfo
 
 	if funcType.Kind == TypeKindFunction {
-		// TODO: Extract return type from function signature
-		resultType = TypeInfo{Kind: TypeKindVoid, Name: "void"}
+		// Extract return type from function signature
+		// For function types, the last parameter in Parameters slice is the return type
+		if len(funcType.Parameters) > 0 {
+			// The last type parameter is the return type
+			resultType = funcType.Parameters[len(funcType.Parameters)-1]
+		} else {
+			// Fallback to void if no return type specified
+			resultType = TypeInfo{Kind: TypeKindVoid, Name: "void"}
+		}
+
+		// If calling a built-in function, lookup the expected return type
+		if id, ok := hirFunc.(*HIRIdentifier); ok {
+			if symbol := c.symbolTable.LookupSymbol(id.Name); symbol != nil {
+				if symbol.Type.Kind == TypeKindFunction && len(symbol.Type.Parameters) > 0 {
+					resultType = symbol.Type.Parameters[len(symbol.Type.Parameters)-1]
+				}
+			}
+		}
 	} else {
 		c.addError(ConversionError{
 			Message: "attempt to call non-function",
@@ -839,6 +957,116 @@ func (c *ASTToHIRConverter) addError(err ConversionError) {
 
 func (e ConversionError) Error() string {
 	return fmt.Sprintf("%s at %s", e.Message, e.Span.String())
+}
+
+// Generic type handling methods
+
+// detectGenericPattern detects if a function has generic type parameters
+func (c *ASTToHIRConverter) detectGenericPattern(astFunc *ast.FunctionDeclaration) bool {
+	// Simple heuristics to detect generic patterns:
+	// 1. Function name contains generic patterns (e.g., contains<T>, map<K,V>)
+	// 2. Parameters or return types use type variables
+	// 3. Function uses type parameters in body
+
+	// Check for common generic naming patterns
+	name := astFunc.Name.Value
+	if strings.Contains(name, "<") && strings.Contains(name, ">") {
+		return true
+	}
+
+	// Check for type variable usage in parameters
+	for _, param := range astFunc.Parameters {
+		if c.containsTypeVariable(param.Type) {
+			return true
+		}
+	}
+
+	// Check return type for type variables
+	if astFunc.ReturnType != nil && c.containsTypeVariable(astFunc.ReturnType) {
+		return true
+	}
+
+	return false
+}
+
+// extractTypeParameters extracts type parameters from a generic function
+func (c *ASTToHIRConverter) extractTypeParameters(astFunc *ast.FunctionDeclaration) []TypeInfo {
+	typeParams := make([]TypeInfo, 0)
+
+	// In a real implementation, this would parse explicit type parameter declarations
+	// For now, infer type parameters from usage patterns
+
+	if c.detectGenericPattern(astFunc) {
+		// Create a basic type parameter for demonstration
+		typeParam := TypeInfo{
+			Kind: TypeKindGeneric,
+			Name: "T", // In reality, extract from declarations
+		}
+		typeParams = append(typeParams, typeParam)
+	}
+
+	return typeParams
+}
+
+// detectTypeGenericPattern detects if a type declaration is generic
+func (c *ASTToHIRConverter) detectTypeGenericPattern(astType *ast.TypeDeclaration) bool {
+	// Check for generic patterns in type declarations
+	name := astType.Name.Value
+
+	// Look for generic naming patterns
+	if strings.Contains(name, "<") && strings.Contains(name, ">") {
+		return true
+	}
+
+	// Check if the type definition contains type variables
+	if astType.Type != nil && c.containsTypeVariable(astType.Type) {
+		return true
+	}
+
+	return false
+}
+
+// extractTypeGenericParameters extracts type parameters from a generic type
+func (c *ASTToHIRConverter) extractTypeGenericParameters(astType *ast.TypeDeclaration) []TypeInfo {
+	typeParams := make([]TypeInfo, 0)
+
+	if c.detectTypeGenericPattern(astType) {
+		// Create basic type parameters for demonstration
+		typeParam := TypeInfo{
+			Kind: TypeKindGeneric,
+			Name: "T",
+		}
+		typeParams = append(typeParams, typeParam)
+	}
+
+	return typeParams
+}
+
+// containsTypeVariable checks if a type contains type variables (indicating generics)
+func (c *ASTToHIRConverter) containsTypeVariable(astType ast.Node) bool {
+	// This is a simplified check - in reality, you'd do AST traversal
+	// to find type variable references
+
+	if astType == nil {
+		return false
+	}
+
+	// Check if the type string representation contains common type variable patterns
+	typeStr := fmt.Sprintf("%v", astType)
+
+	// Look for single uppercase letters (common type variable convention)
+	for _, char := range typeStr {
+		if char >= 'A' && char <= 'Z' && len(typeStr) == 1 {
+			return true
+		}
+	}
+
+	// Look for generic syntax patterns
+	if strings.Contains(typeStr, "<") && strings.Contains(typeStr, ">") {
+		return true
+	}
+
+	return false
 }
 
 // GetErrors returns all conversion errors
