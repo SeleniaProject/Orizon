@@ -805,3 +805,11 @@ func (ao *ASTOptimizer) VisitRefinementType(rt *RefinementType) interface{}  { r
 func (ao *ASTOptimizer) VisitSizedArrayType(sat *SizedArrayType) interface{} { return sat }
 func (ao *ASTOptimizer) VisitIndexType(it *IndexType) interface{}            { return it }
 func (ao *ASTOptimizer) VisitProofType(pt *ProofType) interface{}            { return pt }
+
+// Pattern matching visitor methods (pass through for now)
+func (ao *ASTOptimizer) VisitLiteralPattern(lp *LiteralPattern) interface{}         { return lp }
+func (ao *ASTOptimizer) VisitVariablePattern(vp *VariablePattern) interface{}       { return vp }
+func (ao *ASTOptimizer) VisitConstructorPattern(cp *ConstructorPattern) interface{} { return cp }
+func (ao *ASTOptimizer) VisitGuardPattern(gp *GuardPattern) interface{}             { return gp }
+func (ao *ASTOptimizer) VisitWildcardPattern(wp *WildcardPattern) interface{}       { return wp }
+func (ao *ASTOptimizer) VisitMatchArm(ma *MatchArm) interface{}                     { return ma }
