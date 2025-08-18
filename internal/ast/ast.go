@@ -653,6 +653,22 @@ func (c *CallExpression) String() string {
 }
 func (c *CallExpression) Accept(visitor Visitor) interface{} { return visitor.VisitCallExpression(c) }
 
+// MemberExpression represents member access (obj.field, obj.method())
+type MemberExpression struct {
+	Span   position.Span // Source span of the member access
+	Object Expression    // Object being accessed
+	Member *Identifier   // Member name
+}
+
+func (m *MemberExpression) GetSpan() position.Span { return m.Span }
+func (m *MemberExpression) expressionNode()        {}
+func (m *MemberExpression) String() string {
+	return fmt.Sprintf("%s.%s", m.Object.String(), m.Member.String())
+}
+func (m *MemberExpression) Accept(visitor Visitor) interface{} {
+	return visitor.VisitMemberExpression(m)
+}
+
 // ===== Types =====
 
 // BasicType represents basic built-in types (int, float, string, bool)

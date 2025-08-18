@@ -44,6 +44,7 @@ type Visitor interface {
 	VisitBinaryExpression(node *BinaryExpression) interface{}
 	VisitUnaryExpression(node *UnaryExpression) interface{}
 	VisitCallExpression(node *CallExpression) interface{}
+	VisitMemberExpression(node *MemberExpression) interface{}
 
 	// Type visitors
 	VisitBasicType(node *BasicType) interface{}
@@ -88,6 +89,7 @@ func (v *BaseVisitor) VisitLiteral(node *Literal) interface{}                   
 func (v *BaseVisitor) VisitBinaryExpression(node *BinaryExpression) interface{}       { return nil }
 func (v *BaseVisitor) VisitUnaryExpression(node *UnaryExpression) interface{}         { return nil }
 func (v *BaseVisitor) VisitCallExpression(node *CallExpression) interface{}           { return nil }
+func (v *BaseVisitor) VisitMemberExpression(node *MemberExpression) interface{}       { return nil }
 func (v *BaseVisitor) VisitBasicType(node *BasicType) interface{}                     { return nil }
 func (v *BaseVisitor) VisitIdentifierType(node *IdentifierType) interface{}           { return nil }
 func (v *BaseVisitor) VisitStructField(node *StructField) interface{}                 { return nil }
@@ -574,6 +576,23 @@ func (w *WalkingVisitor) VisitCallExpression(node *CallExpression) interface{} {
 	return result
 }
 
+// VisitMemberExpression walks through member access expressions
+func (w *WalkingVisitor) VisitMemberExpression(node *MemberExpression) interface{} {
+	result := w.visitor.VisitMemberExpression(node)
+
+	// Walk object expression
+	if node.Object != nil {
+		node.Object.Accept(w)
+	}
+
+	// Walk member name
+	if node.Member != nil {
+		node.Member.Accept(w)
+	}
+
+	return result
+}
+
 // VisitIdentifierType walks through identifier type name
 func (w *WalkingVisitor) VisitIdentifierType(node *IdentifierType) interface{} {
 	result := w.visitor.VisitIdentifierType(node)
@@ -840,6 +859,10 @@ func (n *NodeCountVisitor) VisitUnaryExpression(node *UnaryExpression) interface
 	return nil
 }
 func (n *NodeCountVisitor) VisitCallExpression(node *CallExpression) interface{} {
+	n.count++
+	return nil
+}
+func (n *NodeCountVisitor) VisitMemberExpression(node *MemberExpression) interface{} {
 	n.count++
 	return nil
 }
