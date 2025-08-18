@@ -100,14 +100,6 @@ type TypeInfo struct {
 	Methods     []MethodInfo // Method information
 }
 
-// FieldInfo describes struct field information
-type FieldInfo struct {
-	Name   string  // Field name
-	Type   string  // Field type
-	Offset uintptr // Field offset
-	Size   uintptr // Field size
-}
-
 // MethodInfo describes method information
 type MethodInfo struct {
 	Name      string  // Method name

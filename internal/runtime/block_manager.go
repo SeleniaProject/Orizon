@@ -125,7 +125,7 @@ func (bm *BlockManager) AllocateBlock(region *Region, size RegionSize, alignment
 
 	// Align total size
 	if alignment > 0 {
-		totalSize = RegionSize(alignUp(uintptr(totalSize), uintptr(alignment)))
+		totalSize = RegionSize(alignUp(int64(totalSize), int64(alignment)))
 	}
 
 	// Check if this is a large object allocation

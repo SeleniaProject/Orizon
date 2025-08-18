@@ -104,7 +104,7 @@ func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *
 		alignment = r.Header.Alignment
 	}
 
-	if !isPowerOfTwo(uintptr(alignment)) {
+	if !isPowerOfTwo(int64(alignment)) {
 		return nil, &AllocationError{
 			Message:   "alignment must be power of two",
 			Code:      ErrorInvalidAlign,
@@ -216,8 +216,8 @@ func (r *Region) findFirstFit(size RegionSize, alignment RegionAlignment) (*Free
 	current := r.Header.FreeList
 
 	for current != nil {
-		alignedOffset := alignUp(current.Offset, uintptr(alignment))
-		alignedSize := RegionSize(alignedOffset-current.Offset) + size
+		alignedOffset := alignUp(int64(current.Offset), int64(alignment))
+		alignedSize := RegionSize(alignedOffset-int64(current.Offset)) + size
 
 		if alignedSize <= current.Size {
 			return current, nil
@@ -243,8 +243,8 @@ func (r *Region) findBestFit(size RegionSize, alignment RegionAlignment) (*FreeB
 	current := r.Header.FreeList
 
 	for current != nil {
-		alignedOffset := alignUp(current.Offset, uintptr(alignment))
-		alignedSize := RegionSize(alignedOffset-current.Offset) + size
+		alignedOffset := alignUp(int64(current.Offset), int64(alignment))
+		alignedSize := RegionSize(alignedOffset-int64(current.Offset)) + size
 
 		if alignedSize <= current.Size {
 			waste := current.Size - alignedSize
@@ -278,8 +278,8 @@ func (r *Region) findWorstFit(size RegionSize, alignment RegionAlignment) (*Free
 	current := r.Header.FreeList
 
 	for current != nil {
-		alignedOffset := alignUp(current.Offset, uintptr(alignment))
-		alignedSize := RegionSize(alignedOffset-current.Offset) + size
+		alignedOffset := alignUp(int64(current.Offset), int64(alignment))
+		alignedSize := RegionSize(alignedOffset-int64(current.Offset)) + size
 
 		if alignedSize <= current.Size {
 			waste := current.Size - alignedSize
@@ -652,17 +652,6 @@ func (r *Region) concurrentCompact() error {
 }
 
 // Helper functions
-
-// isPowerOfTwo checks if a number is a power of two
-func isPowerOfTwo(n uintptr) bool {
-	return n != 0 && (n&(n-1)) == 0
-}
-
-// alignUp rounds up to the nearest multiple of alignment
-func alignUp(offset uintptr, alignment uintptr) uintptr {
-	return (offset + alignment - 1) &^ (alignment - 1)
-}
-
 // clearMemory zeros out memory block
 func clearMemory(ptr unsafe.Pointer, size int) {
 	// Clear memory by setting all bytes to zero
