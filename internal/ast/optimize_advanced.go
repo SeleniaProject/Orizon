@@ -415,6 +415,18 @@ func (dcv *deadCodeVisitor) VisitCallExpression(node *CallExpression) interface{
 	return node
 }
 
+func (dcv *deadCodeVisitor) VisitMemberExpression(node *MemberExpression) interface{} {
+	dcv.stats.NodesVisited++
+
+	if result := node.Object.Accept(dcv); result != nil {
+		if newObj, ok := result.(Expression); ok {
+			node.Object = newObj
+		}
+	}
+
+	return node
+}
+
 func (dcv *deadCodeVisitor) VisitBasicType(node *BasicType) interface{} {
 	dcv.stats.NodesVisited++
 	return node
@@ -862,6 +874,18 @@ func (ssv *syntaxSugarVisitor) VisitCallExpression(node *CallExpression) interfa
 			if newArg, ok := result.(Expression); ok {
 				node.Arguments[i] = newArg
 			}
+		}
+	}
+
+	return node
+}
+
+func (ssv *syntaxSugarVisitor) VisitMemberExpression(node *MemberExpression) interface{} {
+	ssv.stats.NodesVisited++
+
+	if result := node.Object.Accept(ssv); result != nil {
+		if newObj, ok := result.(Expression); ok {
+			node.Object = newObj
 		}
 	}
 

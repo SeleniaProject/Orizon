@@ -744,6 +744,20 @@ func (cfv *constantFoldingVisitor) VisitCallExpression(node *CallExpression) int
 	return node
 }
 
+func (cfv *constantFoldingVisitor) VisitMemberExpression(node *MemberExpression) interface{} {
+	cfv.stats.NodesVisited++
+
+	// Optimize object expression
+	if result := node.Object.Accept(cfv); result != nil {
+		if newObj, ok := result.(Expression); ok {
+			node.Object = newObj
+		}
+	}
+
+	// Member name is just an identifier, no optimization needed
+	return node
+}
+
 func (cfv *constantFoldingVisitor) VisitBasicType(node *BasicType) interface{} {
 	cfv.stats.NodesVisited++
 	return node

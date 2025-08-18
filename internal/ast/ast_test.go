@@ -168,6 +168,7 @@ func (m *MockVisitor) VisitLiteral(node *Literal) interface{}                   
 func (m *MockVisitor) VisitBinaryExpression(node *BinaryExpression) interface{}       { return node }
 func (m *MockVisitor) VisitUnaryExpression(node *UnaryExpression) interface{}         { return node }
 func (m *MockVisitor) VisitCallExpression(node *CallExpression) interface{}           { return node }
+func (m *MockVisitor) VisitMemberExpression(node *MemberExpression) interface{}       { return node }
 func (m *MockVisitor) VisitBasicType(node *BasicType) interface{}                     { return node }
 func (m *MockVisitor) VisitIdentifierType(node *IdentifierType) interface{}           { return node }
 func (m *MockVisitor) VisitAttribute(node *Attribute) interface{}                     { return node }
