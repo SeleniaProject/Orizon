@@ -36,6 +36,19 @@ build: ## コンパイラをビルド
 	@$(SETCGO) go build -o build/orizon-test$(EXE) ./cmd/orizon-test
 	@echo "✅ ビルド完了"
 
+build-all: ## 全ツールをビルド（CI用）
+	@echo "🔨 全Orizonツールをビルド中..."
+	@$(SETCGO) go build -o build/orizon$(EXE) ./cmd/orizon
+	@$(SETCGO) go build -o build/orizon-compiler$(EXE) ./cmd/orizon-compiler
+	@$(SETCGO) go build -o build/orizon-bootstrap$(EXE) ./cmd/orizon-bootstrap
+	@$(SETCGO) go build -o build/orizon-lsp$(EXE) ./cmd/orizon-lsp
+	@$(SETCGO) go build -o build/orizon-fmt$(EXE) ./cmd/orizon-fmt
+	@$(SETCGO) go build -o build/orizon-fuzz$(EXE) ./cmd/orizon-fuzz
+	@$(SETCGO) go build -o build/orizon-repro$(EXE) ./cmd/orizon-repro
+	@$(SETCGO) go build -o build/orizon-test$(EXE) ./cmd/orizon-test
+	@$(SETCGO) go build -o build/orizon-pkg$(EXE) ./cmd/orizon-pkg
+	@echo "✅ 全ツールビルド完了"
+
 bootstrap: ## ブートストラップ補助ツールをビルド
 	@echo "🔨 orizon-bootstrap をビルド中..."
 	@$(SETCGO) go build -o build/orizon-bootstrap$(EXE) ./cmd/orizon-bootstrap
@@ -85,6 +98,15 @@ build-release: ## リリース用ビルド（最適化有効）
 	@echo "✅ リリースビルド完了"
 
 # テスト関連
+test: ## 単体テストを実行
+	@echo "🧪 単体テスト実行中..."
+	@go test ./...
+	@echo "✅ テスト完了"
+
+smoke: ## LSP/フォーマッタのスモークテスト実行
+	@echo "💨 スモークテスト実行中..."
+	@go run ./cmd/orizon-smoke-test
+	@echo "✅ スモークテスト完了"
 test: ## 全テストを実行
 	@echo "🧪 テスト実行中..."
 	@$(SETCGO) go test -v ./...

@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly self-host builds at 2 AM UTC
 
 jobs:
   test:
@@ -35,3 +37,135 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+  lint-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install gofmt
+        run: go install golang.org/x/tools/cmd/goimports@latest
+
+      - name: Check Go formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Check Go imports
+        run: |
+          unformatted=$(goimports -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files have incorrect imports:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Build all tools
+        run: |
+          make build-all || go build ./cmd/...
+
+      - name: Run orizon-fmt on examples
+        run: |
+          go run ./cmd/orizon-fmt ./examples/*.oriz > /dev/null
+
+      - name: Run LSP/Formatter smoke test
+        run: |
+          go run ./cmd/orizon-smoke-test
+
+  selfhost-nightly:
+    name: Self-hosting E2E Test
+    runs-on: windows-latest
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[selfhost]')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ${{ env.GOMODCACHE }}
+          key: selfhost-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            selfhost-${{ runner.os }}-go-
+
+      - name: Run Self-hosting Stage 0
+        run: .\scripts\win\selfhost-stage0.bat
+        shell: cmd
+
+      - name: Upload Stage 0 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selfhost-stage0-${{ github.run_id }}
+          path: |
+            build/stage0/*.exe
+            artifacts/selfhost/stage0-build-info.txt
+          retention-days: 30
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selfhost-logs-${{ github.run_id }}
+          path: |
+            tmp/**/*.txt
+            tmp/**/*.log
+            artifacts/build-logs/**
+          retention-days: 7
+
+      - name: Collect build logs on failure
+        if: failure()
+        run: .\scripts\win\collect-build-logs.bat
+        shell: cmd
+
+  selfhost-verification:
+    name: Self-hosting Stage 1 & 2 (Future)
+    runs-on: windows-latest
+    needs: selfhost-nightly
+    if: success() && (github.event_name == 'schedule' || contains(github.event.head_commit.message, '[selfhost-full]'))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download Stage 0 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: selfhost-stage0-${{ github.run_id }}
+          path: build/stage0/
+
+      - name: Run Self-hosting Stage 1 (Placeholder)
+        run: |
+          echo "Stage 1 requires functional Orizon compiler"
+          echo "Placeholder for future implementation"
+          # .\scripts\win\selfhost-stage1.bat
+        shell: cmd
+
+      - name: Run Self-hosting Stage 2 (Placeholder)
+        run: |
+          echo "Stage 2 requires Stage 1 completion"
+          echo "Placeholder for future implementation"
+          # .\scripts\win\selfhost-stage2.bat
+        shell: cmd
