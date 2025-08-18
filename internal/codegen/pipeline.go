@@ -3,11 +3,40 @@ package codegen
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/orizon-lang/orizon/internal/hir"
 	"github.com/orizon-lang/orizon/internal/lir"
 	"github.com/orizon-lang/orizon/internal/mir"
 )
+
+// getBinOpFromAssignOp converts assignment operators to binary operations
+func getBinOpFromAssignOp(assignOp string) (mir.BinOpKind, bool) {
+	switch assignOp {
+	case "+=":
+		return mir.OpAdd, true
+	case "-=":
+		return mir.OpSub, true
+	case "*=":
+		return mir.OpMul, true
+	case "/=":
+		return mir.OpDiv, true
+	case "%=":
+		return mir.OpMod, true
+	case "&=":
+		return mir.OpAnd, true
+	case "|=":
+		return mir.OpOr, true
+	case "^=":
+		return mir.OpXor, true
+	case "<<=":
+		return mir.OpShl, true
+	case ">>=":
+		return mir.OpShr, true
+	default:
+		return 0, false // Simple assignment or unsupported
+	}
+}
 
 // LowerToMIR converts HIR to a simple MIR module.
 // Currently supports lowering function declarations with return statements of literal values.
@@ -119,8 +148,8 @@ func lowerHIRExprToValue(e hir.HIRExpression) (mir.Value, bool) {
 			}
 			return mir.Value{Kind: mir.ValConstInt, Int64: 0, Class: mir.ClassInt}, true
 		case string:
-			// Strings not yet representable in MIR Value; fallback to 0
-			return mir.Value{Kind: mir.ValConstInt, Int64: 0, Class: mir.ClassInt}, true
+			// String literals are now supported in MIR
+			return mir.Value{Kind: mir.ValConstString, StrVal: lit, Class: mir.ClassString}, true
 		default:
 			return mir.Value{}, false
 		}
@@ -241,7 +270,7 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 	if v, ok := lowerHIRExprToValue(e); ok {
 		return v, true
 	}
-	// 2) 単項 -x を即値化
+	// 2) 単項 -x: 即値なら畳み込み、一般の場合は 0 - x または -1 * x
 	if ue, ok := e.(*hir.HIRUnaryExpression); ok && ue.Operator == "-" {
 		if vv, ok := lowerHIRExprToValue(ue.Operand); ok {
 			switch vv.Kind {
@@ -253,10 +282,47 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 				return vv, true
 			}
 		}
+		// 一般ケース
+		ov, ok := lowerHIRExpr(ue.Operand, newTemp, bb, env)
+		if !ok {
+			return mir.Value{}, false
+		}
+		// 型からクラスを決定
+		cls := typeToClass(ue.Operand.GetType())
+		dst := newTemp()
+		if cls == mir.ClassFloat {
+			// 0.0 - x
+			zero := mir.Value{Kind: mir.ValConstFloat, Float64: 0.0, Class: mir.ClassFloat}
+			bb.Instr = append(bb.Instr, mir.BinOp{Dst: dst, Op: mir.OpSub, LHS: zero, RHS: ov})
+			return mir.Value{Kind: mir.ValRef, Ref: dst, Class: mir.ClassFloat}, true
+		}
+		// 整数: 0 - x
+		zero := mir.Value{Kind: mir.ValConstInt, Int64: 0, Class: mir.ClassInt}
+		bb.Instr = append(bb.Instr, mir.BinOp{Dst: dst, Op: mir.OpSub, LHS: zero, RHS: ov})
+		return mir.Value{Kind: mir.ValRef, Ref: dst, Class: mir.ClassInt}, true
+	}
+	// 2.0) 単項 +x は恒等（そのまま下ろす）
+	if ue, ok := e.(*hir.HIRUnaryExpression); ok && ue.Operator == "+" {
+		return lowerHIRExpr(ue.Operand, newTemp, bb, env)
 	}
 	// 2.1) 単項 論理否定 !x を値として評価（0/1 を返す）
 	if ue, ok := e.(*hir.HIRUnaryExpression); ok && ue.Operator == "!" {
 		return lowerHIRCond(e, newTemp, bb, env)
+	}
+	// 2.1.1) 単項 ビット反転 ~x を値として評価（xor -1）
+	if ue, ok := e.(*hir.HIRUnaryExpression); ok && ue.Operator == "~" {
+		// try immediate
+		if vv, ok := lowerHIRExprToValue(ue.Operand); ok && vv.Kind == mir.ValConstInt {
+			return mir.Value{Kind: mir.ValConstInt, Int64: ^vv.Int64, Class: mir.ClassInt}, true
+		}
+		// general case: tmp = x ^ -1
+		v, ok := lowerHIRExpr(ue.Operand, newTemp, bb, env)
+		if !ok {
+			return mir.Value{}, false
+		}
+		dst := newTemp()
+		bb.Instr = append(bb.Instr, mir.BinOp{Dst: dst, Op: mir.OpXor, LHS: v, RHS: mir.Value{Kind: mir.ValConstInt, Int64: -1, Class: mir.ClassInt}})
+		return mir.Value{Kind: mir.ValRef, Ref: dst, Class: mir.ClassInt}, true
 	}
 	// 2.2) アドレス演算子 &x（lvalue に限定）
 	if ue, ok := e.(*hir.HIRUnaryExpression); ok && ue.Operator == "&" {
@@ -299,9 +365,92 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 	}
 	// 3) 二項式（即値畳み込み、それ以外はオペランドを評価して BinOp を発行）
 	if be, ok := e.(*hir.HIRBinaryExpression); ok {
+		if os.Getenv("ORIZON_DEBUG_LOWER_OPS") != "" {
+			fmt.Fprintf(os.Stderr, "[lower] HIRBinaryExpression op=%q\n", be.Operator)
+		}
 		// 論理演算子は値コンテキストでも0/1の値として生成
 		if be.Operator == "&&" || be.Operator == "||" {
 			return lowerHIRCond(e, newTemp, bb, env)
+		}
+		// 代入および複合代入（式コンテキスト）
+		if be.Operator == "=" || be.Operator == "+=" || be.Operator == "-=" || be.Operator == "*=" || be.Operator == "/=" || be.Operator == "%=" || be.Operator == "&=" || be.Operator == "|=" || be.Operator == "^=" || be.Operator == "<<=" || be.Operator == ">>=" {
+			// 左辺のアドレス算出（識別子・添字・フィールド・*ptr に対応）
+			// helper: address of LHS
+			getLHSAddr := func(lhs hir.HIRExpression) (mir.Value, bool) {
+				switch t := lhs.(type) {
+				case *hir.HIRIdentifier:
+					if t.Name == "" {
+						return mir.Value{}, false
+					}
+					addr := fmt.Sprintf("%%%s.addr", t.Name)
+					if !env[t.Name] {
+						// 未宣言なら割り当て（ベストエフォート）
+						bb.Instr = append(bb.Instr, mir.Alloca{Dst: addr, Name: t.Name})
+						env[t.Name] = true
+					}
+					return mir.Value{Kind: mir.ValRef, Ref: addr, Class: mir.ClassInt}, true
+				case *hir.HIRIndexExpression, *hir.HIRFieldExpression:
+					return lowerAddressOf(t, newTemp, bb, env)
+				case *hir.HIRUnaryExpression:
+					if t.Operator == "*" {
+						return lowerAddressOf(t.Operand, newTemp, bb, env)
+					}
+					return mir.Value{}, false
+				default:
+					return mir.Value{}, false
+				}
+			}
+			addr, okA := getLHSAddr(be.Left)
+			if !okA {
+				return mir.Value{}, false
+			}
+			// RHS を評価
+			var rhs mir.Value
+			if v, ok := lowerHIRExprToValue(be.Right); ok {
+				rhs = v
+			} else if v, ok := lowerHIRExpr(be.Right, newTemp, bb, env); ok {
+				rhs = v
+			} else {
+				return mir.Value{}, false
+			}
+			// 複合代入なら load -> binop
+			if be.Operator != "=" {
+				tmp := newTemp()
+				bb.Instr = append(bb.Instr, mir.Load{Dst: tmp, Addr: addr})
+				curVal := mir.Value{Kind: mir.ValRef, Ref: tmp, Class: mir.ClassInt}
+				// map operator to BinOp
+				var op mir.BinOpKind
+				switch be.Operator {
+				case "+=":
+					op = mir.OpAdd
+				case "-=":
+					op = mir.OpSub
+				case "*=":
+					op = mir.OpMul
+				case "/=":
+					op = mir.OpDiv
+				case "%=":
+					op = mir.OpMod
+				case "&=":
+					op = mir.OpAnd
+				case "|=":
+					op = mir.OpOr
+				case "^=":
+					op = mir.OpXor
+				case "<<=":
+					op = mir.OpShl
+				case ">>=":
+					op = mir.OpShr
+				}
+				dst := newTemp()
+				bb.Instr = append(bb.Instr, mir.BinOp{Dst: dst, Op: op, LHS: curVal, RHS: rhs})
+				// store back
+				bb.Instr = append(bb.Instr, mir.Store{Addr: addr, Val: mir.Value{Kind: mir.ValRef, Ref: dst, Class: mir.ClassInt}})
+				return mir.Value{Kind: mir.ValRef, Ref: dst, Class: mir.ClassInt}, true
+			}
+			// 単純代入
+			bb.Instr = append(bb.Instr, mir.Store{Addr: addr, Val: rhs})
+			return rhs, true
 		}
 		lhs, lOK := lowerHIRExprToValue(be.Left)
 		rhs, rOK := lowerHIRExprToValue(be.Right)
@@ -336,6 +485,30 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 				if lhs.Kind == mir.ValConstFloat && rhs.Kind == mir.ValConstFloat && rhs.Float64 != 0 {
 					return mir.Value{Kind: mir.ValConstFloat, Float64: lhs.Float64 / rhs.Float64}, true
 				}
+			case "%":
+				if lhs.Kind == mir.ValConstInt && rhs.Kind == mir.ValConstInt && rhs.Int64 != 0 {
+					return mir.Value{Kind: mir.ValConstInt, Int64: lhs.Int64 % rhs.Int64}, true
+				}
+			case "&":
+				if lhs.Kind == mir.ValConstInt && rhs.Kind == mir.ValConstInt {
+					return mir.Value{Kind: mir.ValConstInt, Int64: lhs.Int64 & rhs.Int64}, true
+				}
+			case "|":
+				if lhs.Kind == mir.ValConstInt && rhs.Kind == mir.ValConstInt {
+					return mir.Value{Kind: mir.ValConstInt, Int64: lhs.Int64 | rhs.Int64}, true
+				}
+			case "^":
+				if lhs.Kind == mir.ValConstInt && rhs.Kind == mir.ValConstInt {
+					return mir.Value{Kind: mir.ValConstInt, Int64: lhs.Int64 ^ rhs.Int64}, true
+				}
+			case "<<":
+				if lhs.Kind == mir.ValConstInt && rhs.Kind == mir.ValConstInt {
+					return mir.Value{Kind: mir.ValConstInt, Int64: lhs.Int64 << uint64(rhs.Int64), Class: mir.ClassInt}, true
+				}
+			case ">>":
+				if lhs.Kind == mir.ValConstInt && rhs.Kind == mir.ValConstInt {
+					return mir.Value{Kind: mir.ValConstInt, Int64: lhs.Int64 >> uint64(rhs.Int64), Class: mir.ClassInt}, true
+				}
 			}
 		}
 		// オペランドを一般に評価
@@ -351,7 +524,7 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 			dst := newTemp()
 			bb.Instr = append(bb.Instr, mir.Cmp{Dst: dst, Pred: pred, LHS: lhv, RHS: rhv})
 			return mir.Value{Kind: mir.ValRef, Ref: dst, Class: mir.ClassInt}, true
-		case "+", "-", "*", "/":
+		case "+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>":
 			var op mir.BinOpKind
 			switch be.Operator {
 			case "+":
@@ -362,6 +535,18 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 				op = mir.OpMul
 			case "/":
 				op = mir.OpDiv
+			case "%":
+				op = mir.OpMod
+			case "&":
+				op = mir.OpAnd
+			case "|":
+				op = mir.OpOr
+			case "^":
+				op = mir.OpXor
+			case "<<":
+				op = mir.OpShl
+			case ">>":
+				op = mir.OpShr
 			}
 			dst := newTemp()
 			cls := mir.ClassInt
@@ -374,20 +559,30 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 			return mir.Value{}, false
 		}
 	}
-	// 3.5) 添字/フィールドアクセス（RValue）: アドレスを算出して load
+	// 3.5) 添字/フィールドアクセス（RValue）: 新しいIndexLoad/FieldLoad命令を使用
 	if ie, ok := e.(*hir.HIRIndexExpression); ok {
-		if addr, ok2 := lowerAddressOf(ie, newTemp, bb, env); ok2 {
+		arrayVal, arrayOk := lowerHIRExpr(ie.Array, newTemp, bb, env)
+		indexVal, indexOk := lowerHIRExpr(ie.Index, newTemp, bb, env)
+		if arrayOk && indexOk {
 			tmp := newTemp()
-			bb.Instr = append(bb.Instr, mir.Load{Dst: tmp, Addr: addr})
-			// Class from expression result type
+			bb.Instr = append(bb.Instr, mir.IndexLoad{
+				Dst:   tmp,
+				Array: arrayVal,
+				Index: indexVal,
+			})
 			return mir.Value{Kind: mir.ValRef, Ref: tmp, Class: typeToClass(ie.GetType())}, true
 		}
 		return mir.Value{}, false
 	}
 	if fe, ok := e.(*hir.HIRFieldExpression); ok {
-		if addr, ok2 := lowerAddressOf(fe, newTemp, bb, env); ok2 {
+		objectVal, objectOk := lowerHIRExpr(fe.Object, newTemp, bb, env)
+		if objectOk {
 			tmp := newTemp()
-			bb.Instr = append(bb.Instr, mir.Load{Dst: tmp, Addr: addr})
+			bb.Instr = append(bb.Instr, mir.FieldLoad{
+				Dst:    tmp,
+				Object: objectVal,
+				Field:  fe.Field,
+			})
 			return mir.Value{Kind: mir.ValRef, Ref: tmp, Class: typeToClass(fe.GetType())}, true
 		}
 		return mir.Value{}, false
@@ -411,6 +606,12 @@ func lowerHIRExpr(e hir.HIRExpression, newTemp func() string, bb *mir.BasicBlock
 		var calleeVal *mir.Value
 		if id, ok := ce.Function.(*hir.HIRIdentifier); ok {
 			callee = id.Name
+			// Check if it's a built-in function and map to assembly name
+			if IsBuiltinFunction(callee) {
+				if builtin, exists := GetBuiltinFunction(callee); exists {
+					callee = builtin.AssemblyName
+				}
+			}
 		} else {
 			if v, ok := lowerHIRExpr(ce.Function, newTemp, bb, env); ok {
 				calleeVal = &v
@@ -719,7 +920,95 @@ func lowerHIRStmt(st hir.HIRStatement, blocks *[]*mir.BasicBlock, cur **mir.Basi
 				}
 			}
 		default:
-			// TODO: field/index assignment
+			// Handle field/index assignment
+			rhs, _ := lowerHIRExpr(s.Value, newTemp, *cur, env)
+
+			switch target := s.Target.(type) {
+			case *hir.HIRIndexExpression:
+				// Array index assignment: arr[idx] = value
+				arrayVal, _ := lowerHIRExpr(target.Array, newTemp, *cur, env)
+				indexVal, _ := lowerHIRExpr(target.Index, newTemp, *cur, env)
+
+				if s.Operator == "=" {
+					// Simple assignment
+					(*cur).Instr = append((*cur).Instr, mir.IndexStore{
+						Array: arrayVal,
+						Index: indexVal,
+						Val:   rhs,
+					})
+				} else {
+					// Compound assignment (+=, -=, etc.)
+					// First load the current value
+					tmpDst := newTemp()
+					(*cur).Instr = append((*cur).Instr, mir.IndexLoad{
+						Dst:   tmpDst,
+						Array: arrayVal,
+						Index: indexVal,
+					})
+
+					// Perform the operation
+					op, ok := getBinOpFromAssignOp(s.Operator)
+					if ok {
+						opDst := newTemp()
+						currentVal := mir.Value{Kind: mir.ValRef, Ref: tmpDst}
+						(*cur).Instr = append((*cur).Instr, mir.BinOp{
+							Dst: opDst,
+							Op:  op,
+							LHS: currentVal,
+							RHS: rhs,
+						})
+
+						// Store the result back
+						(*cur).Instr = append((*cur).Instr, mir.IndexStore{
+							Array: arrayVal,
+							Index: indexVal,
+							Val:   mir.Value{Kind: mir.ValRef, Ref: opDst},
+						})
+					}
+				}
+
+			case *hir.HIRFieldExpression:
+				// Struct field assignment: obj.field = value
+				objectVal, _ := lowerHIRExpr(target.Object, newTemp, *cur, env)
+
+				if s.Operator == "=" {
+					// Simple assignment
+					(*cur).Instr = append((*cur).Instr, mir.FieldStore{
+						Object: objectVal,
+						Field:  target.Field,
+						Val:    rhs,
+					})
+				} else {
+					// Compound assignment (+=, -=, etc.)
+					// First load the current value
+					tmpDst := newTemp()
+					(*cur).Instr = append((*cur).Instr, mir.FieldLoad{
+						Dst:    tmpDst,
+						Object: objectVal,
+						Field:  target.Field,
+					})
+
+					// Perform the operation
+					op, ok := getBinOpFromAssignOp(s.Operator)
+					if ok {
+						opDst := newTemp()
+						currentVal := mir.Value{Kind: mir.ValRef, Ref: tmpDst}
+						(*cur).Instr = append((*cur).Instr, mir.BinOp{
+							Dst: opDst,
+							Op:  op,
+							LHS: currentVal,
+							RHS: rhs,
+						})
+
+						// Store the result back
+						(*cur).Instr = append((*cur).Instr, mir.FieldStore{
+							Object: objectVal,
+							Field:  target.Field,
+							Val:    mir.Value{Kind: mir.ValRef, Ref: opDst},
+						})
+					}
+				}
+			}
 		}
 	case *hir.HIRIfStatement:
 		// build then/else/end blocks
@@ -836,8 +1125,30 @@ func lowerHIRStmt(st hir.HIRStatement, blocks *[]*mir.BasicBlock, cur **mir.Basi
 		}
 	case *hir.HIRBlockStatement:
 		lowerHIRStmtBlock(s, blocks, cur, newTemp, env, ctx)
+	case *hir.HIRVariableDeclaration:
+		// Handle variable declarations (let statements)
+		name := s.Name
+		addr := fmt.Sprintf("%%%s.addr", name)
+
+		// Allocate space for the variable
+		(*cur).Instr = append((*cur).Instr, mir.Alloca{Dst: addr, Name: name})
+		env[name] = true
+
+		// If there's an initializer, store its value
+		if s.Initializer != nil {
+			var initVal mir.Value
+			if v, ok := lowerHIRExprToValue(s.Initializer); ok {
+				initVal = v
+			} else if v, ok := lowerHIRExpr(s.Initializer, newTemp, *cur, env); ok {
+				initVal = v
+			} else {
+				// Fallback to zero value
+				initVal = mir.Value{Kind: mir.ValConstInt, Int64: 0}
+			}
+			(*cur).Instr = append((*cur).Instr, mir.Store{Addr: mir.Value{Kind: mir.ValRef, Ref: addr}, Val: initVal})
+		}
 	default:
-		// TODO: for/break/continue, variable declarations belong to declaration pass
+		// Variable declarations belong to declaration pass
 	}
 }
 

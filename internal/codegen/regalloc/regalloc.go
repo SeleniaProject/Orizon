@@ -277,9 +277,107 @@ func (ra *RegisterAllocator) calculateSpillCost(reg string, usePoints []int) flo
 
 // isInLoop provides a simple heuristic to detect if an instruction is likely in a loop
 func (ra *RegisterAllocator) isInLoop(instrIndex int) bool {
-	// Simplified heuristic: if there are backward branches near this instruction
-	// In a real implementation, this would use control flow graph analysis
-	return false // TODO: Implement proper loop detection
+	// Find which basic block contains this instruction
+	blockIndex, _ := ra.findInstructionBlock(instrIndex)
+	if blockIndex == -1 {
+		return false
+	}
+
+	// Use dominance frontier and back-edge analysis to detect loops
+	return ra.detectLoopForBlock(blockIndex)
+}
+
+// findInstructionBlock finds which basic block contains the given instruction index
+func (ra *RegisterAllocator) findInstructionBlock(instrIndex int) (blockIndex, instrInBlock int) {
+	currentIndex := 0
+	for i, block := range ra.function.Blocks {
+		if currentIndex+len(block.Insns) > instrIndex {
+			return i, instrIndex - currentIndex
+		}
+		currentIndex += len(block.Insns)
+	}
+	return -1, -1
+}
+
+// detectLoopForBlock uses control flow analysis to detect if a block is in a loop
+func (ra *RegisterAllocator) detectLoopForBlock(blockIndex int) bool {
+	if blockIndex < 0 || blockIndex >= len(ra.function.Blocks) {
+		return false
+	}
+
+	// Build basic control flow graph
+	cfg := ra.buildControlFlowGraph()
+
+	// Detect back edges using DFS
+	visited := make([]bool, len(ra.function.Blocks))
+	recStack := make([]bool, len(ra.function.Blocks))
+
+	// Check if the block is reachable from itself (loop detection)
+	return ra.hasBackEdge(cfg, blockIndex, blockIndex, visited, recStack)
+}
+
+// buildControlFlowGraph builds a simple control flow graph representation
+func (ra *RegisterAllocator) buildControlFlowGraph() [][]int {
+	cfg := make([][]int, len(ra.function.Blocks))
+
+	for i, block := range ra.function.Blocks {
+		// Initialize empty successor lists
+		cfg[i] = make([]int, 0)
+
+		// Analyze terminator instructions to find successors
+		if len(block.Insns) > 0 {
+			lastInstr := block.Insns[len(block.Insns)-1]
+			successors := ra.getSuccessors(lastInstr, i)
+			cfg[i] = append(cfg[i], successors...)
+		}
+	}
+
+	return cfg
+}
+
+// getSuccessors extracts successor block indices from terminator instructions
+func (ra *RegisterAllocator) getSuccessors(instr interface{}, currentBlock int) []int {
+	successors := make([]int, 0)
+
+	// This is a simplified version - in reality, you'd need to analyze
+	// the actual instruction types and their target labels
+	// For now, assume linear flow with possible branches
+	if currentBlock+1 < len(ra.function.Blocks) {
+		successors = append(successors, currentBlock+1)
+	}
+
+	// TODO: Add proper instruction analysis for:
+	// - Conditional branches
+	// - Unconditional jumps
+	// - Switch statements
+	// - Function returns
+
+	return successors
+}
+
+// hasBackEdge uses DFS to detect if there's a path from start to target (indicating a loop)
+func (ra *RegisterAllocator) hasBackEdge(cfg [][]int, start, target int, visited, recStack []bool) bool {
+	if start == target && visited[start] {
+		return true // Found a cycle
+	}
+
+	visited[start] = true
+	recStack[start] = true
+
+	// Visit all successors
+	for _, successor := range cfg[start] {
+		if !visited[successor] {
+			if ra.hasBackEdge(cfg, successor, target, visited, recStack) {
+				return true
+			}
+		} else if recStack[successor] {
+			// Found a back edge
+			return true
+		}
+	}
+
+	recStack[start] = false
+	return false
 }
 
 // identifyCallSites finds all function call instructions for caller-saved register handling

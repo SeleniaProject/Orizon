@@ -2,6 +2,8 @@
 // for the Orizon programming language. These are essential for self-hosting and low-level operations.
 package intrinsics
 
+import "fmt"
+
 // IntrinsicKind represents the type of intrinsic function
 type IntrinsicKind int
 
@@ -491,39 +493,57 @@ func (it IntrinsicType) String() string {
 	}
 }
 
-// GetIntrinsicType converts a type to IntrinsicType
-// TODO: Implement once type system integration is complete
+// GetIntrinsicType converts a type to IntrinsicType with type system integration
 func GetIntrinsicType(typeName string) IntrinsicType {
+	// Handle basic types
 	switch typeName {
-	case "bool":
+	case "bool", "boolean":
 		return IntrinsicBool
-	case "i8":
+	case "i8", "int8":
 		return IntrinsicI8
-	case "i16":
+	case "i16", "int16":
 		return IntrinsicI16
-	case "i32":
+	case "i32", "int32", "int":
 		return IntrinsicI32
-	case "i64":
+	case "i64", "int64":
 		return IntrinsicI64
-	case "u8":
+	case "u8", "uint8", "byte":
 		return IntrinsicU8
-	case "u16":
+	case "u16", "uint16":
 		return IntrinsicU16
-	case "u32":
+	case "u32", "uint32", "uint":
 		return IntrinsicU32
-	case "u64":
+	case "u64", "uint64":
 		return IntrinsicU64
-	case "f32":
+	case "f32", "float32", "float":
 		return IntrinsicF32
-	case "f64":
+	case "f64", "float64", "double":
 		return IntrinsicF64
 	case "usize":
 		return IntrinsicUSize
 	case "isize":
 		return IntrinsicISize
+	case "string", "str":
+		return IntrinsicPtr // Strings are represented as pointers
+	case "void":
+		return IntrinsicVoid
 	default:
-		if typeName[0] == '*' {
+		// Handle pointer types
+		if len(typeName) > 0 && typeName[0] == '*' {
 			return IntrinsicPtr
+		}
+		// Handle array types
+		if len(typeName) > 2 && typeName[0] == '[' && typeName[len(typeName)-1] == ']' {
+			return IntrinsicPtr // Arrays are represented as pointers
+		}
+		// Handle slice types
+		if len(typeName) > 2 && typeName[:2] == "[]" {
+			return IntrinsicPtr // Slices are represented as pointers
+		}
+		// Handle generic or complex types
+		if len(typeName) > 0 && typeName[0] >= 'A' && typeName[0] <= 'Z' {
+			// Could be a user-defined type or generic
+			return IntrinsicVoid // Default to void for unknown types
 		}
 		return IntrinsicVoid
 	}
@@ -544,4 +564,117 @@ func GetIntrinsic(name string) (*IntrinsicInfo, bool) {
 		return nil, false
 	}
 	return GlobalIntrinsicRegistry.Lookup(name)
+}
+
+// ValidateIntrinsicCall validates that an intrinsic call has correct arguments
+func ValidateIntrinsicCall(intrinsic *IntrinsicInfo, args []IntrinsicType) error {
+	if len(args) != len(intrinsic.Signature.Parameters) {
+		return fmt.Errorf("intrinsic %s expects %d arguments, got %d",
+			intrinsic.Name, len(intrinsic.Signature.Parameters), len(args))
+	}
+
+	for i, param := range intrinsic.Signature.Parameters {
+		if args[i] != param.Type {
+			return fmt.Errorf("intrinsic %s argument %d: expected %s, got %s",
+				intrinsic.Name, i, param.Type.String(), args[i].String())
+		}
+	}
+
+	return nil
+}
+
+// GetIntrinsicReturnType returns the return type of an intrinsic call
+func GetIntrinsicReturnType(intrinsic *IntrinsicInfo, args []IntrinsicType) (IntrinsicType, error) {
+	if err := ValidateIntrinsicCall(intrinsic, args); err != nil {
+		return IntrinsicVoid, err
+	}
+
+	return intrinsic.Signature.ReturnType, nil
+}
+
+// ConvertToNativeType converts an IntrinsicType to a platform-specific native type
+func ConvertToNativeType(intrinsicType IntrinsicType) string {
+	switch intrinsicType {
+	case IntrinsicBool:
+		return "bool"
+	case IntrinsicI8:
+		return "int8_t"
+	case IntrinsicI16:
+		return "int16_t"
+	case IntrinsicI32:
+		return "int32_t"
+	case IntrinsicI64:
+		return "int64_t"
+	case IntrinsicU8:
+		return "uint8_t"
+	case IntrinsicU16:
+		return "uint16_t"
+	case IntrinsicU32:
+		return "uint32_t"
+	case IntrinsicU64:
+		return "uint64_t"
+	case IntrinsicF32:
+		return "float"
+	case IntrinsicF64:
+		return "double"
+	case IntrinsicPtr:
+		return "void*"
+	case IntrinsicUSize:
+		return "size_t"
+	case IntrinsicISize:
+		return "ssize_t"
+	case IntrinsicVoid:
+		return "void"
+	default:
+		return "void"
+	}
+}
+
+// IsNumericType checks if the intrinsic type is numeric
+func IsNumericType(intrinsicType IntrinsicType) bool {
+	switch intrinsicType {
+	case IntrinsicI8, IntrinsicI16, IntrinsicI32, IntrinsicI64,
+		IntrinsicU8, IntrinsicU16, IntrinsicU32, IntrinsicU64,
+		IntrinsicF32, IntrinsicF64, IntrinsicUSize, IntrinsicISize:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsIntegerType checks if the intrinsic type is an integer
+func IsIntegerType(intrinsicType IntrinsicType) bool {
+	switch intrinsicType {
+	case IntrinsicI8, IntrinsicI16, IntrinsicI32, IntrinsicI64,
+		IntrinsicU8, IntrinsicU16, IntrinsicU32, IntrinsicU64,
+		IntrinsicUSize, IntrinsicISize:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsFloatType checks if the intrinsic type is a floating point type
+func IsFloatType(intrinsicType IntrinsicType) bool {
+	return intrinsicType == IntrinsicF32 || intrinsicType == IntrinsicF64
+}
+
+// GetTypeSizeInBytes returns the size of an intrinsic type in bytes
+func GetTypeSizeInBytes(intrinsicType IntrinsicType) int {
+	switch intrinsicType {
+	case IntrinsicBool, IntrinsicI8, IntrinsicU8:
+		return 1
+	case IntrinsicI16, IntrinsicU16:
+		return 2
+	case IntrinsicI32, IntrinsicU32, IntrinsicF32:
+		return 4
+	case IntrinsicI64, IntrinsicU64, IntrinsicF64:
+		return 8
+	case IntrinsicPtr, IntrinsicUSize, IntrinsicISize:
+		return 8 // Assuming 64-bit platform
+	case IntrinsicVoid:
+		return 0
+	default:
+		return 0
+	}
 }
