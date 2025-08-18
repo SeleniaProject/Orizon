@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
@@ -22,7 +25,7 @@ import (
 //	-stdin  read from stdin instead of files, write formatted to stdout.
 //	-ast    use AST-based formatting (enhanced mode).
 //	-diff   show diff output instead of formatted code.
-//	-mode   diff mode: unified (default), context, side-by-side.
+//	-mode   diff mode: unified (default), context, side-by-side
 func main() {
 	var (
 		writeInPlace bool

@@ -2,6 +2,7 @@
 # Phase 0.1.1: 開発環境セットアップの自動化
 
 .PHONY: help build test clean dev docker-dev install-tools fmt lint smoke smoke-win smoke-mac bootstrap bootstrap-golden bootstrap-verify
+.PHONY: tidy-root
 
 # Cross-platform env prefix for disabling CGO per command
 ifeq ($(OS),Windows_NT)
@@ -165,6 +166,19 @@ clean: ## ビルド成果物をクリーンアップ
 	@rm -f coverage.out coverage.html
 	@go clean -cache
 	@echo "✅ クリーンアップ完了"
+
+# ルート直下の散らかった実行ファイルや一時物を整理
+tidy-root: ## ルート直下の.exeなどを削除して綺麗にする（build/は残す）
+	@echo "🧽 ルートディレクトリ整頓中..."
+ifeq ($(OS),Windows_NT)
+	@powershell -NoProfile -Command "Get-ChildItem -File -LiteralPath . | Where-Object { $$_.Name -match '^(.+\.exe|orizon-.*\.exe|gdb-rsp-server\.exe|numa-test\.exe)$$' } | Remove-Item -Force -ErrorAction SilentlyContinue"
+else
+	@rm -f ./*.exe || true
+	@rm -f ./orizon-*.exe || true
+	@rm -f ./gdb-rsp-server.exe || true
+	@rm -f ./numa-test.exe || true
+endif
+	@echo "✅ ルート整頓完了（ビルド物は build/ に出力されます）"
 
 # サンプル実行
 examples: build ## サンプルコードを実行
