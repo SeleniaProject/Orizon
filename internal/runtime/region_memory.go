@@ -328,8 +328,8 @@ func (r *Region) findBuddyFit(size RegionSize, alignment RegionAlignment) (*Free
 // allocateFromBlock allocates memory from a free block
 func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignment RegionAlignment, typeInfo *TypeInfo) (unsafe.Pointer, *AllocBlock, error) {
 	// Calculate aligned offset
-	alignedOffset := alignUp(freeBlock.Offset, uintptr(alignment))
-	alignmentPadding := RegionSize(alignedOffset - freeBlock.Offset)
+	alignedOffset := alignUp(int64(freeBlock.Offset), int64(alignment))
+	alignmentPadding := RegionSize(uintptr(alignedOffset) - freeBlock.Offset)
 	totalSize := alignmentPadding + size
 
 	if totalSize > freeBlock.Size {
@@ -345,7 +345,7 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 	// Create allocation block
 	allocBlock := &AllocBlock{
 		Size:       size,
-		Offset:     alignedOffset,
+		Offset:     uintptr(alignedOffset),
 		Alignment:  alignment,
 		TypeInfo:   typeInfo,
 		StackTrace: getStackTrace(),
@@ -366,7 +366,7 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 		// Split block
 		newFreeBlock := &FreeBlock{
 			Size:   remainingSize,
-			Offset: alignedOffset + uintptr(size),
+			Offset: uintptr(alignedOffset) + uintptr(size),
 			Next:   freeBlock.Next,
 			Prev:   freeBlock.Prev,
 		}
@@ -395,7 +395,7 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 	}
 
 	// Calculate memory address
-	ptr := unsafe.Pointer(uintptr(r.Data) + alignedOffset)
+	ptr := unsafe.Pointer(uintptr(r.Data) + uintptr(alignedOffset))
 
 	// Initialize memory if required by security policy
 	if r.Policy != nil && r.Policy.SecurityPolicy.EnableZeroOnFree {
