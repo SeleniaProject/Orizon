@@ -70,6 +70,17 @@ const (
 	TokenWhere
 	TokenUnsafe
 
+	// 構文仕様の追加キーワード
+	TokenCase
+	TokenDefault
+	TokenFalse
+	TokenTrue
+	TokenTypeKeyword // 'type' キーワード用
+	TokenStatic
+	TokenExtern
+	TokenYield
+	TokenFn // func の別名として追加
+
 	// マクロ関連
 	TokenMacro
 	TokenMacroInvoke  // !
@@ -111,6 +122,11 @@ const (
 	TokenBitXorAssign
 	TokenShlAssign
 	TokenShrAssign
+
+	// 構文仕様の追加演算子
+	TokenSpaceship // <=>
+	TokenRange     // ..
+	TokenEllipsis  // ...
 
 	// 記号
 	TokenLParen
@@ -287,6 +303,7 @@ var tokenNames = map[TokenType]string{
 // keywords maps string keywords to their token types
 var keywords = map[string]TokenType{
 	"func":     TokenFunc,
+	"fn":       TokenFn, // func の別名
 	"let":      TokenLet,
 	"var":      TokenVar,
 	"const":    TokenConst,
@@ -300,6 +317,8 @@ var keywords = map[string]TokenType{
 	"while":    TokenWhile,
 	"loop":     TokenLoop,
 	"match":    TokenMatch,
+	"case":     TokenCase,
+	"default":  TokenDefault,
 	"return":   TokenReturn,
 	"break":    TokenBreak,
 	"continue": TokenContinue,
@@ -317,9 +336,13 @@ var keywords = map[string]TokenType{
 	"in":       TokenIn,
 	"where":    TokenWhere,
 	"unsafe":   TokenUnsafe,
+	"type":     TokenTypeKeyword,
+	"static":   TokenStatic,
+	"extern":   TokenExtern,
+	"yield":    TokenYield,
 	"macro":    TokenMacro,
-	"true":     TokenBool,
-	"false":    TokenBool,
+	"true":     TokenTrue,
+	"false":    TokenFalse,
 }
 
 // CacheEntry represents a cached token with its validity information
@@ -491,10 +514,48 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
+
+	// Check for special prefixes (0x, 0b, 0o)
+	if l.ch == '0' && l.position+1 < len(l.input) {
+		next := l.input[l.position+1]
+		switch next {
+		case 'x', 'X': // Hexadecimal
+			l.readChar() // consume '0'
+			l.readChar() // consume 'x'
+			if !isHexDigit(l.ch) {
+				return l.input[position:l.position] // Error: no hex digits after 0x
+			}
+			for isHexDigit(l.ch) || l.ch == '_' {
+				l.readChar()
+			}
+			return l.input[position:l.position]
+		case 'b', 'B': // Binary
+			l.readChar() // consume '0'
+			l.readChar() // consume 'b'
+			if !isBinaryDigit(l.ch) {
+				return l.input[position:l.position] // Error: no binary digits after 0b
+			}
+			for isBinaryDigit(l.ch) || l.ch == '_' {
+				l.readChar()
+			}
+			return l.input[position:l.position]
+		case 'o', 'O': // Octal
+			l.readChar() // consume '0'
+			l.readChar() // consume 'o'
+			if !isOctalDigit(l.ch) {
+				return l.input[position:l.position] // Error: no octal digits after 0o
+			}
+			for isOctalDigit(l.ch) || l.ch == '_' {
+				l.readChar()
+			}
+			return l.input[position:l.position]
+		}
+	}
+
 	hasDecimal := false
 
-	// Read digits
-	for isDigit(l.ch) {
+	// Read decimal digits
+	for isDigit(l.ch) || l.ch == '_' {
 		l.readChar()
 	}
 
@@ -502,7 +563,21 @@ func (l *Lexer) readNumber() string {
 	if l.ch == '.' && isDigit(l.peekChar()) {
 		hasDecimal = true
 		l.readChar() // consume '.'
-		for isDigit(l.ch) {
+		for isDigit(l.ch) || l.ch == '_' {
+			l.readChar()
+		}
+	}
+
+	// Handle exponent (e/E)
+	if l.ch == 'e' || l.ch == 'E' {
+		l.readChar() // consume 'e'/'E'
+		if l.ch == '+' || l.ch == '-' {
+			l.readChar() // consume sign
+		}
+		if !isDigit(l.ch) {
+			return l.input[position:l.position] // Error: no digits after exponent
+		}
+		for isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
 		}
 	}
@@ -638,6 +713,59 @@ func isAlphaNumeric(ch byte) bool {
 	return isLetter(ch) || isDigit(ch)
 }
 
+// isHexDigit checks if character is hexadecimal digit
+func isHexDigit(ch byte) bool {
+	return isDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
+}
+
+// isBinaryDigit checks if character is binary digit
+func isBinaryDigit(ch byte) bool {
+	return ch == '0' || ch == '1'
+}
+
+// isOctalDigit checks if character is octal digit
+func isOctalDigit(ch byte) bool {
+	return '0' <= ch && ch <= '7'
+}
+
+// readRawString reads a raw string literal (r"...")
+func (l *Lexer) readRawString() string {
+	position := l.position + 1 // Skip opening quote
+	l.readChar()               // consume opening quote
+
+	for l.ch != '"' && l.ch != 0 {
+		l.readChar()
+	}
+
+	if l.ch == '"' {
+		literal := l.input[position:l.position]
+		l.readChar() // consume closing quote
+		return literal
+	}
+
+	// Unterminated raw string
+	return l.input[position:l.position]
+}
+
+// readTemplateString reads a template string literal (`...`)
+func (l *Lexer) readTemplateString() string {
+	position := l.position + 1 // Skip opening backtick
+	l.readChar()               // consume opening backtick
+
+	for l.ch != '`' && l.ch != 0 {
+		l.readChar()
+	}
+
+	if l.ch == '`' {
+		literal := l.input[position:l.position]
+		l.readChar() // consume closing backtick
+		return literal
+	}
+
+	// Unterminated template string
+	return l.input[position:l.position]
+}
+
 // NextToken scans the input and returns the next token with full position information
 func (l *Lexer) NextToken() Token {
 	var tok Token
@@ -741,7 +869,14 @@ func (l *Lexer) NextToken() Token {
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
-			tok = l.newToken(TokenLe, string(ch)+string(l.ch))
+			// Check for spaceship operator <=>
+			if l.peekChar() == '>' {
+				l.readChar()
+				tok = l.newToken(TokenSpaceship, string(ch)+string(l.ch)+string(l.peekChar()))
+				l.readChar() // consume '>'
+			} else {
+				tok = l.newToken(TokenLe, string(ch)+string(l.ch))
+			}
 		} else if l.peekChar() == '<' {
 			ch := l.ch
 			l.readChar()
@@ -818,7 +953,20 @@ func (l *Lexer) NextToken() Token {
 	case ',':
 		tok = l.newTokenFromChar(TokenComma, l.ch)
 	case '.':
-		tok = l.newTokenFromChar(TokenDot, l.ch)
+		if l.peekChar() == '.' {
+			ch := l.ch
+			l.readChar()
+			// Check for ellipsis ...
+			if l.peekChar() == '.' {
+				l.readChar()
+				tok = l.newToken(TokenEllipsis, string(ch)+string(l.ch)+string(l.peekChar()))
+				l.readChar() // consume third '.'
+			} else {
+				tok = l.newToken(TokenRange, string(ch)+string(l.ch))
+			}
+		} else {
+			tok = l.newTokenFromChar(TokenDot, l.ch)
+		}
 	case '(':
 		tok = l.newTokenFromChar(TokenLParen, l.ch)
 	case ')':
@@ -881,12 +1029,24 @@ func (l *Lexer) NextToken() Token {
 			charLiteral := l.readChar2()
 			tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
 		}
+	case '`':
+		// Template string
+		templateLiteral := l.readTemplateString()
+		tok = l.newTokenFromPosition(TokenString, templateLiteral, startPos)
 	case '\n':
 		tok = l.newTokenFromChar(TokenNewline, l.ch)
 	case 0:
 		tok = l.newToken(TokenEOF, "")
 	default:
 		if isLetter(l.ch) || l.ch == '_' {
+			// Check for raw string prefix
+			if l.ch == 'r' && l.peekChar() == '"' {
+				l.readChar() // consume 'r'
+				rawStringLiteral := l.readRawString()
+				tok = l.newTokenFromPosition(TokenString, rawStringLiteral, startPos)
+				return tok
+			}
+
 			identLiteral := l.readIdentifier()
 			if l.hasIdentifierError {
 				// Return error token for identifier with invalid characters
