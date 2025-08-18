@@ -252,11 +252,22 @@ func (s *Server) Run() error {
 				"codeActionProvider": map[string]any{
 					"codeActionKinds": []string{"quickfix", "refactor", "refactor.extract"},
 				},
-				"documentFormattingProvider": true,
-				"signatureHelpProvider":      map[string]any{"triggerCharacters": []string{"(", ","}},
+				"documentFormattingProvider": map[string]any{
+					"workDoneProgress": false,
+					// Extended capabilities for AST-aware formatting
+					"supportsASTFormatting": true,
+					"supportsDiffEdits":     true,
+				},
+				"documentRangeFormattingProvider": map[string]any{
+					"workDoneProgress":      false,
+					"supportsASTFormatting": true,
+					"supportsDiffEdits":     true,
+				},
+				"signatureHelpProvider": map[string]any{"triggerCharacters": []string{"(", ","}},
 				"documentOnTypeFormattingProvider": map[string]any{
-					"firstTriggerCharacter": "}",
-					"moreTriggerCharacter":  []string{"\n", ")", ";"},
+					"firstTriggerCharacter":      "}",
+					"moreTriggerCharacter":       []string{"\n", ")", ";", "{"},
+					"supportsEnhancedFormatting": true,
 				},
 				"documentHighlightProvider": true,
 				"foldingRangeProvider":      true,
@@ -2349,30 +2360,133 @@ func findNodeAt(root *parser.Program, offset int) parser.Node {
 	return best
 }
 
-// handleFormatting applies a simple formatting by re-printing the AST or falling back to trimming whitespace.
+// handleFormatting applies enhanced formatting with AST support and minimal diff edits.
 func (s *Server) handleFormatting(uri string, options map[string]any) []map[string]any {
-	// Delegate to shared formatter for consistency with CLI
 	text := s.docs[uri]
 	if text == "" {
 		return []map[string]any{}
 	}
-	formatted := format.FormatText(text, format.Options{PreserveNewlineStyle: true})
+
+	// Check if enhanced formatting is requested
+	var useAST bool
+	if opts, ok := options["astFormat"]; ok {
+		if ast, ok := opts.(bool); ok {
+			useAST = ast
+		}
+	}
+
+	var formatted string
+	if useAST {
+		// Use enhanced AST-based formatting
+		astOptions := format.DefaultASTFormattingOptions()
+
+		// Apply client preferences if available
+		if tabSize, ok := options["tabSize"]; ok {
+			if size, ok := tabSize.(float64); ok {
+				astOptions.IndentSize = int(size)
+			}
+		}
+		if insertSpaces, ok := options["insertSpaces"]; ok {
+			if spaces, ok := insertSpaces.(bool); ok {
+				astOptions.PreferTabs = !spaces
+			}
+		}
+
+		var err error
+		formatted, err = format.FormatSourceWithAST(text, astOptions)
+		if err != nil {
+			// Fallback to basic formatting on AST error
+			formatted = format.FormatText(text, format.Options{PreserveNewlineStyle: true})
+		}
+	} else {
+		// Use basic formatting
+		formatted = format.FormatText(text, format.Options{PreserveNewlineStyle: true})
+	}
+
 	if formatted == text {
 		return []map[string]any{}
 	}
-	endLine, endChar := utf16LineCharFromOffset(text, len(text))
-	return []map[string]any{
-		{
-			"range": map[string]any{
-				"start": map[string]any{"line": 0, "character": 0},
-				"end":   map[string]any{"line": endLine, "character": endChar},
-			},
-			"newText": formatted,
-		},
-	}
+
+	// Use diff-based minimal edits instead of full document replacement
+	return s.generateMinimalEdits(text, formatted)
 }
 
-// handleRangeFormatting applies formatting to a subset of lines.
+// generateMinimalEdits creates minimal text edits using diff algorithm
+func (s *Server) generateMinimalEdits(original, formatted string) []map[string]any {
+	// Use diff formatter to find minimal changes
+	diffOptions := format.DefaultDiffOptions()
+	diffFormatter := format.NewDiffFormatter(diffOptions)
+	result := diffFormatter.GenerateDiff("document", original, formatted)
+
+	if !result.HasChanges {
+		return []map[string]any{}
+	}
+
+	var edits []map[string]any
+	originalLines := strings.Split(original, "\n")
+	formattedLines := strings.Split(formatted, "\n")
+
+	// Convert diff hunks to LSP text edits
+	for _, hunk := range result.Hunks {
+		// Calculate actual line ranges (diff uses 1-based, LSP uses 0-based)
+		startLine := hunk.OriginalStart - 1
+		if startLine < 0 {
+			startLine = 0
+		}
+
+		endLine := startLine + hunk.OriginalCount
+		if endLine > len(originalLines) {
+			endLine = len(originalLines)
+		}
+
+		// Get replacement text from formatted version
+		newStartLine := hunk.ModifiedStart - 1
+		if newStartLine < 0 {
+			newStartLine = 0
+		}
+		newEndLine := newStartLine + hunk.ModifiedCount
+		if newEndLine > len(formattedLines) {
+			newEndLine = len(formattedLines)
+		}
+
+		var newText string
+		if newEndLine > newStartLine {
+			newText = strings.Join(formattedLines[newStartLine:newEndLine], "\n")
+			if newEndLine < len(formattedLines) {
+				newText += "\n"
+			}
+		}
+
+		// Calculate character positions
+		startOffset := 0
+		for i := 0; i < startLine && i < len(originalLines); i++ {
+			startOffset += len(originalLines[i]) + 1 // +1 for newline
+		}
+
+		endOffset := startOffset
+		for i := startLine; i < endLine && i < len(originalLines); i++ {
+			endOffset += len(originalLines[i])
+			if i < len(originalLines)-1 {
+				endOffset += 1 // +1 for newline except last line
+			}
+		}
+
+		startLinePos, startChar := utf16LineCharFromOffset(original, startOffset)
+		endLinePos, endChar := utf16LineCharFromOffset(original, endOffset)
+
+		edits = append(edits, map[string]any{
+			"range": map[string]any{
+				"start": map[string]any{"line": startLinePos, "character": startChar},
+				"end":   map[string]any{"line": endLinePos, "character": endChar},
+			},
+			"newText": newText,
+		})
+	}
+
+	return edits
+}
+
+// handleRangeFormatting applies formatting to a subset of lines with minimal edits.
 func (s *Server) handleRangeFormatting(uri string, startLine, endLine int, options map[string]any) []map[string]any {
 	text := s.docs[uri]
 	if text == "" {
@@ -2384,36 +2498,32 @@ func (s *Server) handleRangeFormatting(uri string, startLine, endLine int, optio
 	if endLine < startLine {
 		endLine = startLine
 	}
-	startOff, _ := getLineBounds(text, startLine)
-	_, endOff := getLineBounds(text, endLine)
-	if startOff < 0 || endOff < 0 {
+
+	// For range formatting, we format the entire document but only return edits within the range
+	allEdits := s.handleFormatting(uri, options)
+	if len(allEdits) == 0 {
 		return []map[string]any{}
 	}
-	// Format whole document, then slice the changed span (simple but consistent)
-	full := s.handleFormatting(uri, options)
-	if len(full) == 0 {
-		return []map[string]any{}
+
+	// Filter edits to only those that intersect with the requested range
+	var rangeEdits []map[string]any
+	for _, edit := range allEdits {
+		if editRange, ok := edit["range"].(map[string]any); ok {
+			if editStart, ok := editRange["start"].(map[string]any); ok {
+				if editEnd, ok := editRange["end"].(map[string]any); ok {
+					editStartLine := int(editStart["line"].(float64))
+					editEndLine := int(editEnd["line"].(float64))
+
+					// Check if edit intersects with requested range
+					if editStartLine <= endLine && editEndLine >= startLine {
+						rangeEdits = append(rangeEdits, edit)
+					}
+				}
+			}
+		}
 	}
-	// Replace the full text edit with a range-limited edit using the newly formatted content segment
-	newTextAny := full[0]["newText"]
-	newDoc, _ := newTextAny.(string)
-	if newDoc == "" {
-		return []map[string]any{}
-	}
-	// Extract the segment for the requested line range
-	seg := newDoc[startOff:]
-	if endOff <= len(newDoc) {
-		seg = newDoc[startOff:endOff]
-	}
-	sL, sC := utf16LineCharFromOffset(text, startOff)
-	eL, eC := utf16LineCharFromOffset(text, endOff)
-	return []map[string]any{{
-		"range": map[string]any{
-			"start": map[string]any{"line": sL, "character": sC},
-			"end":   map[string]any{"line": eL, "character": eC},
-		},
-		"newText": seg,
-	}}
+
+	return rangeEdits
 }
 
 // handleCodeAction provides simple quick fixes like inserting missing function body braces or removing trailing spaces.
@@ -2628,48 +2738,130 @@ func (s *Server) handleSignatureHelp(uri string, line, character int) map[string
 	}
 }
 
-// handleOnTypeFormatting performs small edits on specific typed characters (e.g., '}' or newline).
+// handleOnTypeFormatting performs intelligent edits on specific typed characters with minimal changes.
 func (s *Server) handleOnTypeFormatting(uri string, line, character int, ch string, options map[string]any) []map[string]any {
-	if ch != "}" && ch != "\n" && ch != ")" && ch != ";" {
+	if ch != "}" && ch != "\n" && ch != ")" && ch != ";" && ch != "{" {
 		return []map[string]any{}
 	}
 	text := s.docs[uri]
 	if text == "" {
 		return []map[string]any{}
 	}
-	// Compute desired indent for the current line and rebuild line content
+
+	// Check if enhanced formatting is enabled
+	var useEnhanced bool
+	if opts, ok := options["astFormat"]; ok {
+		if ast, ok := opts.(bool); ok {
+			useEnhanced = ast
+		}
+	}
+
+	if useEnhanced {
+		// Use AST-aware on-type formatting
+		return s.handleEnhancedOnTypeFormatting(uri, line, character, ch, options)
+	}
+
+	// Basic on-type formatting (existing logic)
 	startOff, endOff := getLineBounds(text, line)
 	if startOff < 0 || endOff < 0 {
 		return []map[string]any{}
 	}
 	lineText := text[startOff:endOff]
-	// Desired indent based on brace balance up to this line
+
+	// Compute desired indent for the current line
 	indentLevel := computeIndentBeforeLine(text, line)
-	// If line starts with '}', reduce indent for this line
+
+	// Special handling for different characters
 	trimmed := strings.TrimLeft(lineText, " \t")
-	if strings.HasPrefix(trimmed, "}") && indentLevel > 0 {
-		indentLevel--
+	switch ch {
+	case "}":
+		// Closing brace reduces indent
+		if strings.HasPrefix(trimmed, "}") && indentLevel > 0 {
+			indentLevel--
+		}
+	case "{":
+		// Opening brace may need space before it
+		if !strings.HasSuffix(strings.TrimSpace(lineText), " {") && strings.HasSuffix(trimmed, "{") {
+			// Add space before brace if not present
+			newText := strings.TrimRight(lineText, " \t")
+			if !strings.HasSuffix(newText, " ") && !strings.HasSuffix(newText, "\t") {
+				newText = strings.TrimSuffix(newText, "{")
+				newText += " {"
+				return s.createSingleLineEdit(text, line, newText)
+			}
+		}
+	case ";":
+		// Semicolon formatting can trigger end-of-statement cleanup
+		// Remove trailing spaces after semicolon
+		if strings.HasSuffix(strings.TrimSpace(lineText), ";") {
+			newText := strings.TrimRight(lineText, " \t")
+			if newText != lineText {
+				return s.createSingleLineEdit(text, line, newText)
+			}
+		}
 	}
-	indentUnit := "  "
-	if ws, ok := options["insertSpaces"].(bool); ok && !ws {
-		indentUnit = "\t"
-	} else if size, ok := options["tabSize"].(float64); ok && size > 0 {
-		indentUnit = strings.Repeat(" ", int(size))
-	}
+
+	// Apply indentation
+	indentUnit := getIndentUnit(options)
 	newLine := strings.Repeat(indentUnit, indentLevel) + strings.TrimRight(trimmed, " \t")
+
 	if newLine == lineText {
 		return []map[string]any{}
 	}
-	// Produce single-line edit
+
+	return s.createSingleLineEdit(text, line, newLine)
+}
+
+// handleEnhancedOnTypeFormatting uses AST information for smarter on-type formatting
+func (s *Server) handleEnhancedOnTypeFormatting(uri string, line, character int, ch string, options map[string]any) []map[string]any {
+	text := s.docs[uri]
+
+	// For enhanced formatting, we format a small region around the cursor
+	// to maintain performance while providing better formatting
+	contextLines := 5 // Format 5 lines before and after
+	startLine := line - contextLines
+	if startLine < 0 {
+		startLine = 0
+	}
+
+	endLine := line + contextLines
+	lines := strings.Split(text, "\n")
+	if endLine >= len(lines) {
+		endLine = len(lines) - 1
+	}
+
+	// Apply range formatting to the context area
+	return s.handleRangeFormatting(uri, startLine, endLine, options)
+}
+
+// createSingleLineEdit creates a text edit for a single line
+func (s *Server) createSingleLineEdit(text string, line int, newText string) []map[string]any {
+	startOff, endOff := getLineBounds(text, line)
+	if startOff < 0 || endOff < 0 {
+		return []map[string]any{}
+	}
+
 	sL, sC := utf16LineCharFromOffset(text, startOff)
 	eL, eC := utf16LineCharFromOffset(text, endOff)
+
 	return []map[string]any{{
 		"range": map[string]any{
 			"start": map[string]any{"line": sL, "character": sC},
 			"end":   map[string]any{"line": eL, "character": eC},
 		},
-		"newText": newLine,
+		"newText": newText,
 	}}
+}
+
+// getIndentUnit returns the indentation unit based on editor options
+func getIndentUnit(options map[string]any) string {
+	indentUnit := "  " // Default to 2 spaces
+	if ws, ok := options["insertSpaces"].(bool); ok && !ws {
+		indentUnit = "\t"
+	} else if size, ok := options["tabSize"].(float64); ok && size > 0 {
+		indentUnit = strings.Repeat(" ", int(size))
+	}
+	return indentUnit
 }
 
 // handleSemanticTokensFull builds LSP semantic tokens for the entire document using a simple
