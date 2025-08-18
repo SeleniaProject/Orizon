@@ -77,11 +77,17 @@ type Options struct {
 	FileRegex    string        // optional regex to include only packages that have files matching this regex
 	ListOnly     bool          // list test names (per package) without executing them
 	FailOnFlaky  bool          // return non-zero if any test recovered from fail to pass after retries
+	// Snapshot testing options
+	UpdateSnapshots  bool   // update snapshots instead of comparing
+	SnapshotDir      string // directory for snapshot files
+	CleanupSnapshots bool   // remove orphaned snapshot files
+	GoldenTests      bool   // enable golden file testing support
 }
 
 // Runner executes `go test -json` per package with concurrency and aggregates results.
 type Runner struct {
-	opts Options
+	opts            Options
+	snapshotManager *SnapshotManager
 }
 
 // New creates a test runner with sane defaults.
@@ -98,7 +104,28 @@ func New(opts Options) *Runner {
 	if opts.Timeout <= 0 {
 		opts.Timeout = 10 * time.Minute
 	}
-	return &Runner{opts: opts}
+
+	// Initialize snapshot manager if snapshot features are enabled
+	var snapshotManager *SnapshotManager
+	if opts.UpdateSnapshots || opts.CleanupSnapshots || opts.GoldenTests {
+		snapshotDir := opts.SnapshotDir
+		if snapshotDir == "" {
+			snapshotDir = "testdata/snapshots"
+		}
+
+		snapshotOptions := SnapshotOptions{
+			BaseDir: snapshotDir,
+			Update:  opts.UpdateSnapshots,
+			Format:  "text",
+			Cleanup: opts.CleanupSnapshots,
+		}
+		snapshotManager = NewSnapshotManager(snapshotOptions)
+	}
+
+	return &Runner{
+		opts:            opts,
+		snapshotManager: snapshotManager,
+	}
 }
 
 // Run executes tests and writes human-readable output to `out` unless JSON mode is enabled.
@@ -290,6 +317,20 @@ func (r *Runner) Run(ctx context.Context, out io.Writer) (Result, error) {
 			return results, errors.New("flaky tests detected")
 		}
 	}
+
+	// Handle snapshot cleanup if enabled
+	if r.snapshotManager != nil {
+		if err := r.snapshotManager.CleanupOrphanedSnapshots(); err != nil {
+			fmt.Fprintf(out, "Warning: snapshot cleanup failed: %v\n", err)
+		}
+
+		// Generate snapshot report if there were snapshot tests
+		snapshotResults := r.snapshotManager.GetResults()
+		if len(snapshotResults) > 0 && !r.opts.JSON {
+			fmt.Fprintln(out, "\n"+r.snapshotManager.GenerateReport())
+		}
+	}
+
 	return results, nil
 }
 

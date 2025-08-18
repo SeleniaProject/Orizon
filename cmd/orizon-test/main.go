@@ -13,25 +13,29 @@ import (
 
 func main() {
 	var (
-		pkgs        string
-		runPat      string
-		par         int
-		jsonOut     bool
-		jsonAug     bool
-		short       bool
-		race        bool
-		timeout     time.Duration
-		color       bool
-		envList     string
-		extra       string
-		junit       string
-		retries     int
-		failFast    bool
-		pkgRegex    string
-		summaryJSON string
-		fileRegex   string
-		listOnly    bool
-		failOnFlaky bool
+		pkgs             string
+		runPat           string
+		par              int
+		jsonOut          bool
+		jsonAug          bool
+		short            bool
+		race             bool
+		timeout          time.Duration
+		color            bool
+		envList          string
+		extra            string
+		junit            string
+		retries          int
+		failFast         bool
+		pkgRegex         string
+		summaryJSON      string
+		fileRegex        string
+		listOnly         bool
+		failOnFlaky      bool
+		updateSnapshots  bool
+		snapshotDir      string
+		cleanupSnapshots bool
+		goldenTests      bool
 	)
 	flag.StringVar(&pkgs, "packages", "./...", "comma-separated package patterns (e.g. ./...,./internal/...)")
 	flag.StringVar(&runPat, "run", "", "regex to select tests (forwarded to go test -run)")
@@ -52,6 +56,10 @@ func main() {
 	flag.StringVar(&fileRegex, "file-regex", "", "optional regex to include only packages that have files matching this regex")
 	flag.BoolVar(&listOnly, "list", false, "list tests without executing (dry run)")
 	flag.BoolVar(&failOnFlaky, "fail-on-flaky", false, "exit non-zero if any test recovered after retries (flaky detected)")
+	flag.BoolVar(&updateSnapshots, "update-snapshots", false, "update snapshot files instead of comparing")
+	flag.StringVar(&snapshotDir, "snapshot-dir", "testdata/snapshots", "directory for snapshot files")
+	flag.BoolVar(&cleanupSnapshots, "cleanup-snapshots", false, "remove orphaned snapshot files")
+	flag.BoolVar(&goldenTests, "golden", false, "enable golden file testing support")
 	flag.Parse()
 
 	pkgsArr := splitNonEmpty(pkgs, ",")
@@ -59,25 +67,29 @@ func main() {
 	extras := splitNonEmpty(extra, " ")
 
 	runner := testrunner.New(testrunner.Options{
-		Packages:     pkgsArr,
-		RunPattern:   runPat,
-		Parallel:     par,
-		JSON:         jsonOut,
-		Short:        short,
-		Race:         race,
-		Timeout:      timeout,
-		Env:          env,
-		Color:        color,
-		ExtraArgs:    extras,
-		JUnitPath:    junit,
-		Retries:      retries,
-		FailFast:     failFast,
-		PackageRegex: pkgRegex,
-		SummaryJSON:  summaryJSON,
-		AugmentJSON:  jsonAug,
-		FileRegex:    fileRegex,
-		ListOnly:     listOnly,
-		FailOnFlaky:  failOnFlaky,
+		Packages:         pkgsArr,
+		RunPattern:       runPat,
+		Parallel:         par,
+		JSON:             jsonOut,
+		Short:            short,
+		Race:             race,
+		Timeout:          timeout,
+		Env:              env,
+		Color:            color,
+		ExtraArgs:        extras,
+		JUnitPath:        junit,
+		Retries:          retries,
+		FailFast:         failFast,
+		PackageRegex:     pkgRegex,
+		SummaryJSON:      summaryJSON,
+		AugmentJSON:      jsonAug,
+		FileRegex:        fileRegex,
+		ListOnly:         listOnly,
+		FailOnFlaky:      failOnFlaky,
+		UpdateSnapshots:  updateSnapshots,
+		SnapshotDir:      snapshotDir,
+		CleanupSnapshots: cleanupSnapshots,
+		GoldenTests:      goldenTests,
 	})
 	ctx := context.Background()
 	res, err := runner.Run(ctx, os.Stdout)
