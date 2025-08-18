@@ -914,6 +914,16 @@ func (transformer *ASTToHIRTransformer) transformBinaryExpression(binExpr *Binar
 		opKind = BinOpDiv
 	case "%":
 		opKind = BinOpMod
+	case "&":
+		opKind = BinOpAnd
+	case "|":
+		opKind = BinOpOr
+	case "^":
+		opKind = BinOpXor
+	case "<<":
+		opKind = BinOpShl
+	case ">>":
+		opKind = BinOpShr
 	case "==":
 		opKind = BinOpEq
 	case "!=":

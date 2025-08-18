@@ -2633,10 +2633,10 @@ func (p *Parser) parsePrefixExpression() Expression {
 		return p.parseFloatLiteral()
 	case lexer.TokenString:
 		return p.parseStringLiteral()
-	case lexer.TokenBool:
+	case lexer.TokenTrue, lexer.TokenFalse:
 		return p.parseBooleanLiteral()
 	// Unary prefix operators
-	case lexer.TokenMinus, lexer.TokenNot, lexer.TokenBitNot:
+	case lexer.TokenMinus, lexer.TokenPlus, lexer.TokenNot, lexer.TokenBitNot:
 		return p.parseUnaryExpression()
 	case lexer.TokenLParen:
 		return p.parseGroupedExpression()

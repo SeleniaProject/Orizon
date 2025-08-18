@@ -434,7 +434,9 @@ func (tc *DependentTypeChecker) CheckIndexExpression(idx *IndexExpression) Depen
 	if sizedArray, ok := arrayType.(*SizedArrayType); ok {
 		// Verify index type is appropriate
 		if basicIndex, ok := indexType.(*BasicType); ok && basicIndex.Name == "Int" {
-			// TODO: Add bounds checking constraint
+			// Add bounds checking constraint: 0 <= index < array.length
+			tc.addBoundsCheckingConstraint(idx, sizedArray)
+
 			// Convert Type to DependentType
 			if depElemType, ok := sizedArray.ElementType.(DependentType); ok {
 				return depElemType
@@ -578,4 +580,30 @@ func (tie *TypeInferenceEngine) InferTypes(program *Program) (map[string]Depende
 	errors = append(errors, solverErrors...)
 
 	return substitutions, errors
+}
+
+// addBoundsCheckingConstraint adds bounds checking constraints for array access
+func (tc *DependentTypeChecker) addBoundsCheckingConstraint(idx *IndexExpression, arrayType *SizedArrayType) {
+	// Create constraint: 0 <= index < arrayLength
+	// For now, this is a simplified implementation that logs the constraint
+	// In a full implementation, this would integrate with the constraint solver
+
+	indexSpan := idx.Index.GetSpan()
+
+	// Log the bounds checking requirement
+	tc.addError(indexSpan, fmt.Sprintf(
+		"Bounds check required: index must be in range [0, size) for array access where size = %s",
+		arrayType.Size.String(),
+	))
+
+	// In a real implementation, you would:
+	// 1. Create symbolic constraints for 0 <= index < arrayType.Size
+	// 2. Add these to a constraint solver
+	// 3. Verify the constraints can be statically proven or insert runtime checks
+	// 4. Generate refinement types with the appropriate bounds information
+
+	// Validate that the size expression exists
+	if arrayType.Size == nil {
+		tc.addError(indexSpan, "Array size expression is required for bounds checking")
+	}
 }

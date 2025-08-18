@@ -795,6 +795,13 @@ type Visitor interface {
 	VisitBreakStatement(*BreakStatement) interface{}
 	VisitContinueStatement(*ContinueStatement) interface{}
 	VisitMatchStatement(*MatchStatement) interface{}
+	VisitMatchArm(*MatchArm) interface{}
+	// Pattern matching visitor methods
+	VisitLiteralPattern(*LiteralPattern) interface{}
+	VisitVariablePattern(*VariablePattern) interface{}
+	VisitConstructorPattern(*ConstructorPattern) interface{}
+	VisitGuardPattern(*GuardPattern) interface{}
+	VisitWildcardPattern(*WildcardPattern) interface{}
 	// Dependent type system visitor methods
 	VisitDependentFunctionType(*DependentFunctionType) interface{}
 	VisitDependentParameter(*DependentParameter) interface{}
