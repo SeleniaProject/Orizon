@@ -1,0 +1,19 @@
+func main() {
+    let a = 10;
+    let b = 5;
+    
+    // 比較演算子
+    let eq = a == b;
+    let ne = a != b;
+    let lt = a < b;
+    let le = a <= b;
+    let gt = a > b;
+    let ge = a >= b;
+    
+    // 論理演算子
+    let and_result = (a > 0) && (b > 0);
+    let or_result = (a < 0) || (b > 0);
+    let not_result = !(a == b);
+    
+    print("演算子テスト完了");
+}

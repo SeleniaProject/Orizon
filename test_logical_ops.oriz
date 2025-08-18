@@ -1,0 +1,9 @@
+func main() {
+    let a = true;
+    let b = false;
+    
+    let and_result = a && b;
+    let or_result = a || b;
+    
+    print("論理演算子テスト");
+}

@@ -1,0 +1,11 @@
+func main() {
+    let i = 0;
+    
+    while (i < 3) {
+        print("ループ中");
+        let j = i + 1;
+        i = j;  // シンプルな代入をテスト
+    }
+    
+    print("whileループテスト完了");
+}
