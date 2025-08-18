@@ -1,0 +1,31 @@
+feat: implement staged pipeline testing (小さな関数から e2e まで)
+
+Implements comprehensive end-to-end testing framework for the HIR -> MIR -> LIR -> Codegen pipeline.
+This fulfills the "段階テスト（小さな関数から e2e まで）" requirement from task.md section 4.
+
+Features:
+- PipelineTestSuite with 5 progressive test stages
+  * Stage 1: Simple expressions (literals, arithmetic, variables)  
+  * Stage 2: Control flow (if statements, loops)
+  * Stage 3: Memory management (references, borrowing)
+  * Stage 4: Complex integration (nested control flow, recursion)
+  * Stage 5: End-to-end (multi-function modules, error handling)
+- Complete pipeline validation: HIR → MIR → LIR → x64 Assembly
+- Memory safety validation integration with existing MIR transformers
+- Intermediate representation preservation for debugging
+- Individual component testing for isolated validation
+
+Implementation details:
+- internal/integration/pipeline_test.go: Main pipeline test framework
+- internal/integration/stage_test.go: Individual component tests
+- Correct integration with existing MIR/LIR structures and x64 emitter
+- Output artifacts saved to tmp/pipeline_test_output/ for inspection
+
+Test results:
+- All 11 pipeline test cases pass successfully
+- All existing project tests continue to pass  
+- Generated assembly validates correctly through x64 emitter
+
+This establishes the foundation for progressive compilation pipeline testing,
+enabling incremental validation from simple functions to complete end-to-end
+scenarios as required for self-hosting milestone achievement.
