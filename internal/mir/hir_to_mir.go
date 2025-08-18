@@ -546,6 +546,20 @@ func (t *HIRToMIRTransformer) transformExpression(hirExpr *parser.HIRExpression)
 		}
 		return Value{}, fmt.Errorf("invalid call expression data")
 
+	case parser.HIRExprBlock:
+		if blk, ok := hirExpr.Data.(*parser.HIRBlock); ok {
+			// Execute statements and return trailing expression value if any
+			if err := t.transformBlock(blk); err != nil {
+				return Value{}, err
+			}
+			if blk.Expression != nil {
+				return t.transformExpression(blk.Expression)
+			}
+			// No value: return 0 as a benign int
+			return Value{Kind: ValConstInt, Int64: 0, Class: ClassInt}, nil
+		}
+		return Value{}, fmt.Errorf("invalid block expression data")
+
 	case parser.HIRExprFieldAccess:
 		if fieldData, ok := hirExpr.Data.(*parser.HIRFieldAccessExpression); ok {
 			return t.transformFieldAccessExpression(fieldData)
@@ -657,6 +671,18 @@ func (t *HIRToMIRTransformer) transformBinaryExpression(expr *parser.HIRBinaryEx
 		return t.generateBinaryOp(OpMul, lhs, rhs)
 	case parser.BinOpDiv:
 		return t.generateBinaryOp(OpDiv, lhs, rhs)
+	case parser.BinOpMod:
+		return t.generateBinaryOp(OpMod, lhs, rhs)
+	case parser.BinOpAnd:
+		return t.generateBinaryOp(OpAnd, lhs, rhs)
+	case parser.BinOpOr:
+		return t.generateBinaryOp(OpOr, lhs, rhs)
+	case parser.BinOpXor:
+		return t.generateBinaryOp(OpXor, lhs, rhs)
+	case parser.BinOpShl:
+		return t.generateBinaryOp(OpShl, lhs, rhs)
+	case parser.BinOpShr:
+		return t.generateBinaryOp(OpShr, lhs, rhs)
 	case parser.BinOpEq:
 		return t.generateComparison(CmpEQ, lhs, rhs)
 	case parser.BinOpNe:
@@ -669,6 +695,22 @@ func (t *HIRToMIRTransformer) transformBinaryExpression(expr *parser.HIRBinaryEx
 		return t.generateComparison(CmpSGT, lhs, rhs)
 	case parser.BinOpGe:
 		return t.generateComparison(CmpSGE, lhs, rhs)
+	case parser.BinOpLogicalAnd:
+		// (lhs && rhs) -> cmp.ne (mul lhs rhs), 0
+		mul, err := t.generateBinaryOp(OpMul, lhs, rhs)
+		if err != nil {
+			return Value{}, err
+		}
+		zero := Value{Kind: ValConstInt, Int64: 0, Class: ClassInt}
+		return t.generateComparison(CmpNE, mul, zero)
+	case parser.BinOpLogicalOr:
+		// (lhs || rhs) -> cmp.ne (add lhs rhs), 0
+		add, err := t.generateBinaryOp(OpAdd, lhs, rhs)
+		if err != nil {
+			return Value{}, err
+		}
+		zero := Value{Kind: ValConstInt, Int64: 0, Class: ClassInt}
+		return t.generateComparison(CmpNE, add, zero)
 	default:
 		return Value{}, fmt.Errorf("unsupported binary operator: %v", expr.Operator)
 	}
@@ -718,6 +760,10 @@ func (t *HIRToMIRTransformer) transformUnaryExpression(expr *parser.HIRUnaryExpr
 		// Logical not: compare with 0
 		zero := Value{Kind: ValConstInt, Int64: 0, Class: ClassInt}
 		return t.generateComparison(CmpEQ, operand, zero)
+	case parser.UnaryOpBitNot:
+		// Bitwise not: xor with -1
+		neg1 := Value{Kind: ValConstInt, Int64: -1, Class: ClassInt}
+		return t.generateBinaryOp(OpXor, operand, neg1)
 	default:
 		return Value{}, fmt.Errorf("unsupported unary operator: %v", expr.Operator)
 	}

@@ -32,9 +32,10 @@ type Value struct {
 	// For constants
 	Int64   int64
 	Float64 float64
+	StrVal  string
 	// For instruction results (index into block/local numbering)
 	Ref string
-	// Lightweight type class hint for lowering (int/float/ptr)
+	// Lightweight type class hint for lowering (int/float/ptr/string)
 	Class ValueClass
 }
 
@@ -45,6 +46,7 @@ const (
 	ValInvalid ValueKind = iota
 	ValConstInt
 	ValConstFloat
+	ValConstString
 	ValRef
 )
 
@@ -85,10 +87,38 @@ type Load struct {
 	Addr Value // expected to be a reference to an address
 }
 
+// IndexLoad loads a value from an array element at the given index.
+type IndexLoad struct {
+	Dst   string
+	Array Value
+	Index Value
+}
+
+// FieldLoad loads a value from a struct field.
+type FieldLoad struct {
+	Dst    string
+	Object Value
+	Field  string
+}
+
 // Store stores a value into an address.
 type Store struct {
 	Addr Value
 	Val  Value
+}
+
+// IndexStore stores a value into an array element at the given index.
+type IndexStore struct {
+	Array Value
+	Index Value
+	Val   Value
+}
+
+// FieldStore stores a value into a struct field.
+type FieldStore struct {
+	Object Value
+	Field  string
+	Val    Value
 }
 
 // Cmp represents a comparison producing a boolean-like value (0/1).
@@ -117,17 +147,27 @@ const (
 	OpSub
 	OpMul
 	OpDiv
+	OpMod
+	OpAnd
+	OpOr
+	OpXor
+	OpShl
+	OpShr
 )
 
-func (BinOp) isInstr()  {}
-func (Ret) isInstr()    {}
-func (Call) isInstr()   {}
-func (Alloca) isInstr() {}
-func (Load) isInstr()   {}
-func (Store) isInstr()  {}
-func (Cmp) isInstr()    {}
-func (Br) isInstr()     {}
-func (CondBr) isInstr() {}
+func (BinOp) isInstr()      {}
+func (Ret) isInstr()        {}
+func (Call) isInstr()       {}
+func (Alloca) isInstr()     {}
+func (Load) isInstr()       {}
+func (IndexLoad) isInstr()  {}
+func (FieldLoad) isInstr()  {}
+func (Store) isInstr()      {}
+func (IndexStore) isInstr() {}
+func (FieldStore) isInstr() {}
+func (Cmp) isInstr()        {}
+func (Br) isInstr()         {}
+func (CondBr) isInstr()     {}
 
 // ValueClass is a minimal type class for lowering decisions.
 type ValueClass int
@@ -136,6 +176,7 @@ const (
 	ClassUnknown ValueClass = iota
 	ClassInt                // integers, pointers
 	ClassFloat              // floating point
+	ClassString             // strings
 )
 
 func (c ValueClass) String() string {
@@ -144,6 +185,8 @@ func (c ValueClass) String() string {
 		return "int"
 	case ClassFloat:
 		return "float"
+	case ClassString:
+		return "string"
 	default:
 		return "unknown"
 	}
@@ -210,6 +253,8 @@ func valString(v Value) string {
 		return fmt.Sprintf("%d", v.Int64)
 	case ValConstFloat:
 		return fmt.Sprintf("%g", v.Float64)
+	case ValConstString:
+		return fmt.Sprintf("\"%s\"", v.StrVal)
 	case ValRef:
 		if v.Ref == "" {
 			return "%ref?"
@@ -284,8 +329,24 @@ func (i Load) String() string {
 	return fmt.Sprintf("%s = load %s", i.Dst, i.Addr.String())
 }
 
+func (i IndexLoad) String() string {
+	return fmt.Sprintf("%s = indexload %s[%s]", i.Dst, i.Array.String(), i.Index.String())
+}
+
+func (i FieldLoad) String() string {
+	return fmt.Sprintf("%s = fieldload %s.%s", i.Dst, i.Object.String(), i.Field)
+}
+
 func (i Store) String() string {
 	return fmt.Sprintf("store %s, %s", i.Addr.String(), i.Val.String())
+}
+
+func (i IndexStore) String() string {
+	return fmt.Sprintf("indexstore %s[%s], %s", i.Array.String(), i.Index.String(), i.Val.String())
+}
+
+func (i FieldStore) String() string {
+	return fmt.Sprintf("fieldstore %s.%s, %s", i.Object.String(), i.Field, i.Val.String())
 }
 
 // CmpPred enumerates compare predicates.
@@ -370,6 +431,18 @@ func (k BinOpKind) String() string {
 		return "mul"
 	case OpDiv:
 		return "div"
+	case OpMod:
+		return "mod"
+	case OpAnd:
+		return "band"
+	case OpOr:
+		return "bor"
+	case OpXor:
+		return "bxor"
+	case OpShl:
+		return "shl"
+	case OpShr:
+		return "shr"
 	default:
 		return "binop?"
 	}
