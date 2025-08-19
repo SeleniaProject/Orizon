@@ -4,6 +4,7 @@ package lexer
 
 import (
 	"fmt"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -79,7 +80,20 @@ const (
 	TokenStatic
 	TokenExtern
 	TokenYield
-	TokenFn // func の別名として追加
+	TokenFn      // func の別名として追加
+	TokenNewtype // newtype 宣言用
+
+	// 効果システム関連
+	TokenEffect // effect keyword for declarations
+	TokenEffects
+
+	// テンプレート文字列関連
+	TokenTemplateString
+	TokenTemplateStart      // ${
+	TokenTemplateEnd        // }
+	TokenRawString          // r"..."
+	TokenInterpolationStart // ${
+	TokenInterpolationEnd   // }
 
 	// マクロ関連
 	TokenMacro
@@ -298,6 +312,35 @@ var tokenNames = map[TokenType]string{
 	TokenCaret:       "CARET",
 	TokenPercent:     "PERCENT",
 	TokenExclamation: "EXCLAMATION",
+
+	// 追加トークン
+	TokenCase:        "CASE",
+	TokenDefault:     "DEFAULT",
+	TokenFalse:       "FALSE",
+	TokenTrue:        "TRUE",
+	TokenTypeKeyword: "TYPE",
+	TokenStatic:      "STATIC",
+	TokenExtern:      "EXTERN",
+	TokenYield:       "YIELD",
+	TokenFn:          "FN",
+	TokenNewtype:     "NEWTYPE",
+
+	// 効果システム関連
+	TokenEffect:  "EFFECT",
+	TokenEffects: "EFFECTS",
+
+	// テンプレート文字列関連
+	TokenTemplateString:     "TEMPLATE_STRING",
+	TokenTemplateStart:      "TEMPLATE_START",
+	TokenTemplateEnd:        "TEMPLATE_END",
+	TokenRawString:          "RAW_STRING",
+	TokenInterpolationStart: "INTERPOLATION_START",
+	TokenInterpolationEnd:   "INTERPOLATION_END",
+
+	// 構文仕様の追加演算子
+	TokenSpaceship: "SPACESHIP",
+	TokenRange:     "RANGE",
+	TokenEllipsis:  "ELLIPSIS",
 }
 
 // keywords maps string keywords to their token types
@@ -343,6 +386,9 @@ var keywords = map[string]TokenType{
 	"macro":    TokenMacro,
 	"true":     TokenTrue,
 	"false":    TokenFalse,
+	"newtype":  TokenNewtype,
+	"effect":   TokenEffect,
+	"effects":  TokenEffects,
 }
 
 // CacheEntry represents a cached token with its validity information
@@ -752,18 +798,57 @@ func (l *Lexer) readTemplateString() string {
 	position := l.position + 1 // Skip opening backtick
 	l.readChar()               // consume opening backtick
 
+	var result strings.Builder
+
 	for l.ch != '`' && l.ch != 0 {
-		l.readChar()
+		if l.ch == '$' && l.peekChar() == '{' {
+			// Found interpolation start ${
+			// Add text before interpolation
+			if l.position > position {
+				result.WriteString(l.input[position:l.position])
+			}
+
+			// Mark interpolation start
+			result.WriteString("${")
+			l.readChar() // consume $
+			l.readChar() // consume {
+
+			// Read until }
+			braceCount := 1
+			interpolationStart := l.position
+			for braceCount > 0 && l.ch != 0 {
+				if l.ch == '{' {
+					braceCount++
+				} else if l.ch == '}' {
+					braceCount--
+				}
+				l.readChar()
+			}
+
+			// Add interpolation expression
+			if braceCount == 0 {
+				result.WriteString(l.input[interpolationStart : l.position-1])
+				result.WriteString("}")
+			}
+
+			position = l.position
+		} else {
+			l.readChar()
+		}
+	}
+
+	// Add remaining text
+	if l.position > position {
+		result.WriteString(l.input[position:l.position])
 	}
 
 	if l.ch == '`' {
-		literal := l.input[position:l.position]
 		l.readChar() // consume closing backtick
-		return literal
+		return result.String()
 	}
 
 	// Unterminated template string
-	return l.input[position:l.position]
+	return result.String()
 }
 
 // NextToken scans the input and returns the next token with full position information
@@ -958,9 +1043,10 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			// Check for ellipsis ...
 			if l.peekChar() == '.' {
+				ch2 := l.ch
 				l.readChar()
-				tok = l.newToken(TokenEllipsis, string(ch)+string(l.ch)+string(l.peekChar()))
-				l.readChar() // consume third '.'
+				ch3 := l.ch
+				tok = l.newToken(TokenEllipsis, string(ch)+string(ch2)+string(ch3))
 			} else {
 				tok = l.newToken(TokenRange, string(ch)+string(l.ch))
 			}
@@ -1032,7 +1118,7 @@ func (l *Lexer) NextToken() Token {
 	case '`':
 		// Template string
 		templateLiteral := l.readTemplateString()
-		tok = l.newTokenFromPosition(TokenString, templateLiteral, startPos)
+		tok = l.newTokenFromPosition(TokenTemplateString, templateLiteral, startPos)
 	case '\n':
 		tok = l.newTokenFromChar(TokenNewline, l.ch)
 	case 0:
