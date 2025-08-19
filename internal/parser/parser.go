@@ -409,7 +409,7 @@ func (p *Parser) skipToNextTopLevelDecl() {
 func (p *Parser) isTopLevelStart(tok lexer.Token) bool {
 	if tok.Type == lexer.TokenFunc || tok.Type == lexer.TokenLet || tok.Type == lexer.TokenVar || tok.Type == lexer.TokenConst ||
 		tok.Type == lexer.TokenMacro || tok.Type == lexer.TokenStruct || tok.Type == lexer.TokenEnum || tok.Type == lexer.TokenTrait ||
-		tok.Type == lexer.TokenImpl || tok.Type == lexer.TokenImport || tok.Type == lexer.TokenExport {
+		tok.Type == lexer.TokenImpl || tok.Type == lexer.TokenImport || tok.Type == lexer.TokenExport || tok.Type == lexer.TokenEffect {
 		return true
 	}
 	if tok.Type == lexer.TokenIdentifier && (tok.Literal == "type" || tok.Literal == "newtype" || tok.Literal == "fn") {
@@ -476,7 +476,7 @@ func (p *Parser) parseDeclaration() Declaration {
 
 	var decl Declaration
 	switch p.current.Type {
-	case lexer.TokenFunc:
+	case lexer.TokenFunc, lexer.TokenFn:
 		fn := p.parseFunctionDeclaration()
 		if fn == nil {
 			// Let parseProgram handle synchronization to avoid double skipping
@@ -484,6 +484,13 @@ func (p *Parser) parseDeclaration() Declaration {
 			return nil
 		}
 		decl = fn
+	case lexer.TokenEffect:
+		ed := p.parseEffectDeclaration()
+		if ed == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse effect declaration", "declaration parsing")
+			return nil
+		}
+		decl = ed
 	case lexer.TokenLet, lexer.TokenVar, lexer.TokenConst:
 		vd := p.parseVariableDeclaration()
 		if vd == nil {
@@ -544,6 +551,15 @@ func (p *Parser) parseDeclaration() Declaration {
 			return nil
 		}
 		decl = ib
+	case lexer.TokenTypeKeyword:
+		// Support 'type' alias declaration with TokenTypeKeyword
+		td := p.parseTypeAliasDeclaration()
+		if td == nil {
+			p.addError(TokenToPosition(p.current), "failed to parse type alias", "declaration parsing")
+			return nil
+		}
+		td.IsPublic = isPublic
+		decl = td
 	default:
 		// Support 'type' alias declaration (lexer has no TokenType; detect identifier 'type')
 		if p.current.Type == lexer.TokenIdentifier && p.current.Literal == "type" {
@@ -556,8 +572,8 @@ func (p *Parser) parseDeclaration() Declaration {
 			decl = td
 			break
 		}
-		// Support 'newtype' nominal wrapper declaration (identifier literal)
-		if p.current.Type == lexer.TokenIdentifier && p.current.Literal == "newtype" {
+		// Support 'newtype' nominal wrapper declaration
+		if p.current.Type == lexer.TokenNewtype || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "newtype") {
 			nd := p.parseNewtypeDeclaration()
 			if nd == nil {
 				p.addError(TokenToPosition(p.current), "failed to parse newtype", "declaration parsing")
@@ -643,6 +659,7 @@ func (p *Parser) parseTypeAliasDeclaration() *TypeAliasDeclaration {
 // parseNewtypeDeclaration parses: newtype Name = Type ;
 func (p *Parser) parseNewtypeDeclaration() *NewtypeDeclaration {
 	start := TokenToPosition(p.current)
+	// Consume the 'newtype' token
 	if !p.expectPeek(lexer.TokenIdentifier) {
 		return nil
 	}
@@ -793,6 +810,26 @@ func (p *Parser) parseExportDeclaration() *ExportDeclaration {
 	}
 	end := TokenToPosition(p.current)
 	return &ExportDeclaration{Span: SpanBetween(start, end), Items: items}
+}
+
+// parseEffectDeclaration: effect Name;
+func (p *Parser) parseEffectDeclaration() *EffectDeclaration {
+	start := TokenToPosition(p.current)
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	// Expect semicolon
+	if !p.expectPeek(lexer.TokenSemicolon) {
+		return nil
+	}
+
+	end := TokenToPosition(p.current)
+	return &EffectDeclaration{
+		Span: SpanBetween(start, end),
+		Name: name,
+	}
 }
 
 // parseStructDeclaration: struct Name { fields }
@@ -1080,13 +1117,13 @@ func (p *Parser) parseTraitDeclaration() *TraitDeclaration {
 			continue
 		}
 		// Disallow unrelated top-level starts inside trait, but allow valid trait items: 'func' and associated 'type'
-		if p.isTopLevelStart(p.current) && !(p.current.Type == lexer.TokenFunc || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "type")) {
+		if p.isTopLevelStart(p.current) && !(p.current.Type == lexer.TokenFunc || p.current.Type == lexer.TokenTypeKeyword || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "type")) {
 			p.addErrorSilent(TokenToPosition(p.current), "unexpected top-level declaration inside trait; missing '}'?", "trait parsing")
 			return nil
 		}
 		// Associated type: 'type' identifier [ : bounds ] ;
-		// Lexer doesn't have a dedicated 'type' token yet; detect identifier literal "type".
-		if p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "type" {
+		// Support both TokenTypeKeyword and identifier literal "type"
+		if p.current.Type == lexer.TokenTypeKeyword || (p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "type") {
 			if !p.expectPeekRaw(lexer.TokenIdentifier) {
 				// Recover to ';' or '}' to continue parsing remaining items
 				p.addErrorSilent(TokenToPosition(p.peek), "expected associated type name after 'type'", "trait parsing")
@@ -1170,7 +1207,7 @@ func (p *Parser) parseImplBlock() *ImplBlock {
 		return nil
 	}
 	// Parse a simple path or type name as first part, then optional generic suffix
-	firstType := p.parsePathOrBasicType()
+	firstType := p.parseBasicTypeOnly()
 	firstType = p.parseGenericSuffixOn(firstType)
 	var trait Type
 	var forType Type
@@ -1181,7 +1218,7 @@ func (p *Parser) parseImplBlock() *ImplBlock {
 		if !p.expectPeek(lexer.TokenIdentifier) {
 			return nil
 		}
-		forType = p.parsePathOrBasicType()
+		forType = p.parseBasicTypeOnly()
 		forType = p.parseGenericSuffixOn(forType)
 	} else {
 		// inherent impl
@@ -1189,6 +1226,12 @@ func (p *Parser) parseImplBlock() *ImplBlock {
 	}
 	// Optional where clause
 	where := p.parseOptionalWhereClause()
+
+	// Skip trivia before expecting LBRACE
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
 	}
@@ -1241,7 +1284,7 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 	startPos := TokenToPosition(p.current)
 
 	// Accept both 'func' keyword and 'fn' identifier as an alias for function declarations
-	isFuncKw := p.currentTokenIs(lexer.TokenFunc) || (p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "fn")
+	isFuncKw := p.currentTokenIs(lexer.TokenFunc) || p.currentTokenIs(lexer.TokenFn) || (p.currentTokenIs(lexer.TokenIdentifier) && p.current.Literal == "fn")
 	if !isFuncKw {
 		return nil
 	}
@@ -1290,6 +1333,28 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 		returnType = p.parseType()
 	}
 
+	// Optional effects annotation: effects(io, alloc, unsafe)
+	var effects *EffectAnnotation
+	// Allow trivia before effects
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if p.peekTokenIs(lexer.TokenEffects) {
+		p.nextToken() // consume 'effects'
+		effects = p.parseEffectAnnotation()
+	}
+
+	// Optional where clause: where T: Display, U: Clone
+	var whereClause []*WherePredicate
+	// Allow trivia before where clause
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if p.peekTokenIs(lexer.TokenWhere) {
+		p.nextToken() // move to 'where'
+		whereClause = p.parseWhereClause()
+	}
+
 	// Allow trivia before function body '{'
 	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
 		p.nextToken()
@@ -1307,14 +1372,76 @@ func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 	span := SpanBetween(startPos, endPos)
 
 	return &FunctionDeclaration{
-		Span:       span,
-		Name:       name,
-		Parameters: parameters,
-		ReturnType: returnType,
-		Body:       body,
-		IsPublic:   false,
-		IsAsync:    false,
-		Generics:   gens,
+		Span:        span,
+		Name:        name,
+		Parameters:  parameters,
+		ReturnType:  returnType,
+		Body:        body,
+		IsPublic:    false,
+		IsAsync:     false,
+		Generics:    gens,
+		WhereClause: whereClause,
+		Effects:     effects,
+	}
+}
+
+// parseEffectAnnotation parses: effects(io, alloc, unsafe)
+func (p *Parser) parseEffectAnnotation() *EffectAnnotation {
+	start := TokenToPosition(p.current)
+
+	if !p.expectPeek(lexer.TokenLParen) {
+		return nil
+	}
+
+	effects := make([]*Effect, 0)
+
+	// Parse effect list
+	for {
+		p.nextToken()
+		if p.currentTokenIs(lexer.TokenRParen) {
+			break
+		}
+		if p.currentTokenIs(lexer.TokenEOF) {
+			p.addError(TokenToPosition(p.current), "unterminated effect annotation", "effect parsing")
+			return nil
+		}
+		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) || p.currentTokenIs(lexer.TokenNewline) {
+			continue
+		}
+
+		if !p.currentTokenIs(lexer.TokenIdentifier) {
+			p.addError(TokenToPosition(p.current), "expected effect name", "effect parsing")
+			return nil
+		}
+
+		effectName := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+		effects = append(effects, &Effect{
+			Span: TokenToSpan(p.current),
+			Name: effectName,
+		})
+
+		// Skip trivia
+		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+			p.nextToken()
+		}
+
+		if p.peekTokenIs(lexer.TokenComma) {
+			p.nextToken()
+			continue
+		}
+		if p.peekTokenIs(lexer.TokenRParen) {
+			p.nextToken()
+			break
+		}
+
+		p.addError(TokenToPosition(p.peek), "expected ',' or ')' in effect list", "effect parsing")
+		return nil
+	}
+
+	end := TokenToPosition(p.current)
+	return &EffectAnnotation{
+		Span:    SpanBetween(start, end),
+		Effects: effects,
 	}
 }
 
@@ -1574,6 +1701,13 @@ func (p *Parser) parseType() Type {
 		// Support path types: A::B::C and apply generic suffix to the tail
 		base := p.parsePathOrBasicType()
 		return parseGenericSuffix(base)
+	case lexer.TokenInteger:
+		// Integer literals as types in dependent contexts (e.g., Array<Int, 10>)
+		// For now, treat as BasicType with the literal value as name
+		return &BasicType{
+			Span: TokenToSpan(p.current),
+			Name: p.current.Literal,
+		}
 	case lexer.TokenLBracket:
 		// Array or slice type: [T] (slice) or [T; N] (array)
 		start := TokenToPosition(p.current)
@@ -1600,21 +1734,30 @@ func (p *Parser) parseType() Type {
 		}
 		end := TokenToPosition(p.current)
 		return &ArrayType{Span: SpanBetween(start, end), ElementType: elem, Size: nil, IsDynamic: true}
-	case lexer.TokenAsync, lexer.TokenFunc:
+	case lexer.TokenLBrace:
+		// Refinement type: {n: Int | n > 0}
+		refinement := p.parseRefinementType()
+		if refinementExpr, ok := refinement.(*RefinementTypeExpression); ok {
+			// Return RefinementTypeExpression directly for now
+			// TODO: Implement proper RefinementType when dependent types are ready
+			return refinementExpr
+		}
+		return nil
+	case lexer.TokenAsync, lexer.TokenFunc, lexer.TokenFn:
 		// function type: [async] func(paramList) [-> type]
 		start := TokenToPosition(p.current)
 		isAsync := false
 		if p.current.Type == lexer.TokenAsync {
 			isAsync = true
-			// ensure 'func' follows
+			// ensure 'func' or 'fn' follows
 			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
 				p.nextToken()
 			}
-			if !p.peekTokenIs(lexer.TokenFunc) {
-				p.addError(TokenToPosition(p.current), "expected 'func' after 'async' in type", "type parsing")
+			if !p.peekTokenIs(lexer.TokenFunc) && !p.peekTokenIs(lexer.TokenFn) {
+				p.addError(TokenToPosition(p.current), "expected 'func' or 'fn' after 'async' in type", "type parsing")
 				return nil
 			}
-			p.nextToken() // move to TokenFunc
+			p.nextToken() // move to TokenFunc or TokenFn
 		}
 		if !p.expectPeekRaw(lexer.TokenLParen) {
 			p.addError(TokenToPosition(p.peek), "expected '(' after 'func' in type", "type parsing")
@@ -1688,6 +1831,60 @@ func (p *Parser) parseType() Type {
 		}
 		end := TokenToPosition(p.current)
 		return &FunctionType{Span: SpanBetween(start, end), Parameters: params, ReturnType: ret, IsAsync: isAsync}
+	case lexer.TokenLParen:
+		// Tuple type: (T1, T2, ...) or unit type: ()
+		start := TokenToPosition(p.current)
+		p.nextToken() // move past '('
+
+		// Check for empty tuple (unit type)
+		if p.currentTokenIs(lexer.TokenRParen) {
+			end := TokenToPosition(p.current)
+			return &TupleType{Span: SpanBetween(start, end), Elements: []Type{}}
+		}
+
+		// Parse tuple elements
+		elements := make([]Type, 0)
+		// Parse first element
+		elem := p.parseType()
+		if elem != nil {
+			elements = append(elements, elem)
+		}
+
+		// Parse remaining elements
+		for {
+			// Skip trivia before comma or ')'
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			if !p.peekTokenIs(lexer.TokenComma) {
+				break
+			}
+			p.nextToken() // consume ','
+
+			// Skip trivia and move to next element
+			for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+				p.nextToken()
+			}
+			p.nextToken()
+
+			// Allow trailing comma
+			if p.currentTokenIs(lexer.TokenRParen) {
+				break
+			}
+
+			elem = p.parseType()
+			if elem != nil {
+				elements = append(elements, elem)
+			}
+		}
+
+		if !p.expectPeekRaw(lexer.TokenRParen) {
+			p.addError(TokenToPosition(p.peek), "expected ')' to close tuple type", "type parsing")
+			return nil
+		}
+
+		end := TokenToPosition(p.current)
+		return &TupleType{Span: SpanBetween(start, end), Elements: elements}
 	default:
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("unexpected token %s in type", p.current.Type.String()),
@@ -1711,7 +1908,44 @@ func (p *Parser) parsePathOrBasicType() Type {
 	}
 	// For MVP, represent path as BasicType with qualified name (resolution later)
 	bt := &BasicType{Span: SpanBetween(start, TokenToPosition(p.current)), Name: strings.Join(parts, "::")}
+
+	// Check for dependent type with where clause: Type where Constraint
+	// Skip trivia before checking 'where'
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken()
+	}
+	if p.peekTokenIs(lexer.TokenWhere) {
+		p.nextToken() // consume 'where'
+		p.nextToken() // move to constraint expression
+		constraint := p.parseExpression(LOWEST)
+		if constraint != nil {
+			end := TokenToPosition(p.current)
+			return &DependentType{
+				Span:       SpanBetween(start, end),
+				BaseType:   bt,
+				Constraint: constraint,
+			}
+		}
+	}
+
 	return bt
+}
+
+// parseBasicTypeOnly parses basic type path without checking for dependent type where clause
+func (p *Parser) parseBasicTypeOnly() Type {
+	// current is identifier at head
+	start := TokenToPosition(p.current)
+	parts := []string{p.current.Literal}
+	// Accumulate segments
+	for p.peekTokenIs(lexer.TokenDoubleColon) {
+		p.nextToken() // consume '::'
+		if !p.expectPeek(lexer.TokenIdentifier) {
+			break
+		}
+		parts = append(parts, p.current.Literal)
+	}
+	// For MVP, represent path as BasicType with qualified name (resolution later)
+	return &BasicType{Span: SpanBetween(start, TokenToPosition(p.current)), Name: strings.Join(parts, "::")}
 }
 
 // parseGenericSuffixOn applies a generic argument suffix like <T, U> to the given base type if the next token is '<'.
@@ -1768,84 +2002,122 @@ func (p *Parser) parseGenericSuffixOn(base Type) Type {
 
 // parseOptionalGenericParameters parses '<...>' if present
 func (p *Parser) parseOptionalGenericParameters() []*GenericParameter {
-	gens := []*GenericParameter{}
-	// Skip trivia
-	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
-		p.nextToken()
-	}
+	// Check if next token is '<' to start generics
 	if !p.peekTokenIs(lexer.TokenLt) {
-		return gens
+		return []*GenericParameter{}
 	}
-	p.nextToken() // move to '<'
-	// Move to first content or '>'
-	p.nextToken()
-	if p.currentTokenIs(lexer.TokenGt) {
-		return gens
+
+	p.nextToken() // consume '<'
+	var params []*GenericParameter
+
+	// Handle empty generics list
+	if p.peekTokenIs(lexer.TokenGt) {
+		p.nextToken() // consume '>'
+		return params
 	}
-	// Parse first param
-	gp := p.parseGenericParameter()
-	if gp != nil {
-		gens = append(gens, gp)
-	}
-	// Remaining params
+
+	// Parse generic parameters separated by commas
 	for {
-		// Skip trivia
-		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+		p.nextToken() // move to the parameter token
+		param := p.parseGenericParameter()
+		if param != nil {
+			params = append(params, param)
+		} else {
+			// Skip invalid parameters
 			p.nextToken()
 		}
+
+		// Check if we're done
+		if p.peekTokenIs(lexer.TokenGt) {
+			p.nextToken() // consume '>'
+			break
+		}
+
+		// Expect comma between parameters
 		if !p.peekTokenIs(lexer.TokenComma) {
+			// Error recovery: consume until '>' or EOF
+			for !p.peekTokenIs(lexer.TokenGt) && !p.peekTokenIs(lexer.TokenEOF) {
+				p.nextToken()
+			}
+			if p.peekTokenIs(lexer.TokenGt) {
+				p.nextToken() // consume '>'
+			}
 			break
 		}
 		p.nextToken() // consume ','
-		// Skip trivia then move to next param
-		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
-			p.nextToken()
-		}
-		p.nextToken()
-		gp = p.parseGenericParameter()
-		if gp != nil {
-			gens = append(gens, gp)
-		}
 	}
-	// Expect '>'
-	if !p.expectPeekRaw(lexer.TokenGt) {
-		p.addError(TokenToPosition(p.peek), "expected '>' to close generics", "generics parsing")
-	}
-	return gens
+
+	return params
 }
 
 // parseGenericParameter parses one of: identifier [":" bounds] | const identifier ":" type | lifetime
 func (p *Parser) parseGenericParameter() *GenericParameter {
 	start := TokenToPosition(p.current)
+
 	// Lifetime parameter: TokenLifetime
 	if p.current.Type == lexer.TokenLifetime {
-		return &GenericParameter{Span: SpanBetween(start, TokenToPosition(p.current)), Kind: GenericParamLifetime, Lifetime: p.current.Literal}
+		lifetime := p.current.Literal
+		return &GenericParameter{
+			Span:     SpanBetween(start, TokenToPosition(p.current)),
+			Kind:     GenericParamLifetime,
+			Lifetime: lifetime,
+		}
 	}
+
 	// Const parameter: 'const' ident ':' type
 	if p.current.Type == lexer.TokenConst {
-		if !p.expectPeek(lexer.TokenIdentifier) {
+		p.nextToken() // consume 'const'
+		if p.current.Type != lexer.TokenIdentifier {
 			return nil
 		}
 		name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
-		if !p.expectPeek(lexer.TokenColon) {
+		p.nextToken()
+		if p.current.Type != lexer.TokenColon {
 			return nil
 		}
-		p.nextToken()
+		p.nextToken() // consume ':'
 		ctype := p.parseType()
-		return &GenericParameter{Span: SpanBetween(start, TokenToPosition(p.current)), Kind: GenericParamConst, Name: name, ConstType: ctype}
+		return &GenericParameter{
+			Span:      SpanBetween(start, TokenToPosition(p.current)),
+			Kind:      GenericParamConst,
+			Name:      name,
+			ConstType: ctype,
+		}
 	}
+
 	// Type parameter: ident [":" bounds]
 	if p.current.Type == lexer.TokenIdentifier {
 		name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
-		bounds := []Type{}
+		var bounds []Type
+
+		// Check for bounds: T: Display + Debug
 		if p.peekTokenIs(lexer.TokenColon) {
-			p.nextToken()
-			p.nextToken()
-			bounds = p.parseTraitBounds()
+			p.nextToken() // move to ':'
+			p.nextToken() // consume ':' and move to first bound
+
+			for {
+				bound := p.parseType()
+				if bound != nil {
+					bounds = append(bounds, bound)
+				}
+
+				// Check if there's a '+' for more bounds
+				if !p.peekTokenIs(lexer.TokenPlus) {
+					break
+				}
+				p.nextToken() // move to '+'
+				p.nextToken() // consume '+' and move to next bound
+			}
 		}
-		return &GenericParameter{Span: SpanBetween(start, TokenToPosition(p.current)), Kind: GenericParamType, Name: name, Bounds: bounds}
+
+		return &GenericParameter{
+			Span:   SpanBetween(start, TokenToPosition(p.current)),
+			Kind:   GenericParamType,
+			Name:   name,
+			Bounds: bounds,
+		}
 	}
-	p.addError(TokenToPosition(p.current), "invalid generic parameter", "generics parsing")
+
 	return nil
 }
 
@@ -1886,12 +2158,13 @@ func (p *Parser) parseOptionalWhereClause() []*WherePredicate {
 		return preds
 	}
 	p.nextToken() // move to 'where'
-	// Move to first predicate
+	// Move to first predicate start
 	p.nextToken()
 	pred := p.parseWherePredicate()
 	if pred != nil {
 		preds = append(preds, pred)
 	}
+	// Check for more predicates
 	for {
 		// Skip trivia
 		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
@@ -1900,12 +2173,12 @@ func (p *Parser) parseOptionalWhereClause() []*WherePredicate {
 		if !p.peekTokenIs(lexer.TokenComma) {
 			break
 		}
-		p.nextToken()
+		p.nextToken() // consume comma
 		// Skip trivia then move to next predicate
 		for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
 			p.nextToken()
 		}
-		p.nextToken()
+		p.nextToken() // move to predicate start
 		pred = p.parseWherePredicate()
 		if pred != nil {
 			preds = append(preds, pred)
@@ -1924,8 +2197,10 @@ func (p *Parser) parseWherePredicate() *WherePredicate {
 	if !p.expectPeek(lexer.TokenColon) {
 		return nil
 	}
-	p.nextToken()
+	p.nextToken() // move past colon to trait bounds
 	bounds := p.parseTraitBounds()
+	// After parsing trait bounds, ensure we're positioned correctly
+	// parseTraitBounds() should leave us on the last bound token
 	return &WherePredicate{Span: SpanBetween(start, TokenToPosition(p.current)), Target: t, Bounds: bounds}
 }
 
@@ -1967,7 +2242,7 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 // parseStatement parses a statement
 func (p *Parser) parseStatement() Statement {
 	// Allow nested function declarations (e.g., inside macro bodies)
-	if p.current.Type == lexer.TokenFunc || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "fn") {
+	if p.current.Type == lexer.TokenFunc || p.current.Type == lexer.TokenFn || (p.current.Type == lexer.TokenIdentifier && p.current.Literal == "fn") {
 		return p.parseFunctionDeclaration()
 	}
 	switch p.current.Type {
@@ -2633,6 +2908,10 @@ func (p *Parser) parsePrefixExpression() Expression {
 		return p.parseFloatLiteral()
 	case lexer.TokenString:
 		return p.parseStringLiteral()
+	case lexer.TokenTemplateString:
+		return p.parseTemplateString()
+	case lexer.TokenRawString:
+		return p.parseRawString()
 	case lexer.TokenTrue, lexer.TokenFalse:
 		return p.parseBooleanLiteral()
 	// Unary prefix operators
@@ -2640,6 +2919,9 @@ func (p *Parser) parsePrefixExpression() Expression {
 		return p.parseUnaryExpression()
 	case lexer.TokenLParen:
 		return p.parseGroupedExpression()
+	// Refinement types: {n: Int | n > 0}
+	case lexer.TokenLBrace:
+		return p.parseRefinementType()
 	// Macro invocation starting with !
 	case lexer.TokenMacroInvoke:
 		return p.parseMacroInvocation()
@@ -2685,6 +2967,167 @@ func (p *Parser) parseFloatLiteral() Expression {
 // parseStringLiteral parses a string literal
 func (p *Parser) parseStringLiteral() Expression {
 	return NewLiteral(TokenToSpan(p.current), p.current.Literal, LiteralString)
+}
+
+// parseTemplateString parses a template string with interpolation
+func (p *Parser) parseTemplateString() Expression {
+	start := TokenToPosition(p.current)
+	elements := make([]*TemplateElement, 0)
+
+	// Parse template string content with interpolation support
+	content := p.current.Literal
+	var i int
+	for i < len(content) {
+		// Look for ${
+		if i < len(content)-1 && content[i] == '$' && content[i+1] == '{' {
+			// Find the end of interpolation
+			braceCount := 1
+			j := i + 2
+			for j < len(content) && braceCount > 0 {
+				if content[j] == '{' {
+					braceCount++
+				} else if content[j] == '}' {
+					braceCount--
+				}
+				j++
+			}
+
+			if braceCount == 0 {
+				// Extract expression text
+				exprText := content[i+2 : j-1]
+
+				// Create a mini-lexer for the expression
+				exprLexer := lexer.NewWithFilename(exprText, p.filename)
+				exprParser := &Parser{
+					lexer:    exprLexer,
+					current:  exprLexer.NextToken(),
+					filename: p.filename,
+				}
+
+				// Parse the expression
+				expr := exprParser.parseExpression(LOWEST)
+				elements = append(elements, &TemplateElement{
+					Span:       SpanBetween(start, TokenToPosition(p.current)),
+					IsText:     false,
+					Expression: expr,
+				})
+
+				i = j
+			} else {
+				// Malformed interpolation, treat as text
+				elements = append(elements, &TemplateElement{
+					Span:   SpanBetween(start, TokenToPosition(p.current)),
+					IsText: true,
+					Text:   string(content[i]),
+				})
+				i++
+			}
+		} else {
+			// Regular text - accumulate until next interpolation or end
+			textStart := i
+			for i < len(content) && !(i < len(content)-1 && content[i] == '$' && content[i+1] == '{') {
+				i++
+			}
+
+			if i > textStart {
+				elements = append(elements, &TemplateElement{
+					Span:   SpanBetween(start, TokenToPosition(p.current)),
+					IsText: true,
+					Text:   content[textStart:i],
+				})
+			}
+		}
+	}
+
+	end := TokenToPosition(p.current)
+	return &TemplateString{
+		Span:     SpanBetween(start, end),
+		Elements: elements,
+	}
+}
+
+// parseRawString parses a raw string literal (r"...")
+func (p *Parser) parseRawString() Expression {
+	return NewLiteral(TokenToSpan(p.current), p.current.Literal, LiteralString)
+}
+
+// parseWhereClause parses a where clause: where T: Display + Debug, U: Clone
+func (p *Parser) parseWhereClause() []*WherePredicate {
+	var predicates []*WherePredicate
+
+	if p.current.Type != lexer.TokenWhere {
+		return predicates
+	}
+
+	p.nextToken() // consume 'where'
+
+	for {
+		// Parse type
+		target := p.parseType()
+
+		// Expect ':'
+		if p.current.Type != lexer.TokenColon {
+			break
+		}
+		p.nextToken() // consume ':'
+
+		// Parse bounds (Trait1 + Trait2 + ...)
+		var bounds []Type
+		for {
+			bound := p.parseType()
+			bounds = append(bounds, bound)
+
+			if p.current.Type != lexer.TokenPlus {
+				break
+			}
+			p.nextToken() // consume '+'
+		}
+
+		predicate := &WherePredicate{
+			Span:   SpanBetween(TokenToPosition(p.current), TokenToPosition(p.current)),
+			Target: target,
+			Bounds: bounds,
+		}
+		predicates = append(predicates, predicate)
+
+		// Check for comma to continue with next predicate
+		if p.current.Type != lexer.TokenComma {
+			break
+		}
+		p.nextToken() // consume ','
+	}
+
+	return predicates
+}
+
+// parseGenericParameters parses generic parameter list: <T, U: Display, const N: usize>
+func (p *Parser) parseGenericParameters() []*GenericParameter {
+	var params []*GenericParameter
+
+	if p.current.Type != lexer.TokenLt {
+		return params
+	}
+
+	p.nextToken() // consume '<'
+
+	for p.current.Type != lexer.TokenGt && p.current.Type != lexer.TokenEOF {
+		param := p.parseGenericParameter()
+		if param != nil {
+			params = append(params, param)
+		}
+
+		if p.current.Type == lexer.TokenComma {
+			p.nextToken() // consume ','
+		} else {
+			break
+		}
+	}
+
+	if p.current.Type == lexer.TokenGt {
+		p.nextToken() // consume '>'
+	}
+
+	return params
 }
 
 // parseBooleanLiteral parses a boolean literal
@@ -2988,16 +3431,6 @@ func (p *Parser) parseMacroParameters() []*MacroParameter {
 			params = append(params, param)
 		}
 
-		// Detect variadic marker '...'
-		dotCount := 0
-		for p.peek.Type == lexer.TokenDot && dotCount < 3 {
-			p.nextToken()
-			dotCount++
-		}
-		if dotCount == 3 && len(params) > 0 {
-			params[len(params)-1].IsVariadic = true
-		}
-
 		if p.peek.Type != lexer.TokenComma {
 			break
 		}
@@ -3018,6 +3451,13 @@ func (p *Parser) parseMacroParameter() *MacroParameter {
 	}
 
 	name := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+	isVariadic := false
+
+	// Check for variadic parameter (...)
+	if p.peek.Type == lexer.TokenEllipsis {
+		isVariadic = true
+		p.nextToken() // consume ...
+	}
 
 	// Check for default value
 	var defaultValue Expression
@@ -3032,6 +3472,7 @@ func (p *Parser) parseMacroParameter() *MacroParameter {
 		Name:         name,
 		Constraint:   nil, // Type constraints not implemented yet
 		DefaultValue: defaultValue,
+		IsVariadic:   isVariadic,
 	}
 }
 
@@ -3309,5 +3750,46 @@ func (p *Parser) parseMacroInvocationWithIdent() *MacroInvocation {
 		Span:      span,
 		Name:      name,
 		Arguments: args,
+	}
+}
+
+// parseRefinementType parses refinement types: {n: Int | n > 0}
+func (p *Parser) parseRefinementType() Expression {
+	start := TokenToPosition(p.current)
+
+	// Skip opening brace
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		return nil
+	}
+
+	variable := NewIdentifier(TokenToSpan(p.current), p.current.Literal)
+
+	if !p.expectPeek(lexer.TokenColon) {
+		return nil
+	}
+
+	p.nextToken()
+	baseType := p.parseType()
+
+	if !p.expectPeek(lexer.TokenBitOr) {
+		return nil
+	}
+
+	p.nextToken()
+	constraint := p.parseExpression(LOWEST)
+
+	if !p.expectPeek(lexer.TokenRBrace) {
+		return nil
+	}
+
+	end := TokenToPosition(p.current)
+	span := SpanBetween(start, end)
+
+	// Create refinement type expression
+	return &RefinementTypeExpression{
+		Span:      span,
+		Variable:  variable,
+		BaseType:  baseType,
+		Predicate: constraint,
 	}
 }

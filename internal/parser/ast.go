@@ -92,14 +92,16 @@ func (p *Program) statementNode()                     {}
 
 // FunctionDeclaration represents a function declaration
 type FunctionDeclaration struct {
-	Span       Span
-	Name       *Identifier
-	Parameters []*Parameter
-	ReturnType Type
-	Body       *BlockStatement
-	IsPublic   bool
-	IsAsync    bool
-	Generics   []*GenericParameter
+	Span        Span
+	Name        *Identifier
+	Parameters  []*Parameter
+	ReturnType  Type
+	Body        *BlockStatement
+	IsPublic    bool
+	IsAsync     bool
+	Generics    []*GenericParameter
+	WhereClause []*WherePredicate // where clause for generic constraints
+	Effects     *EffectAnnotation // Optional effect annotation
 }
 
 func (f *FunctionDeclaration) GetSpan() Span  { return f.Span }
@@ -313,6 +315,24 @@ func (t *TernaryExpression) Accept(visitor Visitor) interface{} {
 }
 func (t *TernaryExpression) expressionNode() {}
 
+// RefinementTypeExpression represents a refinement type expression
+type RefinementTypeExpression struct {
+	Span      Span
+	BaseType  Type
+	Variable  *Identifier
+	Predicate Expression
+}
+
+func (r *RefinementTypeExpression) GetSpan() Span { return r.Span }
+func (r *RefinementTypeExpression) String() string {
+	return fmt.Sprintf("{%s: %s | %s}", r.Variable.Value, r.BaseType.String(), r.Predicate.String())
+}
+func (r *RefinementTypeExpression) Accept(visitor Visitor) interface{} {
+	return visitor.VisitRefinementTypeExpression(r)
+}
+func (r *RefinementTypeExpression) expressionNode() {}
+func (r *RefinementTypeExpression) typeNode()       {} // Implement Type interface
+
 // MacroDefinition represents a macro definition
 type MacroDefinition struct {
 	Span       Span
@@ -333,11 +353,12 @@ func (m *MacroDefinition) declarationNode()                   {}
 
 // StructDeclaration represents a struct type declaration
 type StructDeclaration struct {
-	Span     Span
-	Name     *Identifier
-	Fields   []*StructField // reuse fields from StructType
-	IsPublic bool
-	Generics []*GenericParameter // optional generic parameters
+	Span        Span
+	Name        *Identifier
+	Fields      []*StructField // reuse fields from StructType
+	IsPublic    bool
+	Generics    []*GenericParameter // optional generic parameters
+	WhereClause []*WherePredicate   // where clause for generic constraints
 }
 
 func (d *StructDeclaration) GetSpan() Span  { return d.Span }
@@ -350,11 +371,12 @@ func (d *StructDeclaration) declarationNode() {}
 
 // EnumDeclaration represents an enum type declaration
 type EnumDeclaration struct {
-	Span     Span
-	Name     *Identifier
-	Variants []*EnumVariant // reuse from EnumType
-	IsPublic bool
-	Generics []*GenericParameter
+	Span        Span
+	Name        *Identifier
+	Variants    []*EnumVariant // reuse from EnumType
+	IsPublic    bool
+	Generics    []*GenericParameter
+	WhereClause []*WherePredicate // where clause for generic constraints
 }
 
 func (d *EnumDeclaration) GetSpan() Span                      { return d.Span }
@@ -370,6 +392,7 @@ type TraitDeclaration struct {
 	Methods         []*TraitMethod // signatures
 	IsPublic        bool
 	Generics        []*GenericParameter
+	WhereClause     []*WherePredicate // where clause for generic constraints
 	AssociatedTypes []*AssociatedType
 }
 
@@ -456,6 +479,32 @@ type GenericParameter struct {
 	ConstType Type // type of const parameter
 	// Optional trait bounds for type parameters
 	Bounds []Type
+	// Default type for generic type parameters (e.g., T = i32)
+	DefaultType Type
+}
+
+func (gp *GenericParameter) GetSpan() Span { return gp.Span }
+func (gp *GenericParameter) String() string {
+	switch gp.Kind {
+	case GenericParamType:
+		if len(gp.Bounds) > 0 {
+			bounds := make([]string, len(gp.Bounds))
+			for i, bound := range gp.Bounds {
+				bounds[i] = bound.String()
+			}
+			return fmt.Sprintf("%s: %s", gp.Name.Value, strings.Join(bounds, " + "))
+		}
+		return gp.Name.Value
+	case GenericParamConst:
+		return fmt.Sprintf("const %s: %s", gp.Name.Value, gp.ConstType.String())
+	case GenericParamLifetime:
+		return "'" + gp.Lifetime
+	default:
+		return "unknown"
+	}
+}
+func (gp *GenericParameter) Accept(visitor Visitor) interface{} {
+	return visitor.VisitGenericParameter(gp)
 }
 
 // WherePredicate represents a where-clause predicate: Type : Bound + Bound
@@ -465,12 +514,35 @@ type WherePredicate struct {
 	Bounds []Type
 }
 
+func (wp *WherePredicate) GetSpan() Span { return wp.Span }
+func (wp *WherePredicate) String() string {
+	bounds := make([]string, len(wp.Bounds))
+	for i, bound := range wp.Bounds {
+		bounds[i] = bound.String()
+	}
+	return fmt.Sprintf("%s: %s", wp.Target.String(), strings.Join(bounds, " + "))
+}
+func (wp *WherePredicate) Accept(visitor Visitor) interface{} { return visitor.VisitWherePredicate(wp) }
+
 // AssociatedType represents a trait associated type item: type Name [: Bounds] ;
 type AssociatedType struct {
 	Span   Span
 	Name   *Identifier
 	Bounds []Type
 }
+
+func (at *AssociatedType) GetSpan() Span { return at.Span }
+func (at *AssociatedType) String() string {
+	if len(at.Bounds) > 0 {
+		bounds := make([]string, len(at.Bounds))
+		for i, bound := range at.Bounds {
+			bounds[i] = bound.String()
+		}
+		return fmt.Sprintf("type %s: %s", at.Name.Value, strings.Join(bounds, " + "))
+	}
+	return fmt.Sprintf("type %s", at.Name.Value)
+}
+func (at *AssociatedType) Accept(visitor Visitor) interface{} { return visitor.VisitAssociatedType(at) }
 
 // TypeAliasDeclaration represents: type Name = Type ;
 type TypeAliasDeclaration struct {
@@ -506,6 +578,70 @@ func (d *NewtypeDeclaration) Accept(visitor Visitor) interface{} {
 }
 func (d *NewtypeDeclaration) statementNode()   {}
 func (d *NewtypeDeclaration) declarationNode() {}
+
+// ====== Effect System ======
+
+// EffectDeclaration represents an effect declaration: effect IO;
+type EffectDeclaration struct {
+	Span Span
+	Name *Identifier
+}
+
+func (e *EffectDeclaration) GetSpan() Span                      { return e.Span }
+func (e *EffectDeclaration) String() string                     { return "effect " + e.Name.Value }
+func (e *EffectDeclaration) Accept(visitor Visitor) interface{} { return nil }
+func (e *EffectDeclaration) statementNode()                     {}
+func (e *EffectDeclaration) declarationNode()                   {}
+
+// EffectAnnotation represents an effect annotation: effects(io, alloc, unsafe)
+type EffectAnnotation struct {
+	Span    Span
+	Effects []*Effect
+}
+
+func (e *EffectAnnotation) GetSpan() Span                      { return e.Span }
+func (e *EffectAnnotation) String() string                     { return "effects(...)" }
+func (e *EffectAnnotation) Accept(visitor Visitor) interface{} { return nil }
+
+// Effect represents a single effect in an effect annotation
+type Effect struct {
+	Span Span
+	Name *Identifier // Built-in effects like "io", "alloc", or custom effects
+}
+
+func (e *Effect) GetSpan() Span                      { return e.Span }
+func (e *Effect) String() string                     { return e.Name.Value }
+func (e *Effect) Accept(visitor Visitor) interface{} { return nil }
+
+// ====== Template Strings and Interpolation ======
+
+// TemplateString represents a template string with interpolated expressions
+type TemplateString struct {
+	Span     Span
+	Elements []*TemplateElement
+}
+
+func (t *TemplateString) GetSpan() Span                      { return t.Span }
+func (t *TemplateString) String() string                     { return "template_string" }
+func (t *TemplateString) Accept(visitor Visitor) interface{} { return nil }
+func (t *TemplateString) expressionNode()                    {}
+
+// TemplateElement represents an element within a template string
+type TemplateElement struct {
+	Span       Span
+	IsText     bool       // true for text, false for interpolation
+	Text       string     // for text elements
+	Expression Expression // for interpolation elements
+}
+
+func (t *TemplateElement) GetSpan() Span { return t.Span }
+func (t *TemplateElement) String() string {
+	if t.IsText {
+		return fmt.Sprintf("text(%s)", t.Text)
+	}
+	return fmt.Sprintf("interp(%s)", t.Expression.String())
+}
+func (t *TemplateElement) Accept(visitor Visitor) interface{} { return nil }
 
 // MacroParameter represents a macro parameter with optional type constraints
 type MacroParameter struct {
@@ -707,6 +843,40 @@ func (b *BasicType) String() string                     { return b.Name }
 func (b *BasicType) Accept(visitor Visitor) interface{} { return visitor.VisitBasicType(b) }
 func (b *BasicType) typeNode()                          {}
 
+// TupleType represents tuple types: (T1, T2, ...) or unit type: ()
+type TupleType struct {
+	Span     Span
+	Elements []Type
+}
+
+func (t *TupleType) GetSpan() Span { return t.Span }
+func (t *TupleType) String() string {
+	if len(t.Elements) == 0 {
+		return "()"
+	}
+	parts := make([]string, len(t.Elements))
+	for i, elem := range t.Elements {
+		parts[i] = elem.String()
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+func (t *TupleType) Accept(visitor Visitor) interface{} { return nil }
+func (t *TupleType) typeNode()                          {}
+
+// DependentType represents a dependent type with where clause: Type where Constraint
+type DependentType struct {
+	Span       Span
+	BaseType   Type
+	Constraint Expression
+}
+
+func (d *DependentType) GetSpan() Span { return d.Span }
+func (d *DependentType) String() string {
+	return fmt.Sprintf("%s where %s", d.BaseType.String(), d.Constraint.String())
+}
+func (d *DependentType) Accept(visitor Visitor) interface{} { return nil }
+func (d *DependentType) typeNode()                          {}
+
 // ====== Operators ======
 
 // Operator represents operators with precedence and associativity
@@ -764,6 +934,7 @@ type Visitor interface {
 	VisitCallExpression(*CallExpression) interface{}
 	VisitAssignmentExpression(*AssignmentExpression) interface{}
 	VisitTernaryExpression(*TernaryExpression) interface{}
+	VisitRefinementTypeExpression(*RefinementTypeExpression) interface{}
 	VisitBasicType(*BasicType) interface{}
 	VisitOperator(*Operator) interface{}
 	// Macro-related visitor methods
@@ -802,13 +973,10 @@ type Visitor interface {
 	VisitConstructorPattern(*ConstructorPattern) interface{}
 	VisitGuardPattern(*GuardPattern) interface{}
 	VisitWildcardPattern(*WildcardPattern) interface{}
-	// Dependent type system visitor methods
-	VisitDependentFunctionType(*DependentFunctionType) interface{}
-	VisitDependentParameter(*DependentParameter) interface{}
-	VisitRefinementType(*RefinementType) interface{}
-	VisitSizedArrayType(*SizedArrayType) interface{}
-	VisitIndexType(*IndexType) interface{}
-	VisitProofType(*ProofType) interface{}
+	// Generics and where-clause visitor methods
+	VisitGenericParameter(*GenericParameter) interface{}
+	VisitWherePredicate(*WherePredicate) interface{}
+	VisitAssociatedType(*AssociatedType) interface{}
 }
 
 // ====== AST Builder Utilities ======
