@@ -1,0 +1,9 @@
+func add(a: int, b: int) -> int { 
+    return a + b; 
+}
+
+func main() -> int { 
+    let sum = add(5, 3);
+    print("関数テスト完了");
+    return 0;
+}

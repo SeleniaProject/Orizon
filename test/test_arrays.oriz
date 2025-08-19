@@ -1,0 +1,11 @@
+func main() {
+    // 配列リテラル
+    let numbers = [1, 2, 3, 4, 5];
+    let strings = ["hello", "world"];
+    
+    // 配列アクセス
+    let first = numbers[0];
+    let second = numbers[1];
+    
+    print("配列テスト完了");
+}

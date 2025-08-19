@@ -1,0 +1,16 @@
+func add(a: int, b: int) -> int { 
+    return a + b; 
+}
+
+func multiply(x: int, y: int) -> int { 
+    let result = x * y;
+    return result; 
+}
+
+func main() -> int { 
+    let sum = add(5, 3);
+    let product = multiply(4, 6);
+    
+    print("関数テスト完了");
+    return 0;
+}
