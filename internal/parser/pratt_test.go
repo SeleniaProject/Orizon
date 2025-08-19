@@ -416,7 +416,7 @@ func TestPrattParserErrorRecovery(t *testing.T) {
 		},
 		{
 			name:          "Invalid operator sequence",
-			input:         "a ++ b;",
+			input:         "a @ b;", // @ is not a valid operator
 			expectErrors:  true,
 			minDeclsCount: 1,
 		},

@@ -744,6 +744,20 @@ func (ao *ASTOptimizer) VisitTernaryExpression(te *TernaryExpression) interface{
 	return te
 }
 
+func (ao *ASTOptimizer) VisitRefinementTypeExpression(rte *RefinementTypeExpression) interface{} {
+	// Optimize the constraint expression
+	optimizedConstraint := ao.optimizeNode(rte.Predicate)
+	if optimizedConstraint != nil {
+		return &RefinementTypeExpression{
+			Span:      rte.Span,
+			Variable:  rte.Variable,
+			BaseType:  rte.BaseType,
+			Predicate: optimizedConstraint.(Expression),
+		}
+	}
+	return rte
+}
+
 func (ao *ASTOptimizer) VisitGenericType(gt *GenericType) interface{} {
 	return gt
 }
@@ -784,9 +798,12 @@ func (ao *ASTOptimizer) VisitMacroContext(mc *MacroContext) interface{} {
 	return mc
 }
 
+// TODO: Re-enable when dependent types are properly implemented
+/*
 func (ao *ASTOptimizer) VisitDependentParameter(dp *DependentParameter) interface{} {
 	return dp
 }
+*/
 
 // Handle type-related visitors (no optimization needed for types)
 func (ao *ASTOptimizer) VisitBasicType(bt *BasicType) interface{}       { return bt }
@@ -797,6 +814,8 @@ func (ao *ASTOptimizer) VisitFunctionType(ft *FunctionType) interface{} { return
 func (ao *ASTOptimizer) VisitMacroDefinition(md *MacroDefinition) interface{} { return md }
 func (ao *ASTOptimizer) VisitMacroInvocation(mi *MacroInvocation) interface{} { return mi }
 
+// TODO: Re-enable when dependent type system is properly implemented
+/*
 // Handle dependent type visitors (pass through for now)
 func (ao *ASTOptimizer) VisitDependentFunctionType(dft *DependentFunctionType) interface{} {
 	return dft
@@ -805,6 +824,7 @@ func (ao *ASTOptimizer) VisitRefinementType(rt *RefinementType) interface{}  { r
 func (ao *ASTOptimizer) VisitSizedArrayType(sat *SizedArrayType) interface{} { return sat }
 func (ao *ASTOptimizer) VisitIndexType(it *IndexType) interface{}            { return it }
 func (ao *ASTOptimizer) VisitProofType(pt *ProofType) interface{}            { return pt }
+*/
 
 // Pattern matching visitor methods (pass through for now)
 func (ao *ASTOptimizer) VisitLiteralPattern(lp *LiteralPattern) interface{}         { return lp }
@@ -813,3 +833,8 @@ func (ao *ASTOptimizer) VisitConstructorPattern(cp *ConstructorPattern) interfac
 func (ao *ASTOptimizer) VisitGuardPattern(gp *GuardPattern) interface{}             { return gp }
 func (ao *ASTOptimizer) VisitWildcardPattern(wp *WildcardPattern) interface{}       { return wp }
 func (ao *ASTOptimizer) VisitMatchArm(ma *MatchArm) interface{}                     { return ma }
+
+// Generics and where-clause visitor methods
+func (ao *ASTOptimizer) VisitGenericParameter(gp *GenericParameter) interface{} { return gp }
+func (ao *ASTOptimizer) VisitWherePredicate(wp *WherePredicate) interface{}     { return wp }
+func (ao *ASTOptimizer) VisitAssociatedType(at *AssociatedType) interface{}     { return at }

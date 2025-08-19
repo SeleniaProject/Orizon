@@ -644,12 +644,12 @@ func TestHIR_Impl_Trait_And_Constraints(t *testing.T) {
 		p := NewParser(l, "test.oriz")
 		prog, errs := p.Parse()
 		if len(errs) != 0 {
-			t.Fatalf("unexpected parse errors: %v", errs)
+			t.Fatalf("unexpected parse errors in first test: %v", errs)
 		}
 		tr := NewASTToHIRTransformer()
 		hir, terrs := tr.TransformProgram(prog)
 		if len(terrs) != 0 {
-			t.Fatalf("unexpected transform errors: %v", terrs)
+			t.Fatalf("unexpected transform errors in first test: %v", terrs)
 		}
 		if len(hir.Impls) != 1 {
 			t.Fatalf("expected 1 HIR impl, got %d", len(hir.Impls))
@@ -673,7 +673,7 @@ func TestHIR_Impl_Trait_And_Constraints(t *testing.T) {
 		p := NewParser(l, "test.oriz")
 		prog, errs := p.Parse()
 		if len(errs) != 0 {
-			t.Fatalf("unexpected parse errors: %v", errs)
+			t.Fatalf("unexpected parse errors in second test: %v", errs)
 		}
 		tr := NewASTToHIRTransformer()
 		hir, terrs := tr.TransformProgram(prog)
