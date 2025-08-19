@@ -1,0 +1,13 @@
+// where節のテスト
+fn test_where<T, U>() where T: Clone, U: Debug {}
+
+// マクロのテスト  
+macro println($msg: expr) {
+    print($msg);
+    print("\n");
+}
+
+// 高度なジェネリクス
+struct Container<T> where T: Clone + Debug {
+    value: T,
+}

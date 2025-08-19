@@ -1,0 +1,22 @@
+// 基本的なジェネリクス
+fn basic<T>() {}
+
+// バウンド付きジェネリクス
+fn with_bounds<T: Display + Clone>() {}
+
+// 複数のジェネリクスパラメータ
+fn multi_params<T, U, V>() {}
+
+// 混合ジェネリクス
+fn mixed<T: Display, const N: usize, U: Clone + Debug>() {}
+
+// 構造体ジェネリクス
+struct Vector<T, const N: usize> {
+    data: T,
+}
+
+// 複雑なenum
+enum Complex<T: Display, E, const SIZE: usize> {
+    Success(T),
+    Error(E),
+}

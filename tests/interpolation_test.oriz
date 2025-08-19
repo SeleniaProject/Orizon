@@ -1,0 +1,2 @@
+let name = "World";
+let msg = `Hello, ${name}!`;

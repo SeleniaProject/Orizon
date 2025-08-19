@@ -1,0 +1,1 @@
+fn simple_generic<T: Display>(x: T) {}

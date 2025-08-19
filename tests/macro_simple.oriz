@@ -1,0 +1,7 @@
+macro simple() {
+    print("Hello from macro!");
+}
+
+fn test() {
+    simple!();
+}

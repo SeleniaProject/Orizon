@@ -1,0 +1,5 @@
+effect IO;
+
+fn simple_function() {
+    print("Hello!")
+}

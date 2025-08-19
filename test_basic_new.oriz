@@ -1,9 +1,0 @@
-func test_basic(): int {
-    print("Basic test");
-    return 42;
-}
-
-func main(): int {
-    let result = test_basic();
-    return result;
-}

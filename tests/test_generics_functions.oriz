@@ -1,0 +1,7 @@
+fn test_simple<T>() {}
+
+fn test_bounds<T: Display>() {}
+
+fn test_multi<T, U>() {}
+
+fn test_complex<T: Display + Clone, U: Debug>() {}

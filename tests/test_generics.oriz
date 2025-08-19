@@ -1,0 +1,4 @@
+fn test<T>() {}
+fn test2<T, U>() {}
+fn test3<T: Display>() {}
+fn test4<T, U: Clone + Debug>() {}

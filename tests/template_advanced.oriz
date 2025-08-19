@@ -1,0 +1,9 @@
+let name = "Orizon";
+let version = 1.0;
+let msg = "Hello, ${name}! Version: ${version}";
+
+fn greet(user: string) -> string {
+    "Welcome ${user} to ${name} v${version}!"
+}
+
+let complex = "Result: ${1 + 2 * 3} and ${if true { "yes" } else { "no" }}";

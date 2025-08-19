@@ -1,9 +1,0 @@
-func add(a: int, b: int) -> int { 
-    return a + b; 
-}
-
-func main() -> int { 
-    let result = add(5, 3);
-    print("関数呼び出しテスト");
-    return result;
-}

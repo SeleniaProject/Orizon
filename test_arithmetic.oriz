@@ -1,6 +1,0 @@
-func main() {
-    let x = 10 + 20 * 3;
-    let y = (x - 5) / 2;
-    print("Result: ");
-    print(y.to_string());
-}

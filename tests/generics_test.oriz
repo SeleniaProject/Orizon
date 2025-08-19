@@ -1,0 +1,18 @@
+// Advanced generics test
+fn test_function<T: Display + Debug, U, const N: usize>(x: T, y: U) -> [T; N] 
+where 
+    U: Clone + Send,
+    T: PartialEq<U>
+{
+    // Implementation
+}
+
+struct Container<T, U: Default> where T: Copy {
+    data: T,
+    meta: U,
+}
+
+trait MyTrait<T> where T: Ord {
+    type Output: Display;
+    fn process(self, input: T) -> Self::Output;
+}

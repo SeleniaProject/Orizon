@@ -1,0 +1,24 @@
+fn test_simple<T>() {}
+
+fn test_bounds<T: Display>() {}
+
+fn test_multi<T, U>() {}
+
+fn test_complex<T: Display + Clone, U: Debug>() {}
+
+fn test_const<const N: usize>() {}
+
+fn test_mixed<T: Display, const N: usize, U: Clone>() {}
+
+struct Container<T> {
+    value: T,
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+trait Iterator<T> {
+    fn next() -> Option<T>;
+}

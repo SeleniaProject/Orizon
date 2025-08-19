@@ -1,0 +1,7 @@
+let name = "Orizon";
+let version = 1;
+let msg = "Hello, ${name}! Version: ${version}";
+
+fn greet(user: string) -> string {
+    "Welcome to Orizon!"
+}

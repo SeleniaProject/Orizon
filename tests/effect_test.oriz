@@ -1,0 +1,5 @@
+effect IO;
+
+fn main() -> IO<()> {
+    print("Hello, Orizon!")
+}

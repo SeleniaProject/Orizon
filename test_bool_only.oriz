@@ -1,6 +1,0 @@
-func main() {
-    let is_true = true;
-    let is_false = false;
-    
-    print("ブール値テスト");
-}

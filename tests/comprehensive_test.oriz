@@ -1,0 +1,40 @@
+// エフェクト宣言
+effect IO;
+effect Alloc;
+
+// 基本的な関数
+fn simple() {
+    print("Hello, Orizon!");
+}
+
+// ジェネリクス関数
+fn generic<T>() {}
+fn bounds<T: Display>() {}
+fn multi<T, U: Clone + Debug>() {}
+fn const_generic<const N: usize>() {}
+
+// 構造体とenum
+struct Container<T> {
+    value: T,
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+// エフェクト付き関数
+fn main() -> IO<()> {
+    let name = "Orizon";
+    let msg = "Hello, ${name}!";
+    simple();
+}
+
+// タプル型を返す関数
+fn tuple_func() -> (i32, string) {
+    (42, "answer")
+}
+
+// 単位型を返す関数
+fn unit_func() -> () {
+}
