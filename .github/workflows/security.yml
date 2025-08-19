@@ -1,0 +1,500 @@
+name: Security & Quality Assurance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Daily security scans at 1 AM UTC
+    - cron: '0 1 * * *'
+
+env:
+  GO_VERSION: '1.24.x'
+  CGO_ENABLED: 0
+
+jobs:
+  # Comprehensive dependency scanning
+  dependency-security:
+    name: Dependency Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install security scanning tools (Go-native only)
+        run: |
+          # Install Go-based security tools (avoiding C/C++ dependencies)
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/sonatype-nexus-community/nancy@latest
+          go install github.com/aquasecurity/trivy@latest
+          
+      - name: Run Go vulnerability database check
+        run: |
+          mkdir -p security-reports
+          govulncheck -json ./... > security-reports/govulncheck-report.json 2>&1 || true
+          govulncheck ./... | tee security-reports/govulncheck-summary.txt || true
+          
+      - name: Scan dependencies with Nancy
+        run: |
+          go list -json -deps ./... | nancy sleuth --output-format json > security-reports/nancy-report.json 2>&1 || true
+          go list -json -deps ./... | nancy sleuth | tee security-reports/nancy-summary.txt || true
+          
+      - name: Run Trivy vulnerability scanner
+        run: |
+          trivy fs --format json --output security-reports/trivy-report.json . || true
+          trivy fs --format table . | tee security-reports/trivy-summary.txt || true
+          
+      - name: Check for known security patterns
+        run: |
+          # Custom security pattern detection for Go code
+          {
+            echo "# Security Pattern Analysis"
+            echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            
+            # Check for potentially dangerous patterns
+            echo "## Potentially Dangerous Patterns"
+            
+            # Unsafe operations
+            if grep -r "unsafe\." --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "⚠️ **Unsafe operations detected** - Review for memory safety"
+            else
+              echo "✅ No unsafe operations found"
+            fi
+            
+            # Command execution
+            if grep -r "exec\.Command\|os\.StartProcess" --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "⚠️ **Command execution detected** - Review for injection vulnerabilities"
+            else
+              echo "✅ No direct command execution found"
+            fi
+            
+            # Network operations
+            if grep -r "net\.Listen\|http\.ListenAndServe" --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "ℹ️ **Network operations detected** - Ensure proper input validation"
+            else
+              echo "✅ No network listeners found"
+            fi
+            
+            # File operations
+            if grep -r "os\.OpenFile\|ioutil\.WriteFile" --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "ℹ️ **File operations detected** - Ensure proper path validation"
+            else
+              echo "✅ No direct file operations found"
+            fi
+            
+          } > security-reports/pattern-analysis.md
+          
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-security-reports
+          path: security-reports/
+          retention-days: 30
+
+  # Static application security testing
+  static-security-analysis:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install static analysis tools
+        run: |
+          # Install Go-based static analysis tools (no C/C++ dependencies)
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install github.com/dominikh/go-tools/cmd/keyify@latest
+          go install github.com/mdempsky/unconvert@latest
+          
+      - name: Run Gosec security analysis
+        run: |
+          mkdir -p static-analysis
+          
+          # Run gosec with comprehensive rules
+          gosec -fmt json -out static-analysis/gosec-report.json \
+            -severity medium \
+            -confidence medium \
+            -nosec-tag nosec \
+            ./... || true
+            
+          gosec -fmt sarif -out static-analysis/gosec-results.sarif ./... || true
+          gosec -fmt text ./... | tee static-analysis/gosec-summary.txt || true
+          
+      - name: Run Staticcheck analysis
+        run: |
+          staticcheck -f json ./... > static-analysis/staticcheck-report.json 2>&1 || true
+          staticcheck ./... | tee static-analysis/staticcheck-summary.txt || true
+          
+      - name: Run additional security checks
+        run: |
+          # Check for unconvert
+          unconvert ./... | tee static-analysis/unconvert-report.txt || true
+          
+          # Custom security rule validation
+          {
+            echo "# Additional Security Validation"
+            echo "**Analysis Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            
+            echo "## Code Quality Security Aspects"
+            
+            # Check for hardcoded credentials patterns
+            if grep -r -i "password\s*=\|token\s*=\|secret\s*=\|key\s*=" --include="*.go" . | grep -v vendor/ | grep -v ".git/" | grep -v "_test.go"; then
+              echo "⚠️ **Potential hardcoded credentials detected**"
+            else
+              echo "✅ No hardcoded credentials patterns found"
+            fi
+            
+            # Check for SQL injection patterns
+            if grep -r "fmt\.Sprintf.*SELECT\|fmt\.Sprintf.*INSERT\|fmt\.Sprintf.*UPDATE" --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "⚠️ **Potential SQL injection vulnerability**"
+            else
+              echo "✅ No SQL injection patterns found"
+            fi
+            
+            # Check for path traversal patterns
+            if grep -r "\.\./\|\.\.\\\\" --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "⚠️ **Potential path traversal vulnerability**"
+            else
+              echo "✅ No path traversal patterns found"
+            fi
+            
+            # Check for weak crypto
+            if grep -r "crypto/md5\|crypto/sha1\|crypto/des" --include="*.go" . | grep -v vendor/ | grep -v ".git/"; then
+              echo "⚠️ **Weak cryptographic algorithms detected**"
+            else
+              echo "✅ No weak cryptographic algorithms found"
+            fi
+            
+          } > static-analysis/additional-security-checks.md
+          
+      - name: Upload static analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-security-analysis
+          path: static-analysis/
+          retention-days: 30
+          
+      - name: Upload SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: static-analysis/gosec-results.sarif
+
+  # Code quality and maintainability analysis
+  code-quality-analysis:
+    name: Code Quality & Maintainability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install code quality tools
+        run: |
+          # Install Go-native code quality tools
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+          go install github.com/client9/misspell/cmd/misspell@latest
+          go install github.com/gordonklaus/ineffassign@latest
+          go install github.com/mdempsky/maligned@latest
+          
+      - name: Run comprehensive linting
+        run: |
+          mkdir -p quality-analysis
+          
+          # Run golangci-lint with custom configuration
+          golangci-lint run \
+            --out-format json \
+            --issues-exit-code 0 \
+            --print-resources-usage \
+            > quality-analysis/golangci-lint-report.json
+            
+          golangci-lint run --out-format github-actions
+          golangci-lint run | tee quality-analysis/golangci-lint-summary.txt || true
+          
+      - name: Run cyclomatic complexity analysis
+        run: |
+          gocyclo -over 15 . | tee quality-analysis/complexity-report.txt || true
+          gocyclo -avg . | tee quality-analysis/complexity-average.txt || true
+          
+      - name: Check spelling and documentation
+        run: |
+          misspell -error . | tee quality-analysis/misspell-report.txt || true
+          
+          # Documentation coverage check
+          {
+            echo "# Documentation Coverage Analysis"
+            echo ""
+            
+            # Count total exported functions/types
+            EXPORTED_FUNCS=$(grep -r "^func [A-Z]" --include="*.go" . | grep -v vendor/ | grep -v "_test.go" | wc -l)
+            EXPORTED_TYPES=$(grep -r "^type [A-Z]" --include="*.go" . | grep -v vendor/ | grep -v "_test.go" | wc -l)
+            
+            # Count documented functions/types
+            DOC_FUNCS=$(grep -B1 -r "^func [A-Z]" --include="*.go" . | grep -v vendor/ | grep -v "_test.go" | grep "^//" | wc -l)
+            DOC_TYPES=$(grep -B1 -r "^type [A-Z]" --include="*.go" . | grep -v vendor/ | grep -v "_test.go" | grep "^//" | wc -l)
+            
+            echo "## Summary"
+            echo "- Exported Functions: $EXPORTED_FUNCS"
+            echo "- Documented Functions: $DOC_FUNCS"
+            echo "- Exported Types: $EXPORTED_TYPES" 
+            echo "- Documented Types: $DOC_TYPES"
+            
+            if [ "$EXPORTED_FUNCS" -gt 0 ]; then
+              FUNC_COVERAGE=$((DOC_FUNCS * 100 / EXPORTED_FUNCS))
+              echo "- Function Documentation Coverage: ${FUNC_COVERAGE}%"
+            fi
+            
+            if [ "$EXPORTED_TYPES" -gt 0 ]; then
+              TYPE_COVERAGE=$((DOC_TYPES * 100 / EXPORTED_TYPES))
+              echo "- Type Documentation Coverage: ${TYPE_COVERAGE}%"
+            fi
+            
+          } > quality-analysis/documentation-coverage.md
+          
+      - name: Run ineffective assignments check
+        run: |
+          ineffassign ./... | tee quality-analysis/ineffassign-report.txt || true
+          
+      - name: Check struct alignment
+        run: |
+          maligned ./... | tee quality-analysis/alignment-report.txt || true
+          
+      - name: Generate code metrics
+        run: |
+          {
+            echo "# Code Metrics Report"
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            
+            echo "## Repository Statistics"
+            echo "- Go files: $(find . -name "*.go" -not -path "./vendor/*" | wc -l)"
+            echo "- Lines of code: $(find . -name "*.go" -not -path "./vendor/*" -exec wc -l {} + | tail -1 | awk '{print $1}')"
+            echo "- Test files: $(find . -name "*_test.go" -not -path "./vendor/*" | wc -l)"
+            echo ""
+            
+            echo "## Package Structure"
+            find . -name "*.go" -not -path "./vendor/*" -not -path "./.git/*" | \
+              sed 's|/[^/]*\.go$||' | sort | uniq -c | sort -nr | head -20 | \
+              while read count dir; do
+                echo "- $dir: $count files"
+              done
+              
+          } > quality-analysis/code-metrics.md
+          
+      - name: Upload quality analysis results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-analysis
+          path: quality-analysis/
+          retention-days: 30
+
+  # License and compliance scanning
+  compliance-scanning:
+    name: License & Compliance Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install compliance tools
+        run: |
+          # Install Go-native license scanning tools
+          go install github.com/google/licenseclassifier/v2@latest
+          go install github.com/fossa-contrib/fossa-cli@latest || true
+          
+      - name: Scan dependencies for licenses
+        run: |
+          mkdir -p compliance-reports
+          
+          # Generate dependency list with versions
+          go list -m -json all > compliance-reports/dependencies.json
+          
+          # Create license report
+          {
+            echo "# License Compliance Report"
+            echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            
+            echo "## Direct Dependencies"
+            go list -m all | grep -v "^github.com/orizon-lang/orizon$" | while read dep; do
+              echo "- $dep"
+            done
+            
+            echo ""
+            echo "## License Analysis"
+            echo "Please review the licenses of all dependencies to ensure compliance."
+            echo "Common permissive licenses include MIT, BSD, Apache 2.0."
+            echo "Avoid GPL/LGPL licenses unless compatible with project licensing."
+            
+          } > compliance-reports/license-report.md
+          
+      - name: Check for security-sensitive files
+        run: |
+          {
+            echo "# Security-Sensitive Files Report"
+            echo ""
+            
+            # Check for various sensitive file patterns
+            echo "## Configuration Files"
+            find . -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "*.toml" | \
+              grep -v vendor/ | grep -v ".git/" | while read file; do
+              echo "- $file"
+            done
+            
+            echo ""
+            echo "## Build and CI Files"
+            find . -name "Makefile" -o -name "Dockerfile*" -o -name "*.sh" -o -name "*.ps1" | \
+              grep -v vendor/ | grep -v ".git/" | while read file; do
+              echo "- $file"
+            done
+            
+            echo ""
+            echo "## Documentation"
+            find . -name "*.md" -o -name "*.txt" | \
+              grep -v vendor/ | grep -v ".git/" | head -20 | while read file; do
+              echo "- $file"
+            done
+            
+          } > compliance-reports/sensitive-files-report.md
+          
+      - name: Upload compliance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-reports
+          path: compliance-reports/
+          retention-days: 30
+
+  # Final security summary
+  security-summary:
+    name: Security & Quality Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-security, static-security-analysis, code-quality-analysis, compliance-scanning]
+    if: always()
+    steps:
+      - name: Download all security artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-security-results/
+          
+      - name: Generate comprehensive security report
+        run: |
+          mkdir -p final-security-reports
+          
+          {
+            echo "# Orizon Security & Quality Assurance Report"
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Commit:** ${GITHUB_SHA::8}"
+            echo "**Branch:** ${GITHUB_REF_NAME}"
+            echo ""
+            
+            echo "## Security Analysis Summary"
+            
+            # Check each security component
+            for component in dependency-security static-security-analysis code-quality-analysis compliance-scanning; do
+              if find all-security-results -name "*${component}*" -type d | grep -q .; then
+                echo "✅ ${component}: Completed"
+              else
+                echo "❌ ${component}: Failed or missing"
+              fi
+            done
+            
+            echo ""
+            echo "## Key Findings"
+            
+            # Summarize key security findings
+            echo "### Vulnerability Scanning"
+            if find all-security-results -name "*govulncheck*" | grep -q .; then
+              echo "- Go vulnerability database scan completed"
+            fi
+            
+            if find all-security-results -name "*nancy*" | grep -q .; then
+              echo "- Dependency vulnerability scan completed"
+            fi
+            
+            echo ""
+            echo "### Static Analysis"
+            if find all-security-results -name "*gosec*" | grep -q .; then
+              echo "- Go security analysis completed"
+            fi
+            
+            if find all-security-results -name "*staticcheck*" | grep -q .; then
+              echo "- Advanced static analysis completed"
+            fi
+            
+            echo ""
+            echo "### Code Quality"
+            if find all-security-results -name "*golangci-lint*" | grep -q .; then
+              echo "- Comprehensive linting completed"
+            fi
+            
+            if find all-security-results -name "*complexity*" | grep -q .; then
+              echo "- Complexity analysis completed"
+            fi
+            
+            echo ""
+            echo "### Compliance"
+            if find all-security-results -name "*license*" | grep -q .; then
+              echo "- License compliance scan completed"
+            fi
+            
+            echo ""
+            echo "## Recommendations"
+            echo "1. Review all security reports for critical or high-severity issues"
+            echo "2. Address any vulnerabilities found in dependencies"
+            echo "3. Fix any security hotspots identified by static analysis"
+            echo "4. Improve code quality based on linting recommendations"
+            echo "5. Ensure license compliance for all dependencies"
+            echo "6. Update documentation for better maintainability"
+            echo ""
+            echo "## Next Steps"
+            echo "- Schedule regular security reviews"
+            echo "- Set up automated security monitoring"
+            echo "- Implement security testing in development workflow"
+            echo "- Train team on secure coding practices"
+            echo ""
+            echo "---"
+            echo "*Report generated by Orizon Security & Quality Pipeline*"
+            
+          } > final-security-reports/comprehensive-security-report.md
+          
+      - name: Upload final security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-security-reports
+          path: final-security-reports/
+          retention-days: 90
+          
+      - name: Post security summary to job summary
+        if: always()
+        run: |
+          if [ -f final-security-reports/comprehensive-security-report.md ]; then
+            cat final-security-reports/comprehensive-security-report.md >> $GITHUB_STEP_SUMMARY
+          fi

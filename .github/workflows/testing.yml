@@ -1,0 +1,413 @@
+name: Comprehensive Testing & Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Weekly comprehensive testing on Sunday at 3 AM UTC
+    - cron: '0 3 * * 0'
+
+env:
+  GO_VERSION: '1.24.x'
+  CGO_ENABLED: 0
+  TEST_TIMEOUT: '30m'
+
+jobs:
+  # Matrix testing across multiple Go versions
+  compatibility-matrix:
+    name: Go Version Compatibility (${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.23.x', '1.24.x']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          
+      - name: Download dependencies
+        run: go mod download
+        
+      - name: Build with Go ${{ matrix.go-version }}
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go build -v ./...
+          
+      - name: Test with Go ${{ matrix.go-version }}
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go test -v -timeout=${{ env.TEST_TIMEOUT }} ./...
+
+  # Comprehensive unit and integration testing
+  comprehensive-testing:
+    name: Comprehensive Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install test dependencies
+        run: |
+          go install gotest.tools/gotestsum@latest
+          go install github.com/jstemmer/go-junit-report/v2@latest
+          
+      - name: Run unit tests with detailed output
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p test-results
+          gotestsum --junitfile test-results/unit-tests.xml \
+            --format testname -- \
+            -v -race -timeout=${{ env.TEST_TIMEOUT }} \
+            -coverprofile=test-results/coverage.out \
+            -covermode=atomic \
+            ./...
+            
+      - name: Generate coverage reports
+        run: |
+          go tool cover -func=test-results/coverage.out > test-results/coverage-summary.txt
+          go tool cover -html=test-results/coverage.out -o test-results/coverage.html
+          
+      - name: Run integration tests
+        env:
+          CGO_ENABLED: 0
+        run: |
+          # Build required tools first
+          make build-all
+          
+          # Run comprehensive smoke tests
+          bash ./scripts/linux/smoke.sh
+          
+      - name: Run stress tests
+        env:
+          CGO_ENABLED: 0
+        run: |
+          # Long-running stress tests
+          go test -v -timeout=10m -race -count=5 ./internal/lexer/...
+          go test -v -timeout=10m -race -count=5 ./internal/parser/...
+          go test -v -timeout=10m -race -count=5 ./internal/ast/...
+          
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-results
+          path: |
+            test-results/
+            artifacts/
+          retention-days: 30
+
+  # Memory and performance profiling
+  performance-profiling:
+    name: Performance & Memory Profiling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Build profiling tools
+        env:
+          CGO_ENABLED: 0
+        run: |
+          make build-all
+          
+      - name: Run CPU profiling benchmarks
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p profiles
+          go test -bench=. -benchmem -cpuprofile=profiles/cpu.prof -memprofile=profiles/mem.prof ./...
+          
+      - name: Generate profiling reports
+        run: |
+          go tool pprof -text profiles/cpu.prof > profiles/cpu-analysis.txt
+          go tool pprof -text profiles/mem.prof > profiles/memory-analysis.txt
+          
+      - name: Memory leak detection
+        env:
+          CGO_ENABLED: 0
+        run: |
+          # Run tests with race detector and memory tracking
+          go test -race -v -timeout=15m ./internal/runtime/... 2>&1 | tee profiles/race-detection.log
+          
+      - name: Upload profiling results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-profiles
+          path: profiles/
+          retention-days: 14
+
+  # Extended fuzzing campaign
+  extended-fuzzing:
+    name: Extended Fuzzing Campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Build fuzzing infrastructure
+        env:
+          CGO_ENABLED: 0
+        run: |
+          make build-all
+          mkdir -p fuzz-results
+          
+      - name: Run extended parser fuzzing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          timeout 1800s ./build/orizon-fuzz \
+            --target parser \
+            --duration 30m \
+            --p 8 \
+            --max-execs 1000000 \
+            --stats \
+            --json-stats fuzz-results/extended-parser-stats.json \
+            --corpus corpus/parser_corpus.txt \
+            --covout fuzz-results/extended-parser.cov \
+            --out fuzz-results/extended-parser-crashes.txt \
+            --min-on-crash \
+            --min-dir fuzz-results/parser-crashes-min \
+            --min-budget 5m || true
+            
+      - name: Run extended lexer fuzzing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          timeout 1800s ./build/orizon-fuzz \
+            --target lexer \
+            --duration 30m \
+            --p 8 \
+            --max-execs 1000000 \
+            --stats \
+            --json-stats fuzz-results/extended-lexer-stats.json \
+            --corpus corpus/lexer_corpus.txt \
+            --out fuzz-results/extended-lexer-crashes.txt || true
+            
+      - name: Run semantic fuzzing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          # Semantic-aware fuzzing for complex language constructs
+          timeout 900s ./build/orizon-fuzz \
+            --target astbridge-hir \
+            --duration 15m \
+            --p 4 \
+            --max-execs 500000 \
+            --stats \
+            --json-stats fuzz-results/semantic-fuzz-stats.json \
+            --corpus corpus/astbridge_corpus.txt \
+            --out fuzz-results/semantic-crashes.txt || true
+            
+      - name: Analyze fuzzing results
+        run: |
+          # Generate fuzzing summary report
+          {
+            echo "# Extended Fuzzing Campaign Results"
+            echo "**Campaign Duration:** 60 minutes"
+            echo "**Parallel Workers:** 8"
+            echo ""
+            
+            for target in parser lexer semantic; do
+              stats_file="fuzz-results/extended-${target}-stats.json"
+              if [ -f "$stats_file" ]; then
+                echo "## ${target^} Fuzzing"
+                if command -v jq >/dev/null 2>&1; then
+                  jq -r '"Executions: " + (.executions // "N/A" | tostring) + ", Coverage: " + (.coverage // "N/A" | tostring) + ", Crashes: " + (.crashes // "0" | tostring)' "$stats_file" 2>/dev/null || echo "Stats available in JSON"
+                else
+                  echo "Detailed stats available in $stats_file"
+                fi
+                echo ""
+              fi
+            done
+            
+            echo "## Crash Analysis"
+            find fuzz-results -name "*crashes*.txt" -exec wc -l {} \; | while read count file; do
+              echo "- $(basename "$file"): $count potential issues found"
+            done
+          } > fuzz-results/fuzzing-summary.md
+          
+      - name: Upload extended fuzzing results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extended-fuzzing-results
+          path: fuzz-results/
+          retention-days: 30
+
+  # Platform-specific validation
+  platform-validation:
+    name: Platform-Specific Validation (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Linux
+            os: ubuntu-latest
+            test_script: ./scripts/linux/smoke.sh
+          - platform: Windows
+            os: windows-latest
+            test_script: .\scripts\win\smoke.ps1
+          - platform: macOS
+            os: macos-latest
+            test_script: ./scripts/linux/smoke.sh
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Platform-specific build
+        env:
+          CGO_ENABLED: 0
+        run: |
+          make build-all
+          
+      - name: Run platform-specific tests
+        env:
+          CGO_ENABLED: 0
+          ORIZON_WIN_IOCP: "1"
+          ORIZON_WIN_WSAPOLL: "1"
+        run: |
+          ${{ matrix.test_script }}
+          
+      - name: Run platform-specific unit tests
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go test -v -race -timeout=20m ./...
+          
+      - name: Upload platform results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-validation-${{ matrix.platform }}
+          path: artifacts/
+          retention-days: 14
+
+  # Final validation and reporting
+  validation-summary:
+    name: Testing Validation Summary
+    runs-on: ubuntu-latest
+    needs: [compatibility-matrix, comprehensive-testing, performance-profiling, extended-fuzzing, platform-validation]
+    if: always()
+    steps:
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-test-results/
+          
+      - name: Generate comprehensive test report
+        run: |
+          mkdir -p final-test-reports
+          
+          {
+            echo "# Orizon Comprehensive Testing Report"
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Commit:** ${GITHUB_SHA::8}"
+            echo "**Workflow:** ${{ github.workflow }}"
+            echo ""
+            
+            echo "## Test Execution Summary"
+            
+            # Check each test job
+            for job in compatibility-matrix comprehensive-testing performance-profiling extended-fuzzing platform-validation; do
+              if find all-test-results -name "*${job}*" -type d | grep -q .; then
+                echo "✅ ${job}: Completed"
+              else
+                echo "❌ ${job}: Failed or missing"
+              fi
+            done
+            
+            echo ""
+            echo "## Coverage Analysis"
+            
+            # Find and summarize coverage files
+            find all-test-results -name "coverage-summary.txt" | while read -r file; do
+              if [ -f "$file" ]; then
+                echo "### $(dirname "$file" | sed 's|all-test-results/||')"
+                tail -3 "$file" | head -1 || echo "Coverage data unavailable"
+                echo ""
+              fi
+            done
+            
+            echo "## Performance Insights"
+            
+            # Find and summarize benchmark results
+            find all-test-results -name "*benchmark*.txt" -o -name "*analysis*.txt" | while read -r file; do
+              if [ -f "$file" ]; then
+                echo "### $(basename "$file" .txt)"
+                echo "Analysis available in: $file"
+                echo ""
+              fi
+            done
+            
+            echo "## Fuzzing Campaign Results"
+            
+            # Summarize fuzzing results
+            find all-test-results -name "*fuzz*stats*.json" | while read -r file; do
+              if [ -f "$file" ]; then
+                echo "### $(basename "$file" .json | sed 's/-stats//')"
+                if command -v jq >/dev/null 2>&1; then
+                  jq -r '"Total Executions: " + (.executions // "N/A" | tostring) + ", Coverage Increase: " + (.coverage_increase // "N/A" | tostring) + ", Issues Found: " + (.crashes // "0" | tostring)' "$file" 2>/dev/null || echo "JSON available for detailed analysis"
+                else
+                  echo "Detailed statistics available in artifact"
+                fi
+                echo ""
+              fi
+            done
+            
+            echo "## Recommendations"
+            echo "- Review any failed tests or jobs above"
+            echo "- Check coverage reports for areas needing more tests"
+            echo "- Investigate any performance regressions"
+            echo "- Address any issues found during fuzzing campaigns"
+            echo ""
+            echo "---"
+            echo "*Report generated by Orizon CI/CD Pipeline*"
+            
+          } > final-test-reports/comprehensive-testing-report.md
+          
+      - name: Upload final test reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-test-reports
+          path: final-test-reports/
+          retention-days: 90
+          
+      - name: Post test summary to job summary
+        if: always()
+        run: |
+          if [ -f final-test-reports/comprehensive-testing-report.md ]; then
+            cat final-test-reports/comprehensive-testing-report.md >> $GITHUB_STEP_SUMMARY
+          fi

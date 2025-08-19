@@ -1,0 +1,324 @@
+# GolangCI-Lint Configuration for Orizon Programming Language
+# Comprehensive static analysis configuration for maximum code quality
+
+run:
+  timeout: 10m
+  tests: true
+  skip-dirs:
+    - build/
+    - artifacts/
+    - tmp/
+    - vendor/
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*_generated\\.go$"
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+
+linters-settings:
+  gofmt:
+    simplify: true
+  
+  goimports:
+    local-prefixes: github.com/orizon-lang/orizon
+  
+  golint:
+    min-confidence: 0.8
+  
+  govet:
+    check-shadowing: true
+    enable-all: true
+  
+  staticcheck:
+    go: "1.24"
+    checks: ["all"]
+  
+  gosec:
+    excludes:
+      - G104  # Audit errors not checked
+      - G204  # Subprocess launched with variable
+    severity: medium
+    confidence: medium
+  
+  cyclop:
+    max-complexity: 15
+    package-average: 10.0
+    skip-tests: false
+  
+  dupl:
+    threshold: 100
+  
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  
+  exhaustive:
+    check-generated: false
+    default-signifies-exhaustive: false
+  
+  gocognit:
+    min-complexity: 20
+  
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    ignore-tests: false
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+    disabled-checks:
+      - commentedOutCode
+      - whyNoLint
+  
+  gocyclo:
+    min-complexity: 15
+  
+  godot:
+    scope: declarations
+    exclude:
+      - "check interfaces"
+    period: true
+    capital: false
+  
+  gomnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+      - assign
+    ignored-numbers: 0,1,2,3
+    ignored-functions: strings.SplitN
+  
+  gosimple:
+    go: "1.24"
+    checks: ["all"]
+  
+  lll:
+    line-length: 120
+    tab-width: 4
+  
+  maligned:
+    suggest-new: true
+  
+  misspell:
+    locale: US
+    ignore-words:
+      - orizon
+      - lexer
+      - ast
+      - hir
+      - mir
+      - lir
+  
+  nakedret:
+    max-func-lines: 30
+  
+  nestif:
+    min-complexity: 4
+  
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: false
+  
+  revive:
+    min-confidence: 0.8
+    rules:
+      - name: atomic
+      - name: line-length-limit
+        arguments: [120]
+      - name: argument-limit
+        arguments: [8]
+      - name: cyclomatic
+        arguments: [15]
+      - name: max-public-structs
+        arguments: [3]
+  
+  rowserrcheck:
+    packages:
+      - github.com/jmoiron/sqlx
+  
+  testpackage:
+    skip-regexp: (export|internal)_test\.go
+  
+  thelper:
+    test:
+      first: true
+      name: true
+      begin: true
+    benchmark:
+      first: true
+      name: true
+      begin: true
+  
+  unparam:
+    check-exported: false
+  
+  unused:
+    go: "1.24"
+  
+  whitespace:
+    multi-if: false
+    multi-func: false
+  
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Unwrap(
+      - .Wrap(
+      - .Wrapf(
+
+linters:
+  disable-all: true
+  enable:
+    # Default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    
+    # Additional quality linters
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - cyclop
+    - dupl
+    - durationcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - gofmt
+    - gofumpt
+    - goimports
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - importas
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nlreturn
+    - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - tenv
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - gomnd
+        - lll
+        - wrapcheck
+    
+    # Exclude some linters from generated files
+    - path: ".*\\.pb\\.go"
+      linters:
+        - all
+    
+    # Exclude magic number checks for common patterns
+    - text: "Magic number: 0, in <condition> detected"
+      linters:
+        - gomnd
+    - text: "Magic number: 1, in <condition> detected"
+      linters:
+        - gomnd
+    - text: "Magic number: 2, in <condition> detected"
+      linters:
+        - gomnd
+    
+    # Exclude line length for long URLs or error messages
+    - text: "line is [0-9]+ characters, out of [0-9]+"
+      linters:
+        - lll
+      source: "(https?://|Error:|fmt\\.Errorf)"
+    
+    # Exclude some checks for main functions
+    - path: cmd/
+      text: "main function"
+      linters:
+        - funlen
+        - gocyclo
+    
+    # Exclude certain GoSec rules for specific patterns
+    - text: "G204: Subprocess launched with variable"
+      linters:
+        - gosec
+      path: internal/tools/
+    
+    # Allow TODO/FIXME comments in development
+    - text: "(TODO|FIXME|XXX)"
+      linters:
+        - godox
+  
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+  
+  # Fix found issues (if it's supported by the linter)
+  fix: false
+
+severity:
+  default-severity: error
+  case-sensitive: false
+  rules:
+    - linters:
+        - dupl
+        - gomnd
+        - goconst
+      severity: warning
+    - linters:
+        - gosec
+        - errcheck
+        - staticcheck
+      severity: error
