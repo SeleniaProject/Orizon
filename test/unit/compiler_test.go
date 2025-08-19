@@ -8,7 +8,11 @@ import (
 
 // TestLexerBasics tests basic lexer functionality
 func TestLexerBasics(t *testing.T) {
-	framework, err := orizonTesting.NewTestFramework(nil)
+	// Use default config with verbose enabled
+	config := orizonTesting.DefaultTestConfig()
+	config.Verbose = true
+
+	framework, err := orizonTesting.NewTestFramework(config)
 	if err != nil {
 		t.Fatalf("Failed to create test framework: %v", err)
 	}
