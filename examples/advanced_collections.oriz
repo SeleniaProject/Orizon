@@ -1,0 +1,542 @@
+// High-Performance Collections Demonstration for Orizon
+use std::collections::*;
+use std::concurrent::*;
+use std::sync::*;
+
+// Concurrent data processing pipeline using advanced collections
+actor DataProcessor {
+    // Lock-free structures for high-throughput processing
+    input_queue: LockFreeQueue[DataPacket],
+    processing_buffer: WaitFreeRingBuffer[WorkItem],
+    results_map: AdvancedHashMap[String, ProcessedData],
+    worker_pool: NUMAPool[Worker],
+    
+    // Performance monitoring
+    throughput_counter: AtomicCounter,
+    error_counter: AtomicCounter,
+    processing_times: Vector[Duration],
+    
+    state: ProcessorState,
+}
+
+struct DataPacket {
+    id: String,
+    data: Vector[u8],
+    timestamp: Timestamp,
+    priority: Priority,
+}
+
+struct WorkItem {
+    packet: DataPacket,
+    processing_stage: Stage,
+    retries: u32,
+}
+
+struct ProcessedData {
+    original_id: String,
+    result: ComputationResult,
+    metadata: HashMap[String, String],
+    processing_duration: Duration,
+}
+
+struct Worker {
+    id: u32,
+    specialization: WorkerType,
+    performance_stats: WorkerStats,
+}
+
+enum ProcessorState {
+    Idle,
+    Processing,
+    Draining,
+    Shutdown,
+}
+
+enum WorkerType {
+    CPUIntensive,
+    IOBound,
+    MemoryOptimized,
+    General,
+}
+
+impl DataProcessor {
+    fn new(config: ProcessorConfig) -> Self {
+        // Initialize high-performance collections
+        let input_queue = LockFreeQueue::new();
+        let processing_buffer = WaitFreeRingBuffer::new(config.buffer_size);
+        let results_map = AdvancedHashMap::new(config.results_capacity);
+        
+        // NUMA-aware worker pool
+        let worker_pool = NUMAPool::new(
+            || Worker::new(),
+            |worker| worker.reset()
+        );
+        
+        DataProcessor {
+            input_queue,
+            processing_buffer,
+            results_map,
+            worker_pool,
+            throughput_counter: AtomicCounter::new(),
+            error_counter: AtomicCounter::new(),
+            processing_times: Vector::new(),
+            state: ProcessorState::Idle,
+        }
+    }
+    
+    // High-throughput data ingestion
+    async fn ingest_data(&mut self, packet: DataPacket) -> Result<(), IngestionError> {
+        // Lock-free enqueue for maximum performance
+        self.input_queue.enqueue(packet);
+        self.throughput_counter.increment();
+        
+        // Trigger processing if buffer has space
+        if self.processing_buffer.size() < self.processing_buffer.capacity() * 0.8 {
+            self.process_next_batch().await?;
+        }
+        
+        Ok(())
+    }
+    
+    // Parallel batch processing with work stealing
+    async fn process_next_batch(&mut self) -> Result<(), ProcessingError> {
+        let batch_size = min(64, self.input_queue.size());
+        let mut work_items = Vector::with_capacity(batch_size);
+        
+        // Drain input queue into work items
+        for _ in 0..batch_size {
+            if let Some(packet) = self.input_queue.dequeue() {
+                work_items.push(WorkItem {
+                    packet,
+                    processing_stage: Stage::Initial,
+                    retries: 0,
+                });
+            }
+        }
+        
+        // Parallel processing using worker pool
+        let results = self.process_work_items_parallel(work_items).await?;
+        
+        // Store results in concurrent hash map
+        for result in results {
+            self.results_map.put(result.original_id.clone(), result);
+        }
+        
+        Ok(())
+    }
+    
+    async fn process_work_items_parallel(&mut self, items: Vector[WorkItem]) 
+        -> Result<Vector[ProcessedData], ProcessingError> {
+        
+        let mut handles = Vector::new();
+        let results = Arc::new(Mutex::new(Vector::new()));
+        
+        // Spawn parallel workers
+        for chunk in items.chunks(8) {
+            let worker = self.worker_pool.get();
+            let chunk_clone = chunk.clone();
+            let results_clone = results.clone();
+            
+            let handle = spawn(async move {
+                let processed = worker.process_chunk(chunk_clone).await?;
+                
+                {
+                    let mut results_guard = results_clone.lock().await;
+                    results_guard.extend(processed);
+                }
+                
+                self.worker_pool.put(worker);
+                Ok::<(), ProcessingError>(())
+            });
+            
+            handles.push(handle);
+        }
+        
+        // Wait for all workers to complete
+        for handle in handles {
+            handle.await??;
+        }
+        
+        let final_results = results.lock().await.clone();
+        Ok(final_results)
+    }
+    
+    // Real-time performance monitoring
+    fn get_performance_metrics(&self) -> PerformanceMetrics {
+        let total_operations = self.throughput_counter.get();
+        let total_errors = self.error_counter.get();
+        let success_rate = if total_operations > 0 {
+            1.0 - (total_errors as f64 / total_operations as f64)
+        } else {
+            1.0
+        };
+        
+        let avg_processing_time = if !self.processing_times.is_empty() {
+            self.processing_times.iter().sum::<Duration>() / self.processing_times.len() as u32
+        } else {
+            Duration::zero()
+        };
+        
+        PerformanceMetrics {
+            total_operations,
+            success_rate,
+            average_processing_time: avg_processing_time,
+            queue_depth: self.input_queue.size(),
+            buffer_utilization: self.processing_buffer.size() as f64 / 
+                               self.processing_buffer.capacity() as f64,
+            results_count: self.results_map.size(),
+        }
+    }
+    
+    // Graceful shutdown with data preservation
+    async fn shutdown(&mut self) -> Result<ShutdownSummary, ShutdownError> {
+        self.state = ProcessorState::Draining;
+        
+        // Process remaining items
+        while !self.input_queue.is_empty() {
+            self.process_next_batch().await?;
+        }
+        
+        self.state = ProcessorState::Shutdown;
+        
+        Ok(ShutdownSummary {
+            processed_items: self.throughput_counter.get(),
+            remaining_results: self.results_map.size(),
+            final_metrics: self.get_performance_metrics(),
+        })
+    }
+}
+
+// Advanced algorithm implementations using high-performance collections
+actor AlgorithmEngine {
+    // Red-Black Tree for ordered operations
+    sorted_data: RedBlackTree[i64, DataEntry],
+    
+    // Skip List for probabilistic balancing
+    search_index: ConcurrentSkipList[String, IndexEntry>,
+    
+    // Parallel sorting infrastructure
+    sorter: ParallelSorter[SortableItem],
+    
+    // B+ Tree for range queries
+    range_index: ConcurrentBTree[Timestamp, EventData>,
+    
+    // Lock-free data structures for high concurrency
+    pending_operations: LockFreeQueue[Operation],
+    active_computations: HashMap[ComputationId, ComputationState>,
+}
+
+impl AlgorithmEngine {
+    fn new() -> Self {
+        AlgorithmEngine {
+            sorted_data: RedBlackTree::new(|a, b| a.cmp(b)),
+            search_index: ConcurrentSkipList::new(|a, b| a.cmp(b)),
+            sorter: ParallelSorter::new(|a, b| a.cmp(b)),
+            range_index: ConcurrentBTree::new(|a, b| a.cmp(b)),
+            pending_operations: LockFreeQueue::new(),
+            active_computations: HashMap::new(),
+        }
+    }
+    
+    // Parallel sorting with optimal performance
+    async fn sort_large_dataset(&mut self, data: Vector[SortableItem]) -> Vector[SortableItem] {
+        // Use parallel algorithms for large datasets
+        if data.len() > 100_000 {
+            let start_time = Instant::now();
+            self.sorter.parallel_merge_sort(&mut data);
+            let duration = start_time.elapsed();
+            
+            info!("Sorted {} items in {:?} using parallel merge sort", 
+                  data.len(), duration);
+        } else {
+            // Use quicksort for smaller datasets
+            self.sorter.parallel_quick_sort(&mut data);
+        }
+        
+        data
+    }
+    
+    // Efficient range queries using B+ Tree
+    async fn range_query(&self, start: Timestamp, end: Timestamp) -> Vector[EventData] {
+        let mut results = Vector::new();
+        
+        // B+ Tree provides efficient range iteration
+        for (timestamp, event) in self.range_index.range(start..=end) {
+            results.push(event);
+        }
+        
+        results
+    }
+    
+    // Probabilistic search using Skip List
+    async fn fuzzy_search(&self, query: &str, max_results: usize) -> Vector[IndexEntry> {
+        let mut results = Vector::new();
+        let mut collected = 0;
+        
+        // Skip list provides O(log n) average case search
+        for (key, entry) in self.search_index.iter() {
+            if collected >= max_results {
+                break;
+            }
+            
+            if key.contains(query) {
+                results.push(entry);
+                collected += 1;
+            }
+        }
+        
+        results
+    }
+    
+    // Concurrent computation management
+    async fn start_computation(&mut self, computation: Computation) -> ComputationId {
+        let id = ComputationId::new();
+        let state = ComputationState::new(computation);
+        
+        self.active_computations.insert(id, state);
+        
+        // Queue for background processing
+        self.pending_operations.enqueue(Operation::StartComputation(id));
+        
+        id
+    }
+}
+
+// Stress testing and benchmarking infrastructure
+actor PerformanceTester {
+    benchmark_suite: Benchmark,
+    stress_tests: Vector[StressTest],
+    metrics_collector: MetricsCollector,
+}
+
+impl PerformanceTester {
+    fn new() -> Self {
+        PerformanceTester {
+            benchmark_suite: Benchmark::new(),
+            stress_tests: Vector::new(),
+            metrics_collector: MetricsCollector::new(),
+        }
+    }
+    
+    // Comprehensive collection benchmarks
+    async fn run_collection_benchmarks(&mut self) -> BenchmarkResults {
+        info!("Starting comprehensive collection benchmarks...");
+        
+        // Vector performance
+        self.benchmark_vector_operations().await;
+        
+        // HashMap performance  
+        self.benchmark_hashmap_operations().await;
+        
+        // Concurrent structure performance
+        self.benchmark_concurrent_structures().await;
+        
+        // Memory usage analysis
+        self.benchmark_memory_efficiency().await;
+        
+        self.benchmark_suite.results()
+    }
+    
+    async fn benchmark_vector_operations(&mut self) {
+        let mut vec = Vector::with_capacity(1_000_000);
+        
+        // Push operations
+        self.benchmark_suite.run("Vector Push", 1_000_000, || {
+            vec.push(42);
+        });
+        
+        // Random access
+        self.benchmark_suite.run("Vector Random Access", 100_000, || {
+            let index = fastrand() % vec.len();
+            vec.get(index);
+        });
+        
+        // Pop operations
+        self.benchmark_suite.run("Vector Pop", vec.len(), || {
+            vec.pop();
+        });
+    }
+    
+    async fn benchmark_concurrent_structures(&mut self) {
+        let map = AdvancedHashMap::new(1024);
+        let queue = LockFreeQueue::new();
+        let buffer = WaitFreeRingBuffer::new(1024);
+        
+        // Parallel HashMap operations
+        self.benchmark_suite.run_parallel("Concurrent HashMap", 100_000, 8, || {
+            let key = fastrand() % 10000;
+            map.put(key, format!("value{}", key));
+        });
+        
+        // Lock-free queue operations
+        self.benchmark_suite.run_parallel("Lock-Free Queue", 100_000, 4, || {
+            queue.enqueue(fastrand());
+        });
+        
+        // Wait-free ring buffer
+        self.benchmark_suite.run_parallel("Ring Buffer", 50_000, 2, || {
+            if buffer.push(fastrand()).is_err() {
+                buffer.pop();
+            }
+        });
+    }
+    
+    async fn stress_test_concurrent_access(&mut self) {
+        let map = Arc::new(AdvancedHashMap::new(1024));
+        
+        let stress_test = StressTest::new(
+            "Concurrent HashMap Stress",
+            Duration::from_secs(30),
+            16 // goroutines
+        );
+        
+        stress_test.run(|| {
+            let map_clone = map.clone();
+            let key = format!("key{}", fastrand() % 1000);
+            
+            match fastrand() % 3 {
+                0 => { map_clone.put(key, fastrand()); }
+                1 => { map_clone.get(&key); }
+                2 => { map_clone.remove(&key); }
+                _ => unreachable!(),
+            }
+            
+            Ok(())
+        });
+    }
+}
+
+// Main demonstration function
+fn main() {
+    println!("🚀 Orizon High-Performance Collections Demo");
+    println!("============================================");
+    
+    // Initialize runtime with optimizations
+    let runtime = Runtime::new_with_config(RuntimeConfig {
+        thread_pool_size: std::thread::available_parallelism(),
+        numa_aware: true,
+        gc_strategy: GCStrategy::Concurrent,
+        memory_pools: true,
+    });
+    
+    runtime.block_on(async {
+        // Data processing demonstration
+        let mut processor = DataProcessor::new(ProcessorConfig::high_performance());
+        
+        println!("🔄 Starting high-throughput data processing...");
+        
+        // Simulate high-load data ingestion
+        for i in 0..100_000 {
+            let packet = DataPacket {
+                id: format!("packet_{}", i),
+                data: generate_test_data(1024),
+                timestamp: Timestamp::now(),
+                priority: if i % 10 == 0 { Priority::High } else { Priority::Normal },
+            };
+            
+            processor.ingest_data(packet).await?;
+            
+            if i % 10_000 == 0 {
+                let metrics = processor.get_performance_metrics();
+                println!("📊 Processed {} packets, success rate: {:.2}%", 
+                        metrics.total_operations, metrics.success_rate * 100.0);
+            }
+        }
+        
+        // Algorithm engine demonstration
+        let mut engine = AlgorithmEngine::new();
+        
+        println!("🧮 Testing advanced algorithms...");
+        
+        // Large dataset sorting
+        let large_dataset = generate_sortable_data(1_000_000);
+        let sorted_data = engine.sort_large_dataset(large_dataset).await;
+        println!("✅ Sorted 1M items using parallel algorithms");
+        
+        // Performance testing
+        let mut tester = PerformanceTester::new();
+        
+        println!("🔬 Running comprehensive benchmarks...");
+        let benchmark_results = tester.run_collection_benchmarks().await;
+        
+        println!("📈 Benchmark Results:");
+        benchmark_results.print_summary();
+        
+        // Stress testing
+        println!("💪 Running stress tests...");
+        tester.stress_test_concurrent_access().await;
+        
+        // Shutdown
+        let shutdown_summary = processor.shutdown().await?;
+        println!("🏁 Processing complete. Summary:");
+        println!("   Total processed: {}", shutdown_summary.processed_items);
+        println!("   Final success rate: {:.2}%", 
+                shutdown_summary.final_metrics.success_rate * 100.0);
+        
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })?;
+    
+    println!("✨ All demonstrations completed successfully!");
+}
+
+// Utility functions for test data generation
+fn generate_test_data(size: usize) -> Vector[u8] {
+    let mut data = Vector::with_capacity(size);
+    for _ in 0..size {
+        data.push((fastrand() % 256) as u8);
+    }
+    data
+}
+
+fn generate_sortable_data(count: usize) -> Vector[SortableItem] {
+    let mut data = Vector::with_capacity(count);
+    for i in 0..count {
+        data.push(SortableItem {
+            key: fastrand(),
+            value: format!("item_{}", i),
+            weight: fastrand() as f64,
+        });
+    }
+    data
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct SortableItem {
+    key: u64,
+    value: String,
+    weight: f64,
+}
+
+// Configuration and supporting types
+struct ProcessorConfig {
+    buffer_size: usize,
+    results_capacity: usize,
+    worker_count: usize,
+    numa_enabled: bool,
+}
+
+impl ProcessorConfig {
+    fn high_performance() -> Self {
+        ProcessorConfig {
+            buffer_size: 65536,
+            results_capacity: 1_000_000,
+            worker_count: std::thread::available_parallelism().get(),
+            numa_enabled: true,
+        }
+    }
+}
+
+struct PerformanceMetrics {
+    total_operations: i64,
+    success_rate: f64,
+    average_processing_time: Duration,
+    queue_depth: usize,
+    buffer_utilization: f64,
+    results_count: i64,
+}
+
+struct ShutdownSummary {
+    processed_items: i64,
+    remaining_results: i64,
+    final_metrics: PerformanceMetrics,
+}

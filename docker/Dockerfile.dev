@@ -1,0 +1,49 @@
+# Orizon Programming Language - 開発環境
+# Phase 0.1.1: C/C++ツールチェーンを使用しない統一開発環境
+
+FROM golang:1.21-alpine AS go-env
+
+# Rust環境（プロトタイプ用）
+FROM rust:1.75-alpine AS rust-env
+
+# 最終的な開発環境
+FROM alpine:3.18
+
+# 基本ツールのインストール
+RUN apk add --no-cache \
+    git \
+    make \
+    bash \
+    curl \
+    wget \
+    vim \
+    sudo \
+    openssh-client \
+    ca-certificates \
+    tzdata
+
+# Goインストール（メインコンパイラ実装用）
+COPY --from=go-env /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:$PATH"
+
+# Rustインストール（プロトタイプ用）
+COPY --from=rust-env /usr/local/cargo /usr/local/cargo
+COPY --from=rust-env /usr/local/rustup /usr/local/rustup
+ENV PATH="/usr/local/cargo/bin:$PATH"
+
+# 開発ユーザー作成
+RUN addgroup -g 1000 orizon && \
+    adduser -u 1000 -G orizon -s /bin/bash -D orizon && \
+    echo 'orizon ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# 作業ディレクトリ設定
+WORKDIR /workspace
+RUN chown -R orizon:orizon /workspace
+
+USER orizon
+
+# Go/Rustツールチェーン確認
+RUN go version && cargo --version
+
+# エントリーポイント
+CMD ["/bin/bash"]

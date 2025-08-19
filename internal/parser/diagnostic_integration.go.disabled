@@ -1,0 +1,618 @@
+// Integration of advanced diagnostic system with parser
+// Provides enhanced error reporting and static analysis for parsing
+
+package parser
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/orizon-lang/orizon/internal/diagnostic"
+	"github.com/orizon-lang/orizon/internal/lexer"
+	"github.com/orizon-lang/orizon/internal/position"
+)
+
+// DiagnosticParser extends the base parser with enhanced// TODO: Re-enable when dependent types are properly implemented
+/*
+// TODO: Re-enable when dependent types are properly implemented
+/*
+func (uva *UnusedVariableAnalyzer) VisitDependentFunctionType(node *DependentFunctionType) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitDependentParameter(node *DependentParameter) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitRefinementType(node *RefinementType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitSizedArrayType(node *SizedArrayType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitIndexType(node *IndexType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitProofType(node *ProofType) interface{} { return nil }
+*/
+
+type DiagnosticParser struct {
+	*Parser
+	engine *diagnostic.DiagnosticEngine
+}
+
+// TODO: Re-enable when dependent types are properly implemented
+/*
+func (pa *PerformanceAnalyzer) VisitDependentFunctionType(node *DependentFunctionType) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitDependentParameter(node *DependentParameter) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitRefinementType(node *RefinementType) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitSizedArrayType(node *SizedArrayType) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitIndexType(node *IndexType) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitProofType(node *ProofType) interface{} { return nil }
+*/
+
+// NewDiagnosticParser creates a new parser with diagnostic capabilities
+
+func NewDiagnosticParser(l *lexer.Lexer, filename string) *DiagnosticParser {
+	config := diagnostic.DiagnosticConfig{
+		MaxErrors:         50,
+		WarningsAsErrors:  false,
+		ShowSuggestions:   true,
+		ShowRelatedInfo:   true,
+		EnablePerformance: true,
+		EnableStyle:       true,
+		EnableSecurity:    true,
+		VerboseOutput:     true,
+	}
+
+	return &DiagnosticParser{
+		Parser: NewParser(l, filename),
+		engine: diagnostic.NewDiagnosticEngine(config),
+	}
+}
+
+// GetDiagnostics returns the diagnostic engine
+func (dp *DiagnosticParser) GetDiagnostics() *diagnostic.DiagnosticEngine {
+	return dp.engine
+}
+
+// Enhanced error reporting methods
+
+// reportUnexpectedToken reports an unexpected token with suggestions
+func (dp *DiagnosticParser) reportUnexpectedToken(expected string, actual lexer.Token) {
+	span := position.Span{
+		Start: position.Position{
+			Filename: dp.filename,
+			Line:     actual.Line,
+			Column:   actual.Column,
+			Offset:   0, // Would need to calculate from lexer
+		},
+		End: position.Position{
+			Filename: dp.filename,
+			Line:     actual.Line,
+			Column:   actual.Column + len(actual.Literal),
+			Offset:   len(actual.Literal),
+		},
+	}
+
+	diag := diagnostic.NewDiagnostic().
+		Error().
+		Syntax().
+		Code("E1001").
+		Title("Unexpected token").
+		Message(fmt.Sprintf("Expected '%s', found '%s'", expected, actual.Literal)).
+		Span(span)
+
+	// Add suggestions based on common mistakes
+	dp.addTokenSuggestions(diag, expected, actual)
+
+	dp.engine.AddDiagnostic(diag.Build())
+}
+
+// addTokenSuggestions adds contextual suggestions for token errors
+func (dp *DiagnosticParser) addTokenSuggestions(diag *diagnostic.DiagnosticBuilder, expected string, actual lexer.Token) {
+	switch {
+	case expected == ";" && actual.Type == lexer.TokenNewline:
+		diag.Suggest("Add semicolon", "Add a semicolon before the newline")
+	case expected == ")" && actual.Type == lexer.TokenEOF:
+		diag.Suggest("Add closing parenthesis", "Add a closing parenthesis")
+	case expected == "}" && actual.Type == lexer.TokenEOF:
+		diag.Suggest("Add closing brace", "Add a closing brace")
+	case strings.Contains(expected, "identifier") && isKeyword(actual.Type):
+		diag.Suggest("Use different name", fmt.Sprintf("'%s' is a keyword, try a different identifier", actual.Literal))
+	case expected == "=" && actual.Literal == "==":
+		diag.Suggest("Use assignment operator", "Use '=' for assignment, '==' is for comparison")
+	}
+}
+
+// isKeyword checks if a token type is a keyword
+func isKeyword(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.TokenFunc, lexer.TokenLet, lexer.TokenVar, lexer.TokenConst,
+		lexer.TokenStruct, lexer.TokenEnum, lexer.TokenTrait, lexer.TokenImpl,
+		lexer.TokenIf, lexer.TokenElse:
+		return true
+	default:
+		return false
+	}
+}
+
+// reportUndefinedSymbol reports an undefined symbol with helpful suggestions
+func (dp *DiagnosticParser) reportUndefinedSymbol(name string, span position.Span) {
+	diag := diagnostic.NewDiagnostic().
+		Error().
+		Semantic().
+		Code("E2001").
+		Title("Undefined symbol").
+		Message(fmt.Sprintf("Symbol '%s' is not defined in this scope", name)).
+		Span(span)
+
+	// Add suggestions for common typos or similar names
+	dp.addSymbolSuggestions(diag, name)
+
+	dp.engine.AddDiagnostic(diag.Build())
+}
+
+// addSymbolSuggestions suggests similar symbol names
+func (dp *DiagnosticParser) addSymbolSuggestions(diag *diagnostic.DiagnosticBuilder, name string) {
+	// This would typically check the symbol table for similar names
+	// For now, we'll add some common suggestions
+
+	commonVariants := []string{
+		strings.ToLower(name),
+		strings.ToUpper(name),
+		strings.Title(name),
+	}
+
+	for _, variant := range commonVariants {
+		if variant != name {
+			diag.Suggest("Try alternative spelling", fmt.Sprintf("Did you mean '%s'?", variant))
+		}
+	}
+
+	// Check for common typos
+	if strings.HasSuffix(name, "s") && len(name) > 1 {
+		singular := name[:len(name)-1]
+		diag.Suggest("Try singular form", fmt.Sprintf("Did you mean '%s'?", singular))
+	}
+}
+
+// reportTypeMismatch reports a type mismatch with conversion suggestions
+func (dp *DiagnosticParser) reportTypeMismatch(expected, actual string, span position.Span) {
+	diag := diagnostic.NewDiagnostic().
+		Error().
+		Type().
+		Code("E3001").
+		Title("Type mismatch").
+		Message(fmt.Sprintf("Cannot assign value of type '%s' to variable of type '%s'", actual, expected)).
+		Span(span)
+
+	// Add conversion suggestions
+	dp.addConversionSuggestions(diag, expected, actual)
+
+	dp.engine.AddDiagnostic(diag.Build())
+}
+
+// addConversionSuggestions suggests type conversions
+func (dp *DiagnosticParser) addConversionSuggestions(diag *diagnostic.DiagnosticBuilder, expected, actual string) {
+	// Common type conversions
+	conversions := map[string]map[string]string{
+		"int": {
+			"float":  "Use int(value) to convert float to int",
+			"string": "Use strconv.Atoi(value) to convert string to int",
+		},
+		"float": {
+			"int":    "Use float(value) to convert int to float",
+			"string": "Use strconv.ParseFloat(value, 64) to convert string to float",
+		},
+		"string": {
+			"int":   "Use strconv.Itoa(value) to convert int to string",
+			"float": "Use strconv.FormatFloat(value, 'f', -1, 64) to convert float to string",
+		},
+	}
+
+	if expectedConversions, exists := conversions[expected]; exists {
+		if suggestion, exists := expectedConversions[actual]; exists {
+			diag.Suggest("Add type conversion", suggestion)
+		}
+	}
+}
+
+// Static analysis methods
+
+// analyzeUnusedVariables performs static analysis to find unused variables
+func (dp *DiagnosticParser) analyzeUnusedVariables(program *Program) {
+	// This is a simplified implementation
+	// A real implementation would track variable usage throughout the AST
+
+	visitor := &UnusedVariableAnalyzer{
+		engine:   dp.engine,
+		filename: dp.filename,
+		declared: make(map[string]position.Span),
+		used:     make(map[string]bool),
+	}
+
+	program.Accept(visitor)
+
+	// Report unused variables
+	for name, span := range visitor.declared {
+		if !visitor.used[name] {
+			diag := diagnostic.NewDiagnostic().
+				Warning().
+				Style().
+				Code("W4001").
+				Title("Unused variable").
+				Message(fmt.Sprintf("Variable '%s' is declared but never used", name)).
+				Span(span).
+				Suggest("Remove variable", "Remove the unused variable declaration").
+				Tag("unused")
+
+			dp.engine.AddDiagnostic(diag.Build())
+		}
+	}
+}
+
+// UnusedVariableAnalyzer implements the Visitor interface to find unused variables
+type UnusedVariableAnalyzer struct {
+	engine   *diagnostic.DiagnosticEngine
+	filename string
+	declared map[string]position.Span
+	used     map[string]bool
+}
+
+func (uva *UnusedVariableAnalyzer) VisitProgram(node *Program) interface{} {
+	for _, decl := range node.Declarations {
+		decl.Accept(uva)
+	}
+	return nil
+}
+
+func (uva *UnusedVariableAnalyzer) VisitVariableDeclaration(node *VariableDeclaration) interface{} {
+	span := position.Span{
+		Start: position.Position{
+			Filename: uva.filename,
+			Line:     1, // Would need actual position info
+			Column:   1,
+		},
+		End: position.Position{
+			Filename: uva.filename,
+			Line:     1,
+			Column:   10,
+		},
+	}
+	uva.declared[node.Name.Value] = span
+
+	if node.Initializer != nil {
+		node.Initializer.Accept(uva)
+	}
+	return nil
+}
+
+func (uva *UnusedVariableAnalyzer) VisitIdentifier(node *Identifier) interface{} {
+	uva.used[node.Value] = true
+	return nil
+}
+
+// Implement other visitor methods with empty implementations for now
+func (uva *UnusedVariableAnalyzer) VisitFunctionDeclaration(node *FunctionDeclaration) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitParameter(node *Parameter) interface{}           { return nil }
+func (uva *UnusedVariableAnalyzer) VisitBlockStatement(node *BlockStatement) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitIfStatement(node *IfStatement) interface{}       { return nil }
+func (uva *UnusedVariableAnalyzer) VisitWhileStatement(node *WhileStatement) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitForStatement(node *ForStatement) interface{}     { return nil }
+func (uva *UnusedVariableAnalyzer) VisitReturnStatement(node *ReturnStatement) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitExpressionStatement(node *ExpressionStatement) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitBinaryExpression(node *BinaryExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitUnaryExpression(node *UnaryExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitCallExpression(node *CallExpression) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMemberExpression(node *MemberExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitIndexExpression(node *IndexExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitLiteral(node *Literal) interface{} { return nil }
+
+// TODO: Implement these when the corresponding AST types are added
+// func (uva *UnusedVariableAnalyzer) VisitArrayLiteral(node *ArrayLiteral)                 {}
+// func (uva *UnusedVariableAnalyzer) VisitObjectLiteral(node *ObjectLiteral)               {}
+// func (uva *UnusedVariableAnalyzer) VisitFunctionLiteral(node *FunctionLiteral)           {}
+func (uva *UnusedVariableAnalyzer) VisitBasicType(node *BasicType) interface{}       { return nil }
+func (uva *UnusedVariableAnalyzer) VisitArrayType(node *ArrayType) interface{}       { return nil }
+func (uva *UnusedVariableAnalyzer) VisitFunctionType(node *FunctionType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitStructType(node *StructType) interface{}     { return nil }
+
+// TODO: Implement these when the corresponding AST types are added
+// func (uva *UnusedVariableAnalyzer) VisitFieldDeclaration(node *FieldDeclaration)         {}
+// func (uva *UnusedVariableAnalyzer) VisitInterfaceType(node *InterfaceType)               {}
+// func (uva *UnusedVariableAnalyzer) VisitMethodDeclaration(node *MethodDeclaration)       {}
+func (uva *UnusedVariableAnalyzer) VisitMatchStatement(node *MatchStatement) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMatchArm(node *MatchArm) interface{}             { return nil }
+func (uva *UnusedVariableAnalyzer) VisitLiteralPattern(node *LiteralPattern) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitVariablePattern(node *VariablePattern) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitConstructorPattern(node *ConstructorPattern) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitGuardPattern(node *GuardPattern) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitWildcardPattern(node *WildcardPattern) interface{} {
+	return nil
+}
+
+// Additional visitor methods required by the Visitor interface for UnusedVariableAnalyzer
+func (uva *UnusedVariableAnalyzer) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitEnumDeclaration(node *EnumDeclaration) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitTraitDeclaration(node *TraitDeclaration) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitImplBlock(node *ImplBlock) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitAssignmentExpression(node *AssignmentExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitTernaryExpression(node *TernaryExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitRefinementTypeExpression(node *RefinementTypeExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitOperator(node *Operator) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitArrayExpression(node *ArrayExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitStructExpression(node *StructExpression) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitBreakStatement(node *BreakStatement) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitContinueStatement(node *ContinueStatement) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitEnumType(node *EnumType) interface{}           { return nil }
+func (uva *UnusedVariableAnalyzer) VisitTraitType(node *TraitType) interface{}         { return nil }
+func (uva *UnusedVariableAnalyzer) VisitGenericType(node *GenericType) interface{}     { return nil }
+func (uva *UnusedVariableAnalyzer) VisitReferenceType(node *ReferenceType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitPointerType(node *PointerType) interface{}     { return nil }
+
+// Macro-related visitor methods for UnusedVariableAnalyzer
+func (uva *UnusedVariableAnalyzer) VisitMacroDefinition(node *MacroDefinition) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitMacroParameter(node *MacroParameter) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMacroConstraint(node *MacroConstraint) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitMacroBody(node *MacroBody) interface{}         { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMacroTemplate(node *MacroTemplate) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMacroPattern(node *MacroPattern) interface{}   { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMacroPatternElement(node *MacroPatternElement) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitMacroInvocation(node *MacroInvocation) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitMacroArgument(node *MacroArgument) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitMacroContext(node *MacroContext) interface{}   { return nil }
+
+// Dependent type system visitor methods for UnusedVariableAnalyzer
+// TODO: Re-enable when dependent types are properly implemented
+/*
+func (uva *UnusedVariableAnalyzer) VisitDependentFunctionType(node *DependentFunctionType) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitDependentParameter(node *DependentParameter) interface{} {
+	return nil
+}
+func (uva *UnusedVariableAnalyzer) VisitRefinementType(node *RefinementType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitSizedArrayType(node *SizedArrayType) interface{} { return nil }
+func (uva *UnusedVariableAnalyzer) VisitIndexType(node *IndexType) interface{}           { return nil }
+func (uva *UnusedVariableAnalyzer) VisitProofType(node *ProofType) interface{}           { return nil }
+*/
+
+// Performance analysis methods
+
+// analyzePerformance performs basic performance analysis
+func (dp *DiagnosticParser) analyzePerformance(program *Program) {
+	visitor := &PerformanceAnalyzer{
+		engine:   dp.engine,
+		filename: dp.filename,
+	}
+
+	program.Accept(visitor)
+}
+
+// PerformanceAnalyzer looks for common performance issues
+type PerformanceAnalyzer struct {
+	engine   *diagnostic.DiagnosticEngine
+	filename string
+}
+
+func (pa *PerformanceAnalyzer) VisitProgram(node *Program) interface{} {
+	for _, decl := range node.Declarations {
+		decl.Accept(pa)
+	}
+	return nil
+}
+
+func (pa *PerformanceAnalyzer) VisitForStatement(node *ForStatement) interface{} {
+	// Check for potential infinite loops or inefficient loops
+	if node.Condition == nil {
+		span := position.Span{
+			Start: position.Position{Filename: pa.filename, Line: 1, Column: 1},
+			End:   position.Position{Filename: pa.filename, Line: 1, Column: 10},
+		}
+
+		diag := diagnostic.NewDiagnostic().
+			Warning().
+			Performance().
+			Code("W6001").
+			Title("Potential infinite loop").
+			Message("For loop without condition may run indefinitely").
+			Span(span).
+			Suggest("Add condition", "Add a termination condition to prevent infinite loop").
+			Tag("performance")
+
+		pa.engine.AddDiagnostic(diag.Build())
+	}
+
+	// Visit child nodes
+	if node.Init != nil {
+		node.Init.Accept(pa)
+	}
+	if node.Condition != nil {
+		node.Condition.Accept(pa)
+	}
+	if node.Update != nil {
+		node.Update.Accept(pa)
+	}
+	if node.Body != nil {
+		node.Body.Accept(pa)
+	}
+	return nil
+}
+
+// Implement other visitor methods with empty implementations for now
+func (pa *PerformanceAnalyzer) VisitVariableDeclaration(node *VariableDeclaration) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitFunctionDeclaration(node *FunctionDeclaration) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitParameter(node *Parameter) interface{}             { return nil }
+func (pa *PerformanceAnalyzer) VisitBlockStatement(node *BlockStatement) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitIfStatement(node *IfStatement) interface{}         { return nil }
+func (pa *PerformanceAnalyzer) VisitWhileStatement(node *WhileStatement) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitReturnStatement(node *ReturnStatement) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitExpressionStatement(node *ExpressionStatement) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitBinaryExpression(node *BinaryExpression) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitUnaryExpression(node *UnaryExpression) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitCallExpression(node *CallExpression) interface{}     { return nil }
+func (pa *PerformanceAnalyzer) VisitMemberExpression(node *MemberExpression) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitIndexExpression(node *IndexExpression) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitIdentifier(node *Identifier) interface{}             { return nil }
+func (pa *PerformanceAnalyzer) VisitLiteral(node *Literal) interface{}                   { return nil }
+
+// TODO: Implement these when the corresponding AST types are added
+// func (pa *PerformanceAnalyzer) VisitArrayLiteral(node *ArrayLiteral)                 {}
+// func (pa *PerformanceAnalyzer) VisitObjectLiteral(node *ObjectLiteral)               {}
+// func (pa *PerformanceAnalyzer) VisitFunctionLiteral(node *FunctionLiteral)           {}
+func (pa *PerformanceAnalyzer) VisitBasicType(node *BasicType) interface{}       { return nil }
+func (pa *PerformanceAnalyzer) VisitArrayType(node *ArrayType) interface{}       { return nil }
+func (pa *PerformanceAnalyzer) VisitFunctionType(node *FunctionType) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitStructType(node *StructType) interface{}     { return nil }
+
+// TODO: Implement these when the corresponding AST types are added
+// func (pa *PerformanceAnalyzer) VisitFieldDeclaration(node *FieldDeclaration)         {}
+// func (pa *PerformanceAnalyzer) VisitInterfaceType(node *InterfaceType)               {}
+// func (pa *PerformanceAnalyzer) VisitMethodDeclaration(node *MethodDeclaration)       {}
+
+// Additional visitor methods required by the Visitor interface
+func (pa *PerformanceAnalyzer) VisitStructDeclaration(node *StructDeclaration) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitEnumDeclaration(node *EnumDeclaration) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitTraitDeclaration(node *TraitDeclaration) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitImplBlock(node *ImplBlock) interface{}               { return nil }
+func (pa *PerformanceAnalyzer) VisitImportDeclaration(node *ImportDeclaration) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitExportDeclaration(node *ExportDeclaration) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitAssignmentExpression(node *AssignmentExpression) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitTernaryExpression(node *TernaryExpression) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitRefinementTypeExpression(node *RefinementTypeExpression) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitOperator(node *Operator) interface{}                 { return nil }
+func (pa *PerformanceAnalyzer) VisitArrayExpression(node *ArrayExpression) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitStructExpression(node *StructExpression) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitBreakStatement(node *BreakStatement) interface{}     { return nil }
+func (pa *PerformanceAnalyzer) VisitContinueStatement(node *ContinueStatement) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitMatchStatement(node *MatchStatement) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitEnumType(node *EnumType) interface{}             { return nil }
+func (pa *PerformanceAnalyzer) VisitTraitType(node *TraitType) interface{}           { return nil }
+func (pa *PerformanceAnalyzer) VisitGenericType(node *GenericType) interface{}       { return nil }
+func (pa *PerformanceAnalyzer) VisitReferenceType(node *ReferenceType) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitPointerType(node *PointerType) interface{}       { return nil }
+
+// Macro-related visitor methods
+func (pa *PerformanceAnalyzer) VisitMacroDefinition(node *MacroDefinition) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroParameter(node *MacroParameter) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroConstraint(node *MacroConstraint) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroBody(node *MacroBody) interface{}             { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroTemplate(node *MacroTemplate) interface{}     { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroPattern(node *MacroPattern) interface{}       { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroPatternElement(node *MacroPatternElement) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitMacroInvocation(node *MacroInvocation) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroArgument(node *MacroArgument) interface{}     { return nil }
+func (pa *PerformanceAnalyzer) VisitMacroContext(node *MacroContext) interface{}       { return nil }
+
+// Dependent type system visitor methods
+func (pa *PerformanceAnalyzer) VisitDependentFunctionType(node *DependentFunctionType) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitDependentParameter(node *DependentParameter) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitRefinementType(node *RefinementType) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitSizedArrayType(node *SizedArrayType) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitIndexType(node *IndexType) interface{}           { return nil }
+func (pa *PerformanceAnalyzer) VisitProofType(node *ProofType) interface{}           { return nil }
+
+func (pa *PerformanceAnalyzer) VisitMatchArm(node *MatchArm) interface{}               { return nil }
+func (pa *PerformanceAnalyzer) VisitLiteralPattern(node *LiteralPattern) interface{}   { return nil }
+func (pa *PerformanceAnalyzer) VisitVariablePattern(node *VariablePattern) interface{} { return nil }
+func (pa *PerformanceAnalyzer) VisitConstructorPattern(node *ConstructorPattern) interface{} {
+	return nil
+}
+func (pa *PerformanceAnalyzer) VisitGuardPattern(node *GuardPattern) interface{}       { return nil }
+func (pa *PerformanceAnalyzer) VisitWildcardPattern(node *WildcardPattern) interface{} { return nil }
+
+// Enhanced parsing methods that use diagnostics
+
+// ParseWithDiagnostics parses the source code and returns both AST and diagnostics
+func (dp *DiagnosticParser) ParseWithDiagnostics() (*Program, *diagnostic.DiagnosticEngine) {
+	program := dp.parseProgram()
+
+	// Perform static analysis
+	dp.analyzeUnusedVariables(program)
+	dp.analyzePerformance(program)
+
+	return program, dp.engine
+}
+
+// FormatDiagnostics returns a formatted string of all diagnostics
+func (dp *DiagnosticParser) FormatDiagnostics() string {
+	return dp.engine.FormatDiagnostics()
+}
+
+// HasErrors returns true if there are any errors
+func (dp *DiagnosticParser) HasErrors() bool {
+	return dp.engine.HasErrors()
+}

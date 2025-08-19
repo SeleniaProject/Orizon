@@ -1,0 +1,587 @@
+// Comprehensive Test Suite for Orizon Language
+// Tests all language features and systems programming capabilities
+
+// Unit tests for data structures
+#[test]
+func test_vector_operations() {
+    let mut vec = Vec::new();
+    
+    // Test basic operations
+    assert!(vec.is_empty());
+    assert_eq!(vec.len(), 0);
+    
+    // Test push operations
+    vec.push(1);
+    vec.push(2);
+    vec.push(3);
+    
+    assert_eq!(vec.len(), 3);
+    assert_eq!(vec[0], 1);
+    assert_eq!(vec[1], 2);
+    assert_eq!(vec[2], 3);
+    
+    // Test pop operations
+    assert_eq!(vec.pop(), Some(3));
+    assert_eq!(vec.len(), 2);
+    
+    // Test iteration
+    let sum: i32 = vec.iter().sum();
+    assert_eq!(sum, 3);
+}
+
+#[test]
+func test_hashmap_operations() {
+    let mut map = HashMap::new();
+    
+    // Test insertion
+    assert_eq!(map.insert("key1", 100), None);
+    assert_eq!(map.insert("key2", 200), None);
+    
+    // Test get operations
+    assert_eq!(map.get("key1"), Some(&100));
+    assert_eq!(map.get("key3"), None);
+    
+    // Test update
+    assert_eq!(map.insert("key1", 150), Some(100));
+    assert_eq!(map.get("key1"), Some(&150));
+    
+    // Test removal
+    assert_eq!(map.remove("key1"), Some(150));
+    assert_eq!(map.get("key1"), None);
+    
+    assert_eq!(map.len(), 1);
+}
+
+#[test]
+func test_option_type() {
+    let some_value = Some(42);
+    let none_value: Option<i32> = None;
+    
+    // Test is_some/is_none
+    assert!(some_value.is_some());
+    assert!(!some_value.is_none());
+    assert!(!none_value.is_some());
+    assert!(none_value.is_none());
+    
+    // Test unwrap
+    assert_eq!(some_value.unwrap(), 42);
+    
+    // Test map
+    let mapped = some_value.map(|x| x * 2);
+    assert_eq!(mapped, Some(84));
+    
+    let mapped_none = none_value.map(|x| x * 2);
+    assert_eq!(mapped_none, None);
+    
+    // Test unwrap_or
+    assert_eq!(some_value.unwrap_or(0), 42);
+    assert_eq!(none_value.unwrap_or(0), 0);
+}
+
+#[test]
+func test_result_type() {
+    let ok_value: Result<i32, &str> = Ok(42);
+    let err_value: Result<i32, &str> = Err("error");
+    
+    // Test is_ok/is_err
+    assert!(ok_value.is_ok());
+    assert!(!ok_value.is_err());
+    assert!(!err_value.is_ok());
+    assert!(err_value.is_err());
+    
+    // Test map
+    let mapped_ok = ok_value.map(|x| x * 2);
+    assert_eq!(mapped_ok, Ok(84));
+    
+    let mapped_err = err_value.map(|x| x * 2);
+    assert!(mapped_err.is_err());
+    
+    // Test map_err
+    let mapped_err_msg = err_value.map_err(|e| format!("Error: {}", e));
+    assert_eq!(mapped_err_msg, Err("Error: error".to_string()));
+}
+
+// Memory management tests
+#[test]
+func test_stack_allocator() {
+    let mut allocator = StackAllocator::new(1024).unwrap();
+    
+    // Test basic allocation
+    let ptr1 = allocator.allocate(64, 8).unwrap();
+    assert!(!ptr1.is_null());
+    
+    let ptr2 = allocator.allocate(128, 16).unwrap();
+    assert!(!ptr2.is_null());
+    assert_ne!(ptr1, ptr2);
+    
+    // Test alignment
+    assert_eq!(ptr1 as usize % 8, 0);
+    assert_eq!(ptr2 as usize % 16, 0);
+    
+    // Test out of memory
+    let large_ptr = allocator.allocate(2048, 8);
+    assert!(large_ptr.is_none());
+    
+    // Test reset
+    allocator.reset();
+    let ptr3 = allocator.allocate(64, 8).unwrap();
+    assert_eq!(ptr1, ptr3); // Should reuse the same memory
+}
+
+#[test]
+func test_memory_pool() {
+    let pool = RTMemoryPool::new(64, 100).unwrap();
+    
+    // Test allocation
+    let mut ptrs = Vec::new();
+    for _ in 0..50 {
+        if let Some(ptr) = pool.allocate() {
+            ptrs.push(ptr);
+        }
+    }
+    
+    assert_eq!(ptrs.len(), 50);
+    
+    let (allocated, total, utilization) = pool.usage_stats();
+    assert_eq!(allocated, 50);
+    assert_eq!(total, 100);
+    assert_eq!(utilization, 0.5);
+    
+    // Test deallocation
+    for ptr in ptrs {
+        pool.deallocate(ptr);
+    }
+    
+    let (allocated_after, _, _) = pool.usage_stats();
+    assert_eq!(allocated_after, 0);
+}
+
+// Concurrency tests
+#[test]
+func test_atomic_operations() {
+    let counter = AtomicU64::new(0);
+    
+    // Test basic operations
+    assert_eq!(counter.load(Ordering::Relaxed), 0);
+    
+    counter.store(42, Ordering::Relaxed);
+    assert_eq!(counter.load(Ordering::Relaxed), 42);
+    
+    let old_value = counter.fetch_add(10, Ordering::Relaxed);
+    assert_eq!(old_value, 42);
+    assert_eq!(counter.load(Ordering::Relaxed), 52);
+    
+    // Test compare_exchange
+    let result = counter.compare_exchange(
+        52, 100, Ordering::Relaxed, Ordering::Relaxed
+    );
+    assert_eq!(result, Ok(52));
+    assert_eq!(counter.load(Ordering::Relaxed), 100);
+    
+    let failed_result = counter.compare_exchange(
+        50, 200, Ordering::Relaxed, Ordering::Relaxed
+    );
+    assert_eq!(failed_result, Err(100));
+    assert_eq!(counter.load(Ordering::Relaxed), 100);
+}
+
+#[test]
+func test_lock_free_stack() {
+    let stack = LockFreeStack::new();
+    
+    // Test basic operations
+    assert_eq!(stack.pop(), None);
+    
+    stack.push(1);
+    stack.push(2);
+    stack.push(3);
+    
+    assert_eq!(stack.pop(), Some(3));
+    assert_eq!(stack.pop(), Some(2));
+    assert_eq!(stack.pop(), Some(1));
+    assert_eq!(stack.pop(), None);
+}
+
+#[test]
+func test_concurrent_stack() {
+    let stack = Arc::new(LockFreeStack::new());
+    let num_threads = 4;
+    let items_per_thread = 1000;
+    
+    // Producer threads
+    let mut handles = Vec::new();
+    for thread_id in 0..num_threads {
+        let stack_clone = Arc::clone(&stack);
+        let handle = spawn_thread(move || {
+            for i in 0..items_per_thread {
+                let value = thread_id * items_per_thread + i;
+                stack_clone.push(value);
+            }
+        });
+        handles.push(handle);
+    }
+    
+    // Wait for all producers
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    
+    // Consumer threads
+    let consumed = Arc::new(AtomicUsize::new(0));
+    let mut consumer_handles = Vec::new();
+    
+    for _ in 0..num_threads {
+        let stack_clone = Arc::clone(&stack);
+        let consumed_clone = Arc::clone(&consumed);
+        let handle = spawn_thread(move || {
+            let mut local_count = 0;
+            while let Some(_) = stack_clone.pop() {
+                local_count += 1;
+            }
+            consumed_clone.fetch_add(local_count, Ordering::Relaxed);
+        });
+        consumer_handles.push(handle);
+    }
+    
+    // Wait for all consumers
+    for handle in consumer_handles {
+        handle.join().unwrap();
+    }
+    
+    let total_consumed = consumed.load(Ordering::Relaxed);
+    assert_eq!(total_consumed, num_threads * items_per_thread);
+}
+
+// Actor system tests
+#[test]
+func test_actor_creation_and_messaging() {
+    let counter_actor = spawn_actor!(Counter);
+    
+    // Test initial state
+    let initial_value = counter_actor.get().await;
+    assert_eq!(initial_value, 0);
+    
+    // Test increment
+    let after_increment = counter_actor.increment().await;
+    assert_eq!(after_increment, 1);
+    
+    // Test multiple increments
+    for _ in 0..9 {
+        counter_actor.increment().await;
+    }
+    
+    let final_value = counter_actor.get().await;
+    assert_eq!(final_value, 10);
+}
+
+#[test]
+func test_actor_fault_tolerance() {
+    let supervisor = spawn_supervisor!(RestartStrategy::OneForOne);
+    let worker = supervisor.spawn_child(WorkerActor::new()).await;
+    
+    // Normal operation
+    let result = worker.process_data(42).await;
+    assert_eq!(result, Ok(84));
+    
+    // Cause a failure
+    let error_result = worker.process_data(-1).await; // Triggers panic
+    assert!(error_result.is_err());
+    
+    // Actor should be restarted by supervisor
+    wait_for_restart().await;
+    
+    // Should work again after restart
+    let after_restart = worker.process_data(21).await;
+    assert_eq!(after_restart, Ok(42));
+}
+
+// Network and I/O tests
+#[test]
+func test_tcp_server_client() {
+    let server_addr = "127.0.0.1:0";
+    let server = TcpListener::bind(server_addr).unwrap();
+    let actual_addr = server.local_addr().unwrap();
+    
+    // Spawn server task
+    let server_handle = spawn_async(async move {
+        let (mut stream, _) = server.accept().await.unwrap();
+        let mut buffer = [0u8; 1024];
+        
+        let n = stream.read(&mut buffer).await.unwrap();
+        let received = String::from_utf8_lossy(&buffer[..n]);
+        
+        let response = format!("Echo: {}", received);
+        stream.write_all(response.as_bytes()).await.unwrap();
+    });
+    
+    // Client connection
+    let client_handle = spawn_async(async move {
+        let mut stream = TcpStream::connect(actual_addr).await.unwrap();
+        
+        let message = "Hello, Server!";
+        stream.write_all(message.as_bytes()).await.unwrap();
+        
+        let mut buffer = [0u8; 1024];
+        let n = stream.read(&mut buffer).await.unwrap();
+        let response = String::from_utf8_lossy(&buffer[..n]);
+        
+        assert!(response.contains("Hello, Server!"));
+    });
+    
+    // Wait for both tasks
+    join!(server_handle, client_handle);
+}
+
+#[test]
+func test_file_operations() {
+    let test_file = "test_output.txt";
+    let test_content = "Hello, Orizon file system!";
+    
+    // Write to file
+    {
+        let mut file = File::create(test_file).unwrap();
+        file.write_all(test_content.as_bytes()).unwrap();
+        file.flush().unwrap();
+    }
+    
+    // Read from file
+    {
+        let mut file = File::open(test_file).unwrap();
+        let mut buffer = String::new();
+        file.read_to_string(&mut buffer).unwrap();
+        
+        assert_eq!(buffer, test_content);
+    }
+    
+    // Memory-mapped file access
+    {
+        let mapped_file = MemoryMappedFile::open(test_file).unwrap();
+        let mut buffer = vec![0u8; test_content.len()];
+        let bytes_read = mapped_file.read_at(0, &mut buffer).unwrap();
+        
+        assert_eq!(bytes_read, test_content.len());
+        assert_eq!(String::from_utf8(buffer).unwrap(), test_content);
+    }
+    
+    // Cleanup
+    std::fs::remove_file(test_file).unwrap();
+}
+
+// Performance and benchmarking tests
+#[test]
+func test_simd_operations() {
+    let size = 1024;
+    let a: Vec<f32> = (0..size).map(|i| i as f32).collect();
+    let b: Vec<f32> = (0..size).map(|i| (i * 2) as f32).collect();
+    let mut result = vec![0.0f32; size];
+    
+    // Test SIMD vector addition
+    simd_vector_add(&a, &b, &mut result);
+    
+    // Verify results
+    for i in 0..size {
+        let expected = a[i] + b[i];
+        assert_eq!(result[i], expected);
+    }
+    
+    // Benchmark SIMD vs scalar
+    let start_simd = Instant::now();
+    for _ in 0..1000 {
+        simd_vector_add(&a, &b, &mut result);
+    }
+    let simd_time = start_simd.elapsed();
+    
+    let start_scalar = Instant::now();
+    for _ in 0..1000 {
+        for i in 0..size {
+            result[i] = a[i] + b[i];
+        }
+    }
+    let scalar_time = start_scalar.elapsed();
+    
+    println!("SIMD time: {:?}, Scalar time: {:?}", simd_time, scalar_time);
+    assert!(simd_time < scalar_time); // SIMD should be faster
+}
+
+#[test]
+func test_algorithm_performance() {
+    let size = 10000;
+    let mut data: Vec<i32> = (0..size).rev().collect(); // Reverse sorted
+    
+    // Test parallel merge sort
+    let start_time = Instant::now();
+    let sorted = parallel_merge_sort(data.clone());
+    let parallel_time = start_time.elapsed();
+    
+    // Verify sorted
+    for i in 0..size {
+        assert_eq!(sorted[i], i);
+    }
+    
+    // Test standard sort for comparison
+    let start_time = Instant::now();
+    data.sort();
+    let standard_time = start_time.elapsed();
+    
+    println!("Parallel sort: {:?}, Standard sort: {:?}", 
+             parallel_time, standard_time);
+    
+    // Both should produce the same result
+    assert_eq!(sorted, data);
+}
+
+// Integration tests
+#[test]
+func test_full_system_integration() {
+    // Test complete system with multiple components
+    let memory_pool = RTMemoryPool::new(1024, 1000).unwrap();
+    let ring_buffer = RTRingBuffer::new(512);
+    let packet_processor = PacketProcessor::new().unwrap();
+    let profiler = RTProfiler::new(1000);
+    
+    // Simulate real workload
+    for i in 0..100 {
+        let start_time = unsafe { rdtsc() };
+        
+        // Allocate memory
+        if let Some(ptr) = memory_pool.allocate() {
+            // Create packet
+            let packet = Packet {
+                data: [i as u8; 1500],
+                len: 64 + (i % 1000),
+                timestamp: start_time,
+                src_ip: 0xC0A80001,
+                dst_ip: 0xC0A80002,
+                protocol: 6
+            };
+            
+            // Process packet
+            packet_processor.receive_packet(packet).ok();
+            
+            // Add to ring buffer
+            ring_buffer.push(i).ok();
+            
+            // Deallocate memory
+            memory_pool.deallocate(ptr);
+        }
+        
+        let end_time = unsafe { rdtsc() };
+        profiler.record_latency(end_time - start_time);
+    }
+    
+    // Process all packets
+    let processed = packet_processor.process_packets();
+    assert!(processed > 0);
+    
+    // Check statistics
+    let stats = profiler.get_stats();
+    assert!(stats.count > 0);
+    assert!(stats.mean > 0);
+    
+    let (allocated, total, _) = memory_pool.usage_stats();
+    assert_eq!(allocated, 0); // All memory should be deallocated
+    
+    println!("Integration test completed successfully");
+    println!("Processed {} packets", processed);
+    println!("Average latency: {} cycles", stats.mean);
+}
+
+// Error handling and edge case tests
+#[test]
+func test_error_handling() {
+    // Test division by zero handling
+    let result = safe_divide(10, 0);
+    assert!(result.is_err());
+    
+    let result = safe_divide(10, 2);
+    assert_eq!(result.unwrap(), 5);
+    
+    // Test memory allocation failure simulation
+    let large_pool_result = RTMemoryPool::new(usize::MAX, 1);
+    assert!(large_pool_result.is_err());
+    
+    // Test network connection failure
+    let connection_result = TcpStream::connect("0.0.0.0:1").await;
+    assert!(connection_result.is_err());
+}
+
+#[test]
+func test_boundary_conditions() {
+    // Test empty collections
+    let empty_vec: Vec<i32> = Vec::new();
+    assert_eq!(parallel_merge_sort(empty_vec), Vec::new());
+    
+    let single_item = vec![42];
+    assert_eq!(parallel_merge_sort(single_item), vec![42]);
+    
+    // Test maximum values
+    let max_ring = RTRingBuffer::new(1);
+    assert!(max_ring.push(1).is_ok());
+    assert!(max_ring.push(2).is_err()); // Should be full
+    
+    // Test string operations with edge cases
+    let empty_string = "";
+    let single_char = "a";
+    let unicode_string = "🦀🔥";
+    
+    assert_eq!(empty_string.len(), 0);
+    assert_eq!(single_char.len(), 1);
+    assert!(unicode_string.len() > 2); // Unicode chars are multi-byte
+}
+
+// Main test runner
+func main() {
+    println!("Running comprehensive Orizon test suite...");
+    
+    let test_functions = [
+        ("Vector Operations", test_vector_operations),
+        ("HashMap Operations", test_hashmap_operations),
+        ("Option Type", test_option_type),
+        ("Result Type", test_result_type),
+        ("Stack Allocator", test_stack_allocator),
+        ("Memory Pool", test_memory_pool),
+        ("Atomic Operations", test_atomic_operations),
+        ("Lock-Free Stack", test_lock_free_stack),
+        ("Concurrent Stack", test_concurrent_stack),
+        ("Actor System", test_actor_creation_and_messaging),
+        ("Actor Fault Tolerance", test_actor_fault_tolerance),
+        ("TCP Server/Client", test_tcp_server_client),
+        ("File Operations", test_file_operations),
+        ("SIMD Operations", test_simd_operations),
+        ("Algorithm Performance", test_algorithm_performance),
+        ("System Integration", test_full_system_integration),
+        ("Error Handling", test_error_handling),
+        ("Boundary Conditions", test_boundary_conditions),
+    ];
+    
+    let mut passed = 0;
+    let mut failed = 0;
+    
+    for (name, test_fn) in test_functions {
+        print!("Running test: {} ... ", name);
+        
+        match std::panic::catch_unwind(|| test_fn()) {
+            Ok(_) => {
+                println!("PASSED");
+                passed += 1;
+            }
+            Err(_) => {
+                println!("FAILED");
+                failed += 1;
+            }
+        }
+    }
+    
+    println!("\nTest Results:");
+    println!("  Passed: {}", passed);
+    println!("  Failed: {}", failed);
+    println!("  Total:  {}", passed + failed);
+    
+    if failed == 0 {
+        println!("\n🎉 All tests passed!");
+        std::process::exit(0);
+    } else {
+        println!("\n❌ Some tests failed!");
+        std::process::exit(1);
+    }
+}
