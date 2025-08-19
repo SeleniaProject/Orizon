@@ -385,3 +385,35 @@ func (x64 *X64IOIntegration) GenerateExternalDeclarations() string {
 
 	return asm.String()
 }
+
+// GenerateCompleteFileOpenFunction generates a complete file open function with prologue and epilogue
+func (x64 *X64IOIntegration) GenerateCompleteFileOpenFunction() string {
+	var asm strings.Builder
+
+	// Function label
+	asm.WriteString("orizon_io_file_open:\n")
+
+	// Function prologue
+	asm.WriteString("    push rbp\n")
+	asm.WriteString("    mov rbp, rsp\n")
+	asm.WriteString("    sub rsp, 32        ; Reserve shadow space\n")
+
+	// Function body - file open logic
+	asm.WriteString("    ; File open implementation\n")
+	asm.WriteString("    mov rcx, [rbp+16]  ; lpFileName (path parameter)\n")
+	asm.WriteString("    mov rdx, [rbp+24]  ; dwDesiredAccess (mode parameter)\n")
+	asm.WriteString("    mov r8, 3          ; dwShareMode (FILE_SHARE_READ | FILE_SHARE_WRITE)\n")
+	asm.WriteString("    mov r9, 0          ; lpSecurityAttributes (NULL)\n")
+	asm.WriteString("    push 0             ; hTemplateFile (NULL)\n")
+	asm.WriteString("    push 128           ; dwFlagsAndAttributes (FILE_ATTRIBUTE_NORMAL)\n")
+	asm.WriteString("    push 3             ; dwCreationDisposition (OPEN_EXISTING)\n")
+	asm.WriteString("    call CreateFile    ; Windows API call\n")
+	asm.WriteString("    add rsp, 24        ; Clean up pushed parameters\n")
+
+	// Function epilogue
+	asm.WriteString("    add rsp, 32        ; Restore stack\n")
+	asm.WriteString("    pop rbp\n")
+	asm.WriteString("    ret\n")
+
+	return asm.String()
+}

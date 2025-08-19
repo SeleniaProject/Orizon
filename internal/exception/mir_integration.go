@@ -1,13 +1,35 @@
-// Package exception_mir provides integration between the exception handling system
+// Package exception provides integration between the exception handling system
 // and the MIR (Mid-level Intermediate Representation) for code generation.
 package exception
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/orizon-lang/orizon/internal/mir"
 )
+
+// ExceptionKind represents different types of exceptions
+type ExceptionKind int
+
+const (
+	ExceptionBoundsCheck ExceptionKind = iota
+	ExceptionNullPointer
+	ExceptionDivisionByZero
+	ExceptionAssert
+	ExceptionUserDefined
+)
+
+// ExceptionCodeGen handles code generation for exceptions
+type ExceptionCodeGen struct {
+	labelCounter int
+}
+
+// NewExceptionCodeGen creates a new exception code generator
+func NewExceptionCodeGen() *ExceptionCodeGen {
+	return &ExceptionCodeGen{
+		labelCounter: 0,
+	}
+}
 
 // MIRExceptionIntegration provides exception handling integration with MIR
 type MIRExceptionIntegration struct {
@@ -123,24 +145,24 @@ func (mei *MIRExceptionIntegration) AddNullCheckToMIR(block *mir.BasicBlock, ptr
 	}
 
 	// Create null check instructions
-	cmpInst := mir.Cmp{
+	cmpInst := &mir.Cmp{
 		Dst:  "temp_null_cmp",
 		Pred: mir.CmpEQ,
 		LHS:  mir.Value{Kind: mir.ValRef, Ref: ptrVar},
 		RHS:  mir.Value{Kind: mir.ValConstInt, Int64: 0},
 	}
 
-	branchInst := mir.CondBr{
+	branchInst := &mir.CondBr{
 		Cond:  mir.Value{Kind: mir.ValRef, Ref: "temp_null_cmp"},
 		True:  errorLabel,
 		False: okLabel,
 	}
 
-	jumpOkInst := mir.Br{
+	jumpOkInst := &mir.Br{
 		Target: okLabel,
 	}
 
-	panicInst := mir.Call{
+	panicInst := &mir.Call{
 		Dst:    "",
 		Callee: "panic_null_pointer",
 		Args:   []mir.Value{{Kind: mir.ValRef, Ref: ptrName}},
@@ -167,24 +189,24 @@ func (mei *MIRExceptionIntegration) AddDivisionCheckToMIR(block *mir.BasicBlock,
 	}
 
 	// Create division check instructions
-	cmpInst := mir.Cmp{
+	cmpInst := &mir.Cmp{
 		Dst:  "temp_div_cmp",
 		Pred: mir.CmpEQ,
 		LHS:  mir.Value{Kind: mir.ValRef, Ref: divisorVar},
 		RHS:  mir.Value{Kind: mir.ValConstInt, Int64: 0},
 	}
 
-	branchInst := mir.CondBr{
+	branchInst := &mir.CondBr{
 		Cond:  mir.Value{Kind: mir.ValRef, Ref: "temp_div_cmp"},
 		True:  errorLabel,
 		False: okLabel,
 	}
 
-	jumpOkInst := mir.Br{
+	jumpOkInst := &mir.Br{
 		Target: okLabel,
 	}
 
-	panicInst := mir.Call{
+	panicInst := &mir.Call{
 		Dst:    "",
 		Callee: "panic_division_by_zero",
 		Args:   []mir.Value{{Kind: mir.ValRef, Ref: operation}},
@@ -217,113 +239,105 @@ func (mei *MIRExceptionIntegration) AddAssertToMIR(block *mir.BasicBlock, condit
 
 	// Create assertion check instructions
 	// Branch if condition is false (0)
-	branchInst := &mir.Instruction{
-		Type:      mir.InstBranchCond,
-		Condition: "eq",
-		Arg1:      conditionVar,
-		Arg2:      "0",
-		Target:    errorLabel,
-		Label:     checkLabel,
+	cmpInst := &mir.Cmp{
+		Dst:  "temp_assert_cmp",
+		Pred: mir.CmpEQ,
+		LHS:  mir.Value{Kind: mir.ValRef, Ref: conditionVar},
+		RHS:  mir.Value{Kind: mir.ValConstInt, Int64: 0},
 	}
 
-	jumpOkInst := &mir.Instruction{
-		Type:   mir.InstJump,
+	branchInst := &mir.CondBr{
+		Cond:  mir.Value{Kind: mir.ValRef, Ref: "temp_assert_cmp"},
+		True:  errorLabel,
+		False: okLabel,
+	}
+
+	jumpOkInst := &mir.Br{
 		Target: okLabel,
 	}
 
-	panicInst := &mir.Instruction{
-		Type:  mir.InstCall,
-		Dest:  "",
-		Arg1:  "panic_assert",
-		Args:  []string{message},
-		Label: errorLabel,
-	}
-
-	continueInst := &mir.Instruction{
-		Type:  mir.InstNop,
-		Label: okLabel,
+	panicInst := &mir.Call{
+		Dst:    "",
+		Callee: "panic_assert",
+		Args:   []mir.Value{{Kind: mir.ValConstString, StrVal: message}},
 	}
 
 	// Add instructions to the block
-	block.Instructions = append(block.Instructions,
-		branchInst, jumpOkInst, panicInst, continueInst)
+	block.Instr = append(block.Instr,
+		cmpInst, branchInst, jumpOkInst, panicInst)
 }
 
 // GenerateExceptionHandlers generates MIR for all exception handlers
 func (mei *MIRExceptionIntegration) GenerateExceptionHandlers() *mir.Function {
 	function := &mir.Function{
-		Name:   "exception_handlers",
-		Params: []string{},
-		Blocks: []*mir.BasicBlock{},
+		Name:       "exception_handlers",
+		Parameters: []mir.Value{},
+		Blocks:     []*mir.BasicBlock{},
 	}
 
 	// Create main handler block
 	mainBlock := &mir.BasicBlock{
-		Label:        "exception_handlers",
-		Instructions: []*mir.Instruction{},
+		Name:  "exception_handlers",
+		Instr: []mir.Instr{},
 	}
 
 	// Bounds check handler
 	boundsBlock := &mir.BasicBlock{
-		Label: "panic_bounds_check",
-		Instructions: []*mir.Instruction{
-			{
-				Type: mir.InstCall,
-				Dest: "",
-				Arg1: "runtime_panic",
-				Args: []string{"bounds_check_msg"},
+		Name: "panic_bounds_check",
+		Instr: []mir.Instr{
+			&mir.Call{
+				Dst:    "",
+				Callee: "runtime_panic",
+				Args: []mir.Value{
+					{Kind: mir.ValConstString, StrVal: "bounds_check_msg"},
+				},
 			},
-			{
-				Type: mir.InstReturn,
-			},
+			&mir.Ret{Val: nil},
 		},
 	}
 
 	// Null pointer handler
 	nullBlock := &mir.BasicBlock{
-		Label: "panic_null_pointer",
-		Instructions: []*mir.Instruction{
-			{
-				Type: mir.InstCall,
-				Dest: "",
-				Arg1: "runtime_panic",
-				Args: []string{"null_pointer_msg"},
+		Name: "panic_null_pointer",
+		Instr: []mir.Instr{
+			&mir.Call{
+				Dst:    "",
+				Callee: "runtime_panic",
+				Args: []mir.Value{
+					{Kind: mir.ValConstString, StrVal: "null_pointer_msg"},
+				},
 			},
-			{
-				Type: mir.InstReturn,
-			},
+			&mir.Ret{Val: nil},
 		},
 	}
 
 	// Division by zero handler
 	divBlock := &mir.BasicBlock{
-		Label: "panic_division_by_zero",
-		Instructions: []*mir.Instruction{
-			{
-				Type: mir.InstCall,
-				Dest: "",
-				Arg1: "runtime_panic",
-				Args: []string{"div_zero_msg"},
+		Name: "panic_division_by_zero",
+		Instr: []mir.Instr{
+			&mir.Call{
+				Dst:    "",
+				Callee: "runtime_panic",
+				Args: []mir.Value{
+					{Kind: mir.ValConstString, StrVal: "div_zero_msg"},
+				},
 			},
-			{
-				Type: mir.InstReturn,
-			},
+			&mir.Ret{Val: nil},
 		},
 	}
 
 	// Assertion handler
 	assertBlock := &mir.BasicBlock{
-		Label: "panic_assert",
-		Instructions: []*mir.Instruction{
-			{
-				Type: mir.InstCall,
-				Dest: "",
-				Arg1: "runtime_panic",
-				Args: []string{"assert_msg"},
+		Name: "panic_assert",
+		Instr: []mir.Instr{
+			&mir.Call{
+				Dst:    "",
+				Callee: "runtime_panic",
+				Args: []mir.Value{
+					{Kind: mir.ValConstString, StrVal: "assert_msg"},
+				},
 			},
-			{
-				Type: mir.InstReturn,
-			},
+			&mir.Ret{Val: nil},
 		},
 	}
 
@@ -353,12 +367,13 @@ func (mei *MIRExceptionIntegration) optimizeBlockExceptionChecks(block *mir.Basi
 // removeRedundantBoundsChecks removes redundant bounds checks in a block
 func (mei *MIRExceptionIntegration) removeRedundantBoundsChecks(block *mir.BasicBlock) {
 	seen := make(map[string]bool)
-	optimized := make([]*mir.Instruction, 0, len(block.Instructions))
+	optimized := make([]mir.Instr, 0, len(block.Instr))
 
-	for _, inst := range block.Instructions {
-		// Check if this is a bounds check
-		if inst.Type == mir.InstCmp && strings.Contains(inst.Label, "bounds_check") {
-			key := fmt.Sprintf("bounds_%s_%s", inst.Arg1, inst.Arg2)
+	for _, inst := range block.Instr {
+		// Check if this is a bounds check (Cmp instruction)
+		if cmpInst, ok := inst.(*mir.Cmp); ok {
+			// Use destination variable as key for redundancy check
+			key := fmt.Sprintf("bounds_%s_%s", cmpInst.LHS.String(), cmpInst.RHS.String())
 			if seen[key] {
 				// Skip redundant check
 				continue
@@ -368,26 +383,24 @@ func (mei *MIRExceptionIntegration) removeRedundantBoundsChecks(block *mir.Basic
 		optimized = append(optimized, inst)
 	}
 
-	block.Instructions = optimized
+	block.Instr = optimized
 }
 
 // combineAdjacentNullChecks combines adjacent null checks for the same variable
 func (mei *MIRExceptionIntegration) combineAdjacentNullChecks(block *mir.BasicBlock) {
-	optimized := make([]*mir.Instruction, 0, len(block.Instructions))
+	optimized := make([]mir.Instr, 0, len(block.Instr))
 	i := 0
 
-	for i < len(block.Instructions) {
-		inst := block.Instructions[i]
+	for i < len(block.Instr) {
+		inst := block.Instr[i]
 
-		// Check if this is a null check
-		if inst.Type == mir.InstCmp && strings.Contains(inst.Label, "null_check") {
+		// Check if this is a null check (Cmp instruction)
+		if cmpInst, ok := inst.(*mir.Cmp); ok && cmpInst.Dst != "" {
 			// Look ahead for duplicate null checks
 			j := i + 1
-			for j < len(block.Instructions) {
-				nextInst := block.Instructions[j]
-				if nextInst.Type == mir.InstCmp &&
-					strings.Contains(nextInst.Label, "null_check") &&
-					nextInst.Arg1 == inst.Arg1 {
+			for j < len(block.Instr) {
+				if nextCmp, ok := block.Instr[j].(*mir.Cmp); ok &&
+					nextCmp.LHS.String() == cmpInst.LHS.String() {
 					// Skip duplicate
 					j++
 					continue
@@ -403,7 +416,7 @@ func (mei *MIRExceptionIntegration) combineAdjacentNullChecks(block *mir.BasicBl
 		}
 	}
 
-	block.Instructions = optimized
+	block.Instr = optimized
 }
 
 // optimizeCheckOrdering reorders exception checks for better performance
@@ -411,10 +424,10 @@ func (mei *MIRExceptionIntegration) optimizeCheckOrdering(block *mir.BasicBlock)
 	// This is a simple heuristic: put cheaper checks first
 	// Null checks are generally cheaper than bounds checks
 
-	checkInsts := make([]*mir.Instruction, 0)
-	otherInsts := make([]*mir.Instruction, 0)
+	checkInsts := make([]mir.Instr, 0)
+	otherInsts := make([]mir.Instr, 0)
 
-	for _, inst := range block.Instructions {
+	for _, inst := range block.Instr {
 		if mei.isExceptionCheck(inst) {
 			checkInsts = append(checkInsts, inst)
 		} else {
@@ -432,44 +445,27 @@ func (mei *MIRExceptionIntegration) optimizeCheckOrdering(block *mir.BasicBlock)
 	}
 
 	// Rebuild instructions with optimized order
-	optimized := make([]*mir.Instruction, 0, len(block.Instructions))
+	optimized := make([]mir.Instr, 0, len(block.Instr))
 	optimized = append(optimized, checkInsts...)
 	optimized = append(optimized, otherInsts...)
 
-	block.Instructions = optimized
+	block.Instr = optimized
 }
 
 // isExceptionCheck returns true if the instruction is an exception check
-func (mei *MIRExceptionIntegration) isExceptionCheck(inst *mir.Instruction) bool {
-	if inst.Type != mir.InstCmp {
-		return false
+func (mei *MIRExceptionIntegration) isExceptionCheck(inst mir.Instr) bool {
+	// Check if this is a Cmp instruction (used for exception checks)
+	if _, ok := inst.(*mir.Cmp); ok {
+		return true
 	}
-
-	checkTypes := []string{"bounds_check", "null_check", "div_check", "assert_check"}
-	for _, checkType := range checkTypes {
-		if strings.Contains(inst.Label, checkType) {
-			return true
-		}
-	}
-
 	return false
 }
 
 // getCheckCost returns the relative cost of an exception check
-func (mei *MIRExceptionIntegration) getCheckCost(inst *mir.Instruction) int {
-	if strings.Contains(inst.Label, "null_check") {
-		return 1 // Cheapest
-	}
-	if strings.Contains(inst.Label, "div_check") {
-		return 2
-	}
-	if strings.Contains(inst.Label, "assert_check") {
-		return 3
-	}
-	if strings.Contains(inst.Label, "bounds_check") {
-		return 4 // Most expensive
-	}
-	return 5 // Unknown, place last
+func (mei *MIRExceptionIntegration) getCheckCost(inst mir.Instr) int {
+	// For now, assume all checks have same cost
+	// In a real implementation, we'd analyze the specific check type
+	return 1
 }
 
 // GenerateExceptionMetadata generates metadata for exception handling

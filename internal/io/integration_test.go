@@ -70,10 +70,10 @@ func TestX64Integration(t *testing.T) {
 		t.Fatal("Failed to create x64 integration")
 	}
 
-	// Test file operation assembly generation with proper parameters
-	fileOpenAsm := integration.GenerateFileOpenAsm("rcx", "rdx", "rax")
+	// Test complete file open function generation
+	fileOpenAsm := integration.GenerateCompleteFileOpenFunction()
 	if fileOpenAsm == "" {
-		t.Error("Failed to generate file open assembly")
+		t.Error("Failed to generate complete file open function")
 	} else {
 		// Verify assembly contains basic structure
 		if !strings.Contains(fileOpenAsm, "push rbp") {
@@ -84,9 +84,10 @@ func TestX64Integration(t *testing.T) {
 		}
 	}
 
-	fileCloseAsm := integration.GenerateFileCloseAsm("rcx", "rax")
+	// Test basic file operation assembly generation
+	fileCloseAsm := integration.GenerateCompleteFileCloseFunction()
 	if fileCloseAsm == "" {
-		t.Error("Failed to generate file close assembly")
+		t.Error("Failed to generate complete file close function")
 	} else {
 		if !strings.Contains(fileCloseAsm, "push rbp") {
 			t.Error("File close assembly should contain function prologue")
@@ -363,10 +364,10 @@ func TestX64AssemblyStructure(t *testing.T) {
 		t.Fatal("Failed to create x64 integration")
 	}
 
-	// Test file open assembly structure
-	fileOpenAsm := integration.GenerateFileOpenAsm("rcx", "rdx", "rax")
+	// Test complete file open function structure
+	fileOpenAsm := integration.GenerateCompleteFileOpenFunction()
 	if fileOpenAsm == "" {
-		t.Fatal("Failed to generate file open assembly")
+		t.Fatal("Failed to generate complete file open function")
 	}
 
 	// Verify assembly contains required elements

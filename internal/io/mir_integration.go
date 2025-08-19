@@ -218,7 +218,7 @@ func (iom *IOMIRIntegration) GenerateConsoleReadFunction() *mir.Function {
 // GenerateThreadCreateFunction generates a MIR function for creating threads
 func (iom *IOMIRIntegration) GenerateThreadCreateFunction() *mir.Function {
 	function := &mir.Function{
-		Name: "orizon_thread_create",
+		Name: "orizon_io_thread_create",
 		Parameters: []mir.Value{
 			{Kind: mir.ValRef, Ref: "function_ptr", Class: mir.ClassInt},
 			{Kind: mir.ValRef, Ref: "data", Class: mir.ClassInt},
@@ -309,7 +309,7 @@ func (iom *IOMIRIntegration) GenerateMutexCreateFunction() *mir.Function {
 // GenerateMutexLockFunction generates a MIR function for locking mutexes
 func (iom *IOMIRIntegration) GenerateMutexLockFunction() *mir.Function {
 	function := &mir.Function{
-		Name: "orizon_mutex_lock",
+		Name: "orizon_io_mutex_lock",
 		Parameters: []mir.Value{
 			{Kind: mir.ValRef, Ref: "mutex_handle", Class: mir.ClassInt},
 		},
