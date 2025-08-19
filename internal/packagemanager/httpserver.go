@@ -289,9 +289,31 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 		ah := r.Header.Get("Authorization")
 		const p = "Bearer "
 		if len(ah) <= len(p) || ah[:len(p)] != p {
+			// Log failed authentication attempt
+			globalSecurityLogger.LogAuthenticationAttempt(false, r.Header.Get("User-Agent"), r.RemoteAddr, map[string]interface{}{
+				"reason": "invalid_authorization_header",
+				"method": r.Method,
+				"path":   r.URL.Path,
+			})
 			return false
 		}
-		return ah[len(p):] == token
+		// Use constant-time comparison to prevent timing attacks
+		providedToken := ah[len(p):]
+		if !SecureCompare(providedToken, token) {
+			// Log failed authentication attempt
+			globalSecurityLogger.LogAuthenticationAttempt(false, r.Header.Get("User-Agent"), r.RemoteAddr, map[string]interface{}{
+				"reason": "invalid_token",
+				"method": r.Method,
+				"path":   r.URL.Path,
+			})
+			return false
+		}
+		// Log successful authentication
+		globalSecurityLogger.LogAuthenticationAttempt(true, r.Header.Get("User-Agent"), r.RemoteAddr, map[string]interface{}{
+			"method": r.Method,
+			"path":   r.URL.Path,
+		})
+		return true
 	}
 	// simple health endpoint
 	mux.HandleFunc("/healthz", m.wrap("healthz", cors, func(w http.ResponseWriter, r *http.Request) {
@@ -319,20 +341,72 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+
+		// Validate request headers for security
+		validator := NewInputValidator()
+		headers := make(map[string]string)
+		for name, values := range r.Header {
+			if len(values) > 0 {
+				headers[name] = values[0]
+			}
+		}
+		if err := validator.ValidateHTTPHeaders(headers); err != nil {
+			globalSecurityLogger.LogInputValidationFailure("http_headers", err.Error(), fmt.Sprintf("%v", headers))
+			http.Error(w, "invalid request headers", http.StatusBadRequest)
+			return
+		}
+
 		w = maybeGzip(w, r)
 		// limit request size
 		r.Body = http.MaxBytesReader(w, r.Body, maxPublish)
+
+		// Read and validate JSON payload
+		bodyBytes := make([]byte, maxPublish)
+		n, err := r.Body.Read(bodyBytes)
+		if err != nil && err.Error() != "EOF" {
+			http.Error(w, "failed to read request body", http.StatusBadRequest)
+			return
+		}
+		bodyBytes = bodyBytes[:n]
+
+		// Validate JSON input for security
+		if err := validator.ValidateJSON(bodyBytes); err != nil {
+			globalSecurityLogger.LogInputValidationFailure("json_payload", err.Error(), string(bodyBytes))
+			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
+			return
+		}
+
 		var fb struct {
 			Manifest PackageManifest `json:"manifest"`
 			Data     []byte          `json:"data"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&fb); err != nil {
-			http.Error(w, err.Error(), 400)
+		if err := json.Unmarshal(bodyBytes, &fb); err != nil {
+			http.Error(w, "JSON decode error", 400)
 			return
 		}
+
+		// Validate package manifest fields
+		if err := validator.ValidatePackageID(string(fb.Manifest.Name)); err != nil {
+			globalSecurityLogger.LogInputValidationFailure("package_name", err.Error(), string(fb.Manifest.Name))
+			http.Error(w, "invalid package name", http.StatusBadRequest)
+			return
+		}
+		if err := validator.ValidateVersion(string(fb.Manifest.Version)); err != nil {
+			globalSecurityLogger.LogInputValidationFailure("package_version", err.Error(), string(fb.Manifest.Version))
+			http.Error(w, "invalid package version", http.StatusBadRequest)
+			return
+		}
+
+		// Validate package data size
+		if len(fb.Data) > int(maxPublish) {
+			http.Error(w, "package data too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+
 		cid, err := reg.Publish(r.Context(), PackageBlob{Manifest: fb.Manifest, Data: fb.Data})
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			log.Printf("Publish error: %v", err)
+			http.Error(w, "internal server error", 500)
 			return
 		}
 		// No-store for publish responses
@@ -353,18 +427,33 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+
+		// Validate query parameters
+		validator := NewInputValidator()
+		cidParam := r.URL.Query().Get("cid")
+		if cidParam == "" {
+			http.Error(w, "missing cid parameter", http.StatusBadRequest)
+			return
+		}
+		if err := validator.ValidateCID(cidParam); err != nil {
+			log.Printf("Invalid CID in fetch request: %v", err)
+			http.Error(w, "invalid CID parameter", http.StatusBadRequest)
+			return
+		}
+
 		w = maybeGzip(w, r)
 		if token != "" && mode == "readwrite" {
 			w.Header().Add("Vary", "Authorization")
 		}
-		cid := CID(r.URL.Query().Get("cid"))
+		cid := CID(cidParam)
 		blob, err := reg.Fetch(r.Context(), cid)
 		if err != nil {
 			if err == ErrNotFound {
 				http.NotFound(w, r)
 				return
 			}
-			http.Error(w, err.Error(), 500)
+			log.Printf("Fetch error for CID %s: %v", cidParam, err)
+			http.Error(w, "internal server error", 500)
 			return
 		}
 		// Always require revalidation when caches are involved
@@ -387,17 +476,38 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+
+		// Validate query parameters
+		validator := NewInputValidator()
+		nameParam := r.URL.Query().Get("name")
+		if nameParam == "" {
+			http.Error(w, "missing name parameter", http.StatusBadRequest)
+			return
+		}
+		if err := validator.ValidatePackageID(nameParam); err != nil {
+			log.Printf("Invalid package name in find request: %v", err)
+			http.Error(w, "invalid name parameter", http.StatusBadRequest)
+			return
+		}
+
 		w = maybeGzip(w, r)
 		if token != "" && mode == "readwrite" {
 			w.Header().Add("Vary", "Authorization")
 		}
-		name := PackageID(r.URL.Query().Get("name"))
+		name := PackageID(nameParam)
 		cons := r.URL.Query().Get("constraint")
 		var c *semver.Constraints
 		if cons != "" {
+			// Validate constraint string
+			if err := validator.ValidateString(cons); err != nil {
+				log.Printf("Invalid constraint string in find request: %v", err)
+				http.Error(w, "invalid constraint parameter", http.StatusBadRequest)
+				return
+			}
 			cc, err := semver.NewConstraint(cons)
 			if err != nil {
-				http.Error(w, err.Error(), 400)
+				log.Printf("Semver constraint parse error: %v", err)
+				http.Error(w, "invalid semantic version constraint", 400)
 				return
 			}
 			c = cc
@@ -408,7 +518,8 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 				http.NotFound(w, r)
 				return
 			}
-			http.Error(w, err.Error(), 500)
+			log.Printf("Find error for package %s: %v", nameParam, err)
+			http.Error(w, "internal server error", 500)
 			return
 		}
 		if w.Header().Get("Cache-Control") == "" {
@@ -614,12 +725,25 @@ func writeJSONWithETag(w http.ResponseWriter, r *http.Request, v any) {
 func setSecurityHeaders(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	if r.TLS != nil {
-		// 2 years HSTS
+		// 2 years HSTS with preload and includeSubDomains
 		h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 	}
+	// Prevent MIME type sniffing
 	h.Set("X-Content-Type-Options", "nosniff")
+	// Prevent clickjacking
 	h.Set("X-Frame-Options", "DENY")
+	// Control referrer information
 	h.Set("Referrer-Policy", "no-referrer")
+	// Enable XSS protection in browsers that support it
+	h.Set("X-XSS-Protection", "1; mode=block")
+	// Content Security Policy (restrictive for API)
+	h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none';")
+	// Prevent browsers from caching sensitive responses
+	if !strings.Contains(r.URL.Path, "/healthz") {
+		h.Set("Cache-Control", "no-store, no-cache, must-revalidate, private")
+		h.Set("Pragma", "no-cache")
+		h.Set("Expires", "0")
+	}
 }
 
 // getMaxPublishBytes reads ORIZON_REGISTRY_MAX_PUBLISH_BYTES or returns default 50MB.

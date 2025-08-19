@@ -386,34 +386,105 @@ func (x64 *X64IOIntegration) GenerateExternalDeclarations() string {
 	return asm.String()
 }
 
-// GenerateCompleteFileOpenFunction generates a complete file open function with prologue and epilogue
+// GenerateCompleteFileOpenFunction generates a complete file open function with enhanced prologue and epilogue
 func (x64 *X64IOIntegration) GenerateCompleteFileOpenFunction() string {
 	var asm strings.Builder
 
-	// Function label
+	// Function label with comprehensive documentation
 	asm.WriteString("orizon_io_file_open:\n")
+	asm.WriteString("    ; Complete file open function implementation\n")
+	asm.WriteString("    ; Parameters: file path and open mode via calling convention\n")
+	asm.WriteString("    ; Returns: file handle (INVALID_HANDLE_VALUE on failure)\n")
 
 	// Function prologue
-	asm.WriteString("    push rbp\n")
-	asm.WriteString("    mov rbp, rsp\n")
-	asm.WriteString("    sub rsp, 32        ; Reserve shadow space\n")
+	asm.WriteString("    push rbp           ; Save caller's base pointer\n")
+	asm.WriteString("    mov rbp, rsp       ; Establish new stack frame\n")
+	asm.WriteString("    sub rsp, 48        ; Reserve space for API call and local variables\n")
 
-	// Function body - file open logic
-	asm.WriteString("    ; File open implementation\n")
-	asm.WriteString("    mov rcx, [rbp+16]  ; lpFileName (path parameter)\n")
-	asm.WriteString("    mov rdx, [rbp+24]  ; dwDesiredAccess (mode parameter)\n")
+	// Parameter validation and setup
+	asm.WriteString("    ; File open implementation with parameter validation\n")
+	asm.WriteString("    mov rcx, [rbp+16]  ; Load file path parameter\n")
+	asm.WriteString("    mov rdx, [rbp+24]  ; Load open mode parameter\n")
+	asm.WriteString("    ; Validate parameters before API call\n")
+	asm.WriteString("    test rcx, rcx      ; Check for null path pointer\n")
+	asm.WriteString("    jz   open_error    ; Jump to error handling if null\n")
+
+	// Windows API call setup
+	asm.WriteString("    ; Setup Windows CreateFileA API call parameters\n")
 	asm.WriteString("    mov r8, 3          ; dwShareMode (FILE_SHARE_READ | FILE_SHARE_WRITE)\n")
 	asm.WriteString("    mov r9, 0          ; lpSecurityAttributes (NULL)\n")
 	asm.WriteString("    push 0             ; hTemplateFile (NULL)\n")
 	asm.WriteString("    push 128           ; dwFlagsAndAttributes (FILE_ATTRIBUTE_NORMAL)\n")
 	asm.WriteString("    push 3             ; dwCreationDisposition (OPEN_EXISTING)\n")
-	asm.WriteString("    call CreateFile    ; Windows API call\n")
+	asm.WriteString("    call CreateFileA   ; Windows API call\n")
 	asm.WriteString("    add rsp, 24        ; Clean up pushed parameters\n")
 
+	// Result validation and error handling
+	asm.WriteString("    ; Validate CreateFileA result\n")
+	asm.WriteString("    cmp rax, -1        ; Check for INVALID_HANDLE_VALUE\n")
+	asm.WriteString("    je  open_error     ; Jump to error handling on failure\n")
+	asm.WriteString("    jmp open_done      ; Jump to successful completion\n")
+
+	// Error handling
+	asm.WriteString("open_error:\n")
+	asm.WriteString("    ; Error handling: set invalid handle return value\n")
+	asm.WriteString("    mov rax, -1        ; Set INVALID_HANDLE_VALUE\n")
+
 	// Function epilogue
-	asm.WriteString("    add rsp, 32        ; Restore stack\n")
-	asm.WriteString("    pop rbp\n")
-	asm.WriteString("    ret\n")
+	asm.WriteString("open_done:\n")
+	asm.WriteString("    ; Function cleanup and return\n")
+	asm.WriteString("    add rsp, 48        ; Deallocate local variable space\n")
+	asm.WriteString("    pop rbp            ; Restore caller's base pointer\n")
+	asm.WriteString("    ret                ; Return to caller with handle in rax\n")
+
+	return asm.String()
+}
+
+// GenerateCompleteFileCloseFunction generates a complete file close function with proper prologue and epilogue
+func (x64 *X64IOIntegration) GenerateCompleteFileCloseFunction() string {
+	var asm strings.Builder
+
+	// Function label with proper naming convention
+	asm.WriteString("orizon_io_file_close:\n")
+	asm.WriteString("    ; Complete file close function implementation\n")
+	asm.WriteString("    ; Parameters: file handle passed via calling convention\n")
+	asm.WriteString("    ; Returns: success code (0 = failure, non-zero = success)\n")
+
+	// Function prologue
+	asm.WriteString("    push rbp           ; Save caller's base pointer\n")
+	asm.WriteString("    mov rbp, rsp       ; Establish new stack frame\n")
+	asm.WriteString("    sub rsp, 32        ; Reserve shadow space for Windows API\n")
+
+	// Function body with parameter validation
+	asm.WriteString("    ; File close implementation using Windows CloseHandle API\n")
+	asm.WriteString("    mov rcx, [rbp+16]  ; Load file handle parameter from stack\n")
+	asm.WriteString("    ; Validate handle before API call\n")
+	asm.WriteString("    cmp rcx, 0         ; Check for null handle\n")
+	asm.WriteString("    je  close_error    ; Jump to error handling if null\n")
+	asm.WriteString("    cmp rcx, -1        ; Check for invalid handle value\n")
+	asm.WriteString("    je  close_error    ; Jump to error handling if invalid\n")
+
+	// Call Windows API
+	asm.WriteString("    call CloseHandle   ; Windows API call to close file handle\n")
+	asm.WriteString("    ; rax now contains the result (0 = failure, non-zero = success)\n")
+	asm.WriteString("    test rax, rax      ; Test return value\n")
+	asm.WriteString("    jz   close_error   ; Jump to error handling on failure\n")
+
+	// Success path
+	asm.WriteString("    ; Success path: file successfully closed\n")
+	asm.WriteString("    jmp  close_done    ; Jump to cleanup and return\n")
+
+	// Error handling section
+	asm.WriteString("close_error:\n")
+	asm.WriteString("    ; Error handling: set appropriate error code\n")
+	asm.WriteString("    mov rax, 0         ; Set failure return value\n")
+
+	// Function epilogue
+	asm.WriteString("close_done:\n")
+	asm.WriteString("    ; Function cleanup and return\n")
+	asm.WriteString("    add rsp, 32        ; Deallocate shadow space\n")
+	asm.WriteString("    pop rbp            ; Restore caller's base pointer\n")
+	asm.WriteString("    ret                ; Return to caller with result in rax\n")
 
 	return asm.String()
 }

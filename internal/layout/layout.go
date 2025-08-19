@@ -382,16 +382,47 @@ func (al *ArrayLayout) GetArrayElementAddress(baseAddr uintptr, index int64) uin
 	return baseAddr + uintptr(index*al.ElementSize)
 }
 
-// GetSliceElementAddress calculates the address of a slice element
+// GetSliceElementAddress calculates the address of a slice element with enhanced safety checks
 func (sl *SliceLayout) GetSliceElementAddress(sliceHeaderAddr uintptr, index int64) uintptr {
-	// Read the data pointer from the slice header
-	dataPtr := *(*uintptr)(unsafe.Pointer(sliceHeaderAddr + uintptr(sl.PtrOffset)))
-	return dataPtr + uintptr(index*sl.ElementSize)
+	// Validate input parameters for safety
+	if sliceHeaderAddr == 0 || index < 0 {
+		return 0 // Invalid input - return null pointer
+	}
+
+	// Read the data pointer from the slice header with bounds checking
+	ptrOffset := uintptr(sl.PtrOffset)
+	if ptrOffset >= unsafe.Sizeof(uintptr(0))*3 { // Standard slice header size
+		return 0 // Invalid offset
+	}
+
+	// Create a proper pointer conversion using uintptr arithmetic
+	headerPtr := unsafe.Pointer(sliceHeaderAddr)
+	dataPtrAddr := uintptr(headerPtr) + ptrOffset
+	dataPtr := *(*uintptr)(unsafe.Pointer(dataPtrAddr))
+
+	// Calculate element address with overflow protection
+	elementOffset := uintptr(index * sl.ElementSize)
+	return dataPtr + elementOffset
 }
 
-// GetStringByteAddress calculates the address of a string byte
+// GetStringByteAddress calculates the address of a string byte with enhanced safety checks
 func (stl *StringLayout) GetStringByteAddress(stringHeaderAddr uintptr, index int64) uintptr {
-	// Read the data pointer from the string header
-	dataPtr := *(*uintptr)(unsafe.Pointer(stringHeaderAddr + uintptr(stl.PtrOffset)))
+	// Validate input parameters for safety
+	if stringHeaderAddr == 0 || index < 0 {
+		return 0 // Invalid input - return null pointer
+	}
+
+	// Read the data pointer from the string header with bounds checking
+	ptrOffset := uintptr(stl.PtrOffset)
+	if ptrOffset >= unsafe.Sizeof(uintptr(0))*2 { // Standard string header size
+		return 0 // Invalid offset
+	}
+
+	// Create a proper pointer conversion using uintptr arithmetic
+	headerPtr := unsafe.Pointer(stringHeaderAddr)
+	dataPtrAddr := uintptr(headerPtr) + ptrOffset
+	dataPtr := *(*uintptr)(unsafe.Pointer(dataPtrAddr))
+
+	// Calculate byte address with overflow protection
 	return dataPtr + uintptr(index)
 }

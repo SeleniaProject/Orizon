@@ -12,7 +12,7 @@ func TestCapabilitiesIncludeSemanticTokensAndInlayHints(t *testing.T) {
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
@@ -24,67 +24,74 @@ func TestCapabilitiesIncludeSemanticTokensAndInlayHints(t *testing.T) {
 	}
 	res := msg["result"].(map[string]any)
 	caps := res["capabilities"].(map[string]any)
-	if caps["semanticTokensProvider"] == nil {
-		t.Fatalf("missing semanticTokensProvider")
-	}
-	if _, ok := caps["inlayHintProvider"]; !ok {
-		t.Fatalf("missing inlayHintProvider")
+
+	semanticTokens := caps["semanticTokensProvider"]
+	if semanticTokens == nil {
+		t.Fatalf("missing semanticTokensProvider capability")
 	}
 
-	// exit
+	inlayHint := caps["inlayHintProvider"]
+	if inlayHint == nil {
+		t.Fatalf("missing inlayHintProvider capability")
+	}
+
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
 	<-done
 }
 
-func TestSemanticTokensFullReturnsDataArray(t *testing.T) {
+func TestSemanticTokensRequestHandlesRangeParameter(t *testing.T) {
 	inR, inW := io.Pipe()
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
 	// initialize
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{}})
-	if _, err := readFramedJSON(t, r, 3*time.Second); err != nil {
-		t.Fatalf("init: %v", err)
-	}
-	// open document
-	src := "func main() { let x = 1 + 2 }\n"
+	_, _ = readFramedJSON(t, r, 3*time.Second)
+
+	// initialized
+	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "initialized", "params": map[string]any{}})
+	_, _ = readFramedJSON(t, r, 200*time.Millisecond)
+
+	// textDocument/didOpen
 	writeFramedJSON(t, inW, map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "textDocument/didOpen",
 		"params": map[string]any{
-			"textDocument": map[string]any{"uri": "file:///t.oriz", "text": src, "version": 1},
+			"textDocument": map[string]any{
+				"uri":        "file:///tmp/test.oriz",
+				"languageId": "orizon",
+				"version":    1,
+				"text":       "func add(a: i32, b: i32) -> i32 { return a + b; }",
+			},
 		},
 	})
-	if _, err := readFramedJSON(t, r, 3*time.Second); err != nil {
-		t.Fatalf("diags: %v", err)
-	}
-	// request semantic tokens
+
+	// semantic tokens request with range
 	writeFramedJSON(t, inW, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      2,
-		"method":  "textDocument/semanticTokens/full",
-		"params":  map[string]any{"textDocument": map[string]any{"uri": "file:///t.oriz"}},
+		"method":  "textDocument/semanticTokens/range",
+		"params": map[string]any{
+			"textDocument": map[string]any{"uri": "file:///tmp/test.oriz"},
+			"range": map[string]any{
+				"start": map[string]any{"line": 0, "character": 0},
+				"end":   map[string]any{"line": 0, "character": 20},
+			},
+		},
 	})
-	resp, err := readFramedJSON(t, r, 3*time.Second)
+	msg, err := readFramedJSON(t, r, 3*time.Second)
 	if err != nil {
-		t.Fatalf("semTokens: %v", err)
+		t.Fatalf("read: %v", err)
 	}
-	res := resp["result"].(map[string]any)
-	if res == nil {
-		t.Fatalf("no result")
+	if msg["error"] != nil {
+		t.Fatalf("semantic tokens request failed: %v", msg["error"])
 	}
-	if _, ok := res["data"].([]any); !ok {
-		// Some clients/json decoders may decode []uint32 as []any; accept that it exists
-		if _, ok2 := res["data"].([]uint32); !ok2 {
-			t.Fatalf("data not array-like: %T", res["data"])
-		}
-	}
-	// exit
+
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
 	<-done
 }

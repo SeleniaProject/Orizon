@@ -71,10 +71,19 @@ func TestLSP_DebugCommands_SnapshotAndMessages(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	// LSP server over in-memory pipes
+	// LSP server over in-memory pipes with proper server options
 	pr, pw := io.Pipe()
 	outPr, outPw := io.Pipe()
-	go func() { _ = NewServer(pr, outPw).Run() }()
+
+	// Create server options with appropriate configuration for testing
+	serverOptions := &ServerOptions{
+		EnableDebugIntegration: true,
+		DebugHTTPURL:           srv.URL,
+		MaxDocumentSize:        1024 * 1024, // 1MB for testing
+		CacheSize:              100,
+	}
+
+	go func() { _ = NewServer(pr, outPw, serverOptions).Run() }()
 
 	// initialize with initializationOptions.debugHTTP = srv.URL
 	initReq := map[string]any{
@@ -157,7 +166,16 @@ func TestLSP_DebugCommands_GraphDeadlocksCorrelation(t *testing.T) {
 
 	pr, pw := io.Pipe()
 	outPr, outPw := io.Pipe()
-	go func() { _ = NewServer(pr, outPw).Run() }()
+
+	// Create server options for the second test server instance
+	serverOptions2 := &ServerOptions{
+		EnableDebugIntegration: true,
+		DebugHTTPURL:           srv.URL,
+		MaxDocumentSize:        1024 * 1024,
+		CacheSize:              100,
+	}
+
+	go func() { _ = NewServer(pr, outPw, serverOptions2).Run() }()
 
 	// initialize
 	initReq := map[string]any{

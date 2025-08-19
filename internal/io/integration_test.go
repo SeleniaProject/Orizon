@@ -84,13 +84,24 @@ func TestX64Integration(t *testing.T) {
 		}
 	}
 
-	// Test basic file operation assembly generation
+	// Test basic file operation assembly generation with enhanced validation
 	fileCloseAsm := integration.GenerateCompleteFileCloseFunction()
 	if fileCloseAsm == "" {
 		t.Error("Failed to generate complete file close function")
 	} else {
-		if !strings.Contains(fileCloseAsm, "push rbp") {
-			t.Error("File close assembly should contain function prologue")
+		// Verify assembly contains proper function structure
+		requiredElements := []string{
+			"push rbp",     // Function prologue
+			"mov rbp, rsp", // Stack frame setup
+			"CloseHandle",  // Windows API call
+			"pop rbp",      // Function epilogue restoration
+			"ret",          // Return instruction
+		}
+
+		for _, element := range requiredElements {
+			if !strings.Contains(fileCloseAsm, element) {
+				t.Errorf("File close assembly should contain '%s'", element)
+			}
 		}
 	}
 

@@ -66,7 +66,71 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Security validation
+	validator := NewSecurityValidator()
+
 	inputFile := args[0]
+	if err := validator.ValidateInputFile(inputFile); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Invalid input file: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *debugOut != "" {
+		if err := validator.ValidateOutputPath(*debugOut); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid debug output path: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *smOut != "" {
+		if err := validator.ValidateOutputPath(*smOut); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid sourcemap output path: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *x64Out != "" {
+		if err := validator.ValidateOutputPath(*x64Out); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid x64 output path: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *outELF != "" {
+		if err := validator.ValidateOutputPath(*outELF); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid ELF output path: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *outCOFF != "" {
+		if err := validator.ValidateOutputPath(*outCOFF); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid COFF output path: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *outMachO != "" {
+		if err := validator.ValidateOutputPath(*outMachO); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid Mach-O output path: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *dwarfDir != "" {
+		if err := validator.ValidateOutputPath(*dwarfDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid DWARF output directory: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if *optLevel != "" {
+		if err := validator.ValidateOptimizationLevel(*optLevel); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid optimization level: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	if err := compileFile(inputFile, *debugLexer, *doParse, *optLevel, *emitDebug, *emitSrcMap, *debugOut, *smOut, *dwarfDir, *outELF, *outCOFF, *outMachO, *emitMIR, *emitLIR, *emitX64, *x64Out); err != nil {
 		log.Fatalf("Compilation failed: %v", err)
 	}

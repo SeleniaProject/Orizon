@@ -305,23 +305,43 @@ func (fc *FSCache) Put(key CacheKey, a Artifact) error {
 	for name, data := range a.Files {
 		// compress data
 		tmp := filepath.Join(fc.pathForBlobs(key), name+".gz.tmp")
-		f, err := os.Create(tmp)
+
+		// Use a closure to ensure proper resource cleanup
+		err := func() error {
+			f, err := os.Create(tmp)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				f.Close()
+				// Clean up temp file on error
+				if err != nil {
+					os.Remove(tmp)
+				}
+			}()
+
+			gw := gzip.NewWriter(f)
+			defer gw.Close()
+
+			if _, err = gw.Write(data); err != nil {
+				return err
+			}
+
+			if err = gw.Close(); err != nil {
+				return err
+			}
+
+			if err = f.Close(); err != nil {
+				return err
+			}
+
+			return nil
+		}()
+
 		if err != nil {
 			return err
 		}
-		gw := gzip.NewWriter(f)
-		if _, err := gw.Write(data); err != nil {
-			gw.Close()
-			f.Close()
-			return err
-		}
-		if err := gw.Close(); err != nil {
-			f.Close()
-			return err
-		}
-		if err := f.Close(); err != nil {
-			return err
-		}
+
 		blob := name + ".gz"
 		final := filepath.Join(fc.pathForBlobs(key), blob)
 		if err := os.Rename(tmp, final); err != nil {

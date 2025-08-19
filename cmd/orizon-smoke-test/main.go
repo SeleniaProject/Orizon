@@ -110,7 +110,10 @@ func testFormatter() error {
 		fmtBinary = "orizon-fmt.exe"
 	} else {
 		// Build it
-		cmd := exec.Command("go", "build", "-o", "orizon-fmt.exe", "./cmd/orizon-fmt")
+		cmd, err := globalSecureExecManager.ExecuteSecureGoCommand(context.Background(), "build", "-o", "orizon-fmt.exe", "./cmd/orizon-fmt")
+		if err != nil {
+			return fmt.Errorf("failed to create secure build command: %w", err)
+		}
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to build orizon-fmt: %w", err)
 		}
@@ -119,7 +122,10 @@ func testFormatter() error {
 	}
 
 	// Test formatting
-	cmd := exec.Command(fmtBinary, tmpFile.Name())
+	cmd, err := globalSecureExecManager.ExecuteSecureCommand(context.Background(), fmtBinary, tmpFile.Name())
+	if err != nil {
+		return fmt.Errorf("failed to create secure format command: %w", err)
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("formatter failed: %w", err)
@@ -142,7 +148,10 @@ func testLSPServer() error {
 		lspBinary = "orizon-lsp.exe"
 	} else {
 		// Build it
-		cmd := exec.Command("go", "build", "-o", "orizon-lsp.exe", "./cmd/orizon-lsp")
+		cmd, err := globalSecureExecManager.ExecuteSecureGoCommand(context.Background(), "build", "-o", "orizon-lsp.exe", "./cmd/orizon-lsp")
+		if err != nil {
+			return fmt.Errorf("failed to create secure LSP build command: %w", err)
+		}
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to build orizon-lsp: %w", err)
 		}
@@ -152,9 +161,12 @@ func testLSPServer() error {
 
 	// Start LSP server
 	test := &LSPSmokeTest{}
-	test.cmd = exec.Command(lspBinary)
+	cmd, err := globalSecureExecManager.ExecuteSecureCommand(context.Background(), lspBinary)
+	if err != nil {
+		return fmt.Errorf("failed to create secure LSP command: %w", err)
+	}
+	test.cmd = cmd
 
-	var err error
 	test.stdin, err = test.cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("failed to create stdin pipe: %w", err)
@@ -350,7 +362,10 @@ func testLSPStartup() error {
 		lspBinary = "orizon-lsp.exe"
 	} else {
 		// Build it
-		cmd := exec.Command("go", "build", "-o", "orizon-lsp.exe", "./cmd/orizon-lsp")
+		cmd, err := globalSecureExecManager.ExecuteSecureGoCommand(context.Background(), "build", "-o", "orizon-lsp.exe", "./cmd/orizon-lsp")
+		if err != nil {
+			return fmt.Errorf("failed to create secure LSP build command: %w", err)
+		}
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to build orizon-lsp: %w", err)
 		}
@@ -362,7 +377,10 @@ func testLSPStartup() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, lspBinary)
+	cmd, err := globalSecureExecManager.ExecuteSecureCommand(ctx, lspBinary)
+	if err != nil {
+		return fmt.Errorf("failed to create secure LSP command: %w", err)
+	}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start LSP server: %w", err)
 	}

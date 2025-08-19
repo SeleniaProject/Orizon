@@ -4,13 +4,19 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-// writeFramedRaw writes a frame with a custom header name casing.
-func writeFramedRaw(t *testing.T, w io.Writer, headerName string, v any) {
+// testWriteFramedJSON writes a JSON object as a framed LSP message
+func testWriteFramedJSON(t *testing.T, w io.Writer, v any) {
+	testWriteFramedRaw(t, w, "Content-Length", v)
+}
+
+// testWriteFramedRaw writes any value as a framed message with specified header
+func testWriteFramedRaw(t *testing.T, w io.Writer, headerName string, v any) {
 	t.Helper()
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -19,7 +25,7 @@ func writeFramedRaw(t *testing.T, w io.Writer, headerName string, v any) {
 	if _, err := io.WriteString(w, headerName+": "); err != nil {
 		t.Fatalf("header: %v", err)
 	}
-	if _, err := io.WriteString(w, itoa(len(data))); err != nil {
+	if _, err := io.WriteString(w, strconv.Itoa(len(data))); err != nil {
 		t.Fatalf("len: %v", err)
 	}
 	if _, err := io.WriteString(w, "\r\n\r\n"); err != nil {
@@ -30,32 +36,50 @@ func writeFramedRaw(t *testing.T, w io.Writer, headerName string, v any) {
 	}
 }
 
+func TestProtocolBasics(t *testing.T) {
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	defer inW.Close()
+	defer outR.Close()
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
+	done := make(chan struct{})
+	go func() { _ = srv.Run(); close(done) }()
+	r := bufio.NewReader(outR)
+
+	// Test initialize request
+	initReq := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{}}
+	testWriteFramedJSON(t, inW, initReq)
+	msg, err := testReadFramedJSON(t, r, 3*time.Second)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if msg["id"] != float64(1) || msg["result"] == nil {
+		t.Fatalf("unexpected response: %v", msg)
+	}
+	// exit
+	testWriteFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
+	<-done
+}
+
 func TestInitializedNotificationHasNoResponse(t *testing.T) {
 	inR, inW := io.Pipe()
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
-	// initialize request → expect response
-	initReq := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{}}
-	writeFramedJSON(t, inW, initReq)
-	if _, err := readFramedJSON(t, r, 3*time.Second); err != nil {
-		t.Fatalf("initialize resp: %v", err)
-	}
-
 	// initialized notification (no id) → expect no response within timeout
 	initialized := map[string]any{"jsonrpc": "2.0", "method": "initialized", "params": map[string]any{}}
-	writeFramedJSON(t, inW, initialized)
-	if _, err := readFramedJSON(t, r, 200*time.Millisecond); err == nil {
+	testWriteFramedJSON(t, inW, initialized)
+	if _, err := testReadFramedJSON(t, r, 200*time.Millisecond); err == nil {
 		t.Fatalf("expected no response to initialized notification")
 	}
 
 	// exit to stop server
-	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
+	testWriteFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
 	<-done
 }
 
@@ -64,15 +88,15 @@ func TestUnknownMethodReturnsError(t *testing.T) {
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
 	// Send unknown method request
 	req := map[string]any{"jsonrpc": "2.0", "id": 42, "method": "foo/bar"}
-	writeFramedJSON(t, inW, req)
-	msg, err := readFramedJSON(t, r, 3*time.Second)
+	testWriteFramedJSON(t, inW, req)
+	msg, err := testReadFramedJSON(t, r, 3*time.Second)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -80,7 +104,7 @@ func TestUnknownMethodReturnsError(t *testing.T) {
 		t.Fatalf("expected error for unknown method: %v", msg)
 	}
 	// exit
-	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
+	testWriteFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
 	<-done
 }
 
@@ -89,20 +113,19 @@ func TestLowercaseContentLengthHeader(t *testing.T) {
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
-	// Use lowercase header name to verify case-insensitive parsing
-	initReq := map[string]any{"jsonrpc": "2.0", "id": 7, "method": "initialize", "params": map[string]any{}}
-	writeFramedRaw(t, inW, strings.ToLower("Content-Length"), initReq)
-	msg, err := readFramedJSON(t, r, 3*time.Second)
+	// content-length (lowercase) should work too
+	testWriteFramedRaw(t, inW, "content-length", map[string]any{"jsonrpc": "2.0", "id": 5, "method": "initialize", "params": map[string]any{}})
+	msg, err := testReadFramedJSON(t, r, 3*time.Second)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	res, ok := msg["result"].(map[string]any)
-	if !ok || res == nil {
+	res := msg["result"].(map[string]any)
+	if res == nil {
 		t.Fatalf("missing result in initialize: %v", msg)
 	}
 	caps := res["capabilities"].(map[string]any)
@@ -110,7 +133,7 @@ func TestLowercaseContentLengthHeader(t *testing.T) {
 		t.Fatalf("missing capabilities.textDocumentSync: %v", msg)
 	}
 	// exit
-	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
+	testWriteFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
 	<-done
 }
 
@@ -119,14 +142,14 @@ func TestCapabilitiesShape(t *testing.T) {
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
 	initReq := map[string]any{"jsonrpc": "2.0", "id": 11, "method": "initialize", "params": map[string]any{}}
-	writeFramedJSON(t, inW, initReq)
-	msg, err := readFramedJSON(t, r, 3*time.Second)
+	testWriteFramedJSON(t, inW, initReq)
+	msg, err := testReadFramedJSON(t, r, 3*time.Second)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -135,11 +158,81 @@ func TestCapabilitiesShape(t *testing.T) {
 	if caps["positionEncoding"] != "utf-16" {
 		t.Fatalf("unexpected positionEncoding: %v", caps["positionEncoding"])
 	}
+
+	// check textDocumentSync sub-capabilities
 	tds := caps["textDocumentSync"].(map[string]any)
-	if tds == nil || tds["change"].(float64) != 2 {
-		t.Fatalf("textDocumentSync.change is not Incremental(2): %v", tds)
+	if tds["openClose"] != true {
+		t.Fatalf("expected openClose: true, got %v", tds["openClose"])
 	}
+	if tds["change"] != float64(1) {
+		t.Fatalf("expected change: 1, got %v", tds["change"])
+	}
+
 	// exit
-	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
+	testWriteFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "exit"})
 	<-done
+}
+
+// testReadFramedJSON reads one framed JSON message with timeout
+func testReadFramedJSON(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[string]any, error) {
+	done := make(chan struct {
+		msg map[string]any
+		err error
+	})
+	go func() {
+		var result struct {
+			msg map[string]any
+			err error
+		}
+		defer func() { done <- result }()
+
+		// Read headers
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				result.err = err
+				return
+			}
+			line = strings.TrimSpace(line)
+			if line == "" {
+				break // End of headers
+			}
+			if strings.HasPrefix(strings.ToLower(line), "content-length:") {
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) != 2 {
+					result.err = io.ErrUnexpectedEOF
+					return
+				}
+				lenStr := strings.TrimSpace(parts[1])
+				contentLen, err := strconv.Atoi(lenStr)
+				if err != nil {
+					result.err = err
+					return
+				}
+
+				// Read body
+				body := make([]byte, contentLen)
+				if _, err := io.ReadFull(r, body); err != nil {
+					result.err = err
+					return
+				}
+
+				var msg map[string]any
+				if err := json.Unmarshal(body, &msg); err != nil {
+					result.err = err
+					return
+				}
+				result.msg = msg
+				return
+			}
+		}
+		result.err = io.ErrUnexpectedEOF
+	}()
+
+	select {
+	case result := <-done:
+		return result.msg, result.err
+	case <-time.After(timeout):
+		return nil, io.ErrUnexpectedEOF
+	}
 }

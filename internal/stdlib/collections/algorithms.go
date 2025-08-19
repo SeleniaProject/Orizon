@@ -748,8 +748,12 @@ func (m *AdvancedHashMap[K, V]) tryResize() {
 
 		newMask := uint32(newSize - 1)
 
-		// Rehash all entries
-		for _, bucket := range oldBuckets {
+		// Rehash all entries with proper synchronization to avoid mutex value copying
+		for i := range oldBuckets {
+			// Use index access to avoid copying the mutex-containing bucket struct
+			bucket := &oldBuckets[i]
+			bucket.mu.RLock() // Acquire read lock for safe access
+
 			for _, entry := range bucket.entries {
 				if !entry.deleted {
 					newBucketIdx := entry.hash & newMask
@@ -757,6 +761,8 @@ func (m *AdvancedHashMap[K, V]) tryResize() {
 						newBuckets[newBucketIdx].entries, entry)
 				}
 			}
+
+			bucket.mu.RUnlock() // Release read lock
 		}
 
 		segment.buckets = newBuckets

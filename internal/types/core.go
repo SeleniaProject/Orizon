@@ -4,6 +4,7 @@
 package types
 
 import (
+	"sync"
 	"unsafe"
 
 	"github.com/orizon-lang/orizon/internal/allocator"
@@ -22,8 +23,9 @@ const (
 
 // CoreTypeManager manages core type instances and operations
 type CoreTypeManager struct {
-	allocator  allocator.Allocator
-	stringPool map[string]*OrizonString
+	allocator    allocator.Allocator
+	stringPool   map[string]*OrizonString
+	stringPoolMu sync.RWMutex // Protects stringPool from concurrent access
 }
 
 // GlobalCoreTypeManager is the global instance for core type management
@@ -41,11 +43,13 @@ func InitializeCoreTypes(alloc allocator.Allocator) error {
 // ShutdownCoreTypes cleans up the core type system
 func ShutdownCoreTypes() {
 	if GlobalCoreTypeManager != nil {
-		// Clear string pool
+		// Clear string pool with proper synchronization
+		GlobalCoreTypeManager.stringPoolMu.Lock()
 		for _, str := range GlobalCoreTypeManager.stringPool {
 			str.Destroy()
 		}
 		GlobalCoreTypeManager.stringPool = nil
+		GlobalCoreTypeManager.stringPoolMu.Unlock()
 		GlobalCoreTypeManager = nil
 	}
 }
@@ -225,19 +229,51 @@ func (slice *OrizonSlice) Get(index uintptr) unsafe.Pointer {
 	if index >= slice.length {
 		panic("Index out of bounds")
 	}
+	if slice.typeInfo == nil {
+		panic("Invalid slice: nil typeInfo")
+	}
 	elementSize := slice.typeInfo.Size
-	offset := uintptr(slice.data) + index*elementSize
-	return unsafe.Pointer(offset)
+	if elementSize == 0 {
+		panic("Invalid element size: 0")
+	}
+	// Validate data pointer before pointer arithmetic
+	if slice.data == nil {
+		panic("Null slice data pointer")
+	}
+	// Check for integer overflow in offset calculation
+	if elementSize > 0 && index > ^uintptr(0)/elementSize {
+		panic("Offset calculation would overflow")
+	}
+	// Use unsafe.Add for race detector compatibility
+	return unsafe.Add(slice.data, index*elementSize)
 }
 
 func (slice *OrizonSlice) Set(index uintptr, value unsafe.Pointer) {
 	if index >= slice.length {
 		panic("Index out of bounds")
 	}
+	if slice.typeInfo == nil {
+		panic("Invalid slice: nil typeInfo")
+	}
 	elementSize := slice.typeInfo.Size
-	dest := uintptr(slice.data) + index*elementSize
+	if elementSize == 0 {
+		panic("Invalid element size: 0")
+	}
+	// Validate input pointers for safety
+	if slice.data == nil {
+		panic("Null slice data pointer")
+	}
+	if value == nil {
+		panic("Null value pointer")
+	}
+	// Check for integer overflow in offset calculation
+	if elementSize > 0 && index > ^uintptr(0)/elementSize {
+		panic("Offset calculation would overflow")
+	}
+	// Use unsafe.Add for race detector compatibility
+	dest := unsafe.Add(slice.data, index*elementSize)
 	// Copy value bytes to destination
-	copyBytes(unsafe.Pointer(dest), value, elementSize)
+	copyBytes(dest, value, elementSize)
 }
 
 func (slice *OrizonSlice) Sub(start, end uintptr) *OrizonSlice {
@@ -246,7 +282,7 @@ func (slice *OrizonSlice) Sub(start, end uintptr) *OrizonSlice {
 	}
 
 	elementSize := slice.typeInfo.Size
-	newData := unsafe.Pointer(uintptr(slice.data) + start*elementSize)
+	newData := unsafe.Add(slice.data, start*elementSize)
 	newLength := end - start
 	newCapacity := slice.capacity - start
 
@@ -266,11 +302,14 @@ func NewString(data []byte) *OrizonString {
 		panic("Core type manager not initialized")
 	}
 
-	// Check string pool first
+	// Check string pool first with read lock
 	strKey := string(data)
+	GlobalCoreTypeManager.stringPoolMu.RLock()
 	if pooled, exists := GlobalCoreTypeManager.stringPool[strKey]; exists {
+		GlobalCoreTypeManager.stringPoolMu.RUnlock()
 		return pooled
 	}
+	GlobalCoreTypeManager.stringPoolMu.RUnlock()
 
 	// Allocate memory for string data
 	length := uintptr(len(data))
@@ -280,7 +319,15 @@ func NewString(data []byte) *OrizonString {
 			length: 0,
 			hash:   0,
 		}
+		// Add to pool with write lock
+		GlobalCoreTypeManager.stringPoolMu.Lock()
+		// Double-check pattern to avoid race condition
+		if pooled, exists := GlobalCoreTypeManager.stringPool[strKey]; exists {
+			GlobalCoreTypeManager.stringPoolMu.Unlock()
+			return pooled
+		}
 		GlobalCoreTypeManager.stringPool[strKey] = str
+		GlobalCoreTypeManager.stringPoolMu.Unlock()
 		return str
 	}
 
@@ -298,7 +345,17 @@ func NewString(data []byte) *OrizonString {
 		hash:   hashBytes(data),
 	}
 
+	// Add to pool with write lock
+	GlobalCoreTypeManager.stringPoolMu.Lock()
+	// Double-check pattern to avoid race condition
+	if pooled, exists := GlobalCoreTypeManager.stringPool[strKey]; exists {
+		// Free the allocated memory since we already have this string
+		GlobalCoreTypeManager.allocator.Free(stringData)
+		GlobalCoreTypeManager.stringPoolMu.Unlock()
+		return pooled
+	}
 	GlobalCoreTypeManager.stringPool[strKey] = str
+	GlobalCoreTypeManager.stringPoolMu.Unlock()
 	return str
 }
 
@@ -381,7 +438,7 @@ func (str *OrizonString) Concat(other *OrizonString) *OrizonString {
 	data := make([]byte, newLength)
 
 	copyBytes(unsafe.Pointer(&data[0]), str.data, str.length)
-	copyBytes(unsafe.Pointer(uintptr(unsafe.Pointer(&data[0]))+str.length), other.data, other.length)
+	copyBytes(unsafe.Add(unsafe.Pointer(&data[0]), str.length), other.data, other.length)
 
 	return NewString(data)
 }
@@ -444,18 +501,50 @@ func (vec *OrizonVec) Get(index uintptr) unsafe.Pointer {
 	if index >= vec.length {
 		panic("Index out of bounds")
 	}
+	if vec.typeInfo == nil {
+		panic("Invalid vector: nil typeInfo")
+	}
 	elementSize := vec.typeInfo.Size
-	offset := uintptr(vec.data) + index*elementSize
-	return unsafe.Pointer(offset)
+	if elementSize == 0 {
+		panic("Invalid element size: 0")
+	}
+	// Validate data pointer before pointer arithmetic
+	if vec.data == nil {
+		panic("Null vector data pointer")
+	}
+	// Check for integer overflow in offset calculation
+	if elementSize > 0 && index > ^uintptr(0)/elementSize {
+		panic("Offset calculation would overflow")
+	}
+	// Use unsafe.Add for race detector compatibility
+	return unsafe.Add(vec.data, index*elementSize)
 }
 
 func (vec *OrizonVec) Set(index uintptr, value unsafe.Pointer) {
 	if index >= vec.length {
 		panic("Index out of bounds")
 	}
+	if vec.typeInfo == nil {
+		panic("Invalid vector: nil typeInfo")
+	}
 	elementSize := vec.typeInfo.Size
-	dest := uintptr(vec.data) + index*elementSize
-	copyBytes(unsafe.Pointer(dest), value, elementSize)
+	if elementSize == 0 {
+		panic("Invalid element size: 0")
+	}
+	// Validate input pointers for safety
+	if vec.data == nil {
+		panic("Null vector data pointer")
+	}
+	if value == nil {
+		panic("Null value pointer")
+	}
+	// Check for integer overflow in offset calculation
+	if elementSize > 0 && index > ^uintptr(0)/elementSize {
+		panic("Offset calculation would overflow")
+	}
+	// Use unsafe.Add for race detector compatibility
+	dest := unsafe.Add(vec.data, index*elementSize)
+	copyBytes(dest, value, elementSize)
 }
 
 func (vec *OrizonVec) Push(value unsafe.Pointer) {
@@ -477,8 +566,8 @@ func (vec *OrizonVec) Push(value unsafe.Pointer) {
 	}
 
 	elementSize := vec.typeInfo.Size
-	dest := uintptr(vec.data) + vec.length*elementSize
-	copyBytes(unsafe.Pointer(dest), value, elementSize)
+	dest := unsafe.Add(vec.data, vec.length*elementSize)
+	copyBytes(dest, value, elementSize)
 	vec.length++
 }
 
@@ -486,11 +575,15 @@ func (vec *OrizonVec) Pop() unsafe.Pointer {
 	if vec.length == 0 {
 		panic("Cannot pop from empty vector")
 	}
+	// Validate data pointer before operation
+	if vec.data == nil {
+		panic("Null vector data pointer during pop")
+	}
 
 	vec.length--
 	elementSize := vec.typeInfo.Size
-	lastElement := uintptr(vec.data) + vec.length*elementSize
-	return unsafe.Pointer(lastElement)
+	lastElement := unsafe.Add(vec.data, vec.length*elementSize)
+	return lastElement
 }
 
 func (vec *OrizonVec) Clear() {

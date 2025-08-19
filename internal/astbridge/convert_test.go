@@ -278,20 +278,23 @@ func TestDeclarations_Import_And_Export_RoundTrip(t *testing.T) {
 		},
 	}
 
-	ad1, err := fromParserDecl(pImport)
+	// Create ASTBridge and test its declaration conversion methods
+	bridge := NewASTBridge()
+
+	ad1, err := bridge.declarationConverter.FromParserDeclaration(pImport)
 	if err != nil {
-		t.Fatalf("fromParserDecl import err: %v", err)
+		t.Fatalf("FromParserDeclaration import err: %v", err)
 	}
-	ad2, err := fromParserDecl(pExport)
+	ad2, err := bridge.declarationConverter.FromParserDeclaration(pExport)
 	if err != nil {
-		t.Fatalf("fromParserDecl export err: %v", err)
+		t.Fatalf("FromParserDeclaration export err: %v", err)
 	}
 
-	rd1, err := toParserDecl(ad1)
+	rd1, err := bridge.declarationConverter.ToParserDeclaration(ad1)
 	if err != nil {
 		t.Fatalf("toParserDecl import err: %v", err)
 	}
-	rd2, err := toParserDecl(ad2)
+	rd2, err := bridge.declarationConverter.ToParserDeclaration(ad2)
 	if err != nil {
 		t.Fatalf("toParserDecl export err: %v", err)
 	}

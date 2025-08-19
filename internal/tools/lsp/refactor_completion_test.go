@@ -12,7 +12,7 @@ func TestCompletionResolveAndExtractRefactor(t *testing.T) {
 	outR, outW := io.Pipe()
 	defer inW.Close()
 	defer outR.Close()
-	srv := NewServer(inR, outW)
+	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 	done := make(chan struct{})
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
