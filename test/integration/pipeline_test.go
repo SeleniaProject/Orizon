@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	orizonTesting "github.com/orizon-lang/orizon/internal/testing"
 )
 
-// TestCompilerPipeline tests the entire compiler pipeline
+// TestCompilerPipeline tests the entire compiler pipeline.
 func TestCompilerPipeline(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -87,7 +87,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestCodeGeneration tests code generation quality
+// TestCodeGeneration tests code generation quality.
 func TestCodeGeneration(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -159,7 +159,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestStandardLibrary tests standard library integration
+// TestStandardLibrary tests standard library integration.
 func TestStandardLibrary(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -228,7 +228,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestConcurrency tests concurrency features
+// TestConcurrency tests concurrency features.
 func TestConcurrency(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -316,7 +316,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestInteroperability tests language interoperability
+// TestInteroperability tests language interoperability.
 func TestInteroperability(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -366,7 +366,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestPerformance tests performance characteristics
+// TestPerformance tests performance characteristics.
 func TestPerformance(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -378,7 +378,7 @@ func TestPerformance(t *testing.T) {
 		{
 			Name: "large_compilation",
 			SourceCode: `
-// Generate a large function with many operations
+// Generate a large function with many operations.
 fn large_function() -> i32 {
     let mut result = 0;
     ` + generateLargeFunction(1000) + `
@@ -413,12 +413,14 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// generateLargeFunction generates a large function body for testing
+// generateLargeFunction generates a large function body for testing.
 func generateLargeFunction(size int) string {
 	var body string
+
 	for i := 0; i < size; i++ {
 		digit := i % 10
 		body += "result += " + string(rune('0'+digit)) + ";\n"
 	}
+
 	return body
 }

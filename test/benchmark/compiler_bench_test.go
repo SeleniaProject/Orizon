@@ -1,4 +1,4 @@
-package benchmark
+package benchmark_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	orizonTesting "github.com/orizon-lang/orizon/internal/testing"
 )
 
-// BenchmarkSimpleCompilation benchmarks compilation of simple programs
+// BenchmarkSimpleCompilation benchmarks compilation of simple programs.
 func BenchmarkSimpleCompilation(b *testing.B) {
 	framework, err := orizonTesting.NewBenchmarkFramework(nil)
 	if err != nil {
@@ -25,7 +25,7 @@ fn main() {
 	framework.RunBenchmark(benchmark, b)
 }
 
-// BenchmarkComplexCompilation benchmarks compilation of complex programs
+// BenchmarkComplexCompilation benchmarks compilation of complex programs.
 func BenchmarkComplexCompilation(b *testing.B) {
 	framework, err := orizonTesting.NewBenchmarkFramework(nil)
 	if err != nil {
@@ -86,7 +86,7 @@ fn main() {
 	framework.RunBenchmark(benchmark, b)
 }
 
-// BenchmarkLargeFileCompilation benchmarks compilation of large files
+// BenchmarkLargeFileCompilation benchmarks compilation of large files.
 func BenchmarkLargeFileCompilation(b *testing.B) {
 	framework, err := orizonTesting.NewBenchmarkFramework(nil)
 	if err != nil {
@@ -94,7 +94,7 @@ func BenchmarkLargeFileCompilation(b *testing.B) {
 	}
 	defer framework.Cleanup()
 
-	// Generate a large source file
+	// Generate a large source file.
 	largeSource := generateLargeSource(5000)
 
 	benchmark := &orizonTesting.BenchmarkTest{
@@ -105,7 +105,7 @@ func BenchmarkLargeFileCompilation(b *testing.B) {
 	framework.RunBenchmark(benchmark, b)
 }
 
-// BenchmarkManyFunctionsCompilation benchmarks compilation with many functions
+// BenchmarkManyFunctionsCompilation benchmarks compilation with many functions.
 func BenchmarkManyFunctionsCompilation(b *testing.B) {
 	framework, err := orizonTesting.NewBenchmarkFramework(nil)
 	if err != nil {
@@ -113,7 +113,7 @@ func BenchmarkManyFunctionsCompilation(b *testing.B) {
 	}
 	defer framework.Cleanup()
 
-	// Generate source with many functions
+	// Generate source with many functions.
 	manyFunctionsSource := generateManyFunctions(500)
 
 	benchmark := &orizonTesting.BenchmarkTest{
@@ -124,7 +124,7 @@ func BenchmarkManyFunctionsCompilation(b *testing.B) {
 	framework.RunBenchmark(benchmark, b)
 }
 
-// BenchmarkGenericCompilation benchmarks compilation with generics
+// BenchmarkGenericCompilation benchmarks compilation with generics.
 func BenchmarkGenericCompilation(b *testing.B) {
 	framework, err := orizonTesting.NewBenchmarkFramework(nil)
 	if err != nil {
@@ -193,7 +193,7 @@ fn main() {
 	framework.RunBenchmark(benchmark, b)
 }
 
-// BenchmarkOptimizationLevels benchmarks different optimization levels
+// BenchmarkOptimizationLevels benchmarks different optimization levels.
 func BenchmarkOptimizationLevels(b *testing.B) {
 	sourceCode := `
 fn fibonacci(n: i32) -> i32 {
@@ -213,7 +213,7 @@ fn main() {
 	for _, level := range optimizationLevels {
 		b.Run("optimization_"+level, func(b *testing.B) {
 			config := orizonTesting.DefaultTestConfig()
-			// Note: In a real implementation, you would modify the compiler flags here
+			// Note: In a real implementation, you would modify the compiler flags here.
 			// config.CompilerFlags = []string{"-" + level}
 
 			framework, err := orizonTesting.NewBenchmarkFramework(config)
@@ -232,23 +232,26 @@ fn main() {
 	}
 }
 
-// Helper functions for generating benchmark code
+// Helper functions for generating benchmark code.
 
 func generateLargeSource(lines int) string {
 	var code string
+
 	code += "fn main() {\n"
 	for i := 0; i < lines; i++ {
 		code += "    let var" + string(rune('0'+i%10)) + " = " + string(rune('0'+i%10)) + ";\n"
 	}
+
 	code += "    print(\"Large file compiled\");\n"
 	code += "}\n"
+
 	return code
 }
 
 func generateManyFunctions(count int) string {
 	var code string
 
-	// Generate many small functions
+	// Generate many small functions.
 	for i := 0; i < count; i++ {
 		digit := i % 10
 		code += "fn func" + string(rune('0'+digit)) + "_" + string(rune('0'+(i/10)%10)) + "() -> i32 {\n"
@@ -256,7 +259,7 @@ func generateManyFunctions(count int) string {
 		code += "}\n\n"
 	}
 
-	// Main function that calls some of them
+	// Main function that calls some of them.
 	code += "fn main() {\n"
 	code += "    let sum = func0_0() + func1_0() + func2_0();\n"
 	code += "    print(sum);\n"

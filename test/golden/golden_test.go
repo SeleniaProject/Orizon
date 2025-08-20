@@ -1,4 +1,4 @@
-package golden
+package golden_test
 
 import (
 	"path/filepath"
@@ -7,7 +7,7 @@ import (
 	orizonTesting "github.com/orizon-lang/orizon/internal/testing"
 )
 
-// TestGoldenFiles tests output against golden files
+// TestGoldenFiles tests output against golden files.
 func TestGoldenFiles(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -117,7 +117,7 @@ fn main() {
 	}
 }
 
-// TestUpdateGoldenFiles can be used to update golden files
+// TestUpdateGoldenFiles can be used to update golden files.
 func TestUpdateGoldenFiles(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping golden file update in short mode")
@@ -141,7 +141,7 @@ fn main() {
 			GoldenFile:   filepath.Join(goldenDir, "simple_hello.golden"),
 			UpdateGolden: true,
 		},
-		// Add more tests here when updating golden files
+		// Add more tests here when updating golden files.
 	}
 
 	for _, test := range tests {
