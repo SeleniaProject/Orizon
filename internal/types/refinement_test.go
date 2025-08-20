@@ -283,8 +283,8 @@ func TestPhase2_3_1_RefinementTypes(t *testing.T) {
 	t.Run("ComparisonOperators", func(t *testing.T) {
 		// Test all comparison operators.
 		operators := []struct {
-			expected string
 			op       ComparisonOperator
+			expected string
 		}{
 			{CompOpEQ, "=="},
 			{CompOpNE, "!="},
@@ -305,8 +305,8 @@ func TestPhase2_3_1_RefinementTypes(t *testing.T) {
 	t.Run("LogicalOperators", func(t *testing.T) {
 		// Test all logical operators.
 		operators := []struct {
-			expected string
 			op       LogicalOperator
+			expected string
 		}{
 			{LogOpAnd, "&&"},
 			{LogOpOr, "||"},
