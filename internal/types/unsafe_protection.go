@@ -9,46 +9,46 @@ import (
 	"unsafe"
 )
 
-// UnsafeOperationGuard provides protection for unsafe operations
+// UnsafeOperationGuard provides protection for unsafe operations.
 type UnsafeOperationGuard struct {
-	mutex     sync.RWMutex
-	enabled   bool
 	auditor   *UnsafeAuditor
 	allocator *SafeAllocator
+	mutex     sync.RWMutex
+	enabled   bool
 }
 
-// UnsafeAuditor tracks and validates unsafe operations
+// UnsafeAuditor tracks and validates unsafe operations.
 type UnsafeAuditor struct {
 	operations []UnsafeOperation
 	mutex      sync.RWMutex
 }
 
-// UnsafeOperation represents a tracked unsafe operation
+// UnsafeOperation represents a tracked unsafe operation.
 type UnsafeOperation struct {
-	Type      string
 	Source    unsafe.Pointer
 	Target    unsafe.Pointer
+	Type      string
+	Caller    string
 	Size      uintptr
 	Timestamp int64
-	Caller    string
 	Validated bool
 }
 
-// SafeAllocator provides memory allocation with bounds checking
+// SafeAllocator provides memory allocation with bounds checking.
 type SafeAllocator struct {
 	allocations map[unsafe.Pointer]*AllocationInfo
 	mutex       sync.RWMutex
 }
 
-// AllocationInfo tracks allocated memory regions
+// AllocationInfo tracks allocated memory regions.
 type AllocationInfo struct {
+	Type      reflect.Type
 	Size      uintptr
 	Allocated int64
-	Type      reflect.Type
 	Valid     bool
 }
 
-// NewUnsafeOperationGuard creates a new unsafe operation guard
+// NewUnsafeOperationGuard creates a new unsafe operation guard.
 func NewUnsafeOperationGuard() *UnsafeOperationGuard {
 	return &UnsafeOperationGuard{
 		enabled:   true,
@@ -57,21 +57,21 @@ func NewUnsafeOperationGuard() *UnsafeOperationGuard {
 	}
 }
 
-// NewUnsafeAuditor creates a new unsafe auditor
+// NewUnsafeAuditor creates a new unsafe auditor.
 func NewUnsafeAuditor() *UnsafeAuditor {
 	return &UnsafeAuditor{
 		operations: make([]UnsafeOperation, 0),
 	}
 }
 
-// NewSafeAllocator creates a new safe allocator
+// NewSafeAllocator creates a new safe allocator.
 func NewSafeAllocator() *SafeAllocator {
 	return &SafeAllocator{
 		allocations: make(map[unsafe.Pointer]*AllocationInfo),
 	}
 }
 
-// ValidatePointer validates that a pointer operation is safe
+// ValidatePointer validates that a pointer operation is safe.
 func (guard *UnsafeOperationGuard) ValidatePointer(ptr unsafe.Pointer, size uintptr, operation string) error {
 	if !guard.enabled {
 		return nil
@@ -80,12 +80,12 @@ func (guard *UnsafeOperationGuard) ValidatePointer(ptr unsafe.Pointer, size uint
 	guard.mutex.RLock()
 	defer guard.mutex.RUnlock()
 
-	// Check if pointer is in valid allocation
+	// Check if pointer is in valid allocation.
 	if !guard.allocator.IsValidPointer(ptr, size) {
 		pc, _, _, _ := runtime.Caller(1)
 		caller := runtime.FuncForPC(pc).Name()
 
-		// Log the unsafe operation
+		// Log the unsafe operation.
 		guard.auditor.LogOperation(UnsafeOperation{
 			Type:      operation,
 			Source:    ptr,
@@ -103,7 +103,7 @@ func (guard *UnsafeOperationGuard) ValidatePointer(ptr unsafe.Pointer, size uint
 		}
 	}
 
-	// Log successful validation
+	// Log successful validation.
 	pc, _, _, _ := runtime.Caller(1)
 	caller := runtime.FuncForPC(pc).Name()
 	guard.auditor.LogOperation(UnsafeOperation{
@@ -118,12 +118,12 @@ func (guard *UnsafeOperationGuard) ValidatePointer(ptr unsafe.Pointer, size uint
 	return nil
 }
 
-// UnsafeOperationError represents an unsafe operation error
+// UnsafeOperationError represents an unsafe operation error.
 type UnsafeOperationError struct {
-	Operation string
 	Pointer   unsafe.Pointer
-	Size      uintptr
+	Operation string
 	Caller    string
+	Size      uintptr
 }
 
 func (e *UnsafeOperationError) Error() string {
@@ -131,22 +131,25 @@ func (e *UnsafeOperationError) Error() string {
 		e.Operation, e.Pointer, e.Size, e.Caller)
 }
 
-// SafePointerCast performs a validated pointer cast
+// SafePointerCast performs a validated pointer cast.
 func (guard *UnsafeOperationGuard) SafePointerCast(ptr unsafe.Pointer, targetSize uintptr) (unsafe.Pointer, error) {
 	if err := guard.ValidatePointer(ptr, targetSize, "pointer_cast"); err != nil {
 		return nil, err
 	}
+
 	return ptr, nil
 }
 
-// SafeSliceFromPointer creates a slice from a pointer with bounds checking
-func (guard *UnsafeOperationGuard) SafeSliceFromPointer(ptr unsafe.Pointer, length, capacity uintptr, elementSize uintptr) (unsafe.Pointer, error) {
+// SafeSliceFromPointer creates a slice from a pointer with bounds checking.
+func (guard *UnsafeOperationGuard) SafeSliceFromPointer(
+	ptr unsafe.Pointer, length, capacity uintptr, elementSize uintptr,
+) (unsafe.Pointer, error) {
 	totalSize := capacity * elementSize
 	if err := guard.ValidatePointer(ptr, totalSize, "slice_from_pointer"); err != nil {
 		return nil, err
 	}
 
-	// Additional validation: ensure length <= capacity
+	// Additional validation: ensure length <= capacity.
 	if length > capacity {
 		return nil, &UnsafeOperationError{
 			Operation: "slice_from_pointer",
@@ -159,46 +162,49 @@ func (guard *UnsafeOperationGuard) SafeSliceFromPointer(ptr unsafe.Pointer, leng
 	return ptr, nil
 }
 
-// LogOperation logs an unsafe operation for auditing
+// LogOperation logs an unsafe operation for auditing.
 func (auditor *UnsafeAuditor) LogOperation(op UnsafeOperation) {
 	auditor.mutex.Lock()
 	defer auditor.mutex.Unlock()
 
 	auditor.operations = append(auditor.operations, op)
 
-	// Limit audit log size to prevent memory leaks
+	// Limit audit log size to prevent memory leaks.
 	if len(auditor.operations) > 10000 {
-		// Keep only the latest 5000 operations
+		// Keep only the latest 5000 operations.
 		copy(auditor.operations, auditor.operations[5000:])
 		auditor.operations = auditor.operations[:5000]
 	}
 }
 
-// GetOperations returns a copy of all logged operations
+// GetOperations returns a copy of all logged operations.
 func (auditor *UnsafeAuditor) GetOperations() []UnsafeOperation {
 	auditor.mutex.RLock()
 	defer auditor.mutex.RUnlock()
 
 	operations := make([]UnsafeOperation, len(auditor.operations))
 	copy(operations, auditor.operations)
+
 	return operations
 }
 
-// GetFailedOperations returns operations that failed validation
+// GetFailedOperations returns operations that failed validation.
 func (auditor *UnsafeAuditor) GetFailedOperations() []UnsafeOperation {
 	auditor.mutex.RLock()
 	defer auditor.mutex.RUnlock()
 
 	var failed []UnsafeOperation
+
 	for _, op := range auditor.operations {
 		if !op.Validated {
 			failed = append(failed, op)
 		}
 	}
+
 	return failed
 }
 
-// RegisterAllocation registers a memory allocation
+// RegisterAllocation registers a memory allocation.
 func (allocator *SafeAllocator) RegisterAllocation(ptr unsafe.Pointer, size uintptr, typ reflect.Type) {
 	allocator.mutex.Lock()
 	defer allocator.mutex.Unlock()
@@ -211,18 +217,19 @@ func (allocator *SafeAllocator) RegisterAllocation(ptr unsafe.Pointer, size uint
 	}
 }
 
-// UnregisterAllocation unregisters a memory allocation
+// UnregisterAllocation unregisters a memory allocation.
 func (allocator *SafeAllocator) UnregisterAllocation(ptr unsafe.Pointer) {
 	allocator.mutex.Lock()
 	defer allocator.mutex.Unlock()
 
 	if info, exists := allocator.allocations[ptr]; exists {
 		info.Valid = false
+
 		delete(allocator.allocations, ptr)
 	}
 }
 
-// IsValidPointer checks if a pointer is valid for the given size
+// IsValidPointer checks if a pointer is valid for the given size.
 func (allocator *SafeAllocator) IsValidPointer(ptr unsafe.Pointer, size uintptr) bool {
 	if ptr == nil {
 		return size == 0
@@ -231,21 +238,21 @@ func (allocator *SafeAllocator) IsValidPointer(ptr unsafe.Pointer, size uintptr)
 	allocator.mutex.RLock()
 	defer allocator.mutex.RUnlock()
 
-	// Check if the pointer is within any registered allocation
+	// Check if the pointer is within any registered allocation.
 	for allocPtr, info := range allocator.allocations {
 		if !info.Valid {
 			continue
 		}
 
-		// Calculate the range of the allocation
+		// Calculate the range of the allocation.
 		allocStart := uintptr(allocPtr)
 		allocEnd := allocStart + info.Size
 
-		// Calculate the range of the requested access
+		// Calculate the range of the requested access.
 		accessStart := uintptr(ptr)
 		accessEnd := accessStart + size
 
-		// Check if the access is entirely within the allocation
+		// Check if the access is entirely within the allocation.
 		if accessStart >= allocStart && accessEnd <= allocEnd {
 			return true
 		}
@@ -254,13 +261,13 @@ func (allocator *SafeAllocator) IsValidPointer(ptr unsafe.Pointer, size uintptr)
 	return false
 }
 
-// GetAllocationInfo returns information about an allocation
+// GetAllocationInfo returns information about an allocation.
 func (allocator *SafeAllocator) GetAllocationInfo(ptr unsafe.Pointer) *AllocationInfo {
 	allocator.mutex.RLock()
 	defer allocator.mutex.RUnlock()
 
 	if info, exists := allocator.allocations[ptr]; exists && info.Valid {
-		// Return a copy to avoid race conditions
+		// Return a copy to avoid race conditions.
 		return &AllocationInfo{
 			Size:      info.Size,
 			Allocated: info.Allocated,
@@ -272,15 +279,17 @@ func (allocator *SafeAllocator) GetAllocationInfo(ptr unsafe.Pointer) *Allocatio
 	return nil
 }
 
-// CleanupInvalidAllocations removes invalid allocations
+// CleanupInvalidAllocations removes invalid allocations.
 func (allocator *SafeAllocator) CleanupInvalidAllocations() int {
 	allocator.mutex.Lock()
 	defer allocator.mutex.Unlock()
 
 	cleaned := 0
+
 	for ptr, info := range allocator.allocations {
 		if !info.Valid {
 			delete(allocator.allocations, ptr)
+
 			cleaned++
 		}
 	}
@@ -288,7 +297,7 @@ func (allocator *SafeAllocator) CleanupInvalidAllocations() int {
 	return cleaned
 }
 
-// Enhanced slice operations with safety checks
+// Enhanced slice operations with safety checks.
 func (slice *OrizonSlice) SafeGet(index uintptr, guard *UnsafeOperationGuard) (unsafe.Pointer, error) {
 	if slice.typeInfo == nil {
 		return nil, &UnsafeOperationError{
@@ -346,6 +355,7 @@ func (slice *OrizonSlice) SafeSet(index uintptr, value unsafe.Pointer, guard *Un
 		if err := guard.ValidatePointer(slice.data, offset+elementSize, "slice_set"); err != nil {
 			return err
 		}
+
 		if err := guard.ValidatePointer(value, elementSize, "slice_set_value"); err != nil {
 			return err
 		}
@@ -356,6 +366,3 @@ func (slice *OrizonSlice) SafeSet(index uintptr, value unsafe.Pointer, guard *Un
 
 	return nil
 }
-
-// Global unsafe operation guard
-var globalUnsafeGuard = NewUnsafeOperationGuard()
