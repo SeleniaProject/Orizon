@@ -6,7 +6,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// createOptimizationTestSpan creates a basic position span for optimization testing
+// createOptimizationTestSpan creates a basic position span for optimization testing.
 func createOptimizationTestSpan(line, col int) position.Span {
 	return position.Span{
 		Start: position.Position{Filename: "test.oriz", Line: line, Column: col},
@@ -14,11 +14,11 @@ func createOptimizationTestSpan(line, col int) position.Span {
 	}
 }
 
-// TestOptimizationPipeline tests the basic optimization pipeline functionality
+// TestOptimizationPipeline tests the basic optimization pipeline functionality.
 func TestOptimizationPipeline(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
-	// Create a simple program with optimization opportunities
+	// Create a simple program with optimization opportunities.
 	left := &Literal{Span: span, Kind: LiteralInteger, Value: 1, Raw: "1"}
 	right := &Literal{Span: span, Kind: LiteralInteger, Value: 2, Raw: "2"}
 	expr := &BinaryExpression{
@@ -49,7 +49,7 @@ func TestOptimizationPipeline(t *testing.T) {
 		Declarations: []Declaration{fn},
 	}
 
-	// Create and run optimization pipeline
+	// Create and run optimization pipeline.
 	pipeline := CreateStandardOptimizationPipeline()
 
 	optimized, stats, err := pipeline.Optimize(program)
@@ -70,16 +70,16 @@ func TestOptimizationPipeline(t *testing.T) {
 	}
 }
 
-// TestConstantFoldingPass tests the constant folding optimization pass
+// TestConstantFoldingPass tests the constant folding optimization pass.
 func TestConstantFoldingPass(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
 	tests := []struct {
-		name     string
-		left     *Literal
-		operator Operator
-		right    *Literal
 		expected interface{}
+		left     *Literal
+		right    *Literal
+		name     string
+		operator Operator
 	}{
 		{
 			name:     "Integer addition",
@@ -145,7 +145,7 @@ func TestConstantFoldingPass(t *testing.T) {
 				t.Error("Expected constant to be folded")
 			}
 
-			// Check if result is a literal with the expected value
+			// Check if result is a literal with the expected value.
 			if lit, ok := result.(*Literal); ok {
 				if lit.Value != test.expected {
 					t.Errorf("Expected %v, got %v", test.expected, lit.Value)
@@ -157,11 +157,11 @@ func TestConstantFoldingPass(t *testing.T) {
 	}
 }
 
-// TestDeadCodeEliminationPass tests the dead code elimination optimization pass
+// TestDeadCodeEliminationPass tests the dead code elimination optimization pass.
 func TestDeadCodeEliminationPass(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
-	// Create a block with unreachable code after return
+	// Create a block with unreachable code after return.
 	returnStmt := &ReturnStatement{
 		Span:  span,
 		Value: &Literal{Span: span, Kind: LiteralInteger, Value: 42, Raw: "42"},
@@ -188,7 +188,7 @@ func TestDeadCodeEliminationPass(t *testing.T) {
 		t.Error("Expected dead code to be removed")
 	}
 
-	// Check if unreachable statement was removed
+	// Check if unreachable statement was removed.
 	if resultBlock, ok := result.(*BlockStatement); ok {
 		if len(resultBlock.Statements) != 1 {
 			t.Errorf("Expected 1 statement after dead code removal, got %d", len(resultBlock.Statements))
@@ -198,11 +198,11 @@ func TestDeadCodeEliminationPass(t *testing.T) {
 	}
 }
 
-// TestDeadCodeIfElimination tests dead code elimination in if statements
+// TestDeadCodeIfElimination tests dead code elimination in if statements.
 func TestDeadCodeIfElimination(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
-	// Create if statement with constant true condition
+	// Create if statement with constant true condition.
 	trueCond := &Literal{Span: span, Kind: LiteralBoolean, Value: true, Raw: "true"}
 	thenBlock := &BlockStatement{
 		Span: span,
@@ -241,7 +241,7 @@ func TestDeadCodeIfElimination(t *testing.T) {
 		t.Error("Expected dead code to be removed")
 	}
 
-	// Result should be the then block since condition is always true
+	// Result should be the then block since condition is always true.
 	if resultBlock, ok := result.(*BlockStatement); ok {
 		if len(resultBlock.Statements) != 1 {
 			t.Errorf("Expected 1 statement in optimized block, got %d", len(resultBlock.Statements))
@@ -251,14 +251,14 @@ func TestDeadCodeIfElimination(t *testing.T) {
 	}
 }
 
-// TestSyntaxSugarRemovalPass tests the syntax sugar removal optimization pass
+// TestSyntaxSugarRemovalPass tests the syntax sugar removal optimization pass.
 func TestSyntaxSugarRemovalPass(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
 	tests := []struct {
-		name     string
 		expr     *BinaryExpression
-		expected bool // Whether transformation should occur
+		name     string
+		expected bool
 	}{
 		{
 			name: "Boolean AND with true",
@@ -332,11 +332,11 @@ func TestSyntaxSugarRemovalPass(t *testing.T) {
 	}
 }
 
-// TestOptimizationLevels tests different optimization levels
+// TestOptimizationLevels tests different optimization levels.
 func TestOptimizationLevels(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
-	// Create a simple expression that can be optimized
+	// Create a simple expression that can be optimized.
 	expr := &BinaryExpression{
 		Span:     span,
 		Left:     &Literal{Span: span, Kind: LiteralInteger, Value: 5, Raw: "5"},
@@ -375,7 +375,7 @@ func TestOptimizationLevels(t *testing.T) {
 				t.Error("Expected optimization stats")
 			}
 
-			// At basic level and above, constant folding should occur
+			// At basic level and above, constant folding should occur.
 			if test.level >= OptimizationBasic {
 				if stats.ConstantsFolded == 0 {
 					t.Error("Expected constant folding at basic optimization level")
@@ -385,11 +385,11 @@ func TestOptimizationLevels(t *testing.T) {
 	}
 }
 
-// TestAggressiveOptimizationPipeline tests the aggressive optimization pipeline
+// TestAggressiveOptimizationPipeline tests the aggressive optimization pipeline.
 func TestAggressiveOptimizationPipeline(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
-	// Create a complex expression with multiple optimization opportunities
+	// Create a complex expression with multiple optimization opportunities.
 	innerExpr := &BinaryExpression{
 		Span:     span,
 		Left:     &Literal{Span: span, Kind: LiteralInteger, Value: 2, Raw: "2"},
@@ -419,15 +419,15 @@ func TestAggressiveOptimizationPipeline(t *testing.T) {
 		t.Error("Expected optimization stats")
 	}
 
-	// Should have folded constants
+	// Should have folded constants.
 	if stats.ConstantsFolded == 0 {
 		t.Error("Expected constants to be folded")
 	}
 
-	// Syntax sugar removal may or may not occur depending on optimization order
-	// The important thing is that we get the correct final result
+	// Syntax sugar removal may or may not occur depending on optimization order.
+	// The important thing is that we get the correct final result.
 
-	// Final result should be a single literal with value 6
+	// Final result should be a single literal with value 6.
 	if lit, ok := result.(*Literal); ok {
 		var value int64
 		switch v := lit.Value.(type) {
@@ -437,8 +437,10 @@ func TestAggressiveOptimizationPipeline(t *testing.T) {
 			value = v
 		default:
 			t.Errorf("Expected integer value, got %T", lit.Value)
+
 			return
 		}
+
 		if value != 6 {
 			t.Errorf("Expected final value 6, got %d", value)
 		}
@@ -447,11 +449,11 @@ func TestAggressiveOptimizationPipeline(t *testing.T) {
 	}
 }
 
-// TestOptimizationStats tests optimization statistics tracking
+// TestOptimizationStats tests optimization statistics tracking.
 func TestOptimizationStats(t *testing.T) {
 	span := createOptimizationTestSpan(1, 1)
 
-	// Create a program with various optimization opportunities
+	// Create a program with various optimization opportunities.
 	expr1 := &BinaryExpression{
 		Span:     span,
 		Left:     &Literal{Span: span, Kind: LiteralInteger, Value: 1, Raw: "1"},
@@ -490,7 +492,7 @@ func TestOptimizationStats(t *testing.T) {
 		t.Error("Expected optimization stats")
 	}
 
-	// Verify stats collection
+	// Verify stats collection.
 	if stats.NodesVisited == 0 {
 		t.Error("Expected nodes to be visited")
 	}
@@ -499,7 +501,7 @@ func TestOptimizationStats(t *testing.T) {
 		t.Errorf("Expected global stats, got %s", stats.PassName)
 	}
 
-	// Test stats string representation
+	// Test stats string representation.
 	statsStr := stats.String()
 	if statsStr == "" {
 		t.Error("Expected non-empty stats string")

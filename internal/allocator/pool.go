@@ -6,27 +6,27 @@ import (
 	"unsafe"
 )
 
-// PoolAllocatorImpl implements a pool-based allocator for fixed-size objects
+// PoolAllocatorImpl implements a pool-based allocator for fixed-size objects.
 type PoolAllocatorImpl struct {
-	mu       sync.RWMutex
+	fallback Allocator
 	config   *Config
 	pools    map[uintptr]*Pool
-	fallback Allocator
 	stats    PoolStats
+	mu       sync.RWMutex
 }
 
-// Pool represents a memory pool for objects of a specific size
+// Pool represents a memory pool for objects of a specific size.
 type Pool struct {
-	mu        sync.Mutex
-	size      uintptr
 	chunks    [][]byte
 	freeList  []unsafe.Pointer
+	size      uintptr
 	chunkSize uintptr
 	allocated uint64
 	freed     uint64
+	mu        sync.Mutex
 }
 
-// PoolStats provides statistics for pool allocator
+// PoolStats provides statistics for pool allocator.
 type PoolStats struct {
 	TotalPools      int
 	TotalChunks     int
@@ -38,7 +38,7 @@ type PoolStats struct {
 	MissRate        float64
 }
 
-// NewPoolAllocator creates a new pool allocator
+// NewPoolAllocator creates a new pool allocator.
 func NewPoolAllocator(poolSizes []uintptr, config *Config) (*PoolAllocatorImpl, error) {
 	if len(poolSizes) == 0 {
 		return nil, fmt.Errorf("pool sizes cannot be empty")
@@ -46,7 +46,7 @@ func NewPoolAllocator(poolSizes []uintptr, config *Config) (*PoolAllocatorImpl, 
 
 	pools := make(map[uintptr]*Pool)
 
-	// Create pools for each size
+	// Create pools for each size.
 	for _, size := range poolSizes {
 		alignedSize := alignUp(size, config.AlignmentSize)
 		pools[alignedSize] = &Pool{
@@ -56,7 +56,7 @@ func NewPoolAllocator(poolSizes []uintptr, config *Config) (*PoolAllocatorImpl, 
 		}
 	}
 
-	// Create fallback allocator (system allocator)
+	// Create fallback allocator (system allocator).
 	fallback := NewSystemAllocator(config)
 
 	return &PoolAllocatorImpl{
@@ -66,7 +66,7 @@ func NewPoolAllocator(poolSizes []uintptr, config *Config) (*PoolAllocatorImpl, 
 	}, nil
 }
 
-// Alloc allocates memory from the appropriate pool
+// Alloc allocates memory from the appropriate pool.
 func (pa *PoolAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 	if size == 0 {
 		return nil
@@ -74,23 +74,24 @@ func (pa *PoolAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 
 	alignedSize := alignUp(size, pa.config.AlignmentSize)
 
-	// Find the best-fit pool
+	// Find the best-fit pool.
 	poolSize := pa.findBestPool(alignedSize)
 	if poolSize == 0 {
-		// No suitable pool, use fallback allocator
+		// No suitable pool, use fallback allocator.
 		pa.mu.Lock()
 		pa.stats.MissRate++
 		pa.mu.Unlock()
+
 		return pa.fallback.Alloc(size)
 	}
 
-	// Get from pool
+	// Get from pool.
 	pa.mu.RLock()
 	pool, exists := pa.pools[poolSize]
 	pa.mu.RUnlock()
 
 	if !exists {
-		// Should not happen, but fallback to system allocator
+		// Should not happen, but fallback to system allocator.
 		return pa.fallback.Alloc(size)
 	}
 
@@ -106,17 +107,18 @@ func (pa *PoolAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 	return ptr
 }
 
-// Free frees memory back to the appropriate pool
+// Free frees memory back to the appropriate pool.
 func (pa *PoolAllocatorImpl) Free(ptr unsafe.Pointer) {
 	if ptr == nil {
 		return
 	}
 
-	// Try to find which pool this pointer belongs to
+	// Try to find which pool this pointer belongs to.
 	poolSize := pa.findPoolForPointer(ptr)
 	if poolSize == 0 {
-		// Not from our pools, use fallback
+		// Not from our pools, use fallback.
 		pa.fallback.Free(ptr)
+
 		return
 	}
 
@@ -125,8 +127,9 @@ func (pa *PoolAllocatorImpl) Free(ptr unsafe.Pointer) {
 	pa.mu.RUnlock()
 
 	if !exists {
-		// Should not happen
+		// Should not happen.
 		pa.fallback.Free(ptr)
+
 		return
 	}
 
@@ -138,71 +141,77 @@ func (pa *PoolAllocatorImpl) Free(ptr unsafe.Pointer) {
 	pa.mu.Unlock()
 }
 
-// Realloc reallocates memory
+// Realloc reallocates memory.
 func (pa *PoolAllocatorImpl) Realloc(ptr unsafe.Pointer, newSize uintptr) unsafe.Pointer {
 	if ptr == nil {
 		return pa.Alloc(newSize)
 	}
+
 	if newSize == 0 {
 		pa.Free(ptr)
+
 		return nil
 	}
 
-	// Get old pool size
+	// Get old pool size.
 	oldPoolSize := pa.findPoolForPointer(ptr)
 	newAlignedSize := alignUp(newSize, pa.config.AlignmentSize)
 	newPoolSize := pa.findBestPool(newAlignedSize)
 
-	// If same pool size, just return the same pointer
+	// If same pool size, just return the same pointer.
 	if oldPoolSize != 0 && oldPoolSize == newPoolSize {
 		return ptr
 	}
 
-	// Allocate new memory
+	// Allocate new memory.
 	newPtr := pa.Alloc(newSize)
 	if newPtr == nil {
 		return nil
 	}
 
-	// Copy old data
+	// Copy old data.
 	copySize := oldPoolSize
 	if newSize < oldPoolSize {
 		copySize = newSize
 	}
+
 	if copySize > 0 {
 		copyMemory(newPtr, ptr, copySize)
 	}
 
-	// Free old memory
+	// Free old memory.
 	pa.Free(ptr)
 
 	return newPtr
 }
 
-// TotalAllocated returns total allocated bytes
+// TotalAllocated returns total allocated bytes.
 func (pa *PoolAllocatorImpl) TotalAllocated() uintptr {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
+
 	return pa.stats.TotalAllocated + pa.fallback.TotalAllocated()
 }
 
-// TotalFreed returns total freed bytes
+// TotalFreed returns total freed bytes.
 func (pa *PoolAllocatorImpl) TotalFreed() uintptr {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
+
 	return pa.stats.TotalFreed + pa.fallback.TotalFreed()
 }
 
-// ActiveAllocations returns the number of active allocations
+// ActiveAllocations returns the number of active allocations.
 func (pa *PoolAllocatorImpl) ActiveAllocations() int {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
 
 	count := int(pa.stats.AllocationCount - pa.stats.FreeCount)
+
 	return count + pa.fallback.ActiveAllocations()
 }
 
-// Stats returns allocation statistics
+// Stats returns allocation statistics.
 func (pa *PoolAllocatorImpl) Stats() AllocatorStats {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
@@ -221,7 +230,7 @@ func (pa *PoolAllocatorImpl) Stats() AllocatorStats {
 	}
 }
 
-// Reset resets all pools
+// Reset resets all pools.
 func (pa *PoolAllocatorImpl) Reset() {
 	pa.mu.Lock()
 	defer pa.mu.Unlock()
@@ -234,9 +243,9 @@ func (pa *PoolAllocatorImpl) Reset() {
 	pa.fallback.Reset()
 }
 
-// Helper methods
+// Helper methods.
 
-// findBestPool finds the smallest pool that can accommodate the size
+// findBestPool finds the smallest pool that can accommodate the size.
 func (pa *PoolAllocatorImpl) findBestPool(size uintptr) uintptr {
 	var bestSize uintptr = 0
 
@@ -254,14 +263,14 @@ func (pa *PoolAllocatorImpl) findBestPool(size uintptr) uintptr {
 	return bestSize
 }
 
-// findPoolForPointer finds which pool a pointer belongs to (simplified)
+// findPoolForPointer finds which pool a pointer belongs to (simplified).
 func (pa *PoolAllocatorImpl) findPoolForPointer(ptr unsafe.Pointer) uintptr {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
 
-	// In a real implementation, we would track which chunk each pointer comes from
-	// For simplicity, we'll try to guess based on common sizes
-	// This is not reliable and a real implementation would need better tracking
+	// In a real implementation, we would track which chunk each pointer comes from.
+	// For simplicity, we'll try to guess based on common sizes.
+	// This is not reliable and a real implementation would need better tracking.
 
 	for poolSize, pool := range pa.pools {
 		if pool.containsPointer(ptr) {
@@ -272,38 +281,40 @@ func (pa *PoolAllocatorImpl) findPoolForPointer(ptr unsafe.Pointer) uintptr {
 	return 0 // Not found in any pool
 }
 
-// Pool methods
+// Pool methods.
 
-// alloc allocates from this pool
+// alloc allocates from this pool.
 func (p *Pool) alloc() unsafe.Pointer {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Check free list first
+	// Check free list first.
 	if len(p.freeList) > 0 {
 		ptr := p.freeList[len(p.freeList)-1]
 		p.freeList = p.freeList[:len(p.freeList)-1]
 		p.allocated++
+
 		return ptr
 	}
 
-	// Need to allocate new chunk
+	// Need to allocate new chunk.
 	if err := p.allocateChunk(); err != nil {
 		return nil
 	}
 
-	// Try again from free list
+	// Try again from free list.
 	if len(p.freeList) > 0 {
 		ptr := p.freeList[len(p.freeList)-1]
 		p.freeList = p.freeList[:len(p.freeList)-1]
 		p.allocated++
+
 		return ptr
 	}
 
 	return nil
 }
 
-// free returns memory to this pool
+// free returns memory to this pool.
 func (p *Pool) free(ptr unsafe.Pointer) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -312,9 +323,9 @@ func (p *Pool) free(ptr unsafe.Pointer) {
 	p.freed++
 }
 
-// allocateChunk allocates a new chunk for this pool
+// allocateChunk allocates a new chunk for this pool.
 func (p *Pool) allocateChunk() error {
-	// Calculate how many objects fit in a chunk
+	// Calculate how many objects fit in a chunk.
 	objectsPerChunk := p.chunkSize / p.size
 	if objectsPerChunk == 0 {
 		objectsPerChunk = 1
@@ -322,16 +333,16 @@ func (p *Pool) allocateChunk() error {
 
 	actualChunkSize := objectsPerChunk * p.size
 
-	// Allocate chunk
+	// Allocate chunk.
 	chunk := make([]byte, actualChunkSize)
 	if len(chunk) == 0 {
 		return fmt.Errorf("failed to allocate chunk")
 	}
 
-	// Add chunk to list
+	// Add chunk to list.
 	p.chunks = append(p.chunks, chunk)
 
-	// Add all objects in chunk to free list
+	// Add all objects in chunk to free list.
 	for i := uintptr(0); i < objectsPerChunk; i++ {
 		ptr := unsafe.Pointer(&chunk[i*p.size])
 		p.freeList = append(p.freeList, ptr)
@@ -340,7 +351,7 @@ func (p *Pool) allocateChunk() error {
 	return nil
 }
 
-// containsPointer checks if a pointer belongs to this pool (simplified)
+// containsPointer checks if a pointer belongs to this pool (simplified).
 func (p *Pool) containsPointer(ptr unsafe.Pointer) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -352,7 +363,7 @@ func (p *Pool) containsPointer(ptr unsafe.Pointer) bool {
 		chunkEnd := chunkStart + uintptr(len(chunk))
 
 		if ptrAddr >= chunkStart && ptrAddr < chunkEnd {
-			// Check if it's aligned to object boundaries
+			// Check if it's aligned to object boundaries.
 			offset := ptrAddr - chunkStart
 			if offset%p.size == 0 {
 				return true
@@ -363,7 +374,7 @@ func (p *Pool) containsPointer(ptr unsafe.Pointer) bool {
 	return false
 }
 
-// reset resets this pool
+// reset resets this pool.
 func (p *Pool) reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -374,7 +385,7 @@ func (p *Pool) reset() {
 	p.freed = 0
 }
 
-// GetPoolStats returns statistics for this pool allocator
+// GetPoolStats returns statistics for this pool allocator.
 func (pa *PoolAllocatorImpl) GetPoolStats() PoolStats {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
@@ -383,11 +394,13 @@ func (pa *PoolAllocatorImpl) GetPoolStats() PoolStats {
 	stats.TotalPools = len(pa.pools)
 
 	totalChunks := 0
+
 	for _, pool := range pa.pools {
 		pool.mu.Lock()
 		totalChunks += len(pool.chunks)
 		pool.mu.Unlock()
 	}
+
 	stats.TotalChunks = totalChunks
 
 	// Calculate hit/miss rates
@@ -400,12 +413,13 @@ func (pa *PoolAllocatorImpl) GetPoolStats() PoolStats {
 	return stats
 }
 
-// GetPoolInfo returns information about individual pools
+// GetPoolInfo returns information about individual pools.
 func (pa *PoolAllocatorImpl) GetPoolInfo() []PoolInfo {
 	pa.mu.RLock()
 	defer pa.mu.RUnlock()
 
 	var info []PoolInfo
+
 	for size, pool := range pa.pools {
 		pool.mu.Lock()
 		poolInfo := PoolInfo{
@@ -417,13 +431,14 @@ func (pa *PoolAllocatorImpl) GetPoolInfo() []PoolInfo {
 			ActiveObjects: pool.allocated - pool.freed,
 		}
 		pool.mu.Unlock()
+
 		info = append(info, poolInfo)
 	}
 
 	return info
 }
 
-// PoolInfo provides information about a specific pool
+// PoolInfo provides information about a specific pool.
 type PoolInfo struct {
 	Size          uintptr
 	ChunkCount    int
@@ -433,7 +448,7 @@ type PoolInfo struct {
 	ActiveObjects uint64
 }
 
-// AddPool adds a new pool of the specified size
+// AddPool adds a new pool of the specified size.
 func (pa *PoolAllocatorImpl) AddPool(size uintptr) error {
 	alignedSize := alignUp(size, pa.config.AlignmentSize)
 
@@ -453,7 +468,7 @@ func (pa *PoolAllocatorImpl) AddPool(size uintptr) error {
 	return nil
 }
 
-// RemovePool removes a pool of the specified size
+// RemovePool removes a pool of the specified size.
 func (pa *PoolAllocatorImpl) RemovePool(size uintptr) error {
 	alignedSize := alignUp(size, pa.config.AlignmentSize)
 
@@ -465,30 +480,30 @@ func (pa *PoolAllocatorImpl) RemovePool(size uintptr) error {
 		return fmt.Errorf("pool of size %d does not exist", alignedSize)
 	}
 
-	// Reset the pool before removing
+	// Reset the pool before removing.
 	pool.reset()
 	delete(pa.pools, alignedSize)
 
 	return nil
 }
 
-// OptimizePools optimizes pool sizes based on usage patterns
+// OptimizePools optimizes pool sizes based on usage patterns.
 func (pa *PoolAllocatorImpl) OptimizePools() {
-	// This would analyze allocation patterns and adjust pool sizes
-	// For simplicity, this is left as a placeholder
+	// This would analyze allocation patterns and adjust pool sizes.
+	// For simplicity, this is left as a placeholder.
 }
 
-// Defragment attempts to defragment the pools
+// Defragment attempts to defragment the pools.
 func (pa *PoolAllocatorImpl) Defragment() {
 	pa.mu.Lock()
 	defer pa.mu.Unlock()
 
 	for _, pool := range pa.pools {
 		pool.mu.Lock()
-		// Defragmentation logic would go here
-		// For simplicity, we'll just compact the free list
+		// Defragmentation logic would go here.
+		// For simplicity, we'll just compact the free list.
 		if len(pool.freeList) > 1000 {
-			// Keep only the last 500 free objects to reduce memory usage
+			// Keep only the last 500 free objects to reduce memory usage.
 			pool.freeList = pool.freeList[len(pool.freeList)-500:]
 		}
 		pool.mu.Unlock()

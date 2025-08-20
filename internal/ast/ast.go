@@ -1,11 +1,11 @@
 // Package ast defines the Abstract Syntax Tree (AST) nodes for the Orizon programming language.
 // Phase 1.3.1: 型安全AST定義 - Type-safe AST implementation with visitor pattern
-// This package provides strongly-typed AST nodes with comprehensive position tracking
+// This package provides strongly-typed AST nodes with comprehensive position tracking.
 // and transformation infrastructure for the Orizon compiler.
 //
-// Integration with position package provides unified source location tracking,
+// Integration with position package provides unified source location tracking,.
 // enabling precise error reporting, debugging support, and IDE integration.
-// All AST nodes implement the Node interface with visitor pattern support
+// All AST nodes implement the Node interface with visitor pattern support.
 // for extensible traversal and transformation operations.
 package ast
 
@@ -16,48 +16,48 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// Node is the base interface for all AST nodes
-// Every AST node must provide position information for error reporting and debugging
+// Node is the base interface for all AST nodes.
+// Every AST node must provide position information for error reporting and debugging.
 type Node interface {
-	// GetSpan returns the source span covered by this node
+	// GetSpan returns the source span covered by this node.
 	GetSpan() position.Span
-	// String returns a human-readable representation of the node
+	// String returns a human-readable representation of the node.
 	String() string
-	// Accept implements the visitor pattern for AST traversal
+	// Accept implements the visitor pattern for AST traversal.
 	Accept(visitor Visitor) interface{}
 }
 
-// Statement represents all statement nodes in the AST
+// Statement represents all statement nodes in the AST.
 type Statement interface {
 	Node
 	statementNode() // Marker method to distinguish statements
 }
 
-// Expression represents all expression nodes in the AST
+// Expression represents all expression nodes in the AST.
 type Expression interface {
 	Node
 	expressionNode() // Marker method to distinguish expressions
 }
 
-// Declaration represents all declaration nodes in the AST
+// Declaration represents all declaration nodes in the AST.
 type Declaration interface {
 	Node
 	declarationNode() // Marker method to distinguish declarations
 }
 
-// Type represents all type nodes in the AST
+// Type represents all type nodes in the AST.
 type Type interface {
 	Node
 	typeNode() // Marker method to distinguish types
 }
 
-// ===== Program Structure =====
+// ===== Program Structure =====.
 
-// Program represents the root of the AST - a complete Orizon source file
+// Program represents the root of the AST - a complete Orizon source file.
 type Program struct {
-	Span         position.Span // Source span of the entire program
-	Declarations []Declaration // Top-level declarations (functions, types, constants, etc.)
-	Comments     []Comment     // Comments associated with this program
+	Declarations []Declaration
+	Comments     []Comment
+	Span         position.Span
 }
 
 func (p *Program) GetSpan() position.Span { return p.Span }
@@ -66,15 +66,16 @@ func (p *Program) String() string {
 	for _, decl := range p.Declarations {
 		parts = append(parts, decl.String())
 	}
+
 	return strings.Join(parts, "\n")
 }
 func (p *Program) Accept(visitor Visitor) interface{} { return visitor.VisitProgram(p) }
 
-// Comment represents a comment in the source code
+// Comment represents a comment in the source code.
 type Comment struct {
-	Span    position.Span // Source span of the comment
-	Text    string        // Comment text (without delimiters)
-	IsBlock bool          // True for /* */ comments, false for // comments
+	Text    string
+	Span    position.Span
+	IsBlock bool
 }
 
 func (c *Comment) GetSpan() position.Span { return c.Span }
@@ -82,22 +83,23 @@ func (c *Comment) String() string {
 	if c.IsBlock {
 		return fmt.Sprintf("/* %s */", c.Text)
 	}
+
 	return fmt.Sprintf("// %s", c.Text)
 }
 func (c *Comment) Accept(visitor Visitor) interface{} { return visitor.VisitComment(c) }
 
-// ===== Declarations =====
+// ===== Declarations =====.
 
-// FunctionDeclaration represents a function definition
+// FunctionDeclaration represents a function definition.
 type FunctionDeclaration struct {
-	Span       position.Span   // Source span of the entire function
-	Name       *Identifier     // Function name
-	Parameters []*Parameter    // Function parameters
-	ReturnType Type            // Return type (nil for void functions)
-	Body       *BlockStatement // Function body
-	Attributes []Attribute     // Function attributes (async, pure, etc.)
-	IsExported bool            // Whether function is exported (public)
-	Comments   []Comment       // Associated comments
+	ReturnType Type
+	Name       *Identifier
+	Body       *BlockStatement
+	Parameters []*Parameter
+	Attributes []Attribute
+	Comments   []Comment
+	Span       position.Span
+	IsExported bool
 }
 
 func (f *FunctionDeclaration) GetSpan() position.Span { return f.Span }
@@ -121,17 +123,18 @@ func (f *FunctionDeclaration) String() string {
 	return fmt.Sprintf("%sfunc %s(%s)%s %s",
 		exported, f.Name.String(), strings.Join(params, ", "), retType, f.Body.String())
 }
+
 func (f *FunctionDeclaration) Accept(visitor Visitor) interface{} {
 	return visitor.VisitFunctionDeclaration(f)
 }
 
-// Parameter represents a function parameter
+// Parameter represents a function parameter.
 type Parameter struct {
-	Span         position.Span // Source span of the parameter
-	Name         *Identifier   // Parameter name
-	Type         Type          // Parameter type
-	DefaultValue Expression    // Default value (nil if none)
-	IsMutable    bool          // Whether parameter is mutable
+	Type         Type
+	DefaultValue Expression
+	Name         *Identifier
+	Span         position.Span
+	IsMutable    bool
 }
 
 func (p *Parameter) GetSpan() position.Span { return p.Span }
@@ -150,18 +153,18 @@ func (p *Parameter) String() string {
 }
 func (p *Parameter) Accept(visitor Visitor) interface{} { return visitor.VisitParameter(p) }
 
-// VariableDeclaration represents a variable declaration (let, var, const)
+// VariableDeclaration represents a variable declaration (let, var, const).
 type VariableDeclaration struct {
-	Span       position.Span // Source span of the declaration
-	Name       *Identifier   // Variable name
-	Type       Type          // Variable type (nil for inferred)
-	Value      Expression    // Initial value (nil for uninitialized)
-	Kind       VarKind       // Declaration kind (let, var, const)
-	IsMutable  bool          // Whether variable is mutable
-	IsExported bool          // Whether variable is exported
+	Type       Type
+	Value      Expression
+	Name       *Identifier
+	Span       position.Span
+	Kind       VarKind
+	IsMutable  bool
+	IsExported bool
 }
 
-// VarKind represents the kind of variable declaration
+// VarKind represents the kind of variable declaration.
 type VarKind int
 
 const (
@@ -209,18 +212,19 @@ func (v *VariableDeclaration) String() string {
 
 	return fmt.Sprintf("%s%s %s%s%s%s", exported, v.Kind.String(), mut, v.Name.String(), typ, val)
 }
+
 func (v *VariableDeclaration) Accept(visitor Visitor) interface{} {
 	return visitor.VisitVariableDeclaration(v)
 }
 
-// TypeDeclaration represents a type alias or new type definition
+// TypeDeclaration represents a type alias or new type definition.
 type TypeDeclaration struct {
-	Span       position.Span // Source span of the declaration
-	Name       *Identifier   // Type name
-	Type       Type          // Underlying type
-	IsAlias    bool          // True for type alias, false for new type
-	IsExported bool          // Whether type is exported
-	Comments   []Comment     // Associated comments
+	Type       Type
+	Name       *Identifier
+	Comments   []Comment
+	Span       position.Span
+	IsAlias    bool
+	IsExported bool
 }
 
 func (t *TypeDeclaration) GetSpan() position.Span { return t.Span }
@@ -242,7 +246,7 @@ func (t *TypeDeclaration) Accept(visitor Visitor) interface{} { return visitor.V
 
 // ===== New Declarations: Struct / Enum / Trait / Impl =====
 
-// GenericParamKind indicates the kind of generic parameter
+// GenericParamKind indicates the kind of generic parameter.
 type GenericParamKind int
 
 const (
@@ -251,14 +255,14 @@ const (
 	GenericParamLifetime
 )
 
-// GenericParameter models a single generic parameter
+// GenericParameter models a single generic parameter.
 type GenericParameter struct {
+	ConstType Type
+	Name      *Identifier
+	Lifetime  string
+	Bounds    []Type
 	Span      position.Span
 	Kind      GenericParamKind
-	Name      *Identifier // for type/const; nil for lifetime
-	Lifetime  string      // e.g., 'a
-	ConstType Type        // type of const parameter
-	Bounds    []Type      // Optional trait bounds for type parameters
 }
 
 func (g *GenericParameter) GetSpan() position.Span { return g.Span }
@@ -267,23 +271,23 @@ func (g *GenericParameter) Accept(visitor Visitor) interface{} {
 	return visitor.VisitGenericParameter(g)
 }
 
-// WherePredicate represents a where-clause predicate
+// WherePredicate represents a where-clause predicate.
 type WherePredicate struct {
-	Span   position.Span
 	Target Type
 	Bounds []Type
+	Span   position.Span
 }
 
 func (w *WherePredicate) GetSpan() position.Span             { return w.Span }
 func (w *WherePredicate) String() string                     { return "where" }
 func (w *WherePredicate) Accept(visitor Visitor) interface{} { return visitor.VisitWherePredicate(w) }
 
-// StructField represents a field in a struct or enum variant
+// StructField represents a field in a struct or enum variant.
 type StructField struct {
-	Span     position.Span
-	Name     *Identifier // optional in tuple-like variants
 	Type     Type
-	IsPublic bool // for struct fields
+	Name     *Identifier
+	Span     position.Span
+	IsPublic bool
 }
 
 func (sf *StructField) GetSpan() position.Span { return sf.Span }
@@ -291,17 +295,18 @@ func (sf *StructField) String() string {
 	if sf.Name != nil {
 		return fmt.Sprintf("%s: %s", sf.Name.String(), sf.Type.String())
 	}
+
 	return sf.Type.String()
 }
 func (sf *StructField) Accept(visitor Visitor) interface{} { return visitor.VisitStructField(sf) }
 
-// StructDeclaration represents a struct type declaration
+// StructDeclaration represents a struct type declaration.
 type StructDeclaration struct {
-	Span       position.Span
 	Name       *Identifier
 	Fields     []*StructField
-	IsExported bool
 	Generics   []*GenericParameter
+	Span       position.Span
+	IsExported bool
 }
 
 func (d *StructDeclaration) GetSpan() position.Span { return d.Span }
@@ -312,25 +317,25 @@ func (d *StructDeclaration) Accept(visitor Visitor) interface{} {
 func (d *StructDeclaration) statementNode()   {}
 func (d *StructDeclaration) declarationNode() {}
 
-// EnumVariant represents a single variant of an enum
+// EnumVariant represents a single variant of an enum.
 type EnumVariant struct {
-	Span   position.Span
+	Value  Expression
 	Name   *Identifier
-	Fields []*StructField // Optional associated data
-	Value  Expression     // Optional explicit value
+	Fields []*StructField
+	Span   position.Span
 }
 
 func (v *EnumVariant) GetSpan() position.Span             { return v.Span }
 func (v *EnumVariant) String() string                     { return v.Name.String() }
 func (v *EnumVariant) Accept(visitor Visitor) interface{} { return visitor.VisitEnumVariant(v) }
 
-// EnumDeclaration represents an enum type declaration
+// EnumDeclaration represents an enum type declaration.
 type EnumDeclaration struct {
-	Span       position.Span
 	Name       *Identifier
 	Variants   []*EnumVariant
-	IsExported bool
 	Generics   []*GenericParameter
+	Span       position.Span
+	IsExported bool
 }
 
 func (d *EnumDeclaration) GetSpan() position.Span             { return d.Span }
@@ -339,39 +344,39 @@ func (d *EnumDeclaration) Accept(visitor Visitor) interface{} { return visitor.V
 func (d *EnumDeclaration) statementNode()                     {}
 func (d *EnumDeclaration) declarationNode()                   {}
 
-// TraitMethod represents a trait method signature
+// TraitMethod represents a trait method signature.
 type TraitMethod struct {
-	Span       position.Span
+	ReturnType Type
 	Name       *Identifier
 	Parameters []*Parameter
-	ReturnType Type
-	IsAsync    bool
 	Generics   []*GenericParameter
+	Span       position.Span
+	IsAsync    bool
 }
 
 func (m *TraitMethod) GetSpan() position.Span             { return m.Span }
 func (m *TraitMethod) String() string                     { return fmt.Sprintf("fn %s(...)", m.Name.String()) }
 func (m *TraitMethod) Accept(visitor Visitor) interface{} { return visitor.VisitTraitMethod(m) }
 
-// AssociatedType represents a trait associated type item
+// AssociatedType represents a trait associated type item.
 type AssociatedType struct {
-	Span   position.Span
 	Name   *Identifier
 	Bounds []Type
+	Span   position.Span
 }
 
 func (a *AssociatedType) GetSpan() position.Span             { return a.Span }
 func (a *AssociatedType) String() string                     { return fmt.Sprintf("type %s", a.Name.String()) }
 func (a *AssociatedType) Accept(visitor Visitor) interface{} { return visitor.VisitAssociatedType(a) }
 
-// TraitDeclaration represents a trait declaration (method signatures only)
+// TraitDeclaration represents a trait declaration (method signatures only).
 type TraitDeclaration struct {
-	Span            position.Span
 	Name            *Identifier
 	Methods         []*TraitMethod
-	IsExported      bool
 	Generics        []*GenericParameter
 	AssociatedTypes []*AssociatedType
+	Span            position.Span
+	IsExported      bool
 }
 
 func (d *TraitDeclaration) GetSpan() position.Span { return d.Span }
@@ -382,14 +387,14 @@ func (d *TraitDeclaration) Accept(visitor Visitor) interface{} {
 func (d *TraitDeclaration) statementNode()   {}
 func (d *TraitDeclaration) declarationNode() {}
 
-// ImplDeclaration represents an impl block
+// ImplDeclaration represents an impl block.
 type ImplDeclaration struct {
-	Span         position.Span
-	Trait        Type // optional; nil for inherent impl
-	ForType      Type // required
+	Trait        Type
+	ForType      Type
 	Methods      []*FunctionDeclaration
 	Generics     []*GenericParameter
 	WhereClauses []*WherePredicate
+	Span         position.Span
 }
 
 func (i *ImplDeclaration) GetSpan() position.Span             { return i.Span }
@@ -398,12 +403,12 @@ func (i *ImplDeclaration) Accept(visitor Visitor) interface{} { return visitor.V
 func (i *ImplDeclaration) statementNode()                     {}
 func (i *ImplDeclaration) declarationNode()                   {}
 
-// ImportDeclaration represents an import statement at top level
+// ImportDeclaration represents an import statement at top level.
 type ImportDeclaration struct {
-	Span       position.Span // Source span
-	Path       []*Identifier // Module path segments
-	Alias      *Identifier   // Optional alias
-	IsExported bool          // Whether this import is re-exported (pub import)
+	Alias      *Identifier
+	Path       []*Identifier
+	Span       position.Span
+	IsExported bool
 }
 
 func (d *ImportDeclaration) GetSpan() position.Span { return d.Span }
@@ -413,25 +418,29 @@ func (d *ImportDeclaration) String() string {
 	for _, s := range d.Path {
 		segs = append(segs, s.String())
 	}
+
 	alias := ""
 	if d.Alias != nil {
 		alias = " as " + d.Alias.String()
 	}
+
 	exported := ""
 	if d.IsExported {
 		exported = "pub "
 	}
+
 	return fmt.Sprintf("%simport %s%s", exported, strings.Join(segs, "::"), alias)
 }
+
 func (d *ImportDeclaration) Accept(visitor Visitor) interface{} {
 	return visitor.VisitImportDeclaration(d)
 }
 
-// ExportItem represents a single exported symbol with optional alias
+// ExportItem represents a single exported symbol with optional alias.
 type ExportItem struct {
-	Span  position.Span
 	Name  *Identifier
-	Alias *Identifier // optional
+	Alias *Identifier
+	Span  position.Span
 }
 
 func (e *ExportItem) GetSpan() position.Span { return e.Span }
@@ -439,14 +448,15 @@ func (e *ExportItem) String() string {
 	if e.Alias != nil {
 		return fmt.Sprintf("%s as %s", e.Name.String(), e.Alias.String())
 	}
+
 	return e.Name.String()
 }
 func (e *ExportItem) Accept(visitor Visitor) interface{} { return visitor.VisitExportItem(e) }
 
-// ExportDeclaration represents an export statement: export { a, b as c }
+// ExportDeclaration represents an export statement: export { a, b as c }.
 type ExportDeclaration struct {
-	Span  position.Span
 	Items []*ExportItem
+	Span  position.Span
 }
 
 func (d *ExportDeclaration) GetSpan() position.Span { return d.Span }
@@ -456,18 +466,20 @@ func (d *ExportDeclaration) String() string {
 	for _, it := range d.Items {
 		parts = append(parts, it.String())
 	}
+
 	return fmt.Sprintf("export { %s }", strings.Join(parts, ", "))
 }
+
 func (d *ExportDeclaration) Accept(visitor Visitor) interface{} {
 	return visitor.VisitExportDeclaration(d)
 }
 
-// ===== Statements =====
+// ===== Statements =====.
 
-// BlockStatement represents a block of statements enclosed in braces
+// BlockStatement represents a block of statements enclosed in braces.
 type BlockStatement struct {
-	Span       position.Span // Source span including braces
-	Statements []Statement   // Statements in the block
+	Statements []Statement
+	Span       position.Span
 }
 
 func (b *BlockStatement) GetSpan() position.Span { return b.Span }
@@ -481,14 +493,15 @@ func (b *BlockStatement) String() string {
 	for _, stmt := range b.Statements {
 		parts = append(parts, "  "+stmt.String())
 	}
+
 	return fmt.Sprintf("{\n%s\n}", strings.Join(parts, "\n"))
 }
 func (b *BlockStatement) Accept(visitor Visitor) interface{} { return visitor.VisitBlockStatement(b) }
 
-// ExpressionStatement represents a statement consisting of a single expression
+// ExpressionStatement represents a statement consisting of a single expression.
 type ExpressionStatement struct {
-	Span       position.Span // Source span of the statement
-	Expression Expression    // The expression
+	Expression Expression
+	Span       position.Span
 }
 
 func (e *ExpressionStatement) GetSpan() position.Span { return e.Span }
@@ -498,10 +511,10 @@ func (e *ExpressionStatement) Accept(visitor Visitor) interface{} {
 	return visitor.VisitExpressionStatement(e)
 }
 
-// ReturnStatement represents a return statement
+// ReturnStatement represents a return statement.
 type ReturnStatement struct {
-	Span  position.Span // Source span of the statement
-	Value Expression    // Return value (nil for bare return)
+	Value Expression
+	Span  position.Span
 }
 
 func (r *ReturnStatement) GetSpan() position.Span { return r.Span }
@@ -510,16 +523,17 @@ func (r *ReturnStatement) String() string {
 	if r.Value == nil {
 		return "return"
 	}
+
 	return "return " + r.Value.String()
 }
 func (r *ReturnStatement) Accept(visitor Visitor) interface{} { return visitor.VisitReturnStatement(r) }
 
-// IfStatement represents an if-else conditional statement
+// IfStatement represents an if-else conditional statement.
 type IfStatement struct {
-	Span      position.Span   // Source span of the entire if statement
-	Condition Expression      // Condition expression
-	ThenBlock *BlockStatement // Then block
-	ElseBlock Statement       // Else block (may be another IfStatement or BlockStatement)
+	Condition Expression
+	ElseBlock Statement
+	ThenBlock *BlockStatement
+	Span      position.Span
 }
 
 func (i *IfStatement) GetSpan() position.Span { return i.Span }
@@ -529,15 +543,16 @@ func (i *IfStatement) String() string {
 	if i.ElseBlock != nil {
 		result += " else " + i.ElseBlock.String()
 	}
+
 	return result
 }
 func (i *IfStatement) Accept(visitor Visitor) interface{} { return visitor.VisitIfStatement(i) }
 
-// WhileStatement represents a while loop
+// WhileStatement represents a while loop.
 type WhileStatement struct {
-	Span      position.Span   // Source span of the statement
-	Condition Expression      // Loop condition
-	Body      *BlockStatement // Loop body
+	Condition Expression
+	Body      *BlockStatement
+	Span      position.Span
 }
 
 func (w *WhileStatement) GetSpan() position.Span { return w.Span }
@@ -547,12 +562,12 @@ func (w *WhileStatement) String() string {
 }
 func (w *WhileStatement) Accept(visitor Visitor) interface{} { return visitor.VisitWhileStatement(w) }
 
-// ===== Expressions =====
+// ===== Expressions =====.
 
 // Identifier represents an identifier (variable name, function name, etc.)
 type Identifier struct {
-	Span  position.Span // Source span of the identifier
-	Value string        // Identifier name
+	Value string
+	Span  position.Span
 }
 
 func (i *Identifier) GetSpan() position.Span             { return i.Span }
@@ -560,15 +575,15 @@ func (i *Identifier) expressionNode()                    {}
 func (i *Identifier) String() string                     { return i.Value }
 func (i *Identifier) Accept(visitor Visitor) interface{} { return visitor.VisitIdentifier(i) }
 
-// Literal represents literal values (integers, floats, strings, booleans)
+// Literal represents literal values (integers, floats, strings, booleans).
 type Literal struct {
-	Span  position.Span // Source span of the literal
-	Kind  LiteralKind   // Type of literal
-	Value interface{}   // Literal value
-	Raw   string        // Raw source text
+	Value interface{}
+	Raw   string
+	Span  position.Span
+	Kind  LiteralKind
 }
 
-// LiteralKind represents the kind of literal
+// LiteralKind represents the kind of literal.
 type LiteralKind int
 
 const (
@@ -606,10 +621,10 @@ func (l *Literal) Accept(visitor Visitor) interface{} { return visitor.VisitLite
 
 // BinaryExpression represents binary operations (a + b, a == b, etc.)
 type BinaryExpression struct {
-	Span     position.Span // Source span of the entire expression
-	Left     Expression    // Left operand
-	Operator Operator      // Binary operator
-	Right    Expression    // Right operand
+	Left     Expression
+	Right    Expression
+	Span     position.Span
+	Operator Operator
 }
 
 func (b *BinaryExpression) GetSpan() position.Span { return b.Span }
@@ -617,15 +632,16 @@ func (b *BinaryExpression) expressionNode()        {}
 func (b *BinaryExpression) String() string {
 	return fmt.Sprintf("(%s %s %s)", b.Left.String(), b.Operator.String(), b.Right.String())
 }
+
 func (b *BinaryExpression) Accept(visitor Visitor) interface{} {
 	return visitor.VisitBinaryExpression(b)
 }
 
 // UnaryExpression represents unary operations (-a, !a, etc.)
 type UnaryExpression struct {
-	Span     position.Span // Source span of the expression
-	Operator Operator      // Unary operator
-	Operand  Expression    // Operand expression
+	Operand  Expression
+	Span     position.Span
+	Operator Operator
 }
 
 func (u *UnaryExpression) GetSpan() position.Span { return u.Span }
@@ -635,11 +651,11 @@ func (u *UnaryExpression) String() string {
 }
 func (u *UnaryExpression) Accept(visitor Visitor) interface{} { return visitor.VisitUnaryExpression(u) }
 
-// CallExpression represents function calls
+// CallExpression represents function calls.
 type CallExpression struct {
-	Span      position.Span // Source span of the call
-	Function  Expression    // Function being called
-	Arguments []Expression  // Call arguments
+	Function  Expression
+	Arguments []Expression
+	Span      position.Span
 }
 
 func (c *CallExpression) GetSpan() position.Span { return c.Span }
@@ -649,15 +665,16 @@ func (c *CallExpression) String() string {
 	for _, arg := range c.Arguments {
 		args = append(args, arg.String())
 	}
+
 	return fmt.Sprintf("%s(%s)", c.Function.String(), strings.Join(args, ", "))
 }
 func (c *CallExpression) Accept(visitor Visitor) interface{} { return visitor.VisitCallExpression(c) }
 
-// MemberExpression represents member access (obj.field, obj.method())
+// MemberExpression represents member access (obj.field, obj.method()).
 type MemberExpression struct {
-	Span   position.Span // Source span of the member access
-	Object Expression    // Object being accessed
-	Member *Identifier   // Member name
+	Object Expression
+	Member *Identifier
+	Span   position.Span
 }
 
 func (m *MemberExpression) GetSpan() position.Span { return m.Span }
@@ -665,19 +682,20 @@ func (m *MemberExpression) expressionNode()        {}
 func (m *MemberExpression) String() string {
 	return fmt.Sprintf("%s.%s", m.Object.String(), m.Member.String())
 }
+
 func (m *MemberExpression) Accept(visitor Visitor) interface{} {
 	return visitor.VisitMemberExpression(m)
 }
 
-// ===== Types =====
+// ===== Types =====.
 
-// BasicType represents basic built-in types (int, float, string, bool)
+// BasicType represents basic built-in types (int, float, string, bool).
 type BasicType struct {
 	Span position.Span // Source span of the type
 	Kind BasicKind     // Kind of basic type
 }
 
-// BasicKind represents the kind of basic type
+// BasicKind represents the kind of basic type.
 type BasicKind int
 
 const (
@@ -713,10 +731,10 @@ func (b *BasicType) typeNode()                          {}
 func (b *BasicType) String() string                     { return b.Kind.String() }
 func (b *BasicType) Accept(visitor Visitor) interface{} { return visitor.VisitBasicType(b) }
 
-// IdentifierType represents user-defined types referenced by name
+// IdentifierType represents user-defined types referenced by name.
 type IdentifierType struct {
-	Span position.Span // Source span of the type
-	Name *Identifier   // Type name
+	Name *Identifier
+	Span position.Span
 }
 
 func (i *IdentifierType) GetSpan() position.Span             { return i.Span }
@@ -724,13 +742,13 @@ func (i *IdentifierType) typeNode()                          {}
 func (i *IdentifierType) String() string                     { return i.Name.String() }
 func (i *IdentifierType) Accept(visitor Visitor) interface{} { return visitor.VisitIdentifierType(i) }
 
-// ===== Operators =====
+// ===== Operators =====.
 
-// Operator represents all operators in the language
+// Operator represents all operators in the language.
 type Operator int
 
 const (
-	// Arithmetic operators
+	// Arithmetic operators.
 	OpAdd Operator = iota // +
 	OpSub                 // -
 	OpMul                 // *
@@ -738,7 +756,7 @@ const (
 	OpMod                 // %
 	OpPow                 // **
 
-	// Comparison operators
+	// Comparison operators.
 	OpEq // ==
 	OpNe // !=
 	OpLt // <
@@ -746,12 +764,12 @@ const (
 	OpGt // >
 	OpGe // >=
 
-	// Logical operators
+	// Logical operators.
 	OpAnd // &&
 	OpOr  // ||
 	OpNot // !
 
-	// Bitwise operators
+	// Bitwise operators.
 	OpBitAnd // &
 	OpBitOr  // |
 	OpBitXor // ^
@@ -759,7 +777,7 @@ const (
 	OpShl    // <<
 	OpShr    // >>
 
-	// Assignment operators
+	// Assignment operators.
 	OpAssign    // =
 	OpAddAssign // +=
 	OpSubAssign // -=
@@ -829,13 +847,13 @@ func (op Operator) String() string {
 	}
 }
 
-// ===== Attributes =====
+// ===== Attributes =====.
 
-// Attribute represents function or type attributes
+// Attribute represents function or type attributes.
 type Attribute struct {
-	Span position.Span // Source span of the attribute
-	Name *Identifier   // Attribute name
-	Args []Expression  // Attribute arguments
+	Name *Identifier
+	Args []Expression
+	Span position.Span
 }
 
 func (a *Attribute) GetSpan() position.Span { return a.Span }
@@ -848,6 +866,7 @@ func (a *Attribute) String() string {
 	for _, arg := range a.Args {
 		args = append(args, arg.String())
 	}
+
 	return fmt.Sprintf("@%s(%s)", a.Name.String(), strings.Join(args, ", "))
 }
 func (a *Attribute) Accept(visitor Visitor) interface{} { return visitor.VisitAttribute(a) }

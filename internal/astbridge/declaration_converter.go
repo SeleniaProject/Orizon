@@ -9,19 +9,19 @@ import (
 )
 
 // DeclarationConverter handles conversion between AST and parser declaration types.
-// This specialized converter focuses solely on declaration-level transformations,
+// This specialized converter focuses solely on declaration-level transformations,.
 // ensuring separation of concerns and maintainable code organization.
 type DeclarationConverter struct {
-	// typeConverter handles type-specific conversions
+	// typeConverter handles type-specific conversions.
 	typeConverter *TypeConverter
-	// exprConverter handles expression-specific conversions
+	// exprConverter handles expression-specific conversions.
 	exprConverter *ExpressionConverter
-	// stmtConverter handles statement-specific conversions
+	// stmtConverter handles statement-specific conversions.
 	stmtConverter *StatementConverter
 }
 
 // NewDeclarationConverter creates a new declaration converter with all necessary sub-converters.
-// This constructor ensures proper initialization of all dependencies and maintains
+// This constructor ensures proper initialization of all dependencies and maintains.
 // consistent conversion behavior across the entire AST bridge.
 func NewDeclarationConverter() *DeclarationConverter {
 	typeConverter := NewTypeConverter()
@@ -36,7 +36,7 @@ func NewDeclarationConverter() *DeclarationConverter {
 }
 
 // FromParserDeclaration converts a parser.Declaration to ast.Declaration.
-// This method provides comprehensive declaration conversion with proper error handling
+// This method provides comprehensive declaration conversion with proper error handling.
 // and type safety. It delegates to specific conversion methods based on the concrete
 // declaration type, ensuring extensibility and maintainability.
 func (dc *DeclarationConverter) FromParserDeclaration(decl p.Declaration) (ast.Declaration, error) {
@@ -66,20 +66,21 @@ func (dc *DeclarationConverter) FromParserDeclaration(decl p.Declaration) (ast.D
 	case *p.ExportDeclaration:
 		return dc.fromParserExport(concrete)
 	case *p.MacroDefinition:
-		// Macros are compile-time only constructs and are not represented
+		// Macros are compile-time only constructs and are not represented.
 		// in the runtime AST. They are processed during the preprocessing phase.
 		return nil, nil
 	case *p.ExpressionStatement:
-		// Expression statements at the top level are treated as declarations
+		// Expression statements at the top level are treated as declarations.
 		// in certain contexts. We delegate to statement conversion and wrap if needed.
 		stmt, err := dc.stmtConverter.FromParserStatement(concrete)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert expression statement: %w", err)
 		}
+
 		if astDecl, ok := stmt.(ast.Declaration); ok {
 			return astDecl, nil
 		}
-		// Fallback: wrap as a placeholder type declaration for compatibility
+		// Fallback: wrap as a placeholder type declaration for compatibility.
 		return dc.createPlaceholderDeclaration(), nil
 	default:
 		return nil, fmt.Errorf("unsupported parser declaration type: %T", decl)
@@ -87,7 +88,7 @@ func (dc *DeclarationConverter) FromParserDeclaration(decl p.Declaration) (ast.D
 }
 
 // ToParserDeclaration converts an ast.Declaration to parser.Declaration.
-// This method provides the inverse conversion with comprehensive error handling
+// This method provides the inverse conversion with comprehensive error handling.
 // and maintains symmetry with FromParserDeclaration for bidirectional compatibility.
 func (dc *DeclarationConverter) ToParserDeclaration(decl ast.Declaration) (p.Declaration, error) {
 	if decl == nil {
@@ -119,7 +120,7 @@ func (dc *DeclarationConverter) ToParserDeclaration(decl ast.Declaration) (p.Dec
 }
 
 // createPlaceholderDeclaration creates a placeholder type declaration for edge cases.
-// This utility method provides a safe fallback when declaration conversion cannot
+// This utility method provides a safe fallback when declaration conversion cannot.
 // be performed directly, maintaining AST consistency while preserving error information.
 func (dc *DeclarationConverter) createPlaceholderDeclaration() *ast.TypeDeclaration {
 	return &ast.TypeDeclaration{
@@ -139,7 +140,7 @@ func createEmptySpan() position.Span {
 	}
 }
 
-// Stub implementations for specific declaration types (to be expanded)
+// Stub implementations for specific declaration types (to be expanded).
 
 func (dc *DeclarationConverter) fromParserFunction(fn *p.FunctionDeclaration) (*ast.FunctionDeclaration, error) {
 	return nil, fmt.Errorf("function declaration conversion not yet fully implemented")

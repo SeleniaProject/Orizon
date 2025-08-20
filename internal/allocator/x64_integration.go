@@ -5,21 +5,21 @@ import (
 	"strings"
 )
 
-// X64Integration provides x64 assembly integration for memory allocation
+// X64Integration provides x64 assembly integration for memory allocation.
 type X64Integration struct {
-	allocatorType  AllocatorKind
 	config         *Config
 	mirIntegration *MIRIntegration
+	allocatorType  AllocatorKind
 }
 
-// X64Instruction represents an x64 assembly instruction
+// X64Instruction represents an x64 assembly instruction.
 type X64Instruction struct {
 	Mnemonic string
-	Operands []string
 	Comment  string
+	Operands []string
 }
 
-// NewX64Integration creates a new x64 integration
+// NewX64Integration creates a new x64 integration.
 func NewX64Integration(allocatorType AllocatorKind, config *Config) *X64Integration {
 	return &X64Integration{
 		allocatorType:  allocatorType,
@@ -28,7 +28,7 @@ func NewX64Integration(allocatorType AllocatorKind, config *Config) *X64Integrat
 	}
 }
 
-// GenerateAllocCode generates x64 assembly for memory allocation
+// GenerateAllocCode generates x64 assembly for memory allocation.
 func (xi *X64Integration) GenerateAllocCode(sizeReg string, resultReg string) []X64Instruction {
 	var instructions []X64Instruction
 
@@ -46,7 +46,7 @@ func (xi *X64Integration) GenerateAllocCode(sizeReg string, resultReg string) []
 	return instructions
 }
 
-// GenerateFreeCode generates x64 assembly for memory deallocation
+// GenerateFreeCode generates x64 assembly for memory deallocation.
 func (xi *X64Integration) GenerateFreeCode(ptrReg string) []X64Instruction {
 	var instructions []X64Instruction
 
@@ -64,7 +64,7 @@ func (xi *X64Integration) GenerateFreeCode(ptrReg string) []X64Instruction {
 	return instructions
 }
 
-// generateSystemAllocASM generates system allocation assembly
+// generateSystemAllocASM generates system allocation assembly.
 func (xi *X64Integration) generateSystemAllocASM(sizeReg string, resultReg string) []X64Instruction {
 	return []X64Instruction{
 		{
@@ -135,7 +135,7 @@ func (xi *X64Integration) generateSystemAllocASM(sizeReg string, resultReg strin
 	}
 }
 
-// generateArenaAllocASM generates arena allocation assembly
+// generateArenaAllocASM generates arena allocation assembly.
 func (xi *X64Integration) generateArenaAllocASM(sizeReg string, resultReg string) []X64Instruction {
 	return []X64Instruction{
 		{
@@ -211,7 +211,7 @@ func (xi *X64Integration) generateArenaAllocASM(sizeReg string, resultReg string
 	}
 }
 
-// generatePoolAllocASM generates pool allocation assembly
+// generatePoolAllocASM generates pool allocation assembly.
 func (xi *X64Integration) generatePoolAllocASM(sizeReg string, resultReg string) []X64Instruction {
 	return []X64Instruction{
 		{
@@ -257,7 +257,7 @@ func (xi *X64Integration) generatePoolAllocASM(sizeReg string, resultReg string)
 	}
 }
 
-// generateSystemFreeASM generates system free assembly
+// generateSystemFreeASM generates system free assembly.
 func (xi *X64Integration) generateSystemFreeASM(ptrReg string) []X64Instruction {
 	return []X64Instruction{
 		{
@@ -298,7 +298,7 @@ func (xi *X64Integration) generateSystemFreeASM(ptrReg string) []X64Instruction 
 	}
 }
 
-// generateArenaFreeASM generates arena free assembly (no-op)
+// generateArenaFreeASM generates arena free assembly (no-op).
 func (xi *X64Integration) generateArenaFreeASM(ptrReg string) []X64Instruction {
 	return []X64Instruction{
 		{
@@ -309,7 +309,7 @@ func (xi *X64Integration) generateArenaFreeASM(ptrReg string) []X64Instruction {
 	}
 }
 
-// generatePoolFreeASM generates pool free assembly
+// generatePoolFreeASM generates pool free assembly.
 func (xi *X64Integration) generatePoolFreeASM(ptrReg string) []X64Instruction {
 	return []X64Instruction{
 		{
@@ -365,7 +365,7 @@ func (xi *X64Integration) generatePoolFreeASM(ptrReg string) []X64Instruction {
 	}
 }
 
-// GenerateInlinedArenaAlloc generates optimized inline arena allocation
+// GenerateInlinedArenaAlloc generates optimized inline arena allocation.
 func (xi *X64Integration) GenerateInlinedArenaAlloc(size int, resultReg string) []X64Instruction {
 	alignedSize := ((size + int(xi.config.AlignmentSize) - 1) / int(xi.config.AlignmentSize)) * int(xi.config.AlignmentSize)
 
@@ -443,7 +443,7 @@ func (xi *X64Integration) GenerateInlinedArenaAlloc(size int, resultReg string) 
 	}
 }
 
-// GenerateMemoryBarrier generates memory barrier instructions
+// GenerateMemoryBarrier generates memory barrier instructions.
 func (xi *X64Integration) GenerateMemoryBarrier() []X64Instruction {
 	return []X64Instruction{
 		{
@@ -454,7 +454,7 @@ func (xi *X64Integration) GenerateMemoryBarrier() []X64Instruction {
 	}
 }
 
-// GenerateAtomicAlloc generates atomic allocation with memory barriers
+// GenerateAtomicAlloc generates atomic allocation with memory barriers.
 func (xi *X64Integration) GenerateAtomicAlloc(sizeReg string, resultReg string) []X64Instruction {
 	instructions := []X64Instruction{
 		{
@@ -477,7 +477,7 @@ func (xi *X64Integration) GenerateAtomicAlloc(sizeReg string, resultReg string) 
 	return instructions
 }
 
-// GenerateStackAlloc generates stack allocation
+// GenerateStackAlloc generates stack allocation.
 func (xi *X64Integration) GenerateStackAlloc(size int, resultReg string) []X64Instruction {
 	alignedSize := ((size + 15) / 16) * 16 // 16-byte align for stack
 
@@ -495,7 +495,7 @@ func (xi *X64Integration) GenerateStackAlloc(size int, resultReg string) []X64In
 	}
 }
 
-// GenerateStackFree generates stack deallocation
+// GenerateStackFree generates stack deallocation.
 func (xi *X64Integration) GenerateStackFree(size int) []X64Instruction {
 	alignedSize := ((size + 15) / 16) * 16 // 16-byte align for stack
 
@@ -508,7 +508,7 @@ func (xi *X64Integration) GenerateStackFree(size int) []X64Instruction {
 	}
 }
 
-// GenerateErrorHandling generates error handling code for allocation failures
+// GenerateErrorHandling generates error handling code for allocation failures.
 func (xi *X64Integration) GenerateErrorHandling() []X64Instruction {
 	return []X64Instruction{
 		{
@@ -544,7 +544,7 @@ func (xi *X64Integration) GenerateErrorHandling() []X64Instruction {
 	}
 }
 
-// GeneratePrologue generates function prologue for allocator functions
+// GeneratePrologue generates function prologue for allocator functions.
 func (xi *X64Integration) GeneratePrologue() []X64Instruction {
 	return []X64Instruction{
 		{
@@ -560,7 +560,7 @@ func (xi *X64Integration) GeneratePrologue() []X64Instruction {
 	}
 }
 
-// GenerateEpilogue generates function epilogue for allocator functions
+// GenerateEpilogue generates function epilogue for allocator functions.
 func (xi *X64Integration) GenerateEpilogue() []X64Instruction {
 	return []X64Instruction{
 		{
@@ -581,17 +581,18 @@ func (xi *X64Integration) GenerateEpilogue() []X64Instruction {
 	}
 }
 
-// FormatInstructions formats x64 instructions as assembly code
+// FormatInstructions formats x64 instructions as assembly code.
 func (xi *X64Integration) FormatInstructions(instructions []X64Instruction) string {
 	var result strings.Builder
 
 	for _, instr := range instructions {
 		if strings.HasSuffix(instr.Mnemonic, ":") {
-			// Label
+			// Label.
 			result.WriteString(instr.Mnemonic)
 		} else {
-			// Regular instruction
+			// Regular instruction.
 			result.WriteString(fmt.Sprintf("    %-8s", instr.Mnemonic))
+
 			if len(instr.Operands) > 0 {
 				result.WriteString(strings.Join(instr.Operands, ", "))
 			}
@@ -609,12 +610,12 @@ func (xi *X64Integration) FormatInstructions(instructions []X64Instruction) stri
 	return result.String()
 }
 
-// OptimizeInstructions optimizes the generated x64 instructions
+// OptimizeInstructions optimizes the generated x64 instructions.
 func (xi *X64Integration) OptimizeInstructions(instructions []X64Instruction) []X64Instruction {
 	optimized := make([]X64Instruction, 0, len(instructions))
 
 	for i, instr := range instructions {
-		// Skip redundant moves
+		// Skip redundant moves.
 		if instr.Mnemonic == "mov" && len(instr.Operands) == 2 &&
 			instr.Operands[0] == instr.Operands[1] {
 			continue
@@ -627,10 +628,11 @@ func (xi *X64Integration) OptimizeInstructions(instructions []X64Instruction) []
 			instr.Operands[0] == instructions[i+1].Operands[0] {
 			// Skip redundant push/pop pair
 			i++ // Skip next instruction too
+
 			continue
 		}
 
-		// Remove redundant memory barriers
+		// Remove redundant memory barriers.
 		if instr.Mnemonic == "mfence" && i > 0 &&
 			instructions[i-1].Mnemonic == "mfence" {
 			continue
@@ -642,30 +644,30 @@ func (xi *X64Integration) OptimizeInstructions(instructions []X64Instruction) []
 	return optimized
 }
 
-// GenerateCompleteFunction generates a complete function with prologue, body, and epilogue
+// GenerateCompleteFunction generates a complete function with prologue, body, and epilogue.
 func (xi *X64Integration) GenerateCompleteFunction(name string, bodyInstructions []X64Instruction) []X64Instruction {
 	var complete []X64Instruction
 
-	// Function label
+	// Function label.
 	complete = append(complete, X64Instruction{
 		Mnemonic: name + ":",
 		Operands: []string{},
 		Comment:  "",
 	})
 
-	// Prologue
+	// Prologue.
 	complete = append(complete, xi.GeneratePrologue()...)
 
-	// Body
+	// Body.
 	complete = append(complete, bodyInstructions...)
 
-	// Epilogue
+	// Epilogue.
 	complete = append(complete, xi.GenerateEpilogue()...)
 
 	return complete
 }
 
-// GenerateAllocatorGlobals generates global variable declarations for the allocator
+// GenerateAllocatorGlobals generates global variable declarations for the allocator.
 func (xi *X64Integration) GenerateAllocatorGlobals() string {
 	var globals strings.Builder
 
@@ -689,24 +691,24 @@ func (xi *X64Integration) GenerateAllocatorGlobals() string {
 	return globals.String()
 }
 
-// GenerateAllocatorInterface generates the complete allocator interface
+// GenerateAllocatorInterface generates the complete allocator interface.
 func (xi *X64Integration) GenerateAllocatorInterface() string {
 	var code strings.Builder
 
-	// Global variables
+	// Global variables.
 	code.WriteString(xi.GenerateAllocatorGlobals())
 
-	// Code section
+	// Code section.
 	code.WriteString(".text\n\n")
 
-	// Allocation function
+	// Allocation function.
 	allocBody := xi.GenerateAllocCode("rcx", "rax")
 	allocBody = append(allocBody, xi.GenerateErrorHandling()...)
 	allocFunc := xi.GenerateCompleteFunction("allocator_alloc", allocBody)
 	code.WriteString(xi.FormatInstructions(allocFunc))
 	code.WriteString("\n")
 
-	// Free function
+	// Free function.
 	freeBody := xi.GenerateFreeCode("rcx")
 	freeFunc := xi.GenerateCompleteFunction("allocator_free", freeBody)
 	code.WriteString(xi.FormatInstructions(freeFunc))

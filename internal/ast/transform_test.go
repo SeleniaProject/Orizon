@@ -6,7 +6,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// createTestSpanTransform creates a basic position span for transformation testing
+// createTestSpanTransform creates a basic position span for transformation testing.
 func createTestSpanTransform(line, col int) position.Span {
 	return position.Span{
 		Start: position.Position{Filename: "test.oriz", Line: line, Column: col},
@@ -14,11 +14,11 @@ func createTestSpanTransform(line, col int) position.Span {
 	}
 }
 
-// TestTransformationPipeline tests the transformation pipeline functionality
+// TestTransformationPipeline tests the transformation pipeline functionality.
 func TestTransformationPipeline(t *testing.T) {
 	span := createTestSpanTransform(1, 1)
 
-	// Create a simple binary expression: 1 + 2
+	// Create a simple binary expression: 1 + 2.
 	left := &Literal{Span: span, Kind: LiteralInteger, Value: 1, Raw: "1"}
 	right := &Literal{Span: span, Kind: LiteralInteger, Value: 2, Raw: "2"}
 	expr := &BinaryExpression{
@@ -28,10 +28,10 @@ func TestTransformationPipeline(t *testing.T) {
 		Right:    right,
 	}
 
-	// Create transformation pipeline
+	// Create transformation pipeline.
 	pipeline := NewTransformationPipeline()
 
-	// Test empty pipeline
+	// Test empty pipeline.
 	result, err := pipeline.Transform(expr)
 	if err != nil {
 		t.Errorf("Empty pipeline failed: %v", err)
@@ -42,11 +42,11 @@ func TestTransformationPipeline(t *testing.T) {
 	}
 }
 
-// TestConstantFolding tests basic constant folding functionality
+// TestConstantFolding tests basic constant folding functionality.
 func TestConstantFolding(t *testing.T) {
 	span := createTestSpanTransform(1, 1)
 
-	// Create a simple binary expression: 1 + 2
+	// Create a simple binary expression: 1 + 2.
 	left := &Literal{Span: span, Kind: LiteralInteger, Value: 1, Raw: "1"}
 	right := &Literal{Span: span, Kind: LiteralInteger, Value: 2, Raw: "2"}
 	expr := &BinaryExpression{
@@ -56,19 +56,20 @@ func TestConstantFolding(t *testing.T) {
 		Right:    right,
 	}
 
-	// Apply constant folding
+	// Apply constant folding.
 	transformer := &ConstantFoldingTransformer{}
+
 	result, err := transformer.Transform(expr)
 	if err != nil {
 		t.Errorf("Constant folding failed: %v", err)
 	}
 
-	// Check if result is a literal with value 3
+	// Check if result is a literal with value 3.
 	if litResult, ok := result.(*Literal); ok {
 		if litResult.Kind != LiteralInteger {
 			t.Error("Expected integer literal result")
 		}
-		// Handle both int and int64 types
+		// Handle both int and int64 types.
 		var resultValue int64
 		switch v := litResult.Value.(type) {
 		case int:
@@ -77,8 +78,10 @@ func TestConstantFolding(t *testing.T) {
 			resultValue = v
 		default:
 			t.Errorf("Expected integer value, got %T", litResult.Value)
+
 			return
 		}
+
 		if resultValue != 3 {
 			t.Errorf("Expected result value 3, got %v", resultValue)
 		}
@@ -87,7 +90,7 @@ func TestConstantFolding(t *testing.T) {
 	}
 }
 
-// TestASTBuilder tests the AST builder functionality
+// TestASTBuilder tests the AST builder functionality.
 func TestASTBuilder(t *testing.T) {
 	span := createTestSpanTransform(1, 1)
 
@@ -106,7 +109,7 @@ func TestASTBuilder(t *testing.T) {
 	}
 }
 
-// TestTransformationError tests transformation error functionality
+// TestTransformationError tests transformation error functionality.
 func TestTransformationError(t *testing.T) {
 	span := createTestSpanTransform(1, 1)
 	message := "test error"
@@ -130,11 +133,11 @@ func TestTransformationError(t *testing.T) {
 	}
 }
 
-// TestTransformationWithValidation tests transformation with validation
+// TestTransformationWithValidation tests transformation with validation.
 func TestTransformationWithValidation(t *testing.T) {
 	span := createTestSpanTransform(2, 5)
 
-	// Create a function declaration for testing
+	// Create a function declaration for testing.
 	param := &Parameter{
 		Span: span,
 		Name: &Identifier{Span: span, Value: "x"},
@@ -152,10 +155,9 @@ func TestTransformationWithValidation(t *testing.T) {
 		},
 	}
 
-	// Create pipeline with validation
+	// Create pipeline with validation.
 	pipeline := NewTransformationPipeline()
 	result, err := pipeline.Transform(fn)
-
 	if err != nil {
 		t.Errorf("Transformation with validation failed: %v", err)
 	}

@@ -6,7 +6,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// createTestSpan creates a basic position span for testing
+// createTestSpan creates a basic position span for testing.
 func createTestSpan(line, col int) position.Span {
 	return position.Span{
 		Start: position.Position{Filename: "test.oriz", Line: line, Column: col},
@@ -14,20 +14,21 @@ func createTestSpan(line, col int) position.Span {
 	}
 }
 
-// TestBasicNodeTypes tests basic AST node creation and functionality
+// TestBasicNodeTypes tests basic AST node creation and functionality.
 func TestBasicNodeTypes(t *testing.T) {
 	span := createTestSpan(1, 1)
 
-	// Test Identifier
+	// Test Identifier.
 	id := &Identifier{Span: span, Value: "testVar"}
 	if id.GetSpan() != span {
 		t.Error("Identifier span not set correctly")
 	}
+
 	if id.String() != "testVar" {
 		t.Errorf("Expected 'testVar', got '%s'", id.String())
 	}
 
-	// Test Literal
+	// Test Literal.
 	lit := &Literal{
 		Span:  span,
 		Kind:  LiteralInteger,
@@ -37,21 +38,23 @@ func TestBasicNodeTypes(t *testing.T) {
 	if lit.GetSpan() != span {
 		t.Error("Literal span not set correctly")
 	}
+
 	if lit.Value != 42 {
 		t.Errorf("Expected 42, got %v", lit.Value)
 	}
 
-	// Test BasicType
+	// Test BasicType.
 	basicType := &BasicType{Span: span, Kind: BasicInt}
 	if basicType.GetSpan() != span {
 		t.Error("BasicType span not set correctly")
 	}
+
 	if basicType.String() != "int" {
 		t.Errorf("Expected 'int', got '%s'", basicType.String())
 	}
 }
 
-// TestBinaryExpression tests binary expression functionality
+// TestBinaryExpression tests binary expression functionality.
 func TestBinaryExpression(t *testing.T) {
 	span := createTestSpan(1, 1)
 
@@ -68,15 +71,17 @@ func TestBinaryExpression(t *testing.T) {
 	if binExpr.GetSpan() != span {
 		t.Error("BinaryExpression span not set correctly")
 	}
+
 	if binExpr.Operator != OpAdd {
 		t.Error("BinaryExpression operator not set correctly")
 	}
+
 	if binExpr.Left != left || binExpr.Right != right {
 		t.Error("BinaryExpression operands not set correctly")
 	}
 }
 
-// TestFunctionDeclaration tests function declaration functionality
+// TestFunctionDeclaration tests function declaration functionality.
 func TestFunctionDeclaration(t *testing.T) {
 	span := createTestSpan(1, 1)
 
@@ -100,15 +105,17 @@ func TestFunctionDeclaration(t *testing.T) {
 	if fn.GetSpan() != span {
 		t.Error("FunctionDeclaration span not set correctly")
 	}
+
 	if fn.Name.Value != "test" {
 		t.Error("FunctionDeclaration name not set correctly")
 	}
+
 	if len(fn.Parameters) != 1 {
 		t.Error("FunctionDeclaration parameters not set correctly")
 	}
 }
 
-// TestProgram tests program node functionality
+// TestProgram tests program node functionality.
 func TestProgram(t *testing.T) {
 	span := createTestSpan(1, 1)
 
@@ -127,29 +134,30 @@ func TestProgram(t *testing.T) {
 	if program.GetSpan() != span {
 		t.Error("Program span not set correctly")
 	}
+
 	if len(program.Declarations) != 1 {
 		t.Error("Program declarations not set correctly")
 	}
 }
 
-// TestVisitorPattern tests the visitor pattern implementation
+// TestVisitorPattern tests the visitor pattern implementation.
 func TestVisitorPattern(t *testing.T) {
 	span := createTestSpan(1, 1)
 
-	// Create a simple literal for testing
+	// Create a simple literal for testing.
 	lit := &Literal{Span: span, Kind: LiteralInteger, Value: 42, Raw: "42"}
 
-	// Create a mock visitor
+	// Create a mock visitor.
 	visitor := &MockVisitor{}
 
-	// Test visitor pattern
+	// Test visitor pattern.
 	result := lit.Accept(visitor)
 	if result == nil {
 		t.Error("Visitor pattern returned nil")
 	}
 }
 
-// MockVisitor implements the Visitor interface for testing
+// MockVisitor implements the Visitor interface for testing.
 type MockVisitor struct{}
 
 func (m *MockVisitor) VisitProgram(node *Program) interface{}                         { return node }
@@ -176,7 +184,7 @@ func (m *MockVisitor) VisitImportDeclaration(node *ImportDeclaration) interface{
 func (m *MockVisitor) VisitExportDeclaration(node *ExportDeclaration) interface{}     { return node }
 func (m *MockVisitor) VisitExportItem(node *ExportItem) interface{}                   { return node }
 
-// New nodes added to Visitor interface
+// New nodes added to Visitor interface.
 func (m *MockVisitor) VisitStructDeclaration(node *StructDeclaration) interface{} { return node }
 func (m *MockVisitor) VisitEnumDeclaration(node *EnumDeclaration) interface{}     { return node }
 func (m *MockVisitor) VisitTraitDeclaration(node *TraitDeclaration) interface{}   { return node }

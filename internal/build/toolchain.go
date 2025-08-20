@@ -31,15 +31,16 @@ func (p Platform) Validate() error {
 	if !supported[p.String()] {
 		return fmt.Errorf("unsupported target platform: %s", p.String())
 	}
+
 	return nil
 }
 
 // CommandSpec describes a build command to be executed by a runner.
 type CommandSpec struct {
+	Env     map[string]string
 	WorkDir string
 	Cmd     string
 	Args    []string
-	Env     map[string]string
 }
 
 // GoToolchain provides commands for building Go packages for different platforms.
@@ -54,44 +55,50 @@ func (tc GoToolchain) BuildPackage(target Platform, packagePath string, output s
 	if err := target.Validate(); err != nil {
 		return CommandSpec{}, err
 	}
+
 	args := []string{"build", "-o", output}
-	// Flags
-	for _, f := range tc.DefaultFlags {
-		args = append(args, f)
-	}
-	for _, f := range extraFlags {
-		args = append(args, f)
-	}
-	// ldflags are space-separated after -ldflags
+	// Flags.
+	args = append(args, tc.DefaultFlags...)
+
+	args = append(args, extraFlags...)
+	// ldflags are space-separated after -ldflags.
 	var ldflags string
+
 	if len(tc.DefaultLdFlags) > 0 {
 		for i, lf := range tc.DefaultLdFlags {
 			if i > 0 {
 				ldflags += " "
 			}
+
 			ldflags += lf
 		}
 	}
+
 	if len(extraLdFlags) > 0 {
 		if ldflags != "" {
 			ldflags += " "
 		}
+
 		for i, lf := range extraLdFlags {
 			if i > 0 {
 				ldflags += " "
 			}
+
 			ldflags += lf
 		}
 	}
+
 	if ldflags != "" {
 		args = append(args, "-ldflags", ldflags)
 	}
+
 	args = append(args, packagePath)
 
 	env := map[string]string{
 		"GOOS":   target.GOOS,
 		"GOARCH": target.GOARCH,
 	}
+
 	return CommandSpec{Cmd: "go", Args: args, Env: env}, nil
 }
 

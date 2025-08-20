@@ -8,7 +8,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/types"
 )
 
-// Updated demo to match the current unified effects API
+// Updated demo to match the current unified effects API.
 func integrationDemo() {
 	fmt.Println("=== 統合効果システムデモ ===")
 
@@ -20,24 +20,24 @@ func integrationDemo() {
 	fileWrite := types.NewIOEffect(types.IOEffectFileWrite, types.IOPermissionWrite)
 	fileWrite.Description = "ファイルへ書き込む"
 
-	// 例外効果（ExceptionSpecを使う）
+	// 例外効果（ExceptionSpecを使う）.
 	excSpec := &types.ExceptionSpec{
 		Kind:     types.ExceptionIOError,
 		Severity: types.ExceptionSeverityCritical,
 		Message:  "I/O例外",
 	}
 
-	// 例外効果の作成
+	// 例外効果の作成.
 	excEffect := types.NewExceptionEffect(types.ExceptionEffectIOError, 1)
 	excEffect.Spec = excSpec
 
-	// 統合効果へ変換
+	// 統合効果へ変換.
 	conv := types.NewUnifiedEffectConverter()
 	ue1 := conv.FromIOEffect(memRead)
 	ue2 := conv.FromIOEffect(fileWrite)
 	ue3 := conv.FromExceptionEffect(excEffect)
 
-	// 統合セット
+	// 統合セット.
 	set := types.NewUnifiedEffectSet()
 	set.Add(ue1)
 	set.Add(ue2)
@@ -48,14 +48,14 @@ func integrationDemo() {
 		fmt.Printf("- %s: %s\n", e.Kind.String(), e.Description)
 	}
 
-	// 統合シグネチャ
+	// 統合シグネチャ.
 	sig := types.NewUnifiedEffectSignature("complexFunc")
 	sig.AddEffect(ue1)
 	sig.AddEffect(ue2)
 	sig.AddEffect(ue3)
 	fmt.Printf("complexFunc pure? %v\n", sig.Pure)
 
-	// 制約テスト
+	// 制約テスト.
 	kindConstraint := types.NewUnifiedEffectKindConstraint()
 	kindConstraint.Allow(types.UnifiedEffectIOWrite)
 	kindConstraint.Deny(types.UnifiedEffectThrowsException)

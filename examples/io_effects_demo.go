@@ -28,7 +28,7 @@ func main() {
 	demonstrateConstraints()
 	fmt.Println()
 
-	// Demonstrate integration effects
+	// Demonstrate integration effects.
 	integrationDemo()
 	fmt.Println()
 
@@ -44,11 +44,11 @@ func main() {
 	demonstrateInferenceEngine()
 	fmt.Println()
 
-	// Demonstrate purity checking
+	// Demonstrate purity checking.
 	demonstratePurityChecker()
 	fmt.Println()
 
-	// Demonstrate real-world use cases
+	// Demonstrate real-world use cases.
 	demonstrateRealWorldUsage()
 }
 
@@ -77,7 +77,7 @@ func demonstrateEffectCreation() {
 	dbQuery.AddBehavior(types.IOBehaviorDeterministic)
 	dbQuery.Metadata["timeout"] = 5000
 
-	// Analyze effect properties
+	// Analyze effect properties.
 	effects := []*types.IOEffect{fileRead, fileWrite, networkReq, dbQuery}
 
 	for i, effect := range effects {
@@ -99,7 +99,7 @@ func demonstrateEffectCreation() {
 func demonstrateEffectSets() {
 	fmt.Println("--- I/O Effect Sets and Operations ---")
 
-	// Create effect sets
+	// Create effect sets.
 	fileOps := types.NewIOEffectSet()
 	fileOps.Add(types.NewIOEffect(types.IOEffectFileRead, types.IOPermissionRead))
 	fileOps.Add(types.NewIOEffect(types.IOEffectFileWrite, types.IOPermissionWrite))
@@ -115,7 +115,7 @@ func demonstrateEffectSets() {
 	fmt.Printf("Network operations set size: %d\n", networkOps.Size())
 	fmt.Printf("Network operations pure: %v\n", networkOps.IsPure())
 
-	// Set operations
+	// Set operations.
 	union := fileOps.Union(networkOps)
 	intersection := fileOps.Intersection(networkOps)
 	difference := fileOps.Difference(networkOps)
@@ -124,7 +124,7 @@ func demonstrateEffectSets() {
 	fmt.Printf("Intersection size: %d\n", intersection.Size())
 	fmt.Printf("Difference size: %d\n", difference.Size())
 
-	// Analyze combined effects
+	// Analyze combined effects.
 	fmt.Printf("Combined effects pure: %v\n", union.IsPure())
 	fmt.Printf("Combined effects kinds: %v\n", getEffectKinds(union))
 }
@@ -132,11 +132,11 @@ func demonstrateEffectSets() {
 func demonstrateConstraints() {
 	fmt.Println("--- I/O Constraints and Security ---")
 
-	// Create permission constraint
+	// Create permission constraint.
 	readOnlyConstraint := types.NewIOPermissionConstraint(types.IOPermissionRead)
 	fmt.Println("Created read-only permission constraint")
 
-	// Create resource constraint
+	// Create resource constraint.
 	resourceConstraint := types.NewIOResourceConstraint()
 	resourceConstraint.AllowResource("/tmp/")
 	resourceConstraint.AllowResource("/var/log/")
@@ -144,7 +144,7 @@ func demonstrateConstraints() {
 	resourceConstraint.DenyResource("/root/")
 	fmt.Println("Created resource constraint (allow: /tmp/, /var/log/; deny: /etc/, /root/)")
 
-	// Test effects against constraints
+	// Test effects against constraints.
 	testEffects := []*types.IOEffect{
 		createTestEffect(types.IOEffectFileRead, types.IOPermissionRead, "/tmp/data.txt"),
 		createTestEffect(types.IOEffectFileWrite, types.IOPermissionWrite, "/tmp/output.txt"),
@@ -174,17 +174,17 @@ func demonstrateSignatures() {
 
 	// Create function signatures with different I/O patterns
 
-	// Pure function
+	// Pure function.
 	mathFunc := types.NewIOSignature("calculateSum")
 	mathFunc.AddEffect(types.NewIOEffect(types.IOEffectPure, types.IOPermissionNone))
 
-	// File processing function
+	// File processing function.
 	fileProcessor := types.NewIOSignature("processLogFile")
 	fileProcessor.AddEffect(types.NewIOEffect(types.IOEffectFileRead, types.IOPermissionRead))
 	fileProcessor.AddEffect(types.NewIOEffect(types.IOEffectFileWrite, types.IOPermissionWrite))
 	fileProcessor.AddConstraint(types.NewIOPermissionConstraint(types.IOPermissionRead, types.IOPermissionWrite))
 
-	// Network service function
+	// Network service function.
 	apiService := types.NewIOSignature("fetchUserData")
 	httpEffect := types.NewIOEffect(types.IOEffectHTTPRequest, types.IOPermissionReadWrite)
 	httpEffect.AddBehavior(types.IOBehaviorNonDeterministic)
@@ -192,7 +192,7 @@ func demonstrateSignatures() {
 	apiService.AddEffect(httpEffect)
 	apiService.AddEffect(types.NewIOEffect(types.IOEffectDatabaseQuery, types.IOPermissionRead))
 
-	// Database transaction function
+	// Database transaction function.
 	dbTransaction := types.NewIOSignature("updateUserProfile")
 	dbTransaction.AddEffect(types.NewIOEffect(types.IOEffectDatabaseQuery, types.IOPermissionRead))
 	dbTransaction.AddEffect(types.NewIOEffect(types.IOEffectDatabaseUpdate, types.IOPermissionWrite))
@@ -219,13 +219,13 @@ func demonstrateSignatures() {
 func demonstrateIOMonad() {
 	fmt.Println("--- I/O Monad Operations ---")
 
-	// Pure computation
+	// Pure computation.
 	fmt.Println("1. Pure computation:")
 	pure := types.PureIO(42)
 	result, err := pure.Run()
 	fmt.Printf("   Result: %v, Error: %v\n", result, err)
 
-	// Map operation
+	// Map operation.
 	fmt.Println("2. Map operation (multiply by 2):")
 	mapped := pure.Map(func(x interface{}) interface{} {
 		return x.(int) * 2
@@ -233,7 +233,7 @@ func demonstrateIOMonad() {
 	result, err = mapped.Run()
 	fmt.Printf("   Result: %v, Error: %v\n", result, err)
 
-	// Bind operation
+	// Bind operation.
 	fmt.Println("3. Bind operation (add 10 and return new IO):")
 	bound := pure.Bind(func(x interface{}) *types.IOMonad {
 		return types.PureIO(x.(int) + 10)
@@ -241,7 +241,7 @@ func demonstrateIOMonad() {
 	result, err = bound.Run()
 	fmt.Printf("   Result: %v, Error: %v\n", result, err)
 
-	// Sequence operations
+	// Sequence operations.
 	fmt.Println("4. Sequence operations:")
 	monads := []*types.IOMonad{
 		types.PureIO("first"),
@@ -252,7 +252,7 @@ func demonstrateIOMonad() {
 	result, err = sequence.Run()
 	fmt.Printf("   Result: %v, Error: %v\n", result, err)
 
-	// Parallel operations
+	// Parallel operations.
 	fmt.Println("5. Parallel operations (with timing):")
 	start := time.Now()
 	slowMonads := []*types.IOMonad{
@@ -277,7 +277,7 @@ func demonstrateInferenceEngine() {
 	context := types.NewIOContext()
 	engine := types.NewIOInferenceEngine(context)
 
-	// Register some function signatures
+	// Register some function signatures.
 	printlnSig := types.NewIOSignature("println")
 	printlnSig.AddEffect(types.NewIOEffect(types.IOEffectStdoutWrite, types.IOPermissionWrite))
 	engine.RegisterFunction("println", printlnSig)
@@ -294,7 +294,7 @@ func demonstrateInferenceEngine() {
 
 	fmt.Printf("Registered function signatures for demonstration\n")
 
-	// Test inference on mock expressions
+	// Test inference on mock expressions.
 	testCalls := []string{"println", "readFile", "httpGet", "unknownFunction"}
 
 	for _, funcName := range testCalls {
@@ -319,7 +319,7 @@ func demonstratePurityChecker() {
 
 	checker := types.NewIOPurityChecker(true)
 
-	// Test pure function
+	// Test pure function.
 	pureFunc := types.NewIOSignature("mathOperation")
 	pureFunc.AddEffect(types.NewIOEffect(types.IOEffectPure, types.IOPermissionNone))
 
@@ -329,7 +329,7 @@ func demonstratePurityChecker() {
 	err := checker.EnforcePurity(pureFunc)
 	fmt.Printf("   Enforcement: %v\n", err == nil)
 
-	// Test impure function
+	// Test impure function.
 	impureFunc := types.NewIOSignature("printMessage")
 	impureFunc.AddEffect(types.NewIOEffect(types.IOEffectStdoutWrite, types.IOPermissionWrite))
 
@@ -339,13 +339,13 @@ func demonstratePurityChecker() {
 	err = checker.EnforcePurity(impureFunc)
 	fmt.Printf("   Enforcement: %v\n", err == nil)
 
-	// Whitelist the impure function
+	// Whitelist the impure function.
 	fmt.Println("3. Testing whitelisted impure function:")
 	checker.AllowFunction("printMessage")
 	violations = checker.CheckPurity(impureFunc)
 	fmt.Printf("   Violations after whitelisting: %d\n", len(violations))
 
-	// Test with strict mode disabled
+	// Test with strict mode disabled.
 	relaxedChecker := types.NewIOPurityChecker(false)
 	fmt.Println("4. Testing with relaxed purity checking:")
 	err = relaxedChecker.EnforcePurity(impureFunc)
@@ -355,33 +355,33 @@ func demonstratePurityChecker() {
 func demonstrateRealWorldUsage() {
 	fmt.Println("--- Real-World Usage Examples ---")
 
-	// Example 1: File processing pipeline
+	// Example 1: File processing pipeline.
 	fmt.Println("1. File Processing Pipeline Analysis:")
 	pipeline := analyzeFileProcessingPipeline()
 	fmt.Printf("   Total effects: %d\n", pipeline.Size())
 	fmt.Printf("   Is pure: %v\n", pipeline.IsPure())
 	fmt.Printf("   Effect kinds: %v\n", getEffectKinds(pipeline))
 
-	// Example 2: Web API handler
+	// Example 2: Web API handler.
 	fmt.Println("2. Web API Handler Analysis:")
 	apiHandler := analyzeWebAPIHandler()
 	fmt.Printf("   Total effects: %d\n", apiHandler.Size())
 	fmt.Printf("   Is pure: %v\n", apiHandler.IsPure())
 	fmt.Printf("   Effect kinds: %v\n", getEffectKinds(apiHandler))
 
-	// Example 3: Database migration
+	// Example 3: Database migration.
 	fmt.Println("3. Database Migration Analysis:")
 	migration := analyzeDatabaseMigration()
 	fmt.Printf("   Total effects: %d\n", migration.Size())
 	fmt.Printf("   Is pure: %v\n", migration.IsPure())
 	fmt.Printf("   Effect kinds: %v\n", getEffectKinds(migration))
 
-	// Example 4: Security audit
+	// Example 4: Security audit.
 	fmt.Println("4. Security Audit Example:")
 	performSecurityAudit()
 }
 
-// Helper functions
+// Helper functions.
 
 func getBehaviorStrings(behaviors []types.IOEffectBehavior) []string {
 	result := make([]string, len(behaviors))
@@ -407,7 +407,7 @@ func createTestEffect(kind types.IOEffectKind, permission types.IOEffectPermissi
 }
 
 func analyzeFileProcessingPipeline() *types.IOEffectSet {
-	// Simulates analysis of a file processing pipeline:
+	// Simulates analysis of a file processing pipeline:.
 	// 1. Read input files
 	// 2. Process data (pure computation)
 	// 3. Write results
@@ -416,25 +416,25 @@ func analyzeFileProcessingPipeline() *types.IOEffectSet {
 
 	effects := types.NewIOEffectSet()
 
-	// File reading
+	// File reading.
 	effects.Add(types.NewIOEffect(types.IOEffectFileRead, types.IOPermissionRead))
 	effects.Add(types.NewIOEffect(types.IOEffectDirectoryList, types.IOPermissionRead))
 
-	// File writing
+	// File writing.
 	effects.Add(types.NewIOEffect(types.IOEffectFileWrite, types.IOPermissionWrite))
 	effects.Add(types.NewIOEffect(types.IOEffectFileCreate, types.IOPermissionWrite))
 
-	// Metadata operations
+	// Metadata operations.
 	effects.Add(types.NewIOEffect(types.IOEffectFileMetadata, types.IOPermissionRead))
 
-	// Logging
+	// Logging.
 	effects.Add(types.NewIOEffect(types.IOEffectStdoutWrite, types.IOPermissionWrite))
 
 	return effects
 }
 
 func analyzeWebAPIHandler() *types.IOEffectSet {
-	// Simulates analysis of a web API handler:
+	// Simulates analysis of a web API handler:.
 	// 1. Receive HTTP request
 	// 2. Validate input
 	// 3. Query database
@@ -444,21 +444,21 @@ func analyzeWebAPIHandler() *types.IOEffectSet {
 
 	effects := types.NewIOEffectSet()
 
-	// Network operations
+	// Network operations.
 	effects.Add(types.NewIOEffect(types.IOEffectHTTPRequest, types.IOPermissionRead))
 	effects.Add(types.NewIOEffect(types.IOEffectHTTPResponse, types.IOPermissionWrite))
 
-	// Database operations
+	// Database operations.
 	effects.Add(types.NewIOEffect(types.IOEffectDatabaseQuery, types.IOPermissionRead))
 
-	// Logging
+	// Logging.
 	effects.Add(types.NewIOEffect(types.IOEffectStdoutWrite, types.IOPermissionWrite))
 
 	return effects
 }
 
 func analyzeDatabaseMigration() *types.IOEffectSet {
-	// Simulates analysis of a database migration:
+	// Simulates analysis of a database migration:.
 	// 1. Connect to database
 	// 2. Begin transaction
 	// 3. Read schema
@@ -468,7 +468,7 @@ func analyzeDatabaseMigration() *types.IOEffectSet {
 
 	effects := types.NewIOEffectSet()
 
-	// Database operations
+	// Database operations.
 	effects.Add(types.NewIOEffect(types.IOEffectDatabaseConnect, types.IOPermissionReadWrite))
 	effects.Add(types.NewIOEffect(types.IOEffectDatabaseTransaction, types.IOPermissionWrite))
 	effects.Add(types.NewIOEffect(types.IOEffectDatabaseQuery, types.IOPermissionRead))
@@ -482,12 +482,12 @@ func performSecurityAudit() {
 	// Create a security-focused I/O context
 	context := types.NewIOContext()
 
-	// Only allow read operations and specific safe directories
+	// Only allow read operations and specific safe directories.
 	context.AllowPermission(types.IOPermissionRead)
 	context.AllowKind(types.IOEffectFileRead)
 	context.AllowKind(types.IOEffectDirectoryList)
 
-	// Test various operations against security policy
+	// Test various operations against security policy.
 	testOperations := []*types.IOEffect{
 		createTestEffect(types.IOEffectFileRead, types.IOPermissionRead, "/var/log/app.log"),
 		createTestEffect(types.IOEffectFileWrite, types.IOPermissionWrite, "/tmp/test.txt"),

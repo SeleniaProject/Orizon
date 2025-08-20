@@ -1,5 +1,5 @@
 // Package allocator provides memory allocation services for the Orizon runtime.
-// This implements a minimal but functional memory allocator supporting both
+// This implements a minimal but functional memory allocator supporting both.
 // system-level allocation and arena-based allocation for bootstrap.
 package allocator
 
@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-// AllocatorKind defines the type of allocator
+// AllocatorKind defines the type of allocator.
 type AllocatorKind int
 
 const (
@@ -20,7 +20,7 @@ const (
 	PoolAllocatorKind
 )
 
-// Allocator defines the interface for memory allocators
+// Allocator defines the interface for memory allocators.
 type Allocator interface {
 	Alloc(size uintptr) unsafe.Pointer
 	Free(ptr unsafe.Pointer)
@@ -32,7 +32,7 @@ type Allocator interface {
 	Reset() // For arena allocators
 }
 
-// AllocatorStats provides allocation statistics
+// AllocatorStats provides allocation statistics.
 type AllocatorStats struct {
 	TotalAllocated    uintptr
 	TotalFreed        uintptr
@@ -44,10 +44,10 @@ type AllocatorStats struct {
 	SystemMemory      uintptr
 }
 
-// GlobalAllocator provides the default allocator for the Orizon runtime
+// GlobalAllocator provides the default allocator for the Orizon runtime.
 var GlobalAllocator Allocator
 
-// Initialize sets up the global allocator
+// Initialize sets up the global allocator.
 func Initialize(kind AllocatorKind, options ...Option) error {
 	config := defaultConfig()
 	for _, opt := range options {
@@ -60,14 +60,16 @@ func Initialize(kind AllocatorKind, options ...Option) error {
 	case ArenaAllocatorKind:
 		allocator, err := NewArenaAllocator(config.ArenaSize, config)
 		if err != nil {
-			return fmt.Errorf("failed to create arena allocator: %v", err)
+			return fmt.Errorf("failed to create arena allocator: %w", err)
 		}
+
 		GlobalAllocator = allocator
 	case PoolAllocatorKind:
 		allocator, err := NewPoolAllocator(config.PoolSizes, config)
 		if err != nil {
-			return fmt.Errorf("failed to create pool allocator: %v", err)
+			return fmt.Errorf("failed to create pool allocator: %w", err)
 		}
+
 		GlobalAllocator = allocator
 	default:
 		return fmt.Errorf("unknown allocator kind: %v", kind)
@@ -76,16 +78,16 @@ func Initialize(kind AllocatorKind, options ...Option) error {
 	return nil
 }
 
-// Configuration for allocators
+// Configuration for allocators.
 type Config struct {
-	EnableTracking  bool
-	EnableDebug     bool
-	ArenaSize       uintptr
 	PoolSizes       []uintptr
+	ArenaSize       uintptr
 	MaxAllocations  int
 	MemoryLimit     uintptr
-	EnableLeakCheck bool
 	AlignmentSize   uintptr
+	EnableTracking  bool
+	EnableDebug     bool
+	EnableLeakCheck bool
 }
 
 type Option func(*Config)
@@ -103,7 +105,7 @@ func defaultConfig() *Config {
 	}
 }
 
-// Option functions
+// Option functions.
 func WithTracking(enabled bool) Option {
 	return func(c *Config) { c.EnableTracking = enabled }
 }
@@ -132,27 +134,27 @@ func WithAlignment(alignment uintptr) Option {
 	return func(c *Config) { c.AlignmentSize = alignment }
 }
 
-// Allocation metadata for tracking
+// Allocation metadata for tracking.
 type AllocationInfo struct {
+	StackTrace []uintptr
 	Size       uintptr
 	Timestamp  int64
-	StackTrace []uintptr
 }
 
-// SystemAllocatorImpl implements a simple wrapper around Go's memory allocator
+// SystemAllocatorImpl implements a simple wrapper around Go's memory allocator.
 type SystemAllocatorImpl struct {
-	mu                sync.RWMutex
 	config            *Config
+	activeAllocations map[unsafe.Pointer]*AllocationInfo
+	allocatedSlices   map[unsafe.Pointer][]byte
 	totalAllocated    uintptr
 	totalFreed        uintptr
-	activeAllocations map[unsafe.Pointer]*AllocationInfo
 	allocationCount   uint64
 	freeCount         uint64
 	peakAllocations   int
-	allocatedSlices   map[unsafe.Pointer][]byte // Keep references to prevent GC
+	mu                sync.RWMutex
 }
 
-// NewSystemAllocator creates a new system allocator
+// NewSystemAllocator creates a new system allocator.
 func NewSystemAllocator(config *Config) *SystemAllocatorImpl {
 	return &SystemAllocatorImpl{
 		config:            config,
@@ -161,19 +163,19 @@ func NewSystemAllocator(config *Config) *SystemAllocatorImpl {
 	}
 }
 
-// Alloc allocates memory using the system allocator
+// Alloc allocates memory using the system allocator.
 func (sa *SystemAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 	if size == 0 {
 		return nil
 	}
 
-	// Align size
+	// Align size.
 	alignedSize := alignUp(size, sa.config.AlignmentSize)
 	if alignedSize == 0 {
 		return nil // Overflow or invalid size
 	}
 
-	// Check memory limit
+	// Check memory limit.
 	if sa.config.MemoryLimit > 0 {
 		current := atomic.LoadUintptr(&sa.totalAllocated) - atomic.LoadUintptr(&sa.totalFreed)
 		if current+alignedSize > sa.config.MemoryLimit {
@@ -181,7 +183,7 @@ func (sa *SystemAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 		}
 	}
 
-	// Allocate memory using Go slice
+	// Allocate memory using Go slice.
 	slice := make([]byte, alignedSize)
 	if len(slice) != int(alignedSize) || len(slice) == 0 {
 		return nil
@@ -189,16 +191,16 @@ func (sa *SystemAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 
 	ptr := unsafe.Pointer(&slice[0])
 
-	// Store slice to prevent GC
+	// Store slice to prevent GC.
 	sa.mu.Lock()
 	sa.allocatedSlices[ptr] = slice
 	sa.mu.Unlock()
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUintptr(&sa.totalAllocated, alignedSize)
 	atomic.AddUint64(&sa.allocationCount, 1)
 
-	// Track allocation if enabled
+	// Track allocation if enabled.
 	if sa.config.EnableTracking {
 		sa.trackAllocation(ptr, alignedSize)
 	}
@@ -206,7 +208,7 @@ func (sa *SystemAllocatorImpl) Alloc(size uintptr) unsafe.Pointer {
 	return ptr
 }
 
-// Free frees memory allocated by the system allocator
+// Free frees memory allocated by the system allocator.
 func (sa *SystemAllocatorImpl) Free(ptr unsafe.Pointer) {
 	if ptr == nil {
 		return
@@ -214,36 +216,40 @@ func (sa *SystemAllocatorImpl) Free(ptr unsafe.Pointer) {
 
 	var size uintptr
 
-	// Get size from tracking if enabled
+	// Get size from tracking if enabled.
 	if sa.config.EnableTracking {
 		size = sa.untrackAllocation(ptr)
 	}
 
-	// Remove slice reference to allow GC
+	// Remove slice reference to allow GC.
 	sa.mu.Lock()
 	if slice, exists := sa.allocatedSlices[ptr]; exists {
 		size = uintptr(len(slice)) // Get actual size
+
 		delete(sa.allocatedSlices, ptr)
 	}
 	sa.mu.Unlock()
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUintptr(&sa.totalFreed, size)
 	atomic.AddUint64(&sa.freeCount, 1)
 }
 
-// Realloc reallocates memory
+// Realloc reallocates memory.
 func (sa *SystemAllocatorImpl) Realloc(ptr unsafe.Pointer, newSize uintptr) unsafe.Pointer {
 	if ptr == nil {
 		return sa.Alloc(newSize)
 	}
+
 	if newSize == 0 {
 		sa.Free(ptr)
+
 		return nil
 	}
 
-	// Get old size from tracking
+	// Get old size from tracking.
 	var oldSize uintptr
+
 	if sa.config.EnableTracking {
 		sa.mu.RLock()
 		if info, exists := sa.activeAllocations[ptr]; exists {
@@ -252,38 +258,39 @@ func (sa *SystemAllocatorImpl) Realloc(ptr unsafe.Pointer, newSize uintptr) unsa
 		sa.mu.RUnlock()
 	}
 
-	// Allocate new memory
+	// Allocate new memory.
 	newPtr := sa.Alloc(newSize)
 	if newPtr == nil {
 		return nil
 	}
 
-	// Copy old data
+	// Copy old data.
 	if oldSize > 0 {
 		copySize := oldSize
 		if newSize < oldSize {
 			copySize = newSize
 		}
+
 		copyMemory(newPtr, ptr, copySize)
 	}
 
-	// Free old memory
+	// Free old memory.
 	sa.Free(ptr)
 
 	return newPtr
 }
 
-// TotalAllocated returns total allocated bytes
+// TotalAllocated returns total allocated bytes.
 func (sa *SystemAllocatorImpl) TotalAllocated() uintptr {
 	return atomic.LoadUintptr(&sa.totalAllocated)
 }
 
-// TotalFreed returns total freed bytes
+// TotalFreed returns total freed bytes.
 func (sa *SystemAllocatorImpl) TotalFreed() uintptr {
 	return atomic.LoadUintptr(&sa.totalFreed)
 }
 
-// ActiveAllocations returns the number of active allocations
+// ActiveAllocations returns the number of active allocations.
 func (sa *SystemAllocatorImpl) ActiveAllocations() int {
 	if !sa.config.EnableTracking {
 		return 0
@@ -291,10 +298,11 @@ func (sa *SystemAllocatorImpl) ActiveAllocations() int {
 
 	sa.mu.RLock()
 	defer sa.mu.RUnlock()
+
 	return len(sa.activeAllocations)
 }
 
-// Stats returns allocation statistics
+// Stats returns allocation statistics.
 func (sa *SystemAllocatorImpl) Stats() AllocatorStats {
 	sa.mu.RLock()
 	defer sa.mu.RUnlock()
@@ -311,12 +319,12 @@ func (sa *SystemAllocatorImpl) Stats() AllocatorStats {
 	}
 }
 
-// Reset is a no-op for system allocator
+// Reset is a no-op for system allocator.
 func (sa *SystemAllocatorImpl) Reset() {
-	// System allocator doesn't support reset
+	// System allocator doesn't support reset.
 }
 
-// Helper methods
+// Helper methods.
 
 func (sa *SystemAllocatorImpl) trackAllocation(ptr unsafe.Pointer, size uintptr) {
 	info := &AllocationInfo{
@@ -329,6 +337,7 @@ func (sa *SystemAllocatorImpl) trackAllocation(ptr unsafe.Pointer, size uintptr)
 	}
 
 	sa.mu.Lock()
+
 	sa.activeAllocations[ptr] = info
 	if len(sa.activeAllocations) > sa.peakAllocations {
 		sa.peakAllocations = len(sa.activeAllocations)
@@ -342,17 +351,19 @@ func (sa *SystemAllocatorImpl) untrackAllocation(ptr unsafe.Pointer) uintptr {
 
 	if info, exists := sa.activeAllocations[ptr]; exists {
 		delete(sa.activeAllocations, ptr)
+
 		return info.Size
 	}
+
 	return 0
 }
 
-// Platform-specific system allocation functions
+// Platform-specific system allocation functions.
 
-// systemAlloc allocates memory from the system
+// systemAlloc allocates memory from the system.
 func systemAlloc(size uintptr) unsafe.Pointer {
-	// Use Go's memory allocator for bootstrap
-	// In a real implementation, this would use VirtualAlloc on Windows or mmap on Linux
+	// Use Go's memory allocator for bootstrap.
+	// In a real implementation, this would use VirtualAlloc on Windows or mmap on Linux.
 	if size == 0 {
 		return nil
 	}
@@ -363,56 +374,59 @@ func systemAlloc(size uintptr) unsafe.Pointer {
 		return nil
 	}
 
-	// Keep a reference to prevent GC (in production this would be managed differently)
+	// Keep a reference to prevent GC (in production this would be managed differently).
 	runtime.KeepAlive(slice)
 
 	return unsafe.Pointer(&slice[0])
 }
 
-// systemFree frees system memory
+// systemFree frees system memory.
 func systemFree(ptr unsafe.Pointer) {
-	// In Go, we can't actually free memory directly
-	// The GC will handle it when the slice goes out of scope
-	// In a real implementation, this would use VirtualFree or munmap
+	// In Go, we can't actually free memory directly.
+	// The GC will handle it when the slice goes out of scope.
+	// In a real implementation, this would use VirtualFree or munmap.
 }
 
-// Utility functions
+// Utility functions.
 
-// alignUp aligns a size up to the nearest multiple of alignment
+// alignUp aligns a size up to the nearest multiple of alignment.
 func alignUp(size, alignment uintptr) uintptr {
 	return (size + alignment - 1) &^ (alignment - 1)
 }
 
-// copyMemory copies memory from src to dst
+// copyMemory copies memory from src to dst.
 func copyMemory(dst, src unsafe.Pointer, size uintptr) {
-	// Use Go's copy function
+	// Use Go's copy function.
 	dstSlice := (*[1 << 30]byte)(dst)[:size:size]
 	srcSlice := (*[1 << 30]byte)(src)[:size:size]
 	copy(dstSlice, srcSlice)
 }
 
-// getTimestamp returns current timestamp (simplified)
+// getTimestamp returns current timestamp (simplified).
 func getTimestamp() int64 {
 	return 0 // Simplified for bootstrap
 }
 
-// captureStackTrace captures the current stack trace
+// captureStackTrace captures the current stack trace.
 func captureStackTrace() []uintptr {
 	var pcs [32]uintptr
 	n := runtime.Callers(3, pcs[:])
+
 	return pcs[:n]
 }
 
-// getSystemMemory returns system memory usage
+// getSystemMemory returns system memory usage.
 func getSystemMemory() uintptr {
 	var m runtime.MemStats
+
 	runtime.ReadMemStats(&m)
+
 	return uintptr(m.Sys)
 }
 
-// Memory leak detection
+// Memory leak detection.
 
-// CheckLeaks checks for memory leaks
+// CheckLeaks checks for memory leaks.
 func (sa *SystemAllocatorImpl) CheckLeaks() []LeakInfo {
 	if !sa.config.EnableLeakCheck || !sa.config.EnableTracking {
 		return nil
@@ -434,15 +448,15 @@ func (sa *SystemAllocatorImpl) CheckLeaks() []LeakInfo {
 	return leaks
 }
 
-// LeakInfo represents information about a memory leak
+// LeakInfo represents information about a memory leak.
 type LeakInfo struct {
 	Pointer    unsafe.Pointer
+	StackTrace []uintptr
 	Size       uintptr
 	Timestamp  int64
-	StackTrace []uintptr
 }
 
-// FormatLeaks formats leak information for display
+// FormatLeaks formats leak information for display.
 func FormatLeaks(leaks []LeakInfo) string {
 	if len(leaks) == 0 {
 		return "No memory leaks detected"
@@ -454,9 +468,11 @@ func FormatLeaks(leaks []LeakInfo) string {
 		if len(leak.StackTrace) > 0 {
 			result += "    Stack trace:\n"
 			frames := runtime.CallersFrames(leak.StackTrace)
+
 			for {
 				frame, more := frames.Next()
 				result += fmt.Sprintf("      %s:%d %s\n", frame.File, frame.Line, frame.Function)
+
 				if !more {
 					break
 				}
@@ -467,37 +483,41 @@ func FormatLeaks(leaks []LeakInfo) string {
 	return result
 }
 
-// Global allocation functions for convenience
+// Global allocation functions for convenience.
 
-// Alloc allocates memory using the global allocator
+// Alloc allocates memory using the global allocator.
 func Alloc(size uintptr) unsafe.Pointer {
 	if GlobalAllocator == nil {
-		// Fall back to system allocator if not initialized
+		// Fall back to system allocator if not initialized.
 		panic("Global allocator not initialized")
 	}
+
 	return GlobalAllocator.Alloc(size)
 }
 
-// Free frees memory using the global allocator
+// Free frees memory using the global allocator.
 func Free(ptr unsafe.Pointer) {
 	if GlobalAllocator == nil {
 		panic("Global allocator not initialized")
 	}
+
 	GlobalAllocator.Free(ptr)
 }
 
-// Realloc reallocates memory using the global allocator
+// Realloc reallocates memory using the global allocator.
 func Realloc(ptr unsafe.Pointer, newSize uintptr) unsafe.Pointer {
 	if GlobalAllocator == nil {
 		panic("Global allocator not initialized")
 	}
+
 	return GlobalAllocator.Realloc(ptr, newSize)
 }
 
-// GetStats returns global allocator statistics
+// GetStats returns global allocator statistics.
 func GetStats() AllocatorStats {
 	if GlobalAllocator == nil {
 		return AllocatorStats{}
 	}
+
 	return GlobalAllocator.Stats()
 }

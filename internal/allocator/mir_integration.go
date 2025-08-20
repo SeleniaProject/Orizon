@@ -4,22 +4,22 @@ import (
 	"fmt"
 )
 
-// MIRIntegration provides MIR-level integration for memory allocation
+// MIRIntegration provides MIR-level integration for memory allocation.
 type MIRIntegration struct {
-	allocatorType AllocatorKind
 	config        *Config
+	allocatorType AllocatorKind
 }
 
-// MIRInstruction represents a simplified MIR instruction for allocation
+// MIRInstruction represents a simplified MIR instruction for allocation.
 type MIRInstruction struct {
 	Op       string
-	Operands []string
 	Result   string
 	Type     string
+	Operands []string
 	Size     int
 }
 
-// NewMIRIntegration creates a new MIR integration
+// NewMIRIntegration creates a new MIR integration.
 func NewMIRIntegration(allocatorType AllocatorKind, config *Config) *MIRIntegration {
 	return &MIRIntegration{
 		allocatorType: allocatorType,
@@ -27,7 +27,7 @@ func NewMIRIntegration(allocatorType AllocatorKind, config *Config) *MIRIntegrat
 	}
 }
 
-// GenerateAllocInstruction generates MIR instructions for memory allocation
+// GenerateAllocInstruction generates MIR instructions for memory allocation.
 func (mi *MIRIntegration) GenerateAllocInstruction(resultReg string, size int, alignment int) []MIRInstruction {
 	var instructions []MIRInstruction
 
@@ -39,14 +39,14 @@ func (mi *MIRIntegration) GenerateAllocInstruction(resultReg string, size int, a
 	case PoolAllocatorKind:
 		instructions = mi.generatePoolAlloc(resultReg, size, alignment)
 	default:
-		// Fallback to system allocation
+		// Fallback to system allocation.
 		instructions = mi.generateSystemAlloc(resultReg, size, alignment)
 	}
 
 	return instructions
 }
 
-// GenerateFreeInstruction generates MIR instructions for memory deallocation
+// GenerateFreeInstruction generates MIR instructions for memory deallocation.
 func (mi *MIRIntegration) GenerateFreeInstruction(ptrReg string) []MIRInstruction {
 	var instructions []MIRInstruction
 
@@ -58,14 +58,14 @@ func (mi *MIRIntegration) GenerateFreeInstruction(ptrReg string) []MIRInstructio
 	case PoolAllocatorKind:
 		instructions = mi.generatePoolFree(ptrReg)
 	default:
-		// Fallback to system free
+		// Fallback to system free.
 		instructions = mi.generateSystemFree(ptrReg)
 	}
 
 	return instructions
 }
 
-// generateSystemAlloc generates system allocation instructions
+// generateSystemAlloc generates system allocation instructions.
 func (mi *MIRIntegration) generateSystemAlloc(resultReg string, size int, alignment int) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -95,7 +95,7 @@ func (mi *MIRIntegration) generateSystemAlloc(resultReg string, size int, alignm
 	}
 }
 
-// generateArenaAlloc generates arena allocation instructions
+// generateArenaAlloc generates arena allocation instructions.
 func (mi *MIRIntegration) generateArenaAlloc(resultReg string, size int, alignment int) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -125,7 +125,7 @@ func (mi *MIRIntegration) generateArenaAlloc(resultReg string, size int, alignme
 	}
 }
 
-// generatePoolAlloc generates pool allocation instructions
+// generatePoolAlloc generates pool allocation instructions.
 func (mi *MIRIntegration) generatePoolAlloc(resultReg string, size int, alignment int) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -155,7 +155,7 @@ func (mi *MIRIntegration) generatePoolAlloc(resultReg string, size int, alignmen
 	}
 }
 
-// generateSystemFree generates system free instructions
+// generateSystemFree generates system free instructions.
 func (mi *MIRIntegration) generateSystemFree(ptrReg string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -173,7 +173,7 @@ func (mi *MIRIntegration) generateSystemFree(ptrReg string) []MIRInstruction {
 	}
 }
 
-// generateArenaFree generates arena free instructions (no-op)
+// generateArenaFree generates arena free instructions (no-op).
 func (mi *MIRIntegration) generateArenaFree(ptrReg string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -185,7 +185,7 @@ func (mi *MIRIntegration) generateArenaFree(ptrReg string) []MIRInstruction {
 	}
 }
 
-// generatePoolFree generates pool free instructions
+// generatePoolFree generates pool free instructions.
 func (mi *MIRIntegration) generatePoolFree(ptrReg string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -209,7 +209,7 @@ func (mi *MIRIntegration) generatePoolFree(ptrReg string) []MIRInstruction {
 	}
 }
 
-// GenerateArrayAllocInstruction generates MIR for array allocation
+// GenerateArrayAllocInstruction generates MIR for array allocation.
 func (mi *MIRIntegration) GenerateArrayAllocInstruction(resultReg string, elementSize int, count string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -239,7 +239,7 @@ func (mi *MIRIntegration) GenerateArrayAllocInstruction(resultReg string, elemen
 	}
 }
 
-// GenerateSliceAllocInstruction generates MIR for slice allocation
+// GenerateSliceAllocInstruction generates MIR for slice allocation.
 func (mi *MIRIntegration) GenerateSliceAllocInstruction(resultReg string, elementSize int, len, cap string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -263,7 +263,7 @@ func (mi *MIRIntegration) GenerateSliceAllocInstruction(resultReg string, elemen
 	}
 }
 
-// GenerateStringAllocInstruction generates MIR for string allocation
+// GenerateStringAllocInstruction generates MIR for string allocation.
 func (mi *MIRIntegration) GenerateStringAllocInstruction(resultReg string, strReg string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -281,7 +281,7 @@ func (mi *MIRIntegration) GenerateStringAllocInstruction(resultReg string, strRe
 	}
 }
 
-// GenerateGCInstructions generates MIR for garbage collection
+// GenerateGCInstructions generates MIR for garbage collection.
 func (mi *MIRIntegration) GenerateGCInstructions() []MIRInstruction {
 	if mi.allocatorType == ArenaAllocatorKind {
 		return []MIRInstruction{
@@ -304,7 +304,7 @@ func (mi *MIRIntegration) GenerateGCInstructions() []MIRInstruction {
 	}
 }
 
-// GenerateMemoryBarrierInstruction generates MIR for memory barriers
+// GenerateMemoryBarrierInstruction generates MIR for memory barriers.
 func (mi *MIRIntegration) GenerateMemoryBarrierInstruction() []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -316,7 +316,7 @@ func (mi *MIRIntegration) GenerateMemoryBarrierInstruction() []MIRInstruction {
 	}
 }
 
-// GenerateAtomicAllocInstruction generates MIR for atomic allocation
+// GenerateAtomicAllocInstruction generates MIR for atomic allocation.
 func (mi *MIRIntegration) GenerateAtomicAllocInstruction(resultReg string, size int) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -352,7 +352,7 @@ func (mi *MIRIntegration) GenerateAtomicAllocInstruction(resultReg string, size 
 	}
 }
 
-// GenerateStatsInstruction generates MIR for getting allocator statistics
+// GenerateStatsInstruction generates MIR for getting allocator statistics.
 func (mi *MIRIntegration) GenerateStatsInstruction(resultReg string) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -364,12 +364,12 @@ func (mi *MIRIntegration) GenerateStatsInstruction(resultReg string) []MIRInstru
 	}
 }
 
-// OptimizeInstructions optimizes the generated MIR instructions
+// OptimizeInstructions optimizes the generated MIR instructions.
 func (mi *MIRIntegration) OptimizeInstructions(instructions []MIRInstruction) []MIRInstruction {
 	optimized := make([]MIRInstruction, 0, len(instructions))
 
 	for i, instr := range instructions {
-		// Skip redundant null checks
+		// Skip redundant null checks.
 		if instr.Op == "null_check" && i > 0 {
 			prevInstr := instructions[i-1]
 			if prevInstr.Op == "null_check" && len(prevInstr.Operands) > 0 &&
@@ -378,7 +378,7 @@ func (mi *MIRIntegration) OptimizeInstructions(instructions []MIRInstruction) []
 			}
 		}
 
-		// Skip redundant memory barriers
+		// Skip redundant memory barriers.
 		if instr.Op == "memory_barrier" && i > 0 {
 			prevInstr := instructions[i-1]
 			if prevInstr.Op == "memory_barrier" {
@@ -386,15 +386,16 @@ func (mi *MIRIntegration) OptimizeInstructions(instructions []MIRInstruction) []
 			}
 		}
 
-		// Combine immediate loads with same values
+		// Combine immediate loads with same values.
 		if instr.Op == "load_immediate" && i > 0 {
 			for j := i - 1; j >= 0; j-- {
 				prevInstr := instructions[j]
 				if prevInstr.Op == "load_immediate" &&
 					len(prevInstr.Operands) > 0 && len(instr.Operands) > 0 &&
 					prevInstr.Operands[0] == instr.Operands[0] {
-					// Reuse previous register
+					// Reuse previous register.
 					instr.Result = prevInstr.Result
+
 					break
 				}
 			}
@@ -406,14 +407,14 @@ func (mi *MIRIntegration) OptimizeInstructions(instructions []MIRInstruction) []
 	return optimized
 }
 
-// GenerateInlinedAlloc generates inlined allocation for small, fixed-size objects
+// GenerateInlinedAlloc generates inlined allocation for small, fixed-size objects.
 func (mi *MIRIntegration) GenerateInlinedAlloc(resultReg string, size int) []MIRInstruction {
 	if size > 64 || mi.allocatorType != ArenaAllocatorKind {
-		// Fall back to regular allocation for large objects or non-arena allocators
+		// Fall back to regular allocation for large objects or non-arena allocators.
 		return mi.GenerateAllocInstruction(resultReg, size, int(mi.config.AlignmentSize))
 	}
 
-	// Inlined arena allocation for small objects
+	// Inlined arena allocation for small objects.
 	return []MIRInstruction{
 		{
 			Op:       "load_global",
@@ -484,7 +485,7 @@ func (mi *MIRIntegration) GenerateInlinedAlloc(resultReg string, size int) []MIR
 	}
 }
 
-// GenerateStackAlloc generates stack allocation for temporary objects
+// GenerateStackAlloc generates stack allocation for temporary objects.
 func (mi *MIRIntegration) GenerateStackAlloc(resultReg string, size int) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -496,7 +497,7 @@ func (mi *MIRIntegration) GenerateStackAlloc(resultReg string, size int) []MIRIn
 	}
 }
 
-// GenerateStackFree generates stack deallocation
+// GenerateStackFree generates stack deallocation.
 func (mi *MIRIntegration) GenerateStackFree(ptrReg string, size int) []MIRInstruction {
 	return []MIRInstruction{
 		{
@@ -508,14 +509,14 @@ func (mi *MIRIntegration) GenerateStackFree(ptrReg string, size int) []MIRInstru
 	}
 }
 
-// MIRAllocationPattern represents common allocation patterns
+// MIRAllocationPattern represents common allocation patterns.
 type MIRAllocationPattern struct {
+	Condition    func(size int, usage string) bool
 	Name         string
 	Instructions []MIRInstruction
-	Condition    func(size int, usage string) bool
 }
 
-// GetOptimalPattern returns the optimal allocation pattern for given parameters
+// GetOptimalPattern returns the optimal allocation pattern for given parameters.
 func (mi *MIRIntegration) GetOptimalPattern(size int, usage string) *MIRAllocationPattern {
 	patterns := []*MIRAllocationPattern{
 		{
@@ -547,7 +548,7 @@ func (mi *MIRIntegration) GetOptimalPattern(size int, usage string) *MIRAllocati
 		}
 	}
 
-	// Default pattern
+	// Default pattern.
 	return &MIRAllocationPattern{
 		Name:         "default_alloc",
 		Instructions: mi.GenerateAllocInstruction("result", size, int(mi.config.AlignmentSize)),
@@ -555,11 +556,11 @@ func (mi *MIRIntegration) GetOptimalPattern(size int, usage string) *MIRAllocati
 	}
 }
 
-// GenerateCompleteAllocationSequence generates a complete allocation sequence with error handling
+// GenerateCompleteAllocationSequence generates a complete allocation sequence with error handling.
 func (mi *MIRIntegration) GenerateCompleteAllocationSequence(resultReg string, size int, errorLabel string) []MIRInstruction {
 	instructions := mi.GenerateAllocInstruction(resultReg, size, int(mi.config.AlignmentSize))
 
-	// Add error handling
+	// Add error handling.
 	instructions = append(instructions, []MIRInstruction{
 		{
 			Op:       "cmp_null",

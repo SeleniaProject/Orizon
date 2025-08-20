@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-// TestMIRIntegration tests MIR integration for allocator
+// TestMIRIntegration tests MIR integration for allocator.
 func TestMIRIntegration(t *testing.T) {
 	config := defaultConfig()
 	mir := NewMIRIntegration(SystemAllocatorKind, config)
@@ -17,7 +17,7 @@ func TestMIRIntegration(t *testing.T) {
 			t.Fatal("No instructions generated")
 		}
 
-		// Check for required instructions
+		// Check for required instructions.
 		hasLoadImmediate := false
 		hasCallRuntime := false
 		hasNullCheck := false
@@ -36,9 +36,11 @@ func TestMIRIntegration(t *testing.T) {
 		if !hasLoadImmediate {
 			t.Error("Missing load_immediate instruction")
 		}
+
 		if !hasCallRuntime {
 			t.Error("Missing call_runtime instruction")
 		}
+
 		if !hasNullCheck {
 			t.Error("Missing null_check instruction")
 		}
@@ -51,7 +53,7 @@ func TestMIRIntegration(t *testing.T) {
 			t.Fatal("No instructions generated")
 		}
 
-		// Should have null check and call_runtime
+		// Should have null check and call_runtime.
 		hasNullCheck := false
 		hasCallRuntime := false
 
@@ -67,6 +69,7 @@ func TestMIRIntegration(t *testing.T) {
 		if !hasNullCheck {
 			t.Error("Missing null_check instruction")
 		}
+
 		if !hasCallRuntime {
 			t.Error("Missing call_runtime instruction")
 		}
@@ -79,7 +82,7 @@ func TestMIRIntegration(t *testing.T) {
 			t.Fatal("No instructions generated")
 		}
 
-		// Should have multiplication and runtime call
+		// Should have multiplication and runtime call.
 		hasMul := false
 		hasCallRuntime := false
 
@@ -95,13 +98,14 @@ func TestMIRIntegration(t *testing.T) {
 		if !hasMul {
 			t.Error("Missing mul instruction for size calculation")
 		}
+
 		if !hasCallRuntime {
 			t.Error("Missing call_runtime instruction")
 		}
 	})
 
 	t.Run("OptimizeInstructions", func(t *testing.T) {
-		// Create instructions with redundant null checks
+		// Create instructions with redundant null checks.
 		instructions := []MIRInstruction{
 			{Op: "load_immediate", Operands: []string{"1024"}, Result: "size"},
 			{Op: "null_check", Operands: []string{"ptr"}},
@@ -111,8 +115,9 @@ func TestMIRIntegration(t *testing.T) {
 
 		optimized := mir.OptimizeInstructions(instructions)
 
-		// Should remove redundant null check
+		// Should remove redundant null check.
 		nullCheckCount := 0
+
 		for _, instr := range optimized {
 			if instr.Op == "null_check" {
 				nullCheckCount++
@@ -125,7 +130,7 @@ func TestMIRIntegration(t *testing.T) {
 	})
 }
 
-// TestX64Integration tests x64 assembly integration
+// TestX64Integration tests x64 assembly integration.
 func TestX64Integration(t *testing.T) {
 	config := defaultConfig()
 	x64 := NewX64Integration(SystemAllocatorKind, config)
@@ -137,7 +142,7 @@ func TestX64Integration(t *testing.T) {
 			t.Fatal("No instructions generated")
 		}
 
-		// Should have function call and register management
+		// Should have function call and register management.
 		hasCall := false
 		hasPush := false
 		hasPop := false
@@ -156,9 +161,11 @@ func TestX64Integration(t *testing.T) {
 		if !hasCall {
 			t.Error("Missing call instruction")
 		}
+
 		if !hasPush {
 			t.Error("Missing register save (push)")
 		}
+
 		if !hasPop {
 			t.Error("Missing register restore (pop)")
 		}
@@ -172,7 +179,7 @@ func TestX64Integration(t *testing.T) {
 			t.Fatal("No instructions generated")
 		}
 
-		// Should have arena pointer manipulation
+		// Should have arena pointer manipulation.
 		hasLoad := false
 		hasLea := false
 		hasCmp := false
@@ -193,9 +200,11 @@ func TestX64Integration(t *testing.T) {
 		if !hasLoad {
 			t.Error("Missing arena current pointer load")
 		}
+
 		if !hasLea {
 			t.Error("Missing lea instruction for pointer calculation")
 		}
+
 		if !hasCmp {
 			t.Error("Missing bounds check comparison")
 		}
@@ -214,22 +223,24 @@ func TestX64Integration(t *testing.T) {
 			t.Fatal("No formatted output")
 		}
 
-		// Should contain proper assembly formatting
+		// Should contain proper assembly formatting.
 		if !contains(formatted, "mov") {
 			t.Error("Missing mov instruction in formatted output")
 		}
+
 		if !contains(formatted, "test_label:") {
 			t.Error("Missing label in formatted output")
 		}
+
 		if !contains(formatted, "Test move") {
 			t.Error("Missing comment in formatted output")
 		}
 	})
 }
 
-// TestRuntimeIntegration tests complete runtime integration
+// TestRuntimeIntegration tests complete runtime integration.
 func TestRuntimeIntegration(t *testing.T) {
-	// Test system allocator integration
+	// Test system allocator integration.
 	t.Run("SystemAllocatorRuntime", func(t *testing.T) {
 		config := defaultConfig()
 		systemAlloc := NewSystemAllocator(config)
@@ -238,15 +249,16 @@ func TestRuntimeIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to initialize runtime: %v", err)
 		}
+
 		defer ShutdownRuntime()
 
-		// Test runtime allocation
+		// Test runtime allocation.
 		ptr := RuntimeAlloc(1024)
 		if ptr == nil {
 			t.Fatal("Runtime allocation failed")
 		}
 
-		// Test memory access
+		// Test memory access.
 		data := (*[1024]byte)(ptr)
 		data[0] = 42
 		data[1023] = 43
@@ -260,6 +272,7 @@ func TestRuntimeIntegration(t *testing.T) {
 
 	t.Run("ArenaAllocatorRuntime", func(t *testing.T) {
 		config := defaultConfig()
+
 		arenaAlloc, err := NewArenaAllocator(64*1024, config)
 		if err != nil {
 			t.Fatalf("Failed to create arena allocator: %v", err)
@@ -269,22 +282,26 @@ func TestRuntimeIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to initialize runtime: %v", err)
 		}
+
 		defer ShutdownRuntime()
 
-		// Test multiple allocations
+		// Test multiple allocations.
 		var ptrs []unsafe.Pointer
+
 		for i := 0; i < 10; i++ {
 			ptr := RuntimeAlloc(512)
 			if ptr == nil {
 				t.Fatalf("Arena allocation %d failed", i)
 			}
+
 			ptrs = append(ptrs, ptr)
 		}
 
-		// Verify allocations are in order (arena property)
+		// Verify allocations are in order (arena property).
 		for i := 1; i < len(ptrs); i++ {
 			prev := uintptr(ptrs[i-1])
 			curr := uintptr(ptrs[i])
+
 			if curr <= prev {
 				t.Error("Arena allocations not in order")
 			}
@@ -299,9 +316,10 @@ func TestRuntimeIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to initialize runtime: %v", err)
 		}
+
 		defer ShutdownRuntime()
 
-		// Test slice allocation
+		// Test slice allocation.
 		header := RuntimeAllocSlice(4, 10, 20)
 		if header == nil {
 			t.Fatal("Slice allocation failed")
@@ -310,14 +328,16 @@ func TestRuntimeIntegration(t *testing.T) {
 		if header.Len != 10 {
 			t.Errorf("Slice length wrong: got %d, want 10", header.Len)
 		}
+
 		if header.Cap != 20 {
 			t.Errorf("Slice capacity wrong: got %d, want 20", header.Cap)
 		}
+
 		if header.Data == nil {
 			t.Error("Slice data is nil")
 		}
 
-		// Test slice access
+		// Test slice access.
 		slice := (*[20]uint32)(header.Data)
 		for i := 0; i < 10; i++ {
 			slice[i] = uint32(i * 2)
@@ -340,11 +360,12 @@ func TestRuntimeIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to initialize runtime: %v", err)
 		}
+
 		defer ShutdownRuntime()
 
 		testStr := "Hello, World!"
 
-		// Allocate same string twice
+		// Allocate same string twice.
 		ptr1 := RuntimeAllocString(testStr)
 		ptr2 := RuntimeAllocString(testStr)
 
@@ -352,7 +373,7 @@ func TestRuntimeIntegration(t *testing.T) {
 			t.Fatal("String allocation failed")
 		}
 
-		// Should hit string pool on second allocation
+		// Should hit string pool on second allocation.
 		stats := GetRuntimeStats()
 		if stats.StringPool.Hits == 0 {
 			t.Error("String pool should have hits")
@@ -360,14 +381,14 @@ func TestRuntimeIntegration(t *testing.T) {
 	})
 }
 
-// TestAllocatorInteroperability tests interoperability between different allocator types
+// TestAllocatorInteroperability tests interoperability between different allocator types.
 func TestAllocatorInteroperability(t *testing.T) {
 	t.Run("AllocatorSwitch", func(t *testing.T) {
-		// Test switching between allocator types
+		// Test switching between allocator types.
 		config := defaultConfig()
 		config.EnableTracking = true
 
-		// Start with system allocator
+		// Start with system allocator.
 		err := Initialize(SystemAllocatorKind, WithTracking(true))
 		if err != nil {
 			t.Fatalf("Failed to initialize system allocator: %v", err)
@@ -385,7 +406,7 @@ func TestAllocatorInteroperability(t *testing.T) {
 
 		Free(ptr1)
 
-		// Switch to arena allocator
+		// Switch to arena allocator.
 		err = Initialize(ArenaAllocatorKind, WithArenaSize(32*1024))
 		if err != nil {
 			t.Fatalf("Failed to initialize arena allocator: %v", err)
@@ -401,15 +422,15 @@ func TestAllocatorInteroperability(t *testing.T) {
 			t.Error("Arena allocator should show allocations")
 		}
 
-		// Arena allocator doesn't support individual free
-		// so we just reset
+		// Arena allocator doesn't support individual free.
+		// so we just reset.
 		if arena, ok := GlobalAllocator.(*ArenaAllocatorImpl); ok {
 			arena.Reset()
 		}
 	})
 }
 
-// TestPerformanceCharacteristics tests performance characteristics of allocators
+// TestPerformanceCharacteristics tests performance characteristics of allocators.
 func TestPerformanceCharacteristics(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping performance tests in short mode")
@@ -423,12 +444,12 @@ func TestPerformanceCharacteristics(t *testing.T) {
 			"System": NewSystemAllocator(config),
 		}
 
-		// Add arena allocator
+		// Add arena allocator.
 		if arena, err := NewArenaAllocator(1024*1024, config); err == nil {
 			allocators["Arena"] = arena
 		}
 
-		// Add pool allocator
+		// Add pool allocator.
 		if pool, err := NewPoolAllocator([]uintptr{64, 128, 256, 512, 1024}, config); err == nil {
 			allocators["Pool"] = pool
 		}
@@ -437,7 +458,7 @@ func TestPerformanceCharacteristics(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				const numAllocs = 1000
 
-				// Allocate
+				// Allocate.
 				ptrs := make([]unsafe.Pointer, numAllocs)
 				for i := 0; i < numAllocs; i++ {
 					ptrs[i] = allocator.Alloc(256)
@@ -446,12 +467,12 @@ func TestPerformanceCharacteristics(t *testing.T) {
 					}
 				}
 
-				// Free (if supported)
+				// Free (if supported).
 				for _, ptr := range ptrs {
 					allocator.Free(ptr)
 				}
 
-				// Reset if arena
+				// Reset if arena.
 				if arena, ok := allocator.(*ArenaAllocatorImpl); ok {
 					arena.Reset()
 				}
@@ -460,7 +481,7 @@ func TestPerformanceCharacteristics(t *testing.T) {
 	})
 }
 
-// Helper function to check if string contains substring
+// Helper function to check if string contains substring.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[0:len(substr)] == substr ||
 		(len(s) > len(substr) && contains(s[1:], substr))

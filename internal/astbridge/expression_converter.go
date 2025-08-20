@@ -8,10 +8,10 @@ import (
 )
 
 // ExpressionConverter handles conversion between AST and parser expression types.
-// This specialized converter focuses on expression-level transformations,
+// This specialized converter focuses on expression-level transformations,.
 // ensuring proper handling of all expression constructs in the Orizon language.
 type ExpressionConverter struct {
-	// typeConverter handles type-specific conversions within expressions
+	// typeConverter handles type-specific conversions within expressions.
 	typeConverter *TypeConverter
 }
 
@@ -24,7 +24,7 @@ func NewExpressionConverter(typeConverter *TypeConverter) *ExpressionConverter {
 }
 
 // FromParserExpression converts a parser.Expression to ast.Expression.
-// This method provides comprehensive expression conversion with proper error handling
+// This method provides comprehensive expression conversion with proper error handling.
 // for all supported expression types in the Orizon language.
 func (ec *ExpressionConverter) FromParserExpression(expr p.Expression) (ast.Expression, error) {
 	if expr == nil {
@@ -50,7 +50,7 @@ func (ec *ExpressionConverter) FromParserExpression(expr p.Expression) (ast.Expr
 }
 
 // ToParserExpression converts an ast.Expression to parser.Expression.
-// This method provides the inverse conversion with comprehensive error handling
+// This method provides the inverse conversion with comprehensive error handling.
 // and maintains symmetry with FromParserExpression for bidirectional compatibility.
 func (ec *ExpressionConverter) ToParserExpression(expr ast.Expression) (p.Expression, error) {
 	if expr == nil {
@@ -108,13 +108,13 @@ func (ec *ExpressionConverter) fromParserLiteral(literal *p.Literal) (*ast.Liter
 		return nil, fmt.Errorf("cannot convert nil parser literal")
 	}
 
-	// Map parser literal kind to AST literal kind
+	// Map parser literal kind to AST literal kind.
 	astKind, err := ec.mapParserLiteralKind(literal.Kind)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map literal kind: %w", err)
 	}
 
-	// Use string representation as raw value since parser doesn't store raw text
+	// Use string representation as raw value since parser doesn't store raw text.
 	rawValue := fmt.Sprintf("%v", literal.Value)
 
 	return &ast.Literal{
@@ -132,7 +132,7 @@ func (ec *ExpressionConverter) toParserLiteral(literal *ast.Literal) (*p.Literal
 		return nil, fmt.Errorf("cannot convert nil AST literal")
 	}
 
-	// Map AST literal kind to parser literal kind
+	// Map AST literal kind to parser literal kind.
 	parserKind, err := ec.mapASTLiteralKind(literal.Kind)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map literal kind: %w", err)
@@ -177,7 +177,7 @@ func (ec *ExpressionConverter) mapASTLiteralKind(kind ast.LiteralKind) (p.Litera
 	case ast.LiteralBoolean:
 		return p.LiteralBool, nil
 	case ast.LiteralCharacter:
-		// Parser doesn't have separate char literals, map to string
+		// Parser doesn't have separate char literals, map to string.
 		return p.LiteralString, nil
 	case ast.LiteralNull:
 		return p.LiteralNull, nil
@@ -186,7 +186,7 @@ func (ec *ExpressionConverter) mapASTLiteralKind(kind ast.LiteralKind) (p.Litera
 	}
 }
 
-// Stub implementations for complex expressions (to be expanded)
+// Stub implementations for complex expressions (to be expanded).
 
 func (ec *ExpressionConverter) fromParserBinaryExpression(expr *p.BinaryExpression) (*ast.BinaryExpression, error) {
 	return nil, fmt.Errorf("binary expression conversion not yet implemented")

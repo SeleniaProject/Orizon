@@ -8,12 +8,12 @@ import (
 )
 
 // StatementConverter handles conversion between AST and parser statement types.
-// This specialized converter focuses on statement-level transformations,
+// This specialized converter focuses on statement-level transformations,.
 // ensuring proper handling of all statement constructs in the Orizon language.
 type StatementConverter struct {
-	// typeConverter handles type-specific conversions within statements
+	// typeConverter handles type-specific conversions within statements.
 	typeConverter *TypeConverter
-	// exprConverter handles expression-specific conversions within statements
+	// exprConverter handles expression-specific conversions within statements.
 	exprConverter *ExpressionConverter
 }
 
@@ -27,7 +27,7 @@ func NewStatementConverter(typeConverter *TypeConverter, exprConverter *Expressi
 }
 
 // FromParserStatement converts a parser.Statement to ast.Statement.
-// This method provides comprehensive statement conversion with proper error handling
+// This method provides comprehensive statement conversion with proper error handling.
 // for all supported statement types in the Orizon language.
 func (sc *StatementConverter) FromParserStatement(stmt p.Statement) (ast.Statement, error) {
 	if stmt == nil {
@@ -53,7 +53,7 @@ func (sc *StatementConverter) FromParserStatement(stmt p.Statement) (ast.Stateme
 }
 
 // ToParserStatement converts an ast.Statement to parser.Statement.
-// This method provides the inverse conversion with comprehensive error handling
+// This method provides the inverse conversion with comprehensive error handling.
 // and maintains symmetry with FromParserStatement for bidirectional compatibility.
 func (sc *StatementConverter) ToParserStatement(stmt ast.Statement) (p.Statement, error) {
 	if stmt == nil {
@@ -86,11 +86,13 @@ func (sc *StatementConverter) fromParserBlockStatement(block *p.BlockStatement) 
 	}
 
 	statements := make([]ast.Statement, 0, len(block.Statements))
+
 	for _, stmt := range block.Statements {
 		convertedStmt, err := sc.FromParserStatement(stmt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert statement in block: %w", err)
 		}
+
 		if convertedStmt != nil {
 			statements = append(statements, convertedStmt)
 		}
@@ -110,11 +112,13 @@ func (sc *StatementConverter) toParserBlockStatement(block *ast.BlockStatement) 
 	}
 
 	statements := make([]p.Statement, 0, len(block.Statements))
+
 	for _, stmt := range block.Statements {
 		convertedStmt, err := sc.ToParserStatement(stmt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert statement in block: %w", err)
 		}
+
 		if convertedStmt != nil {
 			statements = append(statements, convertedStmt)
 		}
@@ -170,8 +174,10 @@ func (sc *StatementConverter) fromParserReturnStatement(retStmt *p.ReturnStateme
 	}
 
 	var value ast.Expression
+
 	if retStmt.Value != nil {
 		var err error
+
 		value, err = sc.exprConverter.FromParserExpression(retStmt.Value)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert return value: %w", err)
@@ -192,8 +198,10 @@ func (sc *StatementConverter) toParserReturnStatement(retStmt *ast.ReturnStateme
 	}
 
 	var value p.Expression
+
 	if retStmt.Value != nil {
 		var err error
+
 		value, err = sc.exprConverter.ToParserExpression(retStmt.Value)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert return value: %w", err)
@@ -206,7 +214,7 @@ func (sc *StatementConverter) toParserReturnStatement(retStmt *ast.ReturnStateme
 	}, nil
 }
 
-// Stub implementations for complex statements (to be expanded)
+// Stub implementations for complex statements (to be expanded).
 
 func (sc *StatementConverter) fromParserIfStatement(ifStmt *p.IfStatement) (*ast.IfStatement, error) {
 	return nil, fmt.Errorf("if statement conversion not yet implemented")

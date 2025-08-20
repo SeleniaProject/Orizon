@@ -10,7 +10,7 @@ import (
 )
 
 // TypeConverter handles conversion between AST and parser type representations.
-// This specialized converter ensures type safety and consistency across the entire
+// This specialized converter ensures type safety and consistency across the entire.
 // compilation pipeline while maintaining clear separation of type-related concerns.
 type TypeConverter struct{}
 
@@ -21,7 +21,7 @@ func NewTypeConverter() *TypeConverter {
 }
 
 // FromParserType converts a parser.Type to ast.Type.
-// This method provides comprehensive type conversion with proper error handling
+// This method provides comprehensive type conversion with proper error handling.
 // for all supported type constructs in the Orizon language.
 func (tc *TypeConverter) FromParserType(parserType p.Type) (ast.Type, error) {
 	if parserType == nil {
@@ -39,7 +39,7 @@ func (tc *TypeConverter) FromParserType(parserType p.Type) (ast.Type, error) {
 }
 
 // ToParserType converts an ast.Type to parser.Type.
-// This method provides the inverse conversion with comprehensive error handling
+// This method provides the inverse conversion with comprehensive error handling.
 // and maintains symmetry with FromParserType for bidirectional compatibility.
 func (tc *TypeConverter) ToParserType(astType ast.Type) (p.Type, error) {
 	if astType == nil {
@@ -72,6 +72,7 @@ func (tc *TypeConverter) PrettyPrintParserType(parserType p.Type) string {
 		if stringer, ok := parserType.(fmt.Stringer); ok {
 			return stringer.String()
 		}
+
 		return "<unknown-type>"
 	}
 }
@@ -91,17 +92,17 @@ func (tc *TypeConverter) formatTupleType(tupleType *p.TupleType) string {
 	return fmt.Sprintf("(%s)", strings.Join(elements, ", "))
 }
 
-// Helper methods for specific type conversions
+// Helper methods for specific type conversions.
 
 // fromParserBasicType converts parser BasicType to AST BasicType.
-// This method maps between the different basic type representations and ensures
+// This method maps between the different basic type representations and ensures.
 // proper handling of primitive type semantics.
 func (tc *TypeConverter) fromParserBasicType(basicType *p.BasicType) (*ast.BasicType, error) {
 	if basicType == nil {
 		return nil, fmt.Errorf("cannot convert nil parser basic type")
 	}
 
-	// Map parser basic type names to AST basic kinds
+	// Map parser basic type names to AST basic kinds.
 	kind := tc.mapBasicTypeName(basicType.Name)
 
 	return &ast.BasicType{
@@ -117,7 +118,7 @@ func (tc *TypeConverter) toParserBasicType(basicType *ast.BasicType) (*p.BasicTy
 		return nil, fmt.Errorf("cannot convert nil AST basic type")
 	}
 
-	// Map AST basic kind to parser type name
+	// Map AST basic kind to parser type name.
 	name := tc.mapBasicTypeKind(basicType.Kind)
 
 	return &p.BasicType{
@@ -146,7 +147,7 @@ func (tc *TypeConverter) fromParserTupleType(tupleType *p.TupleType) (ast.Type, 
 		return nil, fmt.Errorf("cannot convert nil parser tuple type")
 	}
 
-	// Unit type () maps to void
+	// Unit type () maps to void.
 	if len(tupleType.Elements) == 0 {
 		return &ast.BasicType{
 			Span: fromParserSpan(tupleType.Span),
@@ -154,8 +155,8 @@ func (tc *TypeConverter) fromParserTupleType(tupleType *p.TupleType) (ast.Type, 
 		}, nil
 	}
 
-	// For now, map tuple types to identifier types with tuple representation
-	// This is a simplified approach - full tuple support would require extending AST
+	// For now, map tuple types to identifier types with tuple representation.
+	// This is a simplified approach - full tuple support would require extending AST.
 	return &ast.IdentifierType{
 		Span: fromParserSpan(tupleType.Span),
 		Name: &ast.Identifier{
@@ -182,7 +183,7 @@ func (tc *TypeConverter) mapBasicTypeName(name string) ast.BasicKind {
 	case "void", "unit", "()":
 		return ast.BasicVoid
 	default:
-		// Fallback for unknown types
+		// Fallback for unknown types.
 		return ast.BasicVoid
 	}
 }
@@ -208,7 +209,7 @@ func (tc *TypeConverter) mapBasicTypeKind(kind ast.BasicKind) string {
 	}
 }
 
-// Helper functions for span conversion
+// Helper functions for span conversion.
 
 // fromParserSpan converts parser.Span to position.Span.
 // This function ensures proper position tracking across conversion boundaries.
