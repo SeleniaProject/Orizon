@@ -1,4 +1,4 @@
-package unit
+package unit_test
 
 import (
 	"testing"
@@ -6,9 +6,9 @@ import (
 	orizonTesting "github.com/orizon-lang/orizon/internal/testing"
 )
 
-// TestLexerBasics tests basic lexer functionality
+// TestLexerBasics tests basic lexer functionality.
 func TestLexerBasics(t *testing.T) {
-	// Use default config with verbose enabled
+	// Use default config with verbose enabled.
 	config := orizonTesting.DefaultTestConfig()
 	config.Verbose = true
 
@@ -64,7 +64,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestParserBasics tests basic parser functionality
+// TestParserBasics tests basic parser functionality.
 func TestParserBasics(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -135,7 +135,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestTypeChecker tests type checking functionality
+// TestTypeChecker tests type checking functionality.
 func TestTypeChecker(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -210,7 +210,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestCoreTypes tests core type functionality
+// TestCoreTypes tests core type functionality.
 func TestCoreTypes(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -294,7 +294,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestMemoryManagement tests memory management functionality
+// TestMemoryManagement tests memory management functionality.
 func TestMemoryManagement(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -328,7 +328,7 @@ fn main() {
         print("arena allocation successful");
     }
     
-    // Arena will be automatically cleaned up
+    // Arena will be automatically cleaned up.
 }`,
 			ExpectedOut: "arena allocation successful",
 			ShouldFail:  false,
@@ -338,7 +338,7 @@ fn main() {
 			SourceCode: `
 fn main() {
     let ptr = alloc(1024);
-    // Intentionally not freeing ptr to test leak detection
+    // Intentionally not freeing ptr to test leak detection.
     print("done");
 }`,
 			ExpectedOut: "done",
@@ -349,7 +349,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestIntrinsics tests compiler intrinsics functionality
+// TestIntrinsics tests compiler intrinsics functionality.
 func TestIntrinsics(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
@@ -414,7 +414,7 @@ fn main() {
 	framework.RunTestSuite(tests, t)
 }
 
-// TestErrorHandling tests error handling functionality
+// TestErrorHandling tests error handling functionality.
 func TestErrorHandling(t *testing.T) {
 	framework, err := orizonTesting.NewTestFramework(nil)
 	if err != nil {
