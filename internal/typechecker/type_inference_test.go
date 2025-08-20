@@ -1,4 +1,4 @@
-package typechecker
+package typechecker_test
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestTypeInferenceEngine_Basic(t *testing.T) {
-	// Basic test to verify type inference engine can be created
+	// Basic test to verify type inference engine can be created.
 	tie := NewTypeInferenceEngine(nil)
 
 	if tie == nil {
@@ -50,7 +50,7 @@ func TestTypeInferenceEngine_CreateUnificationVariable(t *testing.T) {
 		t.Errorf("Expected kind UnificationKindType, got %v", variable.Kind)
 	}
 
-	// Verify variable is stored
+	// Verify variable is stored.
 	if _, exists := tie.unificationVars[variable.ID]; !exists {
 		t.Error("Unification variable not stored in engine")
 	}
@@ -85,7 +85,7 @@ func TestTypeInferenceEngine_AddConstraint(t *testing.T) {
 func TestTypeInferenceEngine_Unify_PrimitiveTypes(t *testing.T) {
 	tie := NewTypeInferenceEngine(nil)
 
-	// Test unifying identical primitive types
+	// Test unifying identical primitive types.
 	type1 := &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "i32"}
 	type2 := &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "i32"}
 
@@ -98,21 +98,21 @@ func TestTypeInferenceEngine_Unify_PrimitiveTypes(t *testing.T) {
 func TestTypeInferenceEngine_Unify_UnificationVariable(t *testing.T) {
 	tie := NewTypeInferenceEngine(nil)
 
-	// Create unification variable
+	// Create unification variable.
 	pos := position.Position{Line: 1, Column: 1}
 	variable := tie.CreateUnificationVariable("test_var", pos)
 
-	// Create variable type
+	// Create variable type.
 	varType := &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: variable.ID}
 	concreteType := &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "i32"}
 
-	// Unify variable with concrete type
+	// Unify variable with concrete type.
 	err := tie.Unify(varType, concreteType)
 	if err != nil {
 		t.Errorf("Unifying variable with concrete type should succeed, got error: %v", err)
 	}
 
-	// Check that variable was bound
+	// Check that variable was bound.
 	if variable.Solution == nil {
 		t.Error("Variable should be bound after unification")
 	}
@@ -125,7 +125,7 @@ func TestTypeInferenceEngine_Unify_UnificationVariable(t *testing.T) {
 func TestTypeInferenceEngine_InferExpression_Literal(t *testing.T) {
 	tie := NewTypeInferenceEngine(nil)
 
-	// Create a literal expression
+	// Create a literal expression.
 	expr := &parser.HIRExpression{
 		Kind: parser.HIRExprLiteral,
 		Data: "test_literal",

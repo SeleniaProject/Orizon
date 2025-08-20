@@ -2,12 +2,13 @@ package typechecker
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/orizon-lang/orizon/internal/parser"
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// TypeInferenceEngine handles type inference and unification
+// TypeInferenceEngine handles type inference and unification.
 type TypeInferenceEngine struct {
 	traitResolver   *TraitResolver
 	inferenceStack  []*InferenceContext
@@ -18,50 +19,50 @@ type TypeInferenceEngine struct {
 	debugMode       bool
 }
 
-// InferenceContext represents a context for type inference
+// InferenceContext represents a context for type inference.
 type InferenceContext struct {
-	Scope          InferenceScope
 	LocalVars      map[string]*parser.HIRType
 	ExpectedType   *parser.HIRType
 	ReturnType     *parser.HIRType
 	TypeParameters []*parser.HIRTypeParameter
 	Constraints    []*TypeConstraint
 	Position       position.Position
+	Scope          InferenceScope
 }
 
-// UnificationVariable represents a type variable in unification
+// UnificationVariable represents a type variable in unification.
 type UnificationVariable struct {
+	Solution        *parser.HIRType
 	ID              string
-	Bounds          []*parser.HIRType // Upper bounds (T: Trait)
-	LowerBounds     []*parser.HIRType // Lower bounds (supertypes)
-	Solution        *parser.HIRType   // Solved type
-	Kind            UnificationKind   // Kind of unification variable
-	CreationContext string            // Where this variable was created
+	CreationContext string
+	Bounds          []*parser.HIRType
+	LowerBounds     []*parser.HIRType
 	Position        position.Position
+	Kind            UnificationKind
 }
 
-// TypeConstraint represents a constraint between types
+// TypeConstraint represents a constraint between types.
 type TypeConstraint struct {
-	Kind       ConstraintKind
 	Left       *parser.HIRType
 	Right      *parser.HIRType
 	Variable   *UnificationVariable
-	Position   position.Position
 	Message    string
+	Position   position.Position
+	Kind       ConstraintKind
 	IsResolved bool
 }
 
-// InferenceError represents an error in type inference
+// InferenceError represents an error in type inference.
 type InferenceError struct {
-	Kind       InferenceErrorKind
-	Message    string
-	Position   position.Position
 	Type1      *parser.HIRType
 	Type2      *parser.HIRType
 	Constraint *TypeConstraint
+	Message    string
+	Position   position.Position
+	Kind       InferenceErrorKind
 }
 
-// InferenceScope represents different inference scopes
+// InferenceScope represents different inference scopes.
 type InferenceScope int
 
 const (
@@ -71,7 +72,7 @@ const (
 	InferenceScopeExpression
 )
 
-// UnificationKind represents different kinds of unification variables
+// UnificationKind represents different kinds of unification variables.
 type UnificationKind int
 
 const (
@@ -81,7 +82,7 @@ const (
 	UnificationKindEffect
 )
 
-// ConstraintKind represents different kinds of type constraints
+// ConstraintKind represents different kinds of type constraints.
 type ConstraintKind int
 
 const (
@@ -92,7 +93,7 @@ const (
 	ConstraintKindEffect
 )
 
-// InferenceErrorKind represents different kinds of inference errors
+// InferenceErrorKind represents different kinds of inference errors.
 type InferenceErrorKind int
 
 const (
@@ -104,7 +105,7 @@ const (
 	InferenceErrorMissingConstraint
 )
 
-// NewTypeInferenceEngine creates a new type inference engine
+// NewTypeInferenceEngine creates a new type inference engine.
 func NewTypeInferenceEngine(traitResolver *TraitResolver) *TypeInferenceEngine {
 	return &TypeInferenceEngine{
 		traitResolver:   traitResolver,
@@ -117,9 +118,9 @@ func NewTypeInferenceEngine(traitResolver *TraitResolver) *TypeInferenceEngine {
 	}
 }
 
-// InferExpression infers the type of an expression
+// InferExpression infers the type of an expression.
 func (tie *TypeInferenceEngine) InferExpression(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// Create new inference context
+	// Create new inference context.
 	ctx := &InferenceContext{
 		Scope:        InferenceScopeExpression,
 		LocalVars:    make(map[string]*parser.HIRType),
@@ -130,12 +131,12 @@ func (tie *TypeInferenceEngine) InferExpression(expr *parser.HIRExpression, expe
 	tie.pushContext(ctx)
 	defer tie.popContext()
 
-	// If expression already has a type, return it
+	// If expression already has a type, return it.
 	if expr.Type != nil {
 		return expr.Type, nil
 	}
 
-	// Infer based on expression kind
+	// Infer based on expression kind.
 	switch expr.Kind {
 	case parser.HIRExprLiteral:
 		return tie.inferLiteral(expr)
@@ -155,19 +156,32 @@ func (tie *TypeInferenceEngine) InferExpression(expr *parser.HIRExpression, expe
 		return tie.inferArray(expr, expectedType)
 	case parser.HIRExprStruct:
 		return tie.inferStruct(expr, expectedType)
-	default:
-		// Create unification variable for unsupported expressions
+	case parser.HIRExprMethodCall, parser.HIRExprCast, parser.HIRExprRef,
+		parser.HIRExprDeref, parser.HIRExprTuple, parser.HIRExprClosure,
+		parser.HIRExprBlock, parser.HIRExprIf, parser.HIRExprMatch,
+		parser.HIRExprLoop, parser.HIRExprBreak, parser.HIRExprContinue,
+		parser.HIRExprReturn, parser.HIRExprYield, parser.HIRExprAwait,
+		parser.HIRExprTry:
+		// Create unification variable for unsupported expressions.
 		unificationVar := tie.CreateUnificationVariable(
 			fmt.Sprintf("expr_%s", expr.Kind.String()),
 			position.Position{Line: 1, Column: 1},
 		)
 		return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: unificationVar.ID}, nil
+	default:
+		// Create unification variable for unsupported expressions.
+		unificationVar := tie.CreateUnificationVariable(
+			fmt.Sprintf("expr_%s", expr.Kind.String()),
+			position.Position{Line: 1, Column: 1},
+		)
+
+		return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: unificationVar.ID}, nil
 	}
 }
 
-// InferFunction infers types for a function body
+// InferFunction infers types for a function body.
 func (tie *TypeInferenceEngine) InferFunction(function *parser.HIRFunction) error {
-	// Create function-level inference context
+	// Create function-level inference context.
 	ctx := &InferenceContext{
 		Scope:          InferenceScopeFunction,
 		LocalVars:      make(map[string]*parser.HIRType),
@@ -179,51 +193,52 @@ func (tie *TypeInferenceEngine) InferFunction(function *parser.HIRFunction) erro
 	tie.pushContext(ctx)
 	defer tie.popContext()
 
-	// Add parameters to local variable scope
+	// Add parameters to local variable scope.
 	for _, param := range function.Parameters {
 		ctx.LocalVars[param.Name] = param.Type
 	}
 
-	// Infer function body
+	// Infer function body.
 	if function.Body != nil {
 		if err := tie.inferBlock(function.Body); err != nil {
 			return err
 		}
 	}
 
-	// Solve constraints
+	// Solve constraints.
 	return tie.solveConstraints()
 }
 
-// Unify attempts to unify two types
+// Unify attempts to unify two types.
 func (tie *TypeInferenceEngine) Unify(type1, type2 *parser.HIRType) error {
 	if tie.debugMode {
-		fmt.Printf("Unifying %s with %s\n", type1.String(), type2.String())
+		log.Printf("Unifying %s with %s\n", type1.String(), type2.String())
 	}
 
-	// Handle nil types
+	// Handle nil types.
 	if type1 == nil || type2 == nil {
 		return fmt.Errorf("cannot unify nil types")
 	}
 
-	// Handle identical types (simplified check)
+	// Handle identical types (simplified check).
 	if type1.Kind == type2.Kind && type1.Data == type2.Data {
 		return nil
 	}
 
-	// Handle unification variables
+	// Handle unification variables.
 	if var1, isVar1 := tie.isUnificationVariable(type1); isVar1 {
 		return tie.unifyVariable(var1, type2)
 	}
+
 	if var2, isVar2 := tie.isUnificationVariable(type2); isVar2 {
 		return tie.unifyVariable(var2, type1)
 	}
 
-	// Handle structural unification
+	// Handle structural unification.
 	return tie.unifyStructural(type1, type2)
 }
 
-// CreateUnificationVariable creates a new unification variable
+// CreateUnificationVariable creates a new unification variable.
 func (tie *TypeInferenceEngine) CreateUnificationVariable(context string, pos position.Position) *UnificationVariable {
 	id := fmt.Sprintf("T%d", len(tie.unificationVars))
 
@@ -237,18 +252,19 @@ func (tie *TypeInferenceEngine) CreateUnificationVariable(context string, pos po
 	}
 
 	tie.unificationVars[id] = variable
+
 	return variable
 }
 
-// AddConstraint adds a type constraint
+// AddConstraint adds a type constraint.
 func (tie *TypeInferenceEngine) AddConstraint(constraint *TypeConstraint) {
 	tie.constraints = append(tie.constraints, constraint)
 	if tie.debugMode {
-		fmt.Printf("Added constraint: %s\n", constraint.Message)
+		log.Printf("Added constraint: %s\n", constraint.Message)
 	}
 }
 
-// Private helper methods
+// Private helper methods.
 
 func (tie *TypeInferenceEngine) pushContext(ctx *InferenceContext) {
 	tie.inferenceStack = append(tie.inferenceStack, ctx)
@@ -264,34 +280,48 @@ func (tie *TypeInferenceEngine) getCurrentContext() *InferenceContext {
 	if len(tie.inferenceStack) == 0 {
 		return nil
 	}
+
 	return tie.inferenceStack[len(tie.inferenceStack)-1]
 }
 
 func (tie *TypeInferenceEngine) inferLiteral(expr *parser.HIRExpression) (*parser.HIRType, error) {
-	// Basic literal type inference
-	// In a full implementation, this would examine the Data field for literal values
+	// Basic literal type inference.
+	// In a full implementation, this would examine the Data field for literal values.
+	if expr == nil {
+		return nil, fmt.Errorf("cannot infer type for nil expression")
+	}
+
 	switch expr.Kind {
 	case parser.HIRExprLiteral:
-		// Default to string type for literals
+		// Default to string type for literals.
 		return &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "string"}, nil
+	case parser.HIRExprVariable, parser.HIRExprCall, parser.HIRExprMethodCall,
+		parser.HIRExprFieldAccess, parser.HIRExprIndex, parser.HIRExprBinary,
+		parser.HIRExprUnary, parser.HIRExprCast, parser.HIRExprRef,
+		parser.HIRExprDeref, parser.HIRExprArray, parser.HIRExprStruct,
+		parser.HIRExprTuple, parser.HIRExprClosure, parser.HIRExprBlock,
+		parser.HIRExprIf, parser.HIRExprMatch, parser.HIRExprLoop,
+		parser.HIRExprBreak, parser.HIRExprContinue, parser.HIRExprReturn,
+		parser.HIRExprYield, parser.HIRExprAwait, parser.HIRExprTry:
+		return &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "unknown"}, nil
 	default:
 		return &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "unknown"}, nil
 	}
 }
 
-func (tie *TypeInferenceEngine) inferVariable(expr *parser.HIRExpression) (*parser.HIRType, error) {
+func (tie *TypeInferenceEngine) inferVariable(_ *parser.HIRExpression) (*parser.HIRType, error) {
 	ctx := tie.getCurrentContext()
 	if ctx == nil {
 		return nil, fmt.Errorf("no inference context for variable")
 	}
 
-	// Create unification variable for unknown variables
+	// Create unification variable for unknown variables.
 	unificationVar := tie.CreateUnificationVariable(
 		"variable",
 		position.Position{Line: 1, Column: 1},
 	)
 
-	// Convert to HIR type
+	// Convert to HIR type.
 	hirType := &parser.HIRType{
 		Kind: parser.HIRTypeGeneric,
 		Data: unificationVar.ID,
@@ -301,51 +331,56 @@ func (tie *TypeInferenceEngine) inferVariable(expr *parser.HIRExpression) (*pars
 }
 
 func (tie *TypeInferenceEngine) inferCall(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// Create unification variable for unknown return type
+	// Create unification variable for unknown return type.
 	returnVar := tie.CreateUnificationVariable("call_return", position.Position{Line: 1, Column: 1})
+
 	return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: returnVar.ID}, nil
 }
 
 func (tie *TypeInferenceEngine) inferBinary(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// For binary operations, assume they return the same type as the left operand
-	// or bool for comparison operations
+	// For binary operations, assume they return the same type as the left operand.
+	// or bool for comparison operations.
 	if expectedType != nil {
 		return expectedType, nil
 	}
 
-	// Default to int for arithmetic operations
+	// Default to int for arithmetic operations.
 	return &parser.HIRType{Kind: parser.HIRTypePrimitive, Data: "i32"}, nil
 }
 
 func (tie *TypeInferenceEngine) inferUnary(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// For unary operations, return expected type or create unification variable
+	// For unary operations, return expected type or create unification variable.
 	if expectedType != nil {
 		return expectedType, nil
 	}
 
 	unificationVar := tie.CreateUnificationVariable("unary_result", position.Position{Line: 1, Column: 1})
+
 	return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: unificationVar.ID}, nil
 }
 
 func (tie *TypeInferenceEngine) inferField(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// Create unification variable for unknown field type
+	// Create unification variable for unknown field type.
 	fieldVar := tie.CreateUnificationVariable("field", position.Position{Line: 1, Column: 1})
+
 	return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: fieldVar.ID}, nil
 }
 
 func (tie *TypeInferenceEngine) inferIndex(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// Create unification variable for unknown element type
+	// Create unification variable for unknown element type.
 	elementVar := tie.CreateUnificationVariable("array_element", position.Position{Line: 1, Column: 1})
+
 	return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: elementVar.ID}, nil
 }
 
 func (tie *TypeInferenceEngine) inferArray(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// Use expected type or create array with unknown element type
+	// Use expected type or create array with unknown element type.
 	if expectedType != nil && expectedType.Kind == parser.HIRTypeArray {
 		return expectedType, nil
 	}
 
 	elementVar := tie.CreateUnificationVariable("array_element", position.Position{Line: 1, Column: 1})
+
 	return &parser.HIRType{
 		Kind: parser.HIRTypeArray,
 		Data: map[string]interface{}{
@@ -356,12 +391,13 @@ func (tie *TypeInferenceEngine) inferArray(expr *parser.HIRExpression, expectedT
 }
 
 func (tie *TypeInferenceEngine) inferStruct(expr *parser.HIRExpression, expectedType *parser.HIRType) (*parser.HIRType, error) {
-	// For struct literals, use expected type or create unification variable
+	// For struct literals, use expected type or create unification variable.
 	if expectedType != nil && expectedType.Kind == parser.HIRTypeStruct {
 		return expectedType, nil
 	}
 
 	structVar := tie.CreateUnificationVariable("struct_literal", position.Position{Line: 1, Column: 1})
+
 	return &parser.HIRType{Kind: parser.HIRTypeGeneric, Data: structVar.ID}, nil
 }
 
@@ -371,74 +407,84 @@ func (tie *TypeInferenceEngine) inferBlock(block *parser.HIRBlock) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func (tie *TypeInferenceEngine) inferStatement(stmt *parser.HIRStatement) error {
-	// Basic statement inference - simplified to avoid HIR complexity
+	// Basic statement inference - simplified to avoid HIR complexity.
 	switch stmt.Kind {
 	case parser.HIRStmtExpression:
-		// For expression statements, simply mark as processed
+		// For expression statements, simply mark as processed.
+		return nil
+	case parser.HIRStmtLet, parser.HIRStmtAssign, parser.HIRStmtReturn,
+		parser.HIRStmtBreak, parser.HIRStmtContinue, parser.HIRStmtWhile,
+		parser.HIRStmtFor, parser.HIRStmtIf, parser.HIRStmtMatch,
+		parser.HIRStmtDefer, parser.HIRStmtUnsafe:
+		// For other statement types, just return success.
 		return nil
 	default:
-		// For other statement types, just return success
+		// For other statement types, just return success.
 		return nil
 	}
 }
 
 func (tie *TypeInferenceEngine) isUnificationVariable(hirType *parser.HIRType) (*UnificationVariable, bool) {
 	if hirType.Kind == parser.HIRTypeGeneric {
-		if variable, exists := tie.unificationVars[hirType.Data.(string)]; exists {
-			return variable, true
+		if idStr, ok := hirType.Data.(string); ok {
+			if variable, exists := tie.unificationVars[idStr]; exists {
+				return variable, true
+			}
 		}
 	}
+
 	return nil, false
 }
 
 func (tie *TypeInferenceEngine) unifyVariable(variable *UnificationVariable, otherType *parser.HIRType) error {
-	// If variable is already solved, unify with solution
+	// If variable is already solved, unify with solution.
 	if variable.Solution != nil {
 		return tie.Unify(variable.Solution, otherType)
 	}
 
-	// Check bounds
+	// Check bounds.
 	for _, bound := range variable.Bounds {
 		if err := tie.checkBound(otherType, bound); err != nil {
 			return err
 		}
 	}
 
-	// Set solution
+	// Set solution.
 	variable.Solution = otherType
 	tie.solutions[variable.ID] = otherType
 
 	if tie.debugMode {
-		fmt.Printf("Solved %s = %s\n", variable.ID, otherType.String())
+		log.Printf("Solved %s = %s\n", variable.ID, otherType.String())
 	}
 
 	return nil
 }
 
 func (tie *TypeInferenceEngine) unifyStructural(type1, type2 *parser.HIRType) error {
-	// Handle different type kinds
+	// Handle different type kinds.
 	if type1.Kind != type2.Kind {
 		return fmt.Errorf("cannot unify different type kinds: %v and %v", type1.Kind, type2.Kind)
 	}
 
-	// For simplified implementation, accept structural types as unified
-	// A full implementation would recursively check array elements,
+	// For simplified implementation, accept structural types as unified.
+	// A full implementation would recursively check array elements,.
 	// function parameters/returns, struct fields, etc.
 	return nil
 }
 
 func (tie *TypeInferenceEngine) checkBound(hirType *parser.HIRType, bound *parser.HIRType) error {
-	// Check if type satisfies bound (simplified)
+	// Check if type satisfies bound (simplified).
 	// In a full implementation, this would check trait bounds, subtyping, etc.
 	return nil
 }
 
 func (tie *TypeInferenceEngine) solveConstraints() error {
-	// Solve constraints iteratively
+	// Solve constraints iteratively.
 	changed := true
 	for changed {
 		changed = false
@@ -450,6 +496,7 @@ func (tie *TypeInferenceEngine) solveConstraints() error {
 
 			if err := tie.solveConstraint(constraint); err != nil {
 				tie.addInferenceError(InferenceErrorConstraintViolation, err.Error(), constraint.Position, constraint.Left, constraint.Right)
+
 				return err
 			}
 
@@ -466,50 +513,53 @@ func (tie *TypeInferenceEngine) solveConstraint(constraint *TypeConstraint) erro
 	case ConstraintKindEquality:
 		return tie.Unify(constraint.Left, constraint.Right)
 	case ConstraintKindSubtype:
-		// Check subtype relationship
+		// Check subtype relationship.
 		return tie.checkSubtype(constraint.Left, constraint.Right)
 	case ConstraintKindTrait:
-		// Check trait bound
+		// Check trait bound.
 		return tie.checkTraitBound(constraint.Left, constraint.Right)
+	case ConstraintKindLifetime, ConstraintKindEffect:
+		// Handle lifetime and effect constraints.
+		return nil
 	default:
 		return fmt.Errorf("unsupported constraint kind: %v", constraint.Kind)
 	}
 }
 
 func (tie *TypeInferenceEngine) checkSubtype(subtype, supertype *parser.HIRType) error {
-	// Simplified subtype checking
+	// Simplified subtype checking.
 	// In a full implementation, this would handle variance, inheritance, etc.
 	return tie.Unify(subtype, supertype)
 }
 
 func (tie *TypeInferenceEngine) checkTraitBound(hirType, traitType *parser.HIRType) error {
-	// Check if type implements trait
-	// This would integrate with the trait resolver
+	// Check if type implements trait.
+	// This would integrate with the trait resolver.
 	return nil
 }
 
 func (tie *TypeInferenceEngine) addInferenceError(kind InferenceErrorKind, message string, pos position.Position, type1, type2 *parser.HIRType) {
-	error := InferenceError{
+	inferenceErr := InferenceError{
 		Kind:     kind,
 		Message:  message,
 		Position: pos,
 		Type1:    type1,
 		Type2:    type2,
 	}
-	tie.errors = append(tie.errors, error)
+	tie.errors = append(tie.errors, inferenceErr)
 }
 
-// GetErrors returns all inference errors
+// GetErrors returns all inference errors.
 func (tie *TypeInferenceEngine) GetErrors() []InferenceError {
 	return tie.errors
 }
 
-// GetSolutions returns all solved unification variables
+// GetSolutions returns all solved unification variables.
 func (tie *TypeInferenceEngine) GetSolutions() map[string]*parser.HIRType {
 	return tie.solutions
 }
 
-// SetDebugMode enables or disables debug output
+// SetDebugMode enables or disables debug output.
 func (tie *TypeInferenceEngine) SetDebugMode(enabled bool) {
 	tie.debugMode = enabled
 }
