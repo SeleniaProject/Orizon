@@ -1,4 +1,4 @@
-// Package parser integration test
+// Package parser integration test.
 // Phase 1.2.1: パーサー統合テスト
 package parser
 
@@ -9,9 +9,9 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// TestParserIntegration tests parser with real code files
+// TestParserIntegration tests parser with real code files.
 func TestParserIntegration(t *testing.T) {
-	// Test with example files
+	// Test with example files.
 	testFiles := []string{
 		"../../examples/hello.oriz",
 		"../../examples/simple.oriz",
@@ -21,6 +21,7 @@ func TestParserIntegration(t *testing.T) {
 		t.Run(file, func(t *testing.T) {
 			if _, err := os.Stat(file); os.IsNotExist(err) {
 				t.Skipf("Test file %s does not exist", file)
+
 				return
 			}
 
@@ -44,7 +45,7 @@ func TestParserIntegration(t *testing.T) {
 
 			t.Logf("Successfully parsed %s with %d declarations", file, len(program.Declarations))
 
-			// Test pretty printing
+			// Test pretty printing.
 			output := PrettyPrint(program)
 			if output == "" {
 				t.Error("Pretty print produced empty output")
@@ -53,7 +54,7 @@ func TestParserIntegration(t *testing.T) {
 	}
 }
 
-// TestComplexExpressions tests complex expression parsing
+// TestComplexExpressions tests complex expression parsing.
 func TestComplexExpressions(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -90,23 +91,27 @@ func TestComplexExpressions(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
 			if len(program.Declarations) == 0 {
 				t.Error("Expected at least one statement")
+
 				return
 			}
 
-			// Verify we got an expression statement
+			// Verify we got an expression statement.
 			stmt, ok := program.Declarations[0].(*ExpressionStatement)
 			if !ok {
 				t.Errorf("Expected ExpressionStatement, got %T", program.Declarations[0])
+
 				return
 			}
 
 			if stmt.Expression == nil {
 				t.Error("Expected expression, got nil")
+
 				return
 			}
 
@@ -115,10 +120,10 @@ func TestComplexExpressions(t *testing.T) {
 	}
 }
 
-// TestLanguageFeatures tests various language features
+// TestLanguageFeatures tests various language features.
 func TestLanguageFeatures(t *testing.T) {
 	input := `
-	// Function with parameters and return type
+	// Function with parameters and return type.
 	func factorial(n: int) -> int {
 		if (n <= 1) {
 			return 1;
@@ -126,12 +131,12 @@ func TestLanguageFeatures(t *testing.T) {
 		return n * factorial(n - 1);
 	}
 
-	// Variable declarations
+	// Variable declarations.
 	let pi = 3.14159;
 	var counter = 0;
 	const MAX_SIZE = 100;
 
-	// Main function
+	// Main function.
 	func main() {
 		let result = factorial(5);
 		counter = counter + 1;
@@ -152,13 +157,13 @@ func TestLanguageFeatures(t *testing.T) {
 		t.Fatal("Failed to parse program")
 	}
 
-	// Expect multiple declarations
+	// Expect multiple declarations.
 	expectedCount := 4 // factorial, pi, counter, main
 	if len(program.Declarations) < expectedCount {
 		t.Errorf("Expected at least %d declarations, got %d", expectedCount, len(program.Declarations))
 	}
 
-	// Verify types of declarations
+	// Verify types of declarations.
 	for i, decl := range program.Declarations {
 		switch d := decl.(type) {
 		case *FunctionDeclaration:
@@ -172,12 +177,12 @@ func TestLanguageFeatures(t *testing.T) {
 		}
 	}
 
-	// Test pretty printing
+	// Test pretty printing.
 	output := PrettyPrint(program)
 	t.Logf("Pretty printed AST:\n%s", output)
 }
 
-// TestErrorTolerance tests parser error tolerance
+// TestErrorTolerance tests parser error tolerance.
 func TestErrorTolerance(t *testing.T) {
 	input := `
 	func good1() { return 1; }
@@ -196,17 +201,18 @@ func TestErrorTolerance(t *testing.T) {
 
 	program, errors := p.Parse()
 
-	// Should have errors but still parse valid parts
+	// Should have errors but still parse valid parts.
 	if len(errors) == 0 {
 		t.Error("Expected some parsing errors")
 	}
 
-	// Should still have parsed some valid declarations
+	// Should still have parsed some valid declarations.
 	if len(program.Declarations) == 0 {
 		t.Error("Expected some valid declarations to be parsed")
 	}
 
 	validCount := 0
+
 	for _, decl := range program.Declarations {
 		if decl != nil {
 			validCount++
@@ -215,7 +221,7 @@ func TestErrorTolerance(t *testing.T) {
 
 	t.Logf("Parsed %d valid declarations with %d errors", validCount, len(errors))
 
-	// Should have parsed at least the good functions and valid variable
+	// Should have parsed at least the good functions and valid variable.
 	if validCount < 3 {
 		t.Errorf("Expected at least 3 valid declarations, got %d", validCount)
 	}

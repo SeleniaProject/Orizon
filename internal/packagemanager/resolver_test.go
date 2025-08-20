@@ -14,13 +14,16 @@ func TestResolver_SimpleGraph(t *testing.T) {
 		},
 	}
 	r := NewResolver(idx, ResolveOptions{PreferHigher: true})
+
 	res, err := r.Resolve([]Requirement{{Name: "A", Constraint: ">=1.0.0"}})
 	if err != nil {
 		t.Fatalf("resolve failed: %v", err)
 	}
+
 	if res["A"] != "1.1.0" {
 		t.Fatalf("expected A=1.1.0, got %s", res["A"])
 	}
+
 	if res["B"] != "1.2.0" {
 		t.Fatalf("expected B=1.2.0, got %s", res["B"])
 	}
@@ -32,6 +35,7 @@ func TestResolver_Conflict(t *testing.T) {
 		"B": {{Name: "B", Version: "2.0.0"}},
 	}
 	r := NewResolver(idx, ResolveOptions{})
+
 	_, err := r.Resolve([]Requirement{{Name: "A", Constraint: ">=1.0.0"}})
 	if err == nil {
 		t.Fatalf("expected conflict error")

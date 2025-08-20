@@ -13,7 +13,7 @@ func TestDependentTypeChecker(t *testing.T) {
 }
 
 func TestRefinementType(t *testing.T) {
-	// Test basic refinement type creation
+	// Test basic refinement type creation.
 	refinement := &RefinementType{}
 
 	if refinement == nil {
@@ -22,7 +22,7 @@ func TestRefinementType(t *testing.T) {
 }
 
 func TestSizedArrayType(t *testing.T) {
-	// Test sized array type creation
+	// Test sized array type creation.
 	arrayType := &SizedArrayType{}
 
 	if arrayType == nil {
@@ -31,7 +31,7 @@ func TestSizedArrayType(t *testing.T) {
 }
 
 func TestDependentFunctionType(t *testing.T) {
-	// Test dependent function type creation
+	// Test dependent function type creation.
 	funcType := &DependentFunctionType{}
 
 	if funcType == nil {

@@ -1,5 +1,5 @@
-// High-level Intermediate Representation (HIR) for Orizon language
-// This file defines the HIR structure that serves as a bridge between
+// High-level Intermediate Representation (HIR) for Orizon language.
+// This file defines the HIR structure that serves as a bridge between.
 // the surface syntax (AST) and lower-level representations. HIR provides:
 // 1. Type-erased representation with explicit type information
 // 2. Desugared constructs for easier analysis and optimization
@@ -13,9 +13,9 @@ import (
 	"strings"
 )
 
-// ====== HIR Core Types ======
+// ====== HIR Core Types ======.
 
-// HIRNode represents any node in the HIR
+// HIRNode represents any node in the HIR.
 type HIRNode interface {
 	String() string
 	GetSpan() Span
@@ -23,7 +23,7 @@ type HIRNode interface {
 	GetHIRKind() HIRKind
 }
 
-// HIRKind represents the different kinds of HIR nodes
+// HIRKind represents the different kinds of HIR nodes.
 type HIRKind int
 
 const (
@@ -38,7 +38,7 @@ const (
 	HIRKindImpl
 )
 
-// HIRVisitor defines the visitor pattern for HIR traversal
+// HIRVisitor defines the visitor pattern for HIR traversal.
 type HIRVisitor interface {
 	VisitHIRModule(*HIRModule) interface{}
 	VisitHIRFunction(*HIRFunction) interface{}
@@ -51,19 +51,19 @@ type HIRVisitor interface {
 	VisitHIRImpl(*HIRImpl) interface{}
 }
 
-// ====== HIR Module Structure ======
+// ====== HIR Module Structure ======.
 
-// HIRModule represents a complete compilation unit
+// HIRModule represents a complete compilation unit.
 type HIRModule struct {
-	Span      Span
+	Metadata  *HIRModuleMetadata
 	Name      string
 	Functions []*HIRFunction
 	Variables []*HIRVariable
 	Types     []*HIRTypeDefinition
 	Imports   []*HIRImport
 	Exports   []*HIRExport
-	Metadata  *HIRModuleMetadata
 	Impls     []*HIRImpl
+	Span      Span
 }
 
 func (m *HIRModule) String() string                        { return fmt.Sprintf("module %s", m.Name) }
@@ -71,7 +71,7 @@ func (m *HIRModule) GetSpan() Span                         { return m.Span }
 func (m *HIRModule) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRModule(m) }
 func (m *HIRModule) GetHIRKind() HIRKind                   { return HIRKindModule }
 
-// HIRModuleMetadata contains compilation metadata
+// HIRModuleMetadata contains compilation metadata.
 type HIRModuleMetadata struct {
 	Version      string
 	Author       string
@@ -80,45 +80,44 @@ type HIRModuleMetadata struct {
 	CompileFlags []string
 }
 
-// HIRImport represents module imports
+// HIRImport represents module imports.
 type HIRImport struct {
-	Span       Span
 	ModuleName string
-	Items      []string // specific items to import, empty means all
-	Alias      string   // import alias
-	IsPublic   bool     // re-export import
+	Alias      string
+	Items      []string
+	Span       Span
+	IsPublic   bool
 }
 
-// HIRExport represents module exports
+// HIRExport represents module exports.
 type HIRExport struct {
-	Span      Span
 	ItemName  string
 	Alias     string
+	Span      Span
 	IsDefault bool
 }
 
-// ====== HIR Function Structure ======
+// ====== HIR Function Structure ======.
 
-// HIRFunction represents a function in HIR
+// HIRFunction represents a function in HIR.
 type HIRFunction struct {
-	Span            Span
-	Name            string
-	Parameters      []*HIRParameter
-	ReturnType      *HIRType
-	Body            *HIRBlock
-	IsPublic        bool
-	IsExtern        bool
-	IsGeneric       bool
-	TypeParameters  []*HIRTypeParameter
-	Constraints     []*HIRConstraint
-	CallConvention  string
-	Attributes      []string
-	LocalVariables  []*HIRVariable
-	ClosureCaptures []*HIRVariable
-	// Method metadata (optional)
+	ImplementedTrait *HIRType
+	ReturnType       *HIRType
+	Body             *HIRBlock
+	MethodOfType     *HIRType
+	CallConvention   string
+	Name             string
+	TypeParameters   []*HIRTypeParameter
+	Constraints      []*HIRConstraint
+	Attributes       []string
+	LocalVariables   []*HIRVariable
+	ClosureCaptures  []*HIRVariable
+	Parameters       []*HIRParameter
+	Span             Span
+	IsGeneric        bool
+	IsExtern         bool
 	IsMethod         bool
-	MethodOfType     *HIRType // receiver type for inherent impl
-	ImplementedTrait *HIRType // trait for trait impl methods
+	IsPublic         bool
 }
 
 func (f *HIRFunction) String() string                        { return fmt.Sprintf("fn %s", f.Name) }
@@ -126,26 +125,26 @@ func (f *HIRFunction) GetSpan() Span                         { return f.Span }
 func (f *HIRFunction) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRFunction(f) }
 func (f *HIRFunction) GetHIRKind() HIRKind                   { return HIRKindFunction }
 
-// HIRParameter represents a function parameter
+// HIRParameter represents a function parameter.
 type HIRParameter struct {
-	Span    Span
-	Name    string
 	Type    *HIRType
+	Default *HIRExpression
+	Name    string
+	Span    Span
 	IsRef   bool
 	IsMut   bool
-	Default *HIRExpression
 }
 
-// HIRTypeParameter represents a type parameter for generic functions
+// HIRTypeParameter represents a type parameter for generic functions.
 type HIRTypeParameter struct {
-	Span     Span
+	Default  *HIRType
 	Name     string
 	Bounds   []*HIRType
-	Default  *HIRType
+	Span     Span
 	Variance VarianceKind
 }
 
-// VarianceKind represents type parameter variance
+// VarianceKind represents type parameter variance.
 type VarianceKind int
 
 const (
@@ -154,17 +153,17 @@ const (
 	VarianceContravariant
 )
 
-// HIRConstraint represents type constraints
+// HIRConstraint represents type constraints.
 type HIRConstraint struct {
-	Span        Span
 	Type        *HIRType
 	Trait       *HIRType
 	WhereClause string
+	Span        Span
 }
 
-// ====== HIR Impl System ======
+// ====== HIR Impl System ======.
 
-// HIRImplKind distinguishes inherent vs trait impl
+// HIRImplKind distinguishes inherent vs trait impl.
 type HIRImplKind int
 
 const (
@@ -172,22 +171,23 @@ const (
 	HIRImplTrait
 )
 
-// HIRImpl represents an implementation block
+// HIRImpl represents an implementation block.
 type HIRImpl struct {
+	ForType     *HIRType
+	Trait       *HIRType
+	TypeParams  []*HIRTypeParameter
+	Constraints []*HIRConstraint
+	Methods     []*HIRFunction
 	Span        Span
 	Kind        HIRImplKind
-	ForType     *HIRType
-	Trait       *HIRType // nil for inherent impl
-	TypeParams  []*HIRTypeParameter
-	Constraints []*HIRConstraint // where predicates converted to constraints
-	Methods     []*HIRFunction   // methods defined in this impl
 }
 
 func (i *HIRImpl) String() string {
-	// Pretty basic representation
+	// Pretty basic representation.
 	if i == nil {
 		return "impl <nil>"
 	}
+
 	switch i.Kind {
 	case HIRImplTrait:
 		return "impl trait"
@@ -201,19 +201,19 @@ func (i *HIRImpl) GetSpan() Span                         { return i.Span }
 func (i *HIRImpl) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRImpl(i) }
 func (i *HIRImpl) GetHIRKind() HIRKind                   { return HIRKindImpl }
 
-// ====== HIR Variable Structure ======
+// ====== HIR Variable Structure ======.
 
-// HIRVariable represents a variable declaration
+// HIRVariable represents a variable declaration.
 type HIRVariable struct {
-	Span         Span
-	Name         string
 	Type         *HIRType
 	Initializer  *HIRExpression
+	LifetimeInfo *LifetimeInfo
+	Name         string
+	Span         Span
+	Scope        ScopeKind
 	IsMutable    bool
 	IsStatic     bool
 	IsGlobal     bool
-	Scope        ScopeKind
-	LifetimeInfo *LifetimeInfo
 }
 
 func (v *HIRVariable) String() string                        { return fmt.Sprintf("var %s", v.Name) }
@@ -221,7 +221,7 @@ func (v *HIRVariable) GetSpan() Span                         { return v.Span }
 func (v *HIRVariable) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRVariable(v) }
 func (v *HIRVariable) GetHIRKind() HIRKind                   { return HIRKindVariable }
 
-// ScopeKind represents variable scope
+// ScopeKind represents variable scope.
 type ScopeKind int
 
 const (
@@ -232,15 +232,15 @@ const (
 	ScopeStatic
 )
 
-// LifetimeInfo contains lifetime analysis information
+// LifetimeInfo contains lifetime analysis information.
 type LifetimeInfo struct {
 	Lifetime   string
-	Borrowck   BorrowKind
 	Region     string
+	Borrowck   BorrowKind
 	Mutability MutabilityKind
 }
 
-// BorrowKind represents borrowing information
+// BorrowKind represents borrowing information.
 type BorrowKind int
 
 const (
@@ -250,7 +250,7 @@ const (
 	BorrowMutable
 )
 
-// MutabilityKind represents mutability information
+// MutabilityKind represents mutability information.
 type MutabilityKind int
 
 const (
@@ -259,14 +259,14 @@ const (
 	MutabilityConst
 )
 
-// ====== HIR Block and Statement Structure ======
+// ====== HIR Block and Statement Structure ======.
 
-// HIRBlock represents a block of statements
+// HIRBlock represents a block of statements.
 type HIRBlock struct {
-	Span       Span
-	Statements []*HIRStatement
-	Expression *HIRExpression // optional trailing expression
+	Expression *HIRExpression
 	Scope      *HIRScope
+	Statements []*HIRStatement
+	Span       Span
 }
 
 func (b *HIRBlock) String() string                        { return "block" }
@@ -274,21 +274,21 @@ func (b *HIRBlock) GetSpan() Span                         { return b.Span }
 func (b *HIRBlock) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRBlock(b) }
 func (b *HIRBlock) GetHIRKind() HIRKind                   { return HIRKindBlock }
 
-// HIRScope represents lexical scope information
+// HIRScope represents lexical scope information.
 type HIRScope struct {
-	ID        int
 	Parent    *HIRScope
-	Children  []*HIRScope
 	Variables map[string]*HIRVariable
 	Types     map[string]*HIRType
+	Children  []*HIRScope
+	ID        int
 	ScopeKind ScopeKind
 }
 
-// HIRStatement represents various kinds of statements
+// HIRStatement represents various kinds of statements.
 type HIRStatement struct {
+	Data interface{}
 	Span Span
 	Kind HIRStatementKind
-	Data interface{} // specific statement data
 }
 
 func (s *HIRStatement) String() string                        { return s.Kind.String() }
@@ -296,7 +296,7 @@ func (s *HIRStatement) GetSpan() Span                         { return s.Span }
 func (s *HIRStatement) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRStatement(s) }
 func (s *HIRStatement) GetHIRKind() HIRKind                   { return HIRKindStatement }
 
-// HIRStatementKind represents different statement types
+// HIRStatementKind represents different statement types.
 type HIRStatementKind int
 
 const (
@@ -345,23 +345,23 @@ func (k HIRStatementKind) String() string {
 	}
 }
 
-// ====== HIR Statement Data Structures ======
+// ====== HIR Statement Data Structures ======.
 
-// HIRLetStatement represents variable declarations
+// HIRLetStatement represents variable declarations.
 type HIRLetStatement struct {
 	Variable    *HIRVariable
 	Pattern     *HIRPattern
 	Initializer *HIRExpression
 }
 
-// HIRAssignStatement represents assignments
+// HIRAssignStatement represents assignments.
 type HIRAssignStatement struct {
 	Target   *HIRExpression
 	Value    *HIRExpression
 	Operator AssignOperatorKind
 }
 
-// AssignOperatorKind represents assignment operators
+// AssignOperatorKind represents assignment operators.
 type AssignOperatorKind int
 
 const (
@@ -378,26 +378,26 @@ const (
 	AssignShr
 )
 
-// HIRReturnStatement represents return statements
+// HIRReturnStatement represents return statements.
 type HIRReturnStatement struct {
 	Value *HIRExpression // nil for bare return
 }
 
-// HIRIfStatement represents conditional statements
+// HIRIfStatement represents conditional statements.
 type HIRIfStatement struct {
 	Condition *HIRExpression
 	ThenBlock *HIRBlock
 	ElseBlock *HIRBlock // nil if no else
 }
 
-// HIRWhileStatement represents while loops
+// HIRWhileStatement represents while loops.
 type HIRWhileStatement struct {
 	Condition *HIRExpression
 	Body      *HIRBlock
 	Label     string // for break/continue targeting
 }
 
-// HIRForStatement represents for loops
+// HIRForStatement represents for loops.
 type HIRForStatement struct {
 	Pattern  *HIRPattern
 	Iterator *HIRExpression
@@ -405,28 +405,28 @@ type HIRForStatement struct {
 	Label    string
 }
 
-// HIRMatchStatement represents pattern matching
+// HIRMatchStatement represents pattern matching.
 type HIRMatchStatement struct {
 	Scrutinee *HIRExpression
 	Arms      []*HIRMatchArm
 }
 
-// HIRMatchArm represents a match arm
+// HIRMatchArm represents a match arm.
 type HIRMatchArm struct {
-	Span    Span
 	Pattern *HIRPattern
-	Guard   *HIRExpression // optional guard condition
+	Guard   *HIRExpression
 	Body    *HIRBlock
+	Span    Span
 }
 
-// ====== HIR Expression Structure ======
+// ====== HIR Expression Structure ======.
 
-// HIRExpression represents expressions in HIR
+// HIRExpression represents expressions in HIR.
 type HIRExpression struct {
+	Data interface{}
+	Type *HIRType
 	Span Span
-	Type *HIRType // explicit type information
 	Kind HIRExpressionKind
-	Data interface{} // specific expression data
 }
 
 func (e *HIRExpression) String() string                        { return e.Kind.String() }
@@ -434,7 +434,7 @@ func (e *HIRExpression) GetSpan() Span                         { return e.Span }
 func (e *HIRExpression) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRExpression(e) }
 func (e *HIRExpression) GetHIRKind() HIRKind                   { return HIRKindExpression }
 
-// HIRExpressionKind represents different expression types
+// HIRExpressionKind represents different expression types.
 type HIRExpressionKind int
 
 const (
@@ -522,28 +522,28 @@ func (k HIRExpressionKind) String() string {
 	}
 }
 
-// ====== HIR Expression Data Structures ======
+// ====== HIR Expression Data Structures ======.
 
-// HIRLiteralExpression represents literal values
+// HIRLiteralExpression represents literal values.
 type HIRLiteralExpression struct {
 	Value interface{}
 	Kind  LiteralKind
 }
 
-// HIRVariableExpression represents variable references
+// HIRVariableExpression represents variable references.
 type HIRVariableExpression struct {
+	Variable *HIRVariable
 	Name     string
-	Variable *HIRVariable // resolved variable reference
 }
 
-// HIRCallExpression represents function calls
+// HIRCallExpression represents function calls.
 type HIRCallExpression struct {
 	Function  *HIRExpression
 	Arguments []*HIRExpression
 	TypeArgs  []*HIRType // type arguments for generic calls
 }
 
-// HIRMethodCallExpression represents method calls
+// HIRMethodCallExpression represents method calls.
 type HIRMethodCallExpression struct {
 	Receiver  *HIRExpression
 	Method    string
@@ -551,27 +551,27 @@ type HIRMethodCallExpression struct {
 	TypeArgs  []*HIRType
 }
 
-// HIRFieldAccessExpression represents field access
+// HIRFieldAccessExpression represents field access.
 type HIRFieldAccessExpression struct {
 	Object    *HIRExpression
-	Field     string
 	FieldType *HIRType
+	Field     string
 }
 
-// HIRIndexExpression represents array/map indexing
+// HIRIndexExpression represents array/map indexing.
 type HIRIndexExpression struct {
 	Object *HIRExpression
 	Index  *HIRExpression
 }
 
-// HIRBinaryExpression represents binary operations
+// HIRBinaryExpression represents binary operations.
 type HIRBinaryExpression struct {
 	Left     *HIRExpression
 	Right    *HIRExpression
 	Operator BinaryOperatorKind
 }
 
-// BinaryOperatorKind represents binary operators
+// BinaryOperatorKind represents binary operators.
 type BinaryOperatorKind int
 
 const (
@@ -598,13 +598,13 @@ const (
 	BinOpRangeInclusive
 )
 
-// HIRUnaryExpression represents unary operations
+// HIRUnaryExpression represents unary operations.
 type HIRUnaryExpression struct {
 	Operand  *HIRExpression
 	Operator UnaryOperatorKind
 }
 
-// UnaryOperatorKind represents unary operators
+// UnaryOperatorKind represents unary operators.
 type UnaryOperatorKind int
 
 const (
@@ -617,14 +617,14 @@ const (
 	UnaryOpCopy
 )
 
-// HIRCastExpression represents type casts
+// HIRCastExpression represents type casts.
 type HIRCastExpression struct {
 	Expression *HIRExpression
 	TargetType *HIRType
 	CastKind   CastKind
 }
 
-// CastKind represents different cast types
+// CastKind represents different cast types.
 type CastKind int
 
 const (
@@ -634,30 +634,30 @@ const (
 	CastCoercion
 )
 
-// HIRArrayExpression represents array literals
+// HIRArrayExpression represents array literals.
 type HIRArrayExpression struct {
 	Elements []*HIRExpression
 	Length   int
 }
 
-// HIRStructExpression represents struct literals
+// HIRStructExpression represents struct literals.
 type HIRStructExpression struct {
 	Type   *HIRType
 	Fields []*HIRFieldInit
 }
 
-// HIRFieldInit represents struct field initialization
+// HIRFieldInit represents struct field initialization.
 type HIRFieldInit struct {
-	Name  string
 	Value *HIRExpression
+	Name  string
 }
 
-// HIRTupleExpression represents tuple literals
+// HIRTupleExpression represents tuple literals.
 type HIRTupleExpression struct {
 	Elements []*HIRExpression
 }
 
-// HIRClosureExpression represents closures/lambdas
+// HIRClosureExpression represents closures/lambdas.
 type HIRClosureExpression struct {
 	Parameters []*HIRParameter
 	ReturnType *HIRType
@@ -665,13 +665,13 @@ type HIRClosureExpression struct {
 	Captures   []*HIRVariable
 }
 
-// ====== HIR Type System ======
+// ====== HIR Type System ======.
 
-// HIRType represents type information in HIR
+// HIRType represents type information in HIR.
 type HIRType struct {
+	Data interface{}
 	Span Span
 	Kind HIRTypeKind
-	Data interface{} // specific type data
 }
 
 func (t *HIRType) String() string                        { return t.Kind.String() }
@@ -679,7 +679,7 @@ func (t *HIRType) GetSpan() Span                         { return t.Span }
 func (t *HIRType) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRType(t) }
 func (t *HIRType) GetHIRKind() HIRKind                   { return HIRKindType }
 
-// HIRTypeKind represents different type kinds
+// HIRTypeKind represents different type kinds.
 type HIRTypeKind int
 
 const (
@@ -749,78 +749,78 @@ func (k HIRTypeKind) String() string {
 	}
 }
 
-// ====== HIR Type Data Structures ======
+// ====== HIR Type Data Structures ======.
 
-// HIRPrimitiveType represents primitive types
+// HIRPrimitiveType represents primitive types.
 type HIRPrimitiveType struct {
 	Name string
 	Size int // in bytes
 }
 
-// HIRArrayType represents array types
+// HIRArrayType represents array types.
 type HIRArrayType struct {
 	ElementType *HIRType
 	Length      int
 }
 
-// HIRSliceType represents slice types
+// HIRSliceType represents slice types.
 type HIRSliceType struct {
 	ElementType *HIRType
 }
 
-// HIRPointerType represents pointer types
+// HIRPointerType represents pointer types.
 type HIRPointerType struct {
 	PointeeType *HIRType
 	IsMutable   bool
 }
 
-// HIRReferenceType represents reference types
+// HIRReferenceType represents reference types.
 type HIRReferenceType struct {
 	ReferentType *HIRType
-	IsMutable    bool
 	Lifetime     string
+	IsMutable    bool
 }
 
-// HIRFunctionType represents function types
+// HIRFunctionType represents function types.
 type HIRFunctionType struct {
-	Parameters []*HIRType
 	ReturnType *HIRType
+	Parameters []*HIRType
 	IsAsync    bool
 	IsUnsafe   bool
 }
 
-// HIRStructType represents struct types
+// HIRStructType represents struct types.
 type HIRStructType struct {
 	Name   string
 	Fields []*HIRFieldType
 }
 
-// HIRFieldType represents struct field types
+// HIRFieldType represents struct field types.
 type HIRFieldType struct {
-	Name string
 	Type *HIRType
+	Name string
 }
 
-// HIREnumType represents enum types
+// HIREnumType represents enum types.
 type HIREnumType struct {
 	Name     string
 	Variants []*HIRVariantType
 }
 
-// HIRVariantType represents enum variant types
+// HIRVariantType represents enum variant types.
 type HIRVariantType struct {
 	Name   string
 	Fields []*HIRType
 }
 
-// HIRTraitType represents trait types
+// HIRTraitType represents trait types.
 type HIRTraitType struct {
 	Name            string
 	Methods         []*HIRMethodSignature
 	AssociatedTypes []*HIRTraitAssociatedType
 }
 
-// HIRMethodSignature represents method signatures
+// HIRMethodSignature represents method signatures.
 type HIRMethodSignature struct {
 	Name           string
 	Parameters     []*HIRType
@@ -828,41 +828,41 @@ type HIRMethodSignature struct {
 	TypeParameters []*HIRTypeParameter
 }
 
-// HIRTraitAssociatedType represents a trait associated type item
+// HIRTraitAssociatedType represents a trait associated type item.
 type HIRTraitAssociatedType struct {
 	Name   string
 	Bounds []*HIRType
 }
 
-// HIRAliasType represents a type alias definition
+// HIRAliasType represents a type alias definition.
 type HIRAliasType struct {
 	Target *HIRType
 }
 
-// HIRNewtypeType represents a nominal wrapper around a base type
+// HIRNewtypeType represents a nominal wrapper around a base type.
 type HIRNewtypeType struct {
 	Base *HIRType
 }
 
-// HIRTupleType represents tuple types
+// HIRTupleType represents tuple types.
 type HIRTupleType struct {
 	Elements []*HIRType
 }
 
-// HIRGenericType represents generic type parameters
+// HIRGenericType represents generic type parameters.
 type HIRGenericType struct {
 	Name   string
 	Bounds []*HIRType
 }
 
-// ====== HIR Pattern System ======
+// ====== HIR Pattern System ======.
 
-// HIRPattern represents patterns for destructuring
+// HIRPattern represents patterns for destructuring.
 type HIRPattern struct {
-	Span Span
+	Data interface{}
 	Type *HIRType
+	Span Span
 	Kind HIRPatternKind
-	Data interface{} // specific pattern data
 }
 
 func (p *HIRPattern) String() string                        { return p.Kind.String() }
@@ -870,7 +870,7 @@ func (p *HIRPattern) GetSpan() Span                         { return p.Span }
 func (p *HIRPattern) Accept(visitor HIRVisitor) interface{} { return visitor.VisitHIRPattern(p) }
 func (p *HIRPattern) GetHIRKind() HIRKind                   { return HIRKindPattern }
 
-// HIRPatternKind represents different pattern types
+// HIRPatternKind represents different pattern types.
 type HIRPatternKind int
 
 const (
@@ -916,15 +916,15 @@ func (k HIRPatternKind) String() string {
 	}
 }
 
-// ====== HIR Type Definitions ======
+// ====== HIR Type Definitions ======.
 
-// HIRTypeDefinition represents user-defined types
+// HIRTypeDefinition represents user-defined types.
 type HIRTypeDefinition struct {
-	Span       Span
+	Data       interface{}
 	Name       string
-	Kind       TypeDefinitionKind
 	TypeParams []*HIRTypeParameter
-	Data       interface{} // specific type definition data
+	Span       Span
+	Kind       TypeDefinitionKind
 }
 
 func (td *HIRTypeDefinition) String() string { return fmt.Sprintf("type %s", td.Name) }
@@ -934,7 +934,7 @@ func (td *HIRTypeDefinition) Accept(visitor HIRVisitor) interface{} {
 }
 func (td *HIRTypeDefinition) GetHIRKind() HIRKind { return HIRKindType }
 
-// TypeDefinitionKind represents different type definition kinds
+// TypeDefinitionKind represents different type definition kinds.
 type TypeDefinitionKind int
 
 const (
@@ -945,9 +945,9 @@ const (
 	TypeDefNewtype
 )
 
-// ====== HIR Utilities ======
+// ====== HIR Utilities ======.
 
-// NewHIRModule creates a new HIR module
+// NewHIRModule creates a new HIR module.
 func NewHIRModule(span Span, name string) *HIRModule {
 	return &HIRModule{
 		Span:      span,
@@ -965,7 +965,7 @@ func NewHIRModule(span Span, name string) *HIRModule {
 	}
 }
 
-// NewHIRFunction creates a new HIR function
+// NewHIRFunction creates a new HIR function.
 func NewHIRFunction(span Span, name string) *HIRFunction {
 	return &HIRFunction{
 		Span:            span,
@@ -979,7 +979,7 @@ func NewHIRFunction(span Span, name string) *HIRFunction {
 	}
 }
 
-// NewHIRVariable creates a new HIR variable
+// NewHIRVariable creates a new HIR variable.
 func NewHIRVariable(span Span, name string, hirType *HIRType) *HIRVariable {
 	return &HIRVariable{
 		Span: span,
@@ -988,7 +988,7 @@ func NewHIRVariable(span Span, name string, hirType *HIRType) *HIRVariable {
 	}
 }
 
-// NewHIRBlock creates a new HIR block
+// NewHIRBlock creates a new HIR block.
 func NewHIRBlock(span Span) *HIRBlock {
 	return &HIRBlock{
 		Span:       span,
@@ -1001,7 +1001,7 @@ func NewHIRBlock(span Span) *HIRBlock {
 	}
 }
 
-// NewHIRExpression creates a new HIR expression
+// NewHIRExpression creates a new HIR expression.
 func NewHIRExpression(span Span, hirType *HIRType, kind HIRExpressionKind, data interface{}) *HIRExpression {
 	return &HIRExpression{
 		Span: span,
@@ -1011,7 +1011,7 @@ func NewHIRExpression(span Span, hirType *HIRType, kind HIRExpressionKind, data 
 	}
 }
 
-// NewHIRType creates a new HIR type
+// NewHIRType creates a new HIR type.
 func NewHIRType(span Span, kind HIRTypeKind, data interface{}) *HIRType {
 	return &HIRType{
 		Span: span,
@@ -1020,7 +1020,7 @@ func NewHIRType(span Span, kind HIRTypeKind, data interface{}) *HIRType {
 	}
 }
 
-// NewHIRPattern creates a new HIR pattern
+// NewHIRPattern creates a new HIR pattern.
 func NewHIRPattern(span Span, hirType *HIRType, kind HIRPatternKind, data interface{}) *HIRPattern {
 	return &HIRPattern{
 		Span: span,
@@ -1030,39 +1030,47 @@ func NewHIRPattern(span Span, hirType *HIRType, kind HIRPatternKind, data interf
 	}
 }
 
-// ====== HIR Pretty Printing ======
+// ====== HIR Pretty Printing ======.
 
-// PrettyPrint returns a formatted string representation of the HIR
+// PrettyPrint returns a formatted string representation of the HIR.
 func (m *HIRModule) PrettyPrint() string {
 	var sb strings.Builder
+
 	sb.WriteString(fmt.Sprintf("HIR Module: %s\n", m.Name))
 
 	if len(m.Imports) > 0 {
 		sb.WriteString("Imports:\n")
+
 		for _, imp := range m.Imports {
 			sb.WriteString(fmt.Sprintf("  import %s\n", imp.ModuleName))
 		}
+
 		sb.WriteString("\n")
 	}
 
 	if len(m.Types) > 0 {
 		sb.WriteString("Types:\n")
+
 		for _, typ := range m.Types {
 			sb.WriteString(fmt.Sprintf("  type %s\n", typ.Name))
 		}
+
 		sb.WriteString("\n")
 	}
 
 	if len(m.Variables) > 0 {
 		sb.WriteString("Variables:\n")
+
 		for _, variable := range m.Variables {
 			sb.WriteString(fmt.Sprintf("  %s\n", variable.String()))
 		}
+
 		sb.WriteString("\n")
 	}
 
 	if len(m.Functions) > 0 {
 		sb.WriteString("Functions:\n")
+
 		for _, function := range m.Functions {
 			sb.WriteString(fmt.Sprintf("  %s\n", function.String()))
 		}

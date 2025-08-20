@@ -233,22 +233,21 @@ func TestInputValidator_ValidateString(t *testing.T) {
 func TestSecurityLogger_LogSecurityEvent(t *testing.T) {
 	logger := NewSecurityLogger()
 
-	// Test that logging doesn't panic and properly sanitizes data
+	// Test that logging doesn't panic and properly sanitizes data.
 	logger.LogSecurityEvent("test_event", map[string]interface{}{
 		"password": "secret123",
 		"token":    "abc123def456",
 		"normal":   "data",
 	})
 
-	// Test authentication logging
+	// Test authentication logging.
 	logger.LogAuthenticationAttempt(false, "test-agent", "192.168.1.1:8080", map[string]interface{}{
 		"reason": "invalid_token",
 	})
 
-	// Test input validation failure logging
+	// Test input validation failure logging.
 	logger.LogInputValidationFailure("json", "invalid format", `{"bad": "data"}`)
-
-	// If we get here without panicking, the test passes
+	// If we get here without panicking, the test passes.
 }
 
 func TestSecureCompare(t *testing.T) {

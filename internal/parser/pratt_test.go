@@ -1,5 +1,5 @@
 // Package parser tests - Phase 1.2.2: Pratt Parser Integration Tests
-// Comprehensive test suite for enhanced operator precedence and associativity
+// Comprehensive test suite for enhanced operator precedence and associativity.
 package parser
 
 import (
@@ -8,7 +8,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// TestOperatorPrecedence tests complete operator precedence hierarchy
+// TestOperatorPrecedence tests complete operator precedence hierarchy.
 func TestOperatorPrecedence(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -66,6 +66,7 @@ func TestOperatorPrecedence(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
@@ -86,7 +87,7 @@ func TestOperatorPrecedence(t *testing.T) {
 	}
 }
 
-// TestAssignmentOperators tests assignment operator precedence and associativity
+// TestAssignmentOperators tests assignment operator precedence and associativity.
 func TestAssignmentOperators(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -124,6 +125,7 @@ func TestAssignmentOperators(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
@@ -144,7 +146,7 @@ func TestAssignmentOperators(t *testing.T) {
 	}
 }
 
-// TestUnaryOperators tests unary operators with proper precedence
+// TestUnaryOperators tests unary operators with proper precedence.
 func TestUnaryOperators(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -187,6 +189,7 @@ func TestUnaryOperators(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
@@ -207,7 +210,7 @@ func TestUnaryOperators(t *testing.T) {
 	}
 }
 
-// TestTernaryOperator tests ternary conditional operator
+// TestTernaryOperator tests ternary conditional operator.
 func TestTernaryOperator(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -245,6 +248,7 @@ func TestTernaryOperator(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
@@ -265,7 +269,7 @@ func TestTernaryOperator(t *testing.T) {
 	}
 }
 
-// TestPrattComplexExpressions tests complex expression combinations
+// TestPrattComplexExpressions tests complex expression combinations.
 func TestPrattComplexExpressions(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -303,6 +307,7 @@ func TestPrattComplexExpressions(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
@@ -323,7 +328,7 @@ func TestPrattComplexExpressions(t *testing.T) {
 	}
 }
 
-// TestAssociativityEdgeCases tests edge cases for associativity
+// TestAssociativityEdgeCases tests edge cases for associativity.
 func TestAssociativityEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -366,6 +371,7 @@ func TestAssociativityEdgeCases(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
@@ -386,13 +392,14 @@ func TestAssociativityEdgeCases(t *testing.T) {
 	}
 }
 
-// BenchmarkPrattParser benchmarks the enhanced Pratt parser performance
+// BenchmarkPrattParser benchmarks the enhanced Pratt parser performance.
 func BenchmarkPrattParser(b *testing.B) {
 	complexExpr := `
 	a = b + c * d ** e - f / g % h << i & j | k ^ l && m || n ? o : p += q -= r *= s /= t %= u;
 	`
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		l := lexer.New(complexExpr)
 		p := NewParser(l, "benchmark.oriz")
@@ -400,7 +407,7 @@ func BenchmarkPrattParser(b *testing.B) {
 	}
 }
 
-// TestPrattParserErrorRecovery tests error recovery in complex expressions
+// TestPrattParserErrorRecovery tests error recovery in complex expressions.
 func TestPrattParserErrorRecovery(t *testing.T) {
 	tests := []struct {
 		name          string

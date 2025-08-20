@@ -10,21 +10,21 @@ import (
 	"unicode/utf8"
 )
 
-// SecurityConfig contains security validation configuration
+// SecurityConfig contains security validation configuration.
 type SecurityConfig struct {
+	AllowedCharsets  []string
+	BlockedPatterns  []*regexp.Regexp
 	MaxJSONSize      int64
 	MaxStringLength  int
 	MaxArrayLength   int
 	MaxObjectDepth   int
-	AllowedCharsets  []string
-	BlockedPatterns  []*regexp.Regexp
 	RequireValidUTF8 bool
 	SanitizeHTML     bool
 }
 
-// DefaultSecurityConfig returns the default security configuration
+// DefaultSecurityConfig returns the default security configuration.
 func DefaultSecurityConfig() *SecurityConfig {
-	// Compile blocked patterns for security threats
+	// Compile blocked patterns for security threats.
 	blockedPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`(?i)<script[^>]*>`),                // XSS
 		regexp.MustCompile(`(?i)javascript:`),                  // JavaScript injection
@@ -49,42 +49,42 @@ func DefaultSecurityConfig() *SecurityConfig {
 	}
 }
 
-// InputValidator provides comprehensive input validation and sanitization
+// InputValidator provides comprehensive input validation and sanitization.
 type InputValidator struct {
 	config *SecurityConfig
 }
 
-// NewInputValidator creates a new input validator with default configuration
+// NewInputValidator creates a new input validator with default configuration.
 func NewInputValidator() *InputValidator {
 	return &InputValidator{
 		config: DefaultSecurityConfig(),
 	}
 }
 
-// NewInputValidatorWithConfig creates a new input validator with custom configuration
+// NewInputValidatorWithConfig creates a new input validator with custom configuration.
 func NewInputValidatorWithConfig(config *SecurityConfig) *InputValidator {
 	return &InputValidator{
 		config: config,
 	}
 }
 
-// ValidateJSON validates and sanitizes JSON input
+// ValidateJSON validates and sanitizes JSON input.
 func (iv *InputValidator) ValidateJSON(data []byte) error {
 	if int64(len(data)) > iv.config.MaxJSONSize {
 		return fmt.Errorf("JSON payload too large: %d bytes (max: %d)", len(data), iv.config.MaxJSONSize)
 	}
 
-	// Check for null bytes
+	// Check for null bytes.
 	if strings.Contains(string(data), "\x00") {
 		return fmt.Errorf("null bytes detected in JSON payload")
 	}
 
-	// Validate UTF-8 encoding
+	// Validate UTF-8 encoding.
 	if iv.config.RequireValidUTF8 && !utf8.Valid(data) {
 		return fmt.Errorf("invalid UTF-8 encoding in JSON payload")
 	}
 
-	// Check for blocked patterns
+	// Check for blocked patterns.
 	dataStr := string(data)
 	for _, pattern := range iv.config.BlockedPatterns {
 		if pattern.MatchString(dataStr) {
@@ -92,13 +92,13 @@ func (iv *InputValidator) ValidateJSON(data []byte) error {
 		}
 	}
 
-	// Validate JSON structure
+	// Validate JSON structure.
 	var parsed interface{}
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		return fmt.Errorf("invalid JSON structure: %w", err)
 	}
 
-	// Validate JSON depth and complexity
+	// Validate JSON depth and complexity.
 	if err := iv.validateJSONStructure(parsed, 0); err != nil {
 		return fmt.Errorf("JSON structure validation failed: %w", err)
 	}
@@ -106,7 +106,7 @@ func (iv *InputValidator) ValidateJSON(data []byte) error {
 	return nil
 }
 
-// validateJSONStructure recursively validates JSON structure
+// validateJSONStructure recursively validates JSON structure.
 func (iv *InputValidator) validateJSONStructure(obj interface{}, depth int) error {
 	if depth > iv.config.MaxObjectDepth {
 		return fmt.Errorf("JSON nesting too deep: %d (max: %d)", depth, iv.config.MaxObjectDepth)
@@ -118,6 +118,7 @@ func (iv *InputValidator) validateJSONStructure(obj interface{}, depth int) erro
 			if err := iv.ValidateString(key); err != nil {
 				return fmt.Errorf("invalid JSON key '%s': %w", key, err)
 			}
+
 			if err := iv.validateJSONStructure(value, depth+1); err != nil {
 				return err
 			}
@@ -126,6 +127,7 @@ func (iv *InputValidator) validateJSONStructure(obj interface{}, depth int) erro
 		if len(v) > iv.config.MaxArrayLength {
 			return fmt.Errorf("JSON array too large: %d (max: %d)", len(v), iv.config.MaxArrayLength)
 		}
+
 		for i, item := range v {
 			if err := iv.validateJSONStructure(item, depth+1); err != nil {
 				return fmt.Errorf("invalid JSON array item %d: %w", i, err)
@@ -136,7 +138,7 @@ func (iv *InputValidator) validateJSONStructure(obj interface{}, depth int) erro
 			return fmt.Errorf("invalid JSON string: %w", err)
 		}
 	case float64, bool, nil:
-		// These types are safe
+		// These types are safe.
 	default:
 		return fmt.Errorf("unsupported JSON value type: %T", v)
 	}
@@ -144,30 +146,30 @@ func (iv *InputValidator) validateJSONStructure(obj interface{}, depth int) erro
 	return nil
 }
 
-// ValidateString validates and sanitizes string input
+// ValidateString validates and sanitizes string input.
 func (iv *InputValidator) ValidateString(s string) error {
 	if len(s) > iv.config.MaxStringLength {
 		return fmt.Errorf("string too long: %d characters (max: %d)", len(s), iv.config.MaxStringLength)
 	}
 
-	// Validate UTF-8 encoding
+	// Validate UTF-8 encoding.
 	if iv.config.RequireValidUTF8 && !utf8.ValidString(s) {
 		return fmt.Errorf("invalid UTF-8 encoding in string")
 	}
 
-	// Check for null bytes
+	// Check for null bytes.
 	if strings.Contains(s, "\x00") {
 		return fmt.Errorf("null bytes detected in string")
 	}
 
-	// Check for control characters (except tab, newline, carriage return)
+	// Check for control characters (except tab, newline, carriage return).
 	for _, r := range s {
 		if unicode.IsControl(r) && r != '\t' && r != '\n' && r != '\r' {
 			return fmt.Errorf("control character detected: U+%04X", r)
 		}
 	}
 
-	// Check for blocked patterns
+	// Check for blocked patterns.
 	for _, pattern := range iv.config.BlockedPatterns {
 		if pattern.MatchString(s) {
 			return fmt.Errorf("blocked pattern detected: %s", pattern.String())
@@ -177,7 +179,7 @@ func (iv *InputValidator) ValidateString(s string) error {
 	return nil
 }
 
-// ValidateURL validates URL input
+// ValidateURL validates URL input.
 func (iv *InputValidator) ValidateURL(rawURL string) (*url.URL, error) {
 	if err := iv.ValidateString(rawURL); err != nil {
 		return nil, fmt.Errorf("invalid URL string: %w", err)
@@ -188,20 +190,23 @@ func (iv *InputValidator) ValidateURL(rawURL string) (*url.URL, error) {
 		return nil, fmt.Errorf("URL parse error: %w", err)
 	}
 
-	// Validate scheme
+	// Validate scheme.
 	allowedSchemes := []string{"http", "https"}
 	schemeAllowed := false
+
 	for _, scheme := range allowedSchemes {
 		if parsedURL.Scheme == scheme {
 			schemeAllowed = true
+
 			break
 		}
 	}
+
 	if !schemeAllowed {
 		return nil, fmt.Errorf("disallowed URL scheme: %s", parsedURL.Scheme)
 	}
 
-	// Validate host
+	// Validate host.
 	if parsedURL.Host == "" {
 		return nil, fmt.Errorf("empty host in URL")
 	}
@@ -216,13 +221,13 @@ func (iv *InputValidator) ValidateURL(rawURL string) (*url.URL, error) {
 	return parsedURL, nil
 }
 
-// ValidatePackageID validates package identifier
+// ValidatePackageID validates package identifier.
 func (iv *InputValidator) ValidatePackageID(id string) error {
 	if err := iv.ValidateString(id); err != nil {
 		return fmt.Errorf("invalid package ID: %w", err)
 	}
 
-	// Package ID specific validation
+	// Package ID specific validation.
 	if len(id) == 0 {
 		return fmt.Errorf("package ID cannot be empty")
 	}
@@ -231,13 +236,13 @@ func (iv *InputValidator) ValidatePackageID(id string) error {
 		return fmt.Errorf("package ID too long: %d characters (max: 255)", len(id))
 	}
 
-	// Allow alphanumeric, hyphens, underscores, dots, slashes (for namespacing)
+	// Allow alphanumeric, hyphens, underscores, dots, slashes (for namespacing).
 	validIDPattern := regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 	if !validIDPattern.MatchString(id) {
 		return fmt.Errorf("package ID contains invalid characters: %s", id)
 	}
 
-	// Must start with alphanumeric
+	// Must start with alphanumeric.
 	if !unicode.IsLetter(rune(id[0])) && !unicode.IsDigit(rune(id[0])) {
 		return fmt.Errorf("package ID must start with alphanumeric character: %s", id)
 	}
@@ -245,13 +250,13 @@ func (iv *InputValidator) ValidatePackageID(id string) error {
 	return nil
 }
 
-// ValidateVersion validates semantic version string
+// ValidateVersion validates semantic version string.
 func (iv *InputValidator) ValidateVersion(version string) error {
 	if err := iv.ValidateString(version); err != nil {
 		return fmt.Errorf("invalid version string: %w", err)
 	}
 
-	// Semantic version pattern (simplified)
+	// Semantic version pattern (simplified).
 	semverPattern := regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
 	if !semverPattern.MatchString(version) {
 		return fmt.Errorf("invalid semantic version format: %s", version)
@@ -260,18 +265,18 @@ func (iv *InputValidator) ValidateVersion(version string) error {
 	return nil
 }
 
-// ValidateCID validates Content Identifier
+// ValidateCID validates Content Identifier.
 func (iv *InputValidator) ValidateCID(cid string) error {
 	if err := iv.ValidateString(cid); err != nil {
 		return fmt.Errorf("invalid CID: %w", err)
 	}
 
-	// CID should be hex-encoded hash
+	// CID should be hex-encoded hash.
 	if len(cid) != 64 { // SHA-256 hex length
 		return fmt.Errorf("invalid CID length: %d (expected: 64)", len(cid))
 	}
 
-	// Check if valid hex
+	// Check if valid hex.
 	hexPattern := regexp.MustCompile(`^[a-fA-F0-9]+$`)
 	if !hexPattern.MatchString(cid) {
 		return fmt.Errorf("CID contains non-hex characters: %s", cid)
@@ -280,13 +285,14 @@ func (iv *InputValidator) ValidateCID(cid string) error {
 	return nil
 }
 
-// SanitizeString removes dangerous characters and patterns from string
+// SanitizeString removes dangerous characters and patterns from string.
 func (iv *InputValidator) SanitizeString(s string) string {
-	// Remove null bytes
+	// Remove null bytes.
 	s = strings.ReplaceAll(s, "\x00", "")
 
-	// Remove other control characters except tab, newline, carriage return
+	// Remove other control characters except tab, newline, carriage return.
 	var sanitized strings.Builder
+
 	for _, r := range s {
 		if !unicode.IsControl(r) || r == '\t' || r == '\n' || r == '\r' {
 			sanitized.WriteRune(r)
@@ -295,7 +301,7 @@ func (iv *InputValidator) SanitizeString(s string) string {
 
 	result := sanitized.String()
 
-	// Apply HTML sanitization if enabled
+	// Apply HTML sanitization if enabled.
 	if iv.config.SanitizeHTML {
 		result = iv.sanitizeHTML(result)
 	}
@@ -303,29 +309,29 @@ func (iv *InputValidator) SanitizeString(s string) string {
 	return result
 }
 
-// sanitizeHTML removes potentially dangerous HTML content
+// sanitizeHTML removes potentially dangerous HTML content.
 func (iv *InputValidator) sanitizeHTML(s string) string {
-	// Remove script tags
+	// Remove script tags.
 	scriptPattern := regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
 	s = scriptPattern.ReplaceAllString(s, "")
 
-	// Remove javascript: and data: URLs
+	// Remove javascript: and data: URLs.
 	jsPattern := regexp.MustCompile(`(?i)javascript:[^"'\s>]*`)
 	s = jsPattern.ReplaceAllString(s, "")
 
 	dataPattern := regexp.MustCompile(`(?i)data:text/html[^"'\s>]*`)
 	s = dataPattern.ReplaceAllString(s, "")
 
-	// Remove event handlers
+	// Remove event handlers.
 	eventPattern := regexp.MustCompile(`(?i)\s*on\w+\s*=\s*["'][^"']*["']`)
 	s = eventPattern.ReplaceAllString(s, "")
 
 	return s
 }
 
-// isPrivateIP checks if an IP address is in private ranges
+// isPrivateIP checks if an IP address is in private ranges.
 func (iv *InputValidator) isPrivateIP(host string) bool {
-	// Simplified check for private IP ranges
+	// Simplified check for private IP ranges.
 	privatePatterns := []string{
 		"127.",     // Loopback
 		"10.",      // Private Class A
@@ -344,7 +350,7 @@ func (iv *InputValidator) isPrivateIP(host string) bool {
 	return false
 }
 
-// ValidateHTTPHeaders validates HTTP headers for security
+// ValidateHTTPHeaders validates HTTP headers for security.
 func (iv *InputValidator) ValidateHTTPHeaders(headers map[string]string) error {
 	for name, value := range headers {
 		if err := iv.ValidateString(name); err != nil {
@@ -355,16 +361,16 @@ func (iv *InputValidator) ValidateHTTPHeaders(headers map[string]string) error {
 			return fmt.Errorf("invalid header value for '%s': %w", name, err)
 		}
 
-		// Check header-specific security rules
+		// Check header-specific security rules.
 		lowerName := strings.ToLower(name)
 		switch lowerName {
 		case "content-length":
-			// Validate numeric value
+			// Validate numeric value.
 			if !regexp.MustCompile(`^\d+$`).MatchString(value) {
 				return fmt.Errorf("invalid Content-Length header: %s", value)
 			}
 		case "host":
-			// Validate hostname
+			// Validate hostname.
 			if _, err := iv.ValidateURL("http://" + value); err != nil {
 				return fmt.Errorf("invalid Host header: %w", err)
 			}

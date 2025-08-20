@@ -1,4 +1,4 @@
-// Tests for HIR (High-level Intermediate Representation) implementation
+// Tests for HIR (High-level Intermediate Representation) implementation.
 // This file tests Phase 1.4.1: HIR design and implementation
 
 package parser
@@ -12,74 +12,89 @@ import (
 
 func TestPhase1_4_1Completion(t *testing.T) {
 	t.Run("Phase 1.4.1 HIR Design and Implementation - Full Implementation", func(t *testing.T) {
-		// Test HIR Module creation
+		// Test HIR Module creation.
 		hirModule := NewHIRModule(Span{}, "test_module")
 		if hirModule == nil {
 			t.Fatal("Failed to create HIR module")
 		}
+
 		if hirModule.Name != "test_module" {
 			t.Errorf("Expected module name 'test_module', got '%s'", hirModule.Name)
 		}
+
 		t.Log("✅ HIR Module creation implemented")
 
-		// Test HIR Function creation
+		// Test HIR Function creation.
 		hirFunction := NewHIRFunction(Span{}, "test_function")
 		if hirFunction == nil {
 			t.Fatal("Failed to create HIR function")
 		}
+
 		if hirFunction.Name != "test_function" {
 			t.Errorf("Expected function name 'test_function', got '%s'", hirFunction.Name)
 		}
+
 		t.Log("✅ HIR Function creation implemented")
 
-		// Test HIR Variable creation
+		// Test HIR Variable creation.
 		hirType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
+
 		hirVariable := NewHIRVariable(Span{}, "test_var", hirType)
 		if hirVariable == nil {
 			t.Fatal("Failed to create HIR variable")
 		}
+
 		if hirVariable.Name != "test_var" {
 			t.Errorf("Expected variable name 'test_var', got '%s'", hirVariable.Name)
 		}
+
 		t.Log("✅ HIR Variable creation implemented")
 
-		// Test HIR Block creation
+		// Test HIR Block creation.
 		hirBlock := NewHIRBlock(Span{})
 		if hirBlock == nil {
 			t.Fatal("Failed to create HIR block")
 		}
+
 		if hirBlock.Scope == nil {
 			t.Error("HIR block should have a scope")
 		}
+
 		t.Log("✅ HIR Block creation implemented")
 
-		// Test HIR Expression creation
+		// Test HIR Expression creation.
 		hirExpr := NewHIRExpression(Span{}, hirType, HIRExprLiteral, &HIRLiteralExpression{Value: 42, Kind: LiteralInteger})
 		if hirExpr == nil {
 			t.Fatal("Failed to create HIR expression")
 		}
+
 		if hirExpr.Kind != HIRExprLiteral {
 			t.Errorf("Expected expression kind HIRExprLiteral, got %v", hirExpr.Kind)
 		}
+
 		t.Log("✅ HIR Expression creation implemented")
 
-		// Test HIR Type creation
+		// Test HIR Type creation.
 		if hirType == nil {
 			t.Fatal("Failed to create HIR type")
 		}
+
 		if hirType.Kind != HIRTypePrimitive {
 			t.Errorf("Expected type kind HIRTypePrimitive, got %v", hirType.Kind)
 		}
+
 		t.Log("✅ HIR Type creation implemented")
 
-		// Test HIR Pattern creation
+		// Test HIR Pattern creation.
 		hirPattern := NewHIRPattern(Span{}, hirType, HIRPatternVariable, "test_pattern")
 		if hirPattern == nil {
 			t.Fatal("Failed to create HIR pattern")
 		}
+
 		if hirPattern.Kind != HIRPatternVariable {
 			t.Errorf("Expected pattern kind HIRPatternVariable, got %v", hirPattern.Kind)
 		}
+
 		t.Log("✅ HIR Pattern creation implemented")
 
 		t.Log("")
@@ -104,7 +119,7 @@ func TestPhase1_4_1Completion(t *testing.T) {
 	})
 }
 
-// ====== HIR Creation Tests ======
+// ====== HIR Creation Tests ======.
 
 func TestHIRModuleCreation(t *testing.T) {
 	tests := []struct {
@@ -123,9 +138,11 @@ func TestHIRModuleCreation(t *testing.T) {
 			if module == nil && tt.expectValid {
 				t.Errorf("Expected valid module, got nil")
 			}
+
 			if module != nil && module.Name != tt.moduleName {
 				t.Errorf("Expected module name '%s', got '%s'", tt.moduleName, module.Name)
 			}
+
 			if module != nil {
 				t.Logf("✅ HIR module '%s' created successfully", tt.moduleName)
 			}
@@ -151,9 +168,11 @@ func TestHIRFunctionCreation(t *testing.T) {
 			if function == nil && tt.expectValid {
 				t.Errorf("Expected valid function, got nil")
 			}
+
 			if function != nil && function.Name != tt.functionName {
 				t.Errorf("Expected function name '%s', got '%s'", tt.functionName, function.Name)
 			}
+
 			if function != nil {
 				t.Logf("✅ HIR function '%s' created successfully", tt.functionName)
 			}
@@ -163,9 +182,9 @@ func TestHIRFunctionCreation(t *testing.T) {
 
 func TestHIRTypeCreation(t *testing.T) {
 	tests := []struct {
+		typeData interface{}
 		name     string
 		typeKind HIRTypeKind
-		typeData interface{}
 	}{
 		{"Primitive int", HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8}},
 		{"Primitive bool", HIRTypePrimitive, &HIRPrimitiveType{Name: "bool", Size: 1}},
@@ -180,9 +199,11 @@ func TestHIRTypeCreation(t *testing.T) {
 			if hirType == nil {
 				t.Errorf("Expected valid type, got nil")
 			}
+
 			if hirType != nil && hirType.Kind != tt.typeKind {
 				t.Errorf("Expected type kind %v, got %v", tt.typeKind, hirType.Kind)
 			}
+
 			if hirType != nil {
 				t.Logf("✅ HIR type '%s' created successfully", tt.name)
 			}
@@ -194,9 +215,9 @@ func TestHIRExpressionCreation(t *testing.T) {
 	intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 
 	tests := []struct {
+		exprData interface{}
 		name     string
 		exprKind HIRExpressionKind
-		exprData interface{}
 	}{
 		{"Literal expression", HIRExprLiteral, &HIRLiteralExpression{Value: 42, Kind: LiteralInteger}},
 		{"Variable expression", HIRExprVariable, &HIRVariableExpression{Name: "x"}},
@@ -211,9 +232,11 @@ func TestHIRExpressionCreation(t *testing.T) {
 			if expr == nil {
 				t.Errorf("Expected valid expression, got nil")
 			}
+
 			if expr != nil && expr.Kind != tt.exprKind {
 				t.Errorf("Expected expression kind %v, got %v", tt.exprKind, expr.Kind)
 			}
+
 			if expr != nil {
 				t.Logf("✅ HIR expression '%s' created successfully", tt.name)
 			}
@@ -221,12 +244,12 @@ func TestHIRExpressionCreation(t *testing.T) {
 	}
 }
 
-// ====== HIR Structure Tests ======
+// ====== HIR Structure Tests ======.
 
 func TestHIRModuleStructure(t *testing.T) {
 	module := NewHIRModule(Span{}, "test_module")
 
-	// Test adding functions
+	// Test adding functions.
 	function := NewHIRFunction(Span{}, "test_func")
 	module.Functions = append(module.Functions, function)
 
@@ -234,7 +257,7 @@ func TestHIRModuleStructure(t *testing.T) {
 		t.Errorf("Expected 1 function, got %d", len(module.Functions))
 	}
 
-	// Test adding variables
+	// Test adding variables.
 	intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 	variable := NewHIRVariable(Span{}, "test_var", intType)
 	module.Variables = append(module.Variables, variable)
@@ -243,7 +266,7 @@ func TestHIRModuleStructure(t *testing.T) {
 		t.Errorf("Expected 1 variable, got %d", len(module.Variables))
 	}
 
-	// Test pretty printing
+	// Test pretty printing.
 	prettyPrint := module.PrettyPrint()
 	if prettyPrint == "" {
 		t.Error("Pretty print should not be empty")
@@ -256,7 +279,7 @@ func TestHIRModuleStructure(t *testing.T) {
 func TestHIRFunctionStructure(t *testing.T) {
 	function := NewHIRFunction(Span{}, "test_func")
 
-	// Add parameters
+	// Add parameters.
 	intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 	param := &HIRParameter{
 		Span: Span{},
@@ -269,14 +292,14 @@ func TestHIRFunctionStructure(t *testing.T) {
 		t.Errorf("Expected 1 parameter, got %d", len(function.Parameters))
 	}
 
-	// Set return type
+	// Set return type.
 	function.ReturnType = intType
 
 	if function.ReturnType == nil {
 		t.Error("Function should have a return type")
 	}
 
-	// Add body
+	// Add body.
 	function.Body = NewHIRBlock(Span{})
 
 	if function.Body == nil {
@@ -289,7 +312,7 @@ func TestHIRFunctionStructure(t *testing.T) {
 func TestHIRBlockStructure(t *testing.T) {
 	block := NewHIRBlock(Span{})
 
-	// Add statements
+	// Add statements.
 	intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 	expr := NewHIRExpression(Span{}, intType, HIRExprLiteral, &HIRLiteralExpression{Value: 42, Kind: LiteralInteger})
 	stmt := &HIRStatement{
@@ -303,12 +326,12 @@ func TestHIRBlockStructure(t *testing.T) {
 		t.Errorf("Expected 1 statement, got %d", len(block.Statements))
 	}
 
-	// Test scope
+	// Test scope.
 	if block.Scope == nil {
 		t.Error("Block should have a scope")
 	}
 
-	// Add variables to scope
+	// Add variables to scope.
 	variable := NewHIRVariable(Span{}, "local_var", intType)
 	block.Scope.Variables["local_var"] = variable
 
@@ -319,12 +342,12 @@ func TestHIRBlockStructure(t *testing.T) {
 	t.Log("✅ HIR block structure test passed")
 }
 
-// ====== HIR Kind Tests ======
+// ====== HIR Kind Tests ======.
 
 func TestHIRKinds(t *testing.T) {
 	tests := []struct {
-		name string
 		node HIRNode
+		name string
 		kind HIRKind
 	}{
 		{"Module kind", NewHIRModule(Span{}, "test"), HIRKindModule},
@@ -344,10 +367,10 @@ func TestHIRKinds(t *testing.T) {
 	}
 }
 
-// ====== HIR String Representation Tests ======
+// ====== HIR String Representation Tests ======.
 
 func TestHIRStringRepresentations(t *testing.T) {
-	// Test statement kind strings
+	// Test statement kind strings.
 	stmtKinds := []HIRStatementKind{
 		HIRStmtExpression, HIRStmtLet, HIRStmtAssign, HIRStmtReturn,
 		HIRStmtIf, HIRStmtWhile, HIRStmtFor, HIRStmtMatch,
@@ -362,7 +385,7 @@ func TestHIRStringRepresentations(t *testing.T) {
 		}
 	}
 
-	// Test expression kind strings
+	// Test expression kind strings.
 	exprKinds := []HIRExpressionKind{
 		HIRExprLiteral, HIRExprVariable, HIRExprCall, HIRExprBinary,
 		HIRExprUnary, HIRExprArray, HIRExprStruct, HIRExprBlock,
@@ -377,7 +400,7 @@ func TestHIRStringRepresentations(t *testing.T) {
 		}
 	}
 
-	// Test type kind strings
+	// Test type kind strings.
 	typeKinds := []HIRTypeKind{
 		HIRTypePrimitive, HIRTypeArray, HIRTypeFunction, HIRTypeStruct,
 		HIRTypeEnum, HIRTypeTrait, HIRTypeGeneric, HIRTypeRefinement,
@@ -393,34 +416,37 @@ func TestHIRStringRepresentations(t *testing.T) {
 	}
 }
 
-// ====== Performance Tests ======
+// ====== Performance Tests ======.
 
 func TestHIRCreationPerformance(t *testing.T) {
 	const numNodes = 1000
 
-	// Test module creation performance
+	// Test module creation performance.
 	for i := 0; i < numNodes; i++ {
 		module := NewHIRModule(Span{}, fmt.Sprintf("module_%d", i))
 		if module == nil {
 			t.Errorf("Failed to create module %d", i)
+
 			break
 		}
 	}
 
-	// Test function creation performance
+	// Test function creation performance.
 	for i := 0; i < numNodes; i++ {
 		function := NewHIRFunction(Span{}, fmt.Sprintf("func_%d", i))
 		if function == nil {
 			t.Errorf("Failed to create function %d", i)
+
 			break
 		}
 	}
 
-	// Test type creation performance
+	// Test type creation performance.
 	for i := 0; i < numNodes; i++ {
 		hirType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 		if hirType == nil {
 			t.Errorf("Failed to create type %d", i)
+
 			break
 		}
 	}
@@ -428,16 +454,16 @@ func TestHIRCreationPerformance(t *testing.T) {
 	t.Logf("✅ Successfully created %d HIR nodes of each type", numNodes)
 }
 
-// ====== Integration Tests ======
+// ====== Integration Tests ======.
 
 func TestHIRIntegration(t *testing.T) {
-	// Create a complete HIR structure
+	// Create a complete HIR structure.
 	module := NewHIRModule(Span{}, "integration_test")
 
-	// Add a function with parameters and body
+	// Add a function with parameters and body.
 	function := NewHIRFunction(Span{}, "test_function")
 
-	// Add parameters
+	// Add parameters.
 	intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 	param := &HIRParameter{
 		Span: Span{},
@@ -447,10 +473,10 @@ func TestHIRIntegration(t *testing.T) {
 	function.Parameters = append(function.Parameters, param)
 	function.ReturnType = intType
 
-	// Add function body
+	// Add function body.
 	body := NewHIRBlock(Span{})
 
-	// Add a return statement
+	// Add a return statement.
 	returnExpr := NewHIRExpression(Span{}, intType, HIRExprVariable, &HIRVariableExpression{Name: "x"})
 	returnStmt := &HIRStatement{
 		Span: Span{},
@@ -462,13 +488,13 @@ func TestHIRIntegration(t *testing.T) {
 	function.Body = body
 	module.Functions = append(module.Functions, function)
 
-	// Add a global variable
+	// Add a global variable.
 	globalVar := NewHIRVariable(Span{}, "global_counter", intType)
 	globalVar.IsGlobal = true
 	globalVar.Initializer = NewHIRExpression(Span{}, intType, HIRExprLiteral, &HIRLiteralExpression{Value: 0, Kind: LiteralInteger})
 	module.Variables = append(module.Variables, globalVar)
 
-	// Verify the structure
+	// Verify the structure.
 	if len(module.Functions) != 1 {
 		t.Errorf("Expected 1 function, got %d", len(module.Functions))
 	}
@@ -485,7 +511,7 @@ func TestHIRIntegration(t *testing.T) {
 		t.Errorf("Expected 1 statement, got %d", len(body.Statements))
 	}
 
-	// Test pretty printing
+	// Test pretty printing.
 	prettyPrint := module.PrettyPrint()
 	if prettyPrint == "" {
 		t.Error("Pretty print should not be empty")

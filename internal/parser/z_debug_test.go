@@ -22,11 +22,14 @@ func Test__Debug_ErrorToleranceTokens(t *testing.T) {
 	p := NewParser(l, "dbg.oriz")
 	prog, errs := p.Parse()
 	t.Logf("errs=%d decls=%d", len(errs), len(prog.Declarations))
+
 	for i, d := range prog.Declarations {
 		if d == nil {
 			t.Logf("decl %d: <nil>", i)
+
 			continue
 		}
+
 		switch x := d.(type) {
 		case *FunctionDeclaration:
 			t.Logf("decl %d: func %s", i, x.Name.Value)
@@ -52,10 +55,12 @@ let invalid = ;
 
 let valid = 42;
 `
+
 	l := lexer.New(input)
 	for i := 0; i < 200; i++ {
 		tok := l.NextToken()
 		t.Logf("%3d: %s %q", i, tok.Type.String(), tok.Literal)
+
 		if tok.Type == lexer.TokenEOF {
 			break
 		}

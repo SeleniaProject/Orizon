@@ -1,5 +1,5 @@
-// Lifetime management system for Orizon MIR
-// This file implements lifetime tracking, inference, and validation for
+// Lifetime management system for Orizon MIR.
+// This file implements lifetime tracking, inference, and validation for.
 // memory safety in the Orizon language. It provides:
 // 1. Lifetime variable representation and management
 // 2. Lifetime constraint tracking and solving
@@ -13,28 +13,28 @@ import (
 	"strings"
 )
 
-// ====== Lifetime Core Types ======
+// ====== Lifetime Core Types ======.
 
-// LifetimeID represents a unique lifetime identifier
+// LifetimeID represents a unique lifetime identifier.
 type LifetimeID string
 
-// Special lifetime constants
+// Special lifetime constants.
 const (
 	StaticLifetime    LifetimeID = "'static"
 	UnknownLifetime   LifetimeID = "'unknown"
 	AnonymousLifetime LifetimeID = "'_"
 )
 
-// Lifetime represents a lifetime in the MIR
+// Lifetime represents a lifetime in the MIR.
 type Lifetime struct {
-	ID          LifetimeID
-	Kind        LifetimeKind
 	Scope       *LifetimeScope
-	Constraints []*LifetimeConstraint
+	ID          LifetimeID
 	Origin      LifetimeOrigin
+	Constraints []*LifetimeConstraint
+	Kind        LifetimeKind
 }
 
-// LifetimeKind classifies different types of lifetimes
+// LifetimeKind classifies different types of lifetimes.
 type LifetimeKind int
 
 const (
@@ -62,15 +62,15 @@ func (lk LifetimeKind) String() string {
 	}
 }
 
-// LifetimeOrigin tracks where a lifetime comes from
+// LifetimeOrigin tracks where a lifetime comes from.
 type LifetimeOrigin struct {
+	Function string
+	Block    string
 	Kind     LifetimeOriginKind
-	Function string // Function where lifetime is defined
-	Block    string // Block where lifetime starts
-	Stmt     int    // Statement index
+	Stmt     int
 }
 
-// LifetimeOriginKind classifies lifetime origins
+// LifetimeOriginKind classifies lifetime origins.
 type LifetimeOriginKind int
 
 const (
@@ -81,29 +81,29 @@ const (
 	OriginInferred                            // Inferred by compiler
 )
 
-// LifetimeScope represents the scope where a lifetime is valid
+// LifetimeScope represents the scope where a lifetime is valid.
 type LifetimeScope struct {
-	ID        string
 	Parent    *LifetimeScope
-	Children  []*LifetimeScope
-	StartStmt int // Statement index where scope starts
-	EndStmt   int // Statement index where scope ends
+	ID        string
 	Function  string
 	Block     string
+	Children  []*LifetimeScope
+	StartStmt int
+	EndStmt   int
 }
 
-// ====== Lifetime Constraints ======
+// ====== Lifetime Constraints ======.
 
-// LifetimeConstraint represents a relationship between lifetimes
+// LifetimeConstraint represents a relationship between lifetimes.
 type LifetimeConstraint struct {
-	Kind   ConstraintKind
+	Origin *LifetimeOrigin
 	From   LifetimeID
 	To     LifetimeID
-	Reason string // Human-readable explanation
-	Origin *LifetimeOrigin
+	Reason string
+	Kind   ConstraintKind
 }
 
-// ConstraintKind represents different types of lifetime constraints
+// ConstraintKind represents different types of lifetime constraints.
 type ConstraintKind int
 
 const (
@@ -138,18 +138,18 @@ func (lc *LifetimeConstraint) String() string {
 	}
 }
 
-// ====== Lifetime Manager ======
+// ====== Lifetime Manager ======.
 
-// LifetimeManager manages lifetime inference and checking
+// LifetimeManager manages lifetime inference and checking.
 type LifetimeManager struct {
 	lifetimes   map[LifetimeID]*Lifetime
-	constraints []*LifetimeConstraint
 	scopes      map[string]*LifetimeScope
-	counter     int // For generating unique lifetime IDs
+	constraints []*LifetimeConstraint
 	errors      []error
+	counter     int
 }
 
-// NewLifetimeManager creates a new lifetime manager
+// NewLifetimeManager creates a new lifetime manager.
 func NewLifetimeManager() *LifetimeManager {
 	lm := &LifetimeManager{
 		lifetimes:   make(map[LifetimeID]*Lifetime),
@@ -159,12 +159,13 @@ func NewLifetimeManager() *LifetimeManager {
 		errors:      make([]error, 0),
 	}
 
-	// Add the static lifetime
+	// Add the static lifetime.
 	lm.addStaticLifetime()
+
 	return lm
 }
 
-// addStaticLifetime adds the 'static lifetime
+// addStaticLifetime adds the 'static lifetime.
 func (lm *LifetimeManager) addStaticLifetime() {
 	staticLifetime := &Lifetime{
 		ID:   StaticLifetime,
@@ -176,13 +177,14 @@ func (lm *LifetimeManager) addStaticLifetime() {
 	lm.lifetimes[StaticLifetime] = staticLifetime
 }
 
-// GenerateLifetimeID generates a unique lifetime ID
+// GenerateLifetimeID generates a unique lifetime ID.
 func (lm *LifetimeManager) GenerateLifetimeID() LifetimeID {
 	lm.counter++
+
 	return LifetimeID(fmt.Sprintf("'lt_%d", lm.counter))
 }
 
-// CreateLifetime creates a new lifetime with the given properties
+// CreateLifetime creates a new lifetime with the given properties.
 func (lm *LifetimeManager) CreateLifetime(kind LifetimeKind, scope *LifetimeScope, origin LifetimeOrigin) *Lifetime {
 	id := lm.GenerateLifetimeID()
 	lifetime := &Lifetime{
@@ -193,10 +195,11 @@ func (lm *LifetimeManager) CreateLifetime(kind LifetimeKind, scope *LifetimeScop
 		Origin:      origin,
 	}
 	lm.lifetimes[id] = lifetime
+
 	return lifetime
 }
 
-// CreateNamedLifetime creates a named lifetime (like 'a)
+// CreateNamedLifetime creates a named lifetime (like 'a).
 func (lm *LifetimeManager) CreateNamedLifetime(name string, scope *LifetimeScope, origin LifetimeOrigin) *Lifetime {
 	id := LifetimeID("'" + name)
 	if existing, exists := lm.lifetimes[id]; exists {
@@ -211,18 +214,20 @@ func (lm *LifetimeManager) CreateNamedLifetime(name string, scope *LifetimeScope
 		Origin:      origin,
 	}
 	lm.lifetimes[id] = lifetime
+
 	return lifetime
 }
 
-// GetLifetime retrieves a lifetime by ID
+// GetLifetime retrieves a lifetime by ID.
 func (lm *LifetimeManager) GetLifetime(id LifetimeID) (*Lifetime, bool) {
 	lifetime, exists := lm.lifetimes[id]
+
 	return lifetime, exists
 }
 
-// ====== Constraint Management ======
+// ====== Constraint Management ======.
 
-// AddConstraint adds a lifetime constraint
+// AddConstraint adds a lifetime constraint.
 func (lm *LifetimeManager) AddConstraint(kind ConstraintKind, from, to LifetimeID, reason string, origin *LifetimeOrigin) {
 	constraint := &LifetimeConstraint{
 		Kind:   kind,
@@ -233,25 +238,25 @@ func (lm *LifetimeManager) AddConstraint(kind ConstraintKind, from, to LifetimeI
 	}
 	lm.constraints = append(lm.constraints, constraint)
 
-	// Add constraint to the from lifetime as well
+	// Add constraint to the from lifetime as well.
 	if fromLifetime, exists := lm.lifetimes[from]; exists {
 		fromLifetime.Constraints = append(fromLifetime.Constraints, constraint)
 	}
 }
 
-// AddOutlivesConstraint adds an outlives constraint: from: to
+// AddOutlivesConstraint adds an outlives constraint: from: to.
 func (lm *LifetimeManager) AddOutlivesConstraint(from, to LifetimeID, reason string) {
 	lm.AddConstraint(ConstraintOutlives, from, to, reason, nil)
 }
 
-// AddEqualConstraint adds an equality constraint: from = to
+// AddEqualConstraint adds an equality constraint: from = to.
 func (lm *LifetimeManager) AddEqualConstraint(from, to LifetimeID, reason string) {
 	lm.AddConstraint(ConstraintEqual, from, to, reason, nil)
 }
 
-// ====== Scope Management ======
+// ====== Scope Management ======.
 
-// CreateScope creates a new lifetime scope
+// CreateScope creates a new lifetime scope.
 func (lm *LifetimeManager) CreateScope(id, function, block string, parent *LifetimeScope) *LifetimeScope {
 	scope := &LifetimeScope{
 		ID:        id,
@@ -268,35 +273,39 @@ func (lm *LifetimeManager) CreateScope(id, function, block string, parent *Lifet
 	}
 
 	lm.scopes[id] = scope
+
 	return scope
 }
 
-// GetScope retrieves a scope by ID
+// GetScope retrieves a scope by ID.
 func (lm *LifetimeManager) GetScope(id string) (*LifetimeScope, bool) {
 	scope, exists := lm.scopes[id]
+
 	return scope, exists
 }
 
-// IsAncestorScope checks if ancestor is an ancestor of descendant
+// IsAncestorScope checks if ancestor is an ancestor of descendant.
 func (lm *LifetimeManager) IsAncestorScope(ancestor, descendant *LifetimeScope) bool {
 	if descendant == nil {
 		return false
 	}
+
 	if descendant.Parent == ancestor {
 		return true
 	}
+
 	return lm.IsAncestorScope(ancestor, descendant.Parent)
 }
 
-// ====== Lifetime Inference ======
+// ====== Lifetime Inference ======.
 
-// InferLifetimes performs lifetime inference for a function
+// InferLifetimes performs lifetime inference for a function.
 func (lm *LifetimeManager) InferLifetimes(function *Function) error {
 	if function == nil {
 		return fmt.Errorf("cannot infer lifetimes for nil function")
 	}
 
-	// Create function scope
+	// Create function scope.
 	funcScope := lm.CreateScope(
 		fmt.Sprintf("func_%s", function.Name),
 		function.Name,
@@ -304,14 +313,14 @@ func (lm *LifetimeManager) InferLifetimes(function *Function) error {
 		nil,
 	)
 
-	// Process parameters
+	// Process parameters.
 	for _, param := range function.Parameters {
 		if err := lm.inferParameterLifetime(param, funcScope); err != nil {
 			lm.errors = append(lm.errors, err)
 		}
 	}
 
-	// Process blocks
+	// Process blocks.
 	for _, block := range function.Blocks {
 		if err := lm.inferBlockLifetimes(block, funcScope); err != nil {
 			lm.errors = append(lm.errors, err)
@@ -321,10 +330,10 @@ func (lm *LifetimeManager) InferLifetimes(function *Function) error {
 	return nil
 }
 
-// inferParameterLifetime infers lifetime for a function parameter
+// inferParameterLifetime infers lifetime for a function parameter.
 func (lm *LifetimeManager) inferParameterLifetime(param Value, scope *LifetimeScope) error {
-	// For now, create a lifetime for reference parameters
-	// In MIR, pointers are represented as ClassInt
+	// For now, create a lifetime for reference parameters.
+	// In MIR, pointers are represented as ClassInt.
 	if param.Kind == ValRef {
 		origin := LifetimeOrigin{
 			Kind:     OriginParameter,
@@ -332,12 +341,13 @@ func (lm *LifetimeManager) inferParameterLifetime(param Value, scope *LifetimeSc
 		}
 		lm.CreateLifetime(LifetimeLocal, scope, origin)
 	}
+
 	return nil
 }
 
-// inferBlockLifetimes infers lifetimes for instructions in a block
+// inferBlockLifetimes infers lifetimes for instructions in a block.
 func (lm *LifetimeManager) inferBlockLifetimes(block *BasicBlock, funcScope *LifetimeScope) error {
-	// Create block scope
+	// Create block scope.
 	blockScope := lm.CreateScope(
 		fmt.Sprintf("block_%s", block.Name),
 		funcScope.Function,
@@ -345,7 +355,7 @@ func (lm *LifetimeManager) inferBlockLifetimes(block *BasicBlock, funcScope *Lif
 		funcScope,
 	)
 
-	// Process each instruction
+	// Process each instruction.
 	for i, instr := range block.Instr {
 		if err := lm.inferInstructionLifetimes(instr, blockScope, i); err != nil {
 			lm.errors = append(lm.errors, err)
@@ -355,11 +365,11 @@ func (lm *LifetimeManager) inferBlockLifetimes(block *BasicBlock, funcScope *Lif
 	return nil
 }
 
-// inferInstructionLifetimes infers lifetimes for a single instruction
+// inferInstructionLifetimes infers lifetimes for a single instruction.
 func (lm *LifetimeManager) inferInstructionLifetimes(instr Instr, scope *LifetimeScope, stmtIndex int) error {
 	switch inst := instr.(type) {
 	case Alloca:
-		// Local allocations get local lifetimes
+		// Local allocations get local lifetimes.
 		origin := LifetimeOrigin{
 			Kind:     OriginLocal,
 			Function: scope.Function,
@@ -369,7 +379,7 @@ func (lm *LifetimeManager) inferInstructionLifetimes(instr Instr, scope *Lifetim
 		lm.CreateLifetime(LifetimeLocal, scope, origin)
 
 	case Load:
-		// Loads might create borrows
+		// Loads might create borrows.
 		origin := LifetimeOrigin{
 			Kind:     OriginBorrow,
 			Function: scope.Function,
@@ -379,23 +389,23 @@ func (lm *LifetimeManager) inferInstructionLifetimes(instr Instr, scope *Lifetim
 		lm.CreateLifetime(LifetimeTemp, scope, origin)
 
 	case Store:
-		// Stores might affect lifetime constraints
-		// For now, no specific action needed
+		// Stores might affect lifetime constraints.
+		// For now, no specific action needed.
 
 	case Call:
-		// Function calls need lifetime checking
+		// Function calls need lifetime checking.
 		return lm.inferCallLifetimes(inst, scope, stmtIndex)
 
 	default:
-		// Other instructions don't affect lifetimes directly
+		// Other instructions don't affect lifetimes directly.
 	}
 
 	return nil
 }
 
-// inferCallLifetimes infers lifetimes for function calls
+// inferCallLifetimes infers lifetimes for function calls.
 func (lm *LifetimeManager) inferCallLifetimes(call Call, scope *LifetimeScope, stmtIndex int) error {
-	// For now, create temporary lifetimes for call results
+	// For now, create temporary lifetimes for call results.
 	if call.Callee != "" {
 		origin := LifetimeOrigin{
 			Kind:     OriginInferred,
@@ -405,14 +415,15 @@ func (lm *LifetimeManager) inferCallLifetimes(call Call, scope *LifetimeScope, s
 		}
 		lm.CreateLifetime(LifetimeTemp, scope, origin)
 	}
+
 	return nil
 }
 
-// ====== Constraint Solving ======
+// ====== Constraint Solving ======.
 
-// SolveConstraints attempts to solve all lifetime constraints
+// SolveConstraints attempts to solve all lifetime constraints.
 func (lm *LifetimeManager) SolveConstraints() error {
-	// Simple constraint solving - more sophisticated algorithms needed for production
+	// Simple constraint solving - more sophisticated algorithms needed for production.
 	for _, constraint := range lm.constraints {
 		if err := lm.checkConstraint(constraint); err != nil {
 			lm.errors = append(lm.errors, err)
@@ -426,7 +437,7 @@ func (lm *LifetimeManager) SolveConstraints() error {
 	return nil
 }
 
-// checkConstraint validates a single constraint
+// checkConstraint validates a single constraint.
 func (lm *LifetimeManager) checkConstraint(constraint *LifetimeConstraint) error {
 	fromLifetime, fromExists := lm.lifetimes[constraint.From]
 	toLifetime, toExists := lm.lifetimes[constraint.To]
@@ -434,6 +445,7 @@ func (lm *LifetimeManager) checkConstraint(constraint *LifetimeConstraint) error
 	if !fromExists {
 		return fmt.Errorf("lifetime %s not found in constraint %s", constraint.From, constraint)
 	}
+
 	if !toExists {
 		return fmt.Errorf("lifetime %s not found in constraint %s", constraint.To, constraint)
 	}
@@ -450,19 +462,19 @@ func (lm *LifetimeManager) checkConstraint(constraint *LifetimeConstraint) error
 	}
 }
 
-// checkOutlivesConstraint checks if 'from' outlives 'to'
+// checkOutlivesConstraint checks if 'from' outlives 'to'.
 func (lm *LifetimeManager) checkOutlivesConstraint(from, to *Lifetime, constraint *LifetimeConstraint) error {
-	// Static lifetime outlives everything
+	// Static lifetime outlives everything.
 	if from.ID == StaticLifetime {
 		return nil
 	}
 
-	// Nothing outlives static (except static itself)
+	// Nothing outlives static (except static itself).
 	if to.ID == StaticLifetime && from.ID != StaticLifetime {
 		return fmt.Errorf("lifetime %s cannot outlive 'static: %s", from.ID, constraint.Reason)
 	}
 
-	// Check scope relationship
+	// Check scope relationship.
 	if from.Scope != nil && to.Scope != nil {
 		if !lm.IsAncestorScope(from.Scope, to.Scope) && from.Scope != to.Scope {
 			return fmt.Errorf("lifetime %s does not outlive %s: %s", from.ID, to.ID, constraint.Reason)
@@ -472,70 +484,75 @@ func (lm *LifetimeManager) checkOutlivesConstraint(from, to *Lifetime, constrain
 	return nil
 }
 
-// checkEqualConstraint checks if two lifetimes are equal
+// checkEqualConstraint checks if two lifetimes are equal.
 func (lm *LifetimeManager) checkEqualConstraint(from, to *Lifetime, constraint *LifetimeConstraint) error {
-	// For now, just check if they're the same lifetime
+	// For now, just check if they're the same lifetime.
 	if from.ID != to.ID {
 		return fmt.Errorf("lifetimes %s and %s are not equal: %s", from.ID, to.ID, constraint.Reason)
 	}
+
 	return nil
 }
 
-// checkSubtypeConstraint checks if 'from' is a subtype of 'to'
+// checkSubtypeConstraint checks if 'from' is a subtype of 'to'.
 func (lm *LifetimeManager) checkSubtypeConstraint(from, to *Lifetime, constraint *LifetimeConstraint) error {
-	// Subtyping for lifetimes is the same as outlives
+	// Subtyping for lifetimes is the same as outlives.
 	return lm.checkOutlivesConstraint(from, to, constraint)
 }
 
-// ====== Error Management ======
+// ====== Error Management ======.
 
-// GetErrors returns all accumulated errors
+// GetErrors returns all accumulated errors.
 func (lm *LifetimeManager) GetErrors() []error {
 	return lm.errors
 }
 
-// ClearErrors clears all accumulated errors
+// ClearErrors clears all accumulated errors.
 func (lm *LifetimeManager) ClearErrors() {
 	lm.errors = make([]error, 0)
 }
 
-// ====== Debug and Reporting ======
+// ====== Debug and Reporting ======.
 
-// String returns a string representation of the lifetime manager
+// String returns a string representation of the lifetime manager.
 func (lm *LifetimeManager) String() string {
 	var b strings.Builder
+
 	b.WriteString("LifetimeManager {\n")
 
 	b.WriteString("  Lifetimes:\n")
+
 	for id, lifetime := range lm.lifetimes {
 		b.WriteString(fmt.Sprintf("    %s: %s\n", id, lifetime.Kind))
 	}
 
 	b.WriteString("  Constraints:\n")
+
 	for _, constraint := range lm.constraints {
 		b.WriteString(fmt.Sprintf("    %s (%s)\n", constraint, constraint.Reason))
 	}
 
 	b.WriteString("}\n")
+
 	return b.String()
 }
 
-// ValidateLifetimes performs a complete lifetime validation for a module
+// ValidateLifetimes performs a complete lifetime validation for a module.
 func (lm *LifetimeManager) ValidateLifetimes(module *Module) error {
 	if module == nil {
 		return fmt.Errorf("cannot validate lifetimes for nil module")
 	}
 
-	// Process each function
+	// Process each function.
 	for _, function := range module.Functions {
 		if err := lm.InferLifetimes(function); err != nil {
-			return fmt.Errorf("lifetime inference failed for function %s: %v", function.Name, err)
+			return fmt.Errorf("lifetime inference failed for function %s: %w", function.Name, err)
 		}
 	}
 
-	// Solve all constraints
+	// Solve all constraints.
 	if err := lm.SolveConstraints(); err != nil {
-		return fmt.Errorf("constraint solving failed: %v", err)
+		return fmt.Errorf("constraint solving failed: %w", err)
 	}
 
 	return nil

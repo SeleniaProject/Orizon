@@ -8,7 +8,7 @@ func TestHIRValidatorBasics(t *testing.T) {
 	validator := NewHIRValidator()
 
 	t.Run("Basic Module Validation", func(t *testing.T) {
-		// Create a valid HIR module
+		// Create a valid HIR module.
 		module := &HIRModule{
 			Span:      Span{},
 			Name:      "test_module",
@@ -17,7 +17,7 @@ func TestHIRValidatorBasics(t *testing.T) {
 			Types:     []*HIRTypeDefinition{},
 		}
 
-		// Validate the module
+		// Validate the module.
 		errs := validator.ValidateModule(module)
 		if len(errs) > 0 {
 			t.Logf("Got %d validation errors (expected for incomplete implementation)", len(errs))
@@ -27,7 +27,7 @@ func TestHIRValidatorBasics(t *testing.T) {
 	})
 
 	t.Run("Function Validation", func(t *testing.T) {
-		// Create a simple function
+		// Create a simple function.
 		intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int"})
 		function := &HIRFunction{
 			Span:       Span{},
@@ -37,14 +37,14 @@ func TestHIRValidatorBasics(t *testing.T) {
 			Body:       &HIRBlock{Span: Span{}, Statements: []*HIRStatement{}},
 		}
 
-		// Test individual function validation
+		// Test individual function validation.
 		validator.validateFunction(function)
 
 		t.Log("✅ Function validation test successful")
 	})
 
 	t.Run("Variable Validation", func(t *testing.T) {
-		// Create a simple variable
+		// Create a simple variable.
 		intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int"})
 		variable := &HIRVariable{
 			Span:        Span{},
@@ -53,7 +53,7 @@ func TestHIRValidatorBasics(t *testing.T) {
 			Initializer: nil,
 		}
 
-		// Test individual variable validation
+		// Test individual variable validation.
 		validator.validateVariable(variable)
 
 		t.Log("✅ Variable validation test successful")

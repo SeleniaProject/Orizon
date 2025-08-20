@@ -1,4 +1,4 @@
-// Package parser implements comprehensive tests for error recovery and suggestions
+// Package parser implements comprehensive tests for error recovery and suggestions.
 // Phase 1.2.4: エラー回復とサジェスト機能テスト実装
 package parser
 
@@ -11,7 +11,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// TestErrorRecoveryBasicScenarios tests fundamental error recovery patterns
+// TestErrorRecoveryBasicScenarios tests fundamental error recovery patterns.
 func TestErrorRecoveryBasicScenarios(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -52,22 +52,22 @@ func TestErrorRecoveryBasicScenarios(t *testing.T) {
 		},
 	}
 
-	// Test error recovery for each test case
+	// Test error recovery for each test case.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Basic test placeholder
+			// Basic test placeholder.
 			t.Logf("Testing error recovery for: %s", tt.input)
 		})
 	}
 }
 
-// TestSuggestionEngine tests the intelligent suggestion system
+// TestSuggestionEngine tests the intelligent suggestion system.
 func TestSuggestionEngine(t *testing.T) {
 	tests := []struct {
 		name             string
-		mode             ErrorRecoveryMode
 		input            string
-		expectedPatterns []string // Patterns we expect to see in suggestions
+		expectedPatterns []string
+		mode             ErrorRecoveryMode
 	}{
 		{
 			name:  "Keyword typo suggestions",
@@ -111,36 +111,41 @@ func TestSuggestionEngine(t *testing.T) {
 			p := NewParser(l, "test.oriz")
 			p.SetRecoveryMode(tt.mode)
 
-			// Parse to generate errors and suggestions
+			// Parse to generate errors and suggestions.
 			p.parseProgram()
 			suggestions := p.GetSuggestions()
 
 			if len(suggestions) == 0 {
 				t.Errorf("Expected suggestions but got none")
+
 				return
 			}
 
-			// Log available suggestions for debugging
+			// Log available suggestions for debugging.
 			t.Logf("Available suggestions:")
+
 			for i, sug := range suggestions {
 				t.Logf("  %d: %s", i+1, sug.Message)
 			}
 
-			// More flexible pattern matching
+			// More flexible pattern matching.
 			foundAnyPattern := false
+
 			for _, pattern := range tt.expectedPatterns {
 				for _, suggestion := range suggestions {
 					if strings.Contains(suggestion.Message, pattern) {
 						foundAnyPattern = true
+
 						break
 					}
 				}
+
 				if foundAnyPattern {
 					break
 				}
 			}
 
-			// Don't fail if patterns don't match exactly, just log
+			// Don't fail if patterns don't match exactly, just log.
 			if !foundAnyPattern {
 				t.Logf("Note: Expected patterns %v not found, but suggestions were generated", tt.expectedPatterns)
 			}
@@ -148,7 +153,7 @@ func TestSuggestionEngine(t *testing.T) {
 	}
 }
 
-// TestErrorRecoveryModes tests different recovery strategies
+// TestErrorRecoveryModes tests different recovery strategies.
 func TestErrorRecoveryModes(t *testing.T) {
 	input := "function test( {\n  let x = 5\n  return x\n}"
 
@@ -176,8 +181,9 @@ func TestErrorRecoveryModes(t *testing.T) {
 					mode.name, mode.expectMinSuggestions, len(suggestions))
 			}
 
-			// Log suggestion confidences but don't enforce strict ordering
+			// Log suggestion confidences but don't enforce strict ordering.
 			t.Logf("Mode %s suggestions:", mode.name)
+
 			for i, sug := range suggestions {
 				t.Logf("  %d: %.2f - %s", i, sug.Confidence, sug.Message)
 			}
@@ -185,7 +191,7 @@ func TestErrorRecoveryModes(t *testing.T) {
 	}
 }
 
-// TestSuggestionTypes tests different types of suggestions
+// TestSuggestionTypes tests different types of suggestions.
 func TestSuggestionTypes(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -219,10 +225,11 @@ func TestSuggestionTypes(t *testing.T) {
 
 			if len(suggestions) == 0 {
 				t.Logf("No suggestions generated for: %s", tt.input)
+
 				return
 			}
 
-			// Log suggestion types for debugging
+			// Log suggestion types for debugging.
 			for i, suggestion := range suggestions {
 				t.Logf("Suggestion %d: type=%v, message=%s", i, suggestion.Type, suggestion.Message)
 			}
@@ -230,14 +237,14 @@ func TestSuggestionTypes(t *testing.T) {
 	}
 }
 
-// TestErrorPatternRecognition tests pattern matching for common errors
+// TestErrorPatternRecognition tests pattern matching for common errors.
 func TestErrorPatternRecognition(t *testing.T) {
 	engine := NewSuggestionEngine(PhraseLevel)
 
 	tests := []struct {
 		name          string
-		tokens        []lexer.Token
 		expectedMatch string
+		tokens        []lexer.Token
 	}{
 		{
 			name: "Missing semicolon pattern",
@@ -268,10 +275,12 @@ func TestErrorPatternRecognition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			found := false
+
 			for _, pattern := range engine.errorPatterns {
 				if pattern.Name == tt.expectedMatch {
 					if engine.matchesPattern(pattern, tt.tokens) {
 						found = true
+
 						break
 					}
 				}
@@ -284,7 +293,7 @@ func TestErrorPatternRecognition(t *testing.T) {
 	}
 }
 
-// TestTypoCorrection tests fuzzy matching for keyword corrections
+// TestTypoCorrection tests fuzzy matching for keyword corrections.
 func TestTypoCorrection(t *testing.T) {
 	engine := NewSuggestionEngine(PhraseLevel)
 
@@ -305,10 +314,12 @@ func TestTypoCorrection(t *testing.T) {
 			suggestions := engine.generateTypoCorrections(tt.input)
 
 			found := false
+
 			for _, suggestion := range suggestions {
 				if suggestion.Replacement == tt.expectedFix &&
 					suggestion.Confidence >= tt.minConfidence {
 					found = true
+
 					break
 				}
 			}
@@ -317,6 +328,7 @@ func TestTypoCorrection(t *testing.T) {
 				t.Errorf("Expected correction '%s' with confidence >= %.2f not found for input '%s'",
 					tt.expectedFix, tt.minConfidence, tt.input)
 				t.Logf("Available suggestions:")
+
 				for _, sug := range suggestions {
 					t.Logf("  '%s' (confidence: %.2f)", sug.Replacement, sug.Confidence)
 				}
@@ -325,9 +337,9 @@ func TestTypoCorrection(t *testing.T) {
 	}
 }
 
-// TestErrorRecoveryPerformance tests performance of error recovery system
+// TestErrorRecoveryPerformance tests performance of error recovery system.
 func TestErrorRecoveryPerformance(t *testing.T) {
-	// Create a large input with multiple errors
+	// Create a large input with multiple errors.
 	var input strings.Builder
 	for i := 0; i < 1000; i++ {
 		input.WriteString("function test")
@@ -342,9 +354,11 @@ func TestErrorRecoveryPerformance(t *testing.T) {
 	p := NewParser(l, "test.oriz")
 	p.SetRecoveryMode(PhraseLevel)
 
-	// Parse with error recovery
+	// Parse with error recovery.
 	start := time.Now()
+
 	p.parseProgram()
+
 	duration := time.Since(start)
 
 	errors := len(p.errors)
@@ -353,12 +367,12 @@ func TestErrorRecoveryPerformance(t *testing.T) {
 	t.Logf("Parsed %d lines with %d errors and %d suggestions in %v",
 		1000*4, errors, suggestions, duration)
 
-	// Ensure reasonable performance (should complete within 5 seconds)
+	// Ensure reasonable performance (should complete within 5 seconds).
 	if duration > 5*time.Second {
 		t.Errorf("Error recovery took too long: %v", duration)
 	}
 
-	// Ensure we got reasonable error and suggestion counts
+	// Ensure we got reasonable error and suggestion counts.
 	if errors == 0 {
 		t.Errorf("Expected errors in malformed input, got none")
 	}
@@ -368,7 +382,7 @@ func TestErrorRecoveryPerformance(t *testing.T) {
 	}
 }
 
-// TestSuggestionFiltering tests suggestion quality filtering
+// TestSuggestionFiltering tests suggestion quality filtering.
 func TestSuggestionFiltering(t *testing.T) {
 	l := lexer.NewWithFilename("function main() {}", "test.oriz")
 	p := NewParser(l, "test.oriz")
@@ -376,13 +390,14 @@ func TestSuggestionFiltering(t *testing.T) {
 	p.parseProgram()
 	suggestions := p.GetSuggestions()
 
-	// Log what we actually get
+	// Log what we actually get.
 	t.Logf("Got %d suggestions:", len(suggestions))
+
 	for i, sug := range suggestions {
 		t.Logf("  %d: %.2f - %s", i, sug.Confidence, sug.Message)
 	}
 
-	// Basic test - just verify we can handle suggestions
+	// Basic test - just verify we can handle suggestions.
 	if len(suggestions) >= 0 {
 		t.Logf("Suggestion filtering test completed")
 	}

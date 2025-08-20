@@ -1,4 +1,4 @@
-// Package parser tests - basic parser functionality tests
+// Package parser tests - basic parser functionality tests.
 // Phase 1.2.1: 再帰下降パーサーテスト
 package parser
 
@@ -8,7 +8,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// TestParserBasic tests basic parser functionality
+// TestParserBasic tests basic parser functionality.
 func TestParserBasic(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -41,20 +41,23 @@ func TestParserBasic(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Parser errors: %v", errors)
+
 				return
 			}
 
 			if program == nil {
 				t.Error("Expected program, got nil")
+
 				return
 			}
 
 			if len(program.Declarations) == 0 {
 				t.Error("Expected at least one declaration")
+
 				return
 			}
 
-			// Basic verification that we got some kind of declaration
+			// Basic verification that we got some kind of declaration.
 			decl := program.Declarations[0]
 			if decl == nil {
 				t.Error("Expected declaration, got nil")
@@ -65,7 +68,7 @@ func TestParserBasic(t *testing.T) {
 	}
 }
 
-// TestParserErrors tests error handling
+// TestParserErrors tests error handling.
 func TestParserErrors(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -101,6 +104,7 @@ func TestParserErrors(t *testing.T) {
 				t.Errorf("Expected error: %v, got errors: %v", tt.expectedError, errors)
 				t.Logf("Input: %s", tt.input)
 				t.Logf("Number of errors: %d", len(errors))
+
 				for i, err := range errors {
 					t.Logf("Error %d: %v", i, err)
 				}
@@ -113,7 +117,7 @@ func TestParserErrors(t *testing.T) {
 	}
 }
 
-// TestExpressionParsing tests expression parsing
+// TestExpressionParsing tests expression parsing.
 func TestExpressionParsing(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -146,11 +150,13 @@ func TestExpressionParsing(t *testing.T) {
 
 			if len(errors) > 0 {
 				t.Errorf("Unexpected errors: %v", errors)
+
 				return
 			}
 
 			if len(program.Declarations) == 0 {
 				t.Error("Expected at least one statement")
+
 				return
 			}
 
@@ -159,7 +165,7 @@ func TestExpressionParsing(t *testing.T) {
 	}
 }
 
-// TestASTStructure tests AST node structure
+// TestASTStructure tests AST node structure.
 func TestASTStructure(t *testing.T) {
 	input := "func test() { let x = 42; return x; }"
 
@@ -172,12 +178,12 @@ func TestASTStructure(t *testing.T) {
 		t.Fatalf("Unexpected errors: %v", errors)
 	}
 
-	// Verify program structure
+	// Verify program structure.
 	if len(program.Declarations) != 1 {
 		t.Fatalf("Expected 1 declaration, got %d", len(program.Declarations))
 	}
 
-	// Verify function declaration
+	// Verify function declaration.
 	funcDecl, ok := program.Declarations[0].(*FunctionDeclaration)
 	if !ok {
 		t.Fatalf("Expected FunctionDeclaration, got %T", program.Declarations[0])
@@ -187,22 +193,22 @@ func TestASTStructure(t *testing.T) {
 		t.Errorf("Expected function name 'test', got '%s'", funcDecl.Name.Value)
 	}
 
-	// Verify function body
+	// Verify function body.
 	if funcDecl.Body == nil {
 		t.Fatal("Expected function body, got nil")
 	}
 
-	// Verify body has statements
+	// Verify body has statements.
 	if len(funcDecl.Body.Statements) != 2 {
 		t.Fatalf("Expected 2 statements in body, got %d", len(funcDecl.Body.Statements))
 	}
 
-	// Verify first statement is variable declaration
+	// Verify first statement is variable declaration.
 	if _, ok := funcDecl.Body.Statements[0].(*VariableDeclaration); !ok {
 		t.Errorf("Expected first statement to be VariableDeclaration, got %T", funcDecl.Body.Statements[0])
 	}
 
-	// Verify second statement is return statement
+	// Verify second statement is return statement.
 	if _, ok := funcDecl.Body.Statements[1].(*ReturnStatement); !ok {
 		t.Errorf("Expected second statement to be ReturnStatement, got %T", funcDecl.Body.Statements[1])
 	}
@@ -210,7 +216,7 @@ func TestASTStructure(t *testing.T) {
 	t.Log("AST structure verification passed")
 }
 
-// TestPrettyPrint tests AST pretty printing
+// TestPrettyPrint tests AST pretty printing.
 func TestPrettyPrint(t *testing.T) {
 	input := "func add(a: int, b: int) { return a + b; }"
 
@@ -223,7 +229,7 @@ func TestPrettyPrint(t *testing.T) {
 		t.Fatalf("Unexpected errors: %v", errors)
 	}
 
-	// Test pretty printing
+	// Test pretty printing.
 	output := PrettyPrint(program)
 	if output == "" {
 		t.Error("Expected non-empty pretty print output")
@@ -232,7 +238,7 @@ func TestPrettyPrint(t *testing.T) {
 	t.Logf("Pretty print output:\n%s", output)
 }
 
-// BenchmarkParser benchmarks parser performance
+// BenchmarkParser benchmarks parser performance.
 func BenchmarkParser(b *testing.B) {
 	input := `
 	func fibonacci(n: int) -> int {
@@ -249,6 +255,7 @@ func BenchmarkParser(b *testing.B) {
 	`
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		l := lexer.New(input)
 		p := NewParser(l, "benchmark.oriz")
@@ -257,9 +264,9 @@ func BenchmarkParser(b *testing.B) {
 	}
 }
 
-// TestParserRecovery tests parser error recovery
+// TestParserRecovery tests parser error recovery.
 func TestParserRecovery(t *testing.T) {
-	// Test that parser can recover from errors and continue parsing
+	// Test that parser can recover from errors and continue parsing.
 	input := `
 	func invalid syntax here
 	func valid() { return 42; }
@@ -271,12 +278,12 @@ func TestParserRecovery(t *testing.T) {
 
 	program, errors := p.Parse()
 
-	// Should have errors but still parse some valid declarations
+	// Should have errors but still parse some valid declarations.
 	if len(errors) == 0 {
 		t.Error("Expected parsing errors for invalid syntax")
 	}
 
-	// Should still have parsed the valid function and variable
+	// Should still have parsed the valid function and variable.
 	if len(program.Declarations) == 0 {
 		t.Error("Expected some declarations to be parsed despite errors")
 	}

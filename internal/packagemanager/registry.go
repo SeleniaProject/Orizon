@@ -46,10 +46,8 @@ type Registry interface {
 	All(ctx context.Context) ([]PackageManifest, error)
 }
 
-var (
-	// ErrNotFound is returned when a blob or package cannot be found anywhere in the registry cluster.
-	ErrNotFound = errors.New("not found")
-)
+// ErrNotFound is returned when a blob or package cannot be found anywhere in the registry cluster.
+var ErrNotFound = errors.New("not found")
 
 // versionList is a helper slice for sorting versions.
 type versionList []PackageVersion
@@ -59,16 +57,16 @@ func (vl versionList) Swap(i, j int) { vl[i], vl[j] = vl[j], vl[i] }
 func (vl versionList) Less(i, j int) bool {
 	vi := mustSemver(vl[i].Version)
 	vj := mustSemver(vl[j].Version)
+
 	return vi.LessThan(vj)
 }
 
 // InMemoryRegistry is a simple, thread-safe, content-addressed registry with peer replication.
 type InMemoryRegistry struct {
-	mu    sync.RWMutex
 	blobs map[CID]PackageBlob
-	// name index for resolving by semver constraint
 	index map[PackageID][]PackageVersion
 	peers []*InMemoryRegistry
+	mu    sync.RWMutex
 }
 
 // NewInMemoryRegistry constructs an empty registry.
@@ -83,20 +81,25 @@ func NewInMemoryRegistry() *InMemoryRegistry {
 func (r *InMemoryRegistry) ConnectPeers(peers ...*InMemoryRegistry) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	for _, p := range peers {
 		if p == nil || p == r {
 			continue
 		}
+
 		r.peers = append(r.peers, p)
-		// ensure reciprocal link
+		// ensure reciprocal link.
 		p.mu.Lock()
 		found := false
+
 		for _, back := range p.peers {
 			if back == r {
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			p.peers = append(p.peers, r)
 		}
@@ -109,6 +112,7 @@ func (r *InMemoryRegistry) Publish(ctx context.Context, blob PackageBlob) (CID, 
 	if blob.Data == nil {
 		return "", errors.New("empty data")
 	}
+
 	id := ComputeCID(blob.Data)
 
 	r.mu.Lock()
@@ -118,10 +122,11 @@ func (r *InMemoryRegistry) Publish(ctx context.Context, blob PackageBlob) (CID, 
 		r.index[blob.Manifest.Name] = append(r.index[blob.Manifest.Name], pv)
 		sort.Sort(versionList(r.index[blob.Manifest.Name]))
 	}
+
 	peers := append([]*InMemoryRegistry(nil), r.peers...)
 	r.mu.Unlock()
 
-	// best-effort replication; ignore peer errors
+	// best-effort replication; ignore peer errors.
 	for _, p := range peers {
 		select {
 		case <-ctx.Done():
@@ -130,6 +135,7 @@ func (r *InMemoryRegistry) Publish(ctx context.Context, blob PackageBlob) (CID, 
 		}
 		p.replicate(id, blob)
 	}
+
 	return id, nil
 }
 
@@ -149,8 +155,10 @@ func (r *InMemoryRegistry) Fetch(ctx context.Context, id CID) (PackageBlob, erro
 	r.mu.RLock()
 	if b, ok := r.blobs[id]; ok {
 		r.mu.RUnlock()
+
 		return b, nil
 	}
+
 	peers := append([]*InMemoryRegistry(nil), r.peers...)
 	r.mu.RUnlock()
 
@@ -163,59 +171,69 @@ func (r *InMemoryRegistry) Fetch(ctx context.Context, id CID) (PackageBlob, erro
 		p.mu.RLock()
 		b, ok := p.blobs[id]
 		p.mu.RUnlock()
+
 		if ok {
 			return b, nil
 		}
 	}
+
 	return PackageBlob{}, ErrNotFound
 }
 
 // Find returns the highest version that satisfies the constraint (or lowest if none provided), searching peers if needed.
 func (r *InMemoryRegistry) Find(ctx context.Context, name PackageID, constraint *semver.Constraints) (CID, PackageManifest, error) {
-	// collect candidates locally first
+	// collect candidates locally first.
 	type cand struct {
 		ver *semver.Version
 		pv  PackageVersion
 	}
+
 	r.mu.RLock()
 	local := append([]PackageVersion(nil), r.index[name]...)
 	r.mu.RUnlock()
 
 	pick := func(list []PackageVersion) (PackageVersion, bool) {
 		bestIdx := -1
+
 		var bestVer *semver.Version
+
 		for i := range list {
 			sv := mustSemver(list[i].Version)
 			if constraint != nil && !constraint.Check(sv) {
 				continue
 			}
+
 			if bestIdx == -1 || sv.GreaterThan(bestVer) {
 				bestIdx, bestVer = i, sv
 			}
 		}
+
 		if bestIdx >= 0 {
 			return list[bestIdx], true
 		}
+
 		return PackageVersion{}, false
 	}
 
 	if pv, ok := pick(local); ok {
-		// derive CID from stored blob
+		// derive CID from stored blob.
 		r.mu.RLock()
 		for cid, blob := range r.blobs {
 			if blob.Manifest.Name == pv.Name && blob.Manifest.Version == pv.Version {
 				m := blob.Manifest
 				r.mu.RUnlock()
+
 				return cid, m, nil
 			}
 		}
 		r.mu.RUnlock()
 	}
 
-	// search peers
+	// search peers.
 	r.mu.RLock()
 	peers := append([]*InMemoryRegistry(nil), r.peers...)
 	r.mu.RUnlock()
+
 	for _, p := range peers {
 		select {
 		case <-ctx.Done():
@@ -223,37 +241,43 @@ func (r *InMemoryRegistry) Find(ctx context.Context, name PackageID, constraint 
 		default:
 		}
 		p.mu.RLock()
+
 		pv, ok := pick(p.index[name])
 		if ok {
 			for cid, blob := range p.blobs {
 				if blob.Manifest.Name == pv.Name && blob.Manifest.Version == pv.Version {
 					m := blob.Manifest
 					p.mu.RUnlock()
+
 					return cid, m, nil
 				}
 			}
 		}
 		p.mu.RUnlock()
 	}
+
 	return "", PackageManifest{}, ErrNotFound
 }
 
 // List returns all manifests for the specified package name from local index then peers.
 func (r *InMemoryRegistry) List(ctx context.Context, name PackageID) ([]PackageManifest, error) {
 	out := make([]PackageManifest, 0)
+
 	r.mu.RLock()
 	local := append([]PackageVersion(nil), r.index[name]...)
+
 	blobs := make(map[CID]PackageBlob, len(r.blobs))
 	for k, v := range r.blobs {
 		blobs[k] = v
 	}
+
 	peers := append([]*InMemoryRegistry(nil), r.peers...)
 	r.mu.RUnlock()
 
 	appendFrom := func(list []PackageVersion, sourceBlobs map[CID]PackageBlob) {
 		for _, pv := range list {
-			// Try to reconstruct manifest directly
-			out = append(out, PackageManifest{Name: pv.Name, Version: pv.Version, Dependencies: pv.Dependencies})
+			// Try to reconstruct manifest directly.
+			out = append(out, PackageManifest(pv))
 		}
 	}
 	appendFrom(local, blobs)
@@ -266,42 +290,49 @@ func (r *InMemoryRegistry) List(ctx context.Context, name PackageID) ([]PackageM
 		}
 		p.mu.RLock()
 		for _, pv := range p.index[name] {
-			out = append(out, PackageManifest{Name: pv.Name, Version: pv.Version, Dependencies: pv.Dependencies})
+			out = append(out, PackageManifest(pv))
 		}
 		p.mu.RUnlock()
 	}
-	// De-duplicate by name+version
+	// De-duplicate by name+version.
 	seen := make(map[string]bool, len(out))
 	uniq := out[:0]
+
 	for _, m := range out {
 		key := string(m.Name) + "@" + string(m.Version)
 		if !seen[key] {
 			seen[key] = true
+
 			uniq = append(uniq, m)
 		}
 	}
-	// Sort by version ascending for determinism
+	// Sort by version ascending for determinism.
 	sort.Slice(uniq, func(i, j int) bool {
 		if uniq[i].Name != uniq[j].Name {
 			return uniq[i].Name < uniq[j].Name
 		}
+
 		vi := mustSemver(uniq[i].Version)
 		vj := mustSemver(uniq[j].Version)
+
 		return vi.LessThan(vj)
 	})
+
 	return uniq, nil
 }
 
 // All returns every manifest across local and peer registries.
 func (r *InMemoryRegistry) All(ctx context.Context) ([]PackageManifest, error) {
 	r.mu.RLock()
-	// collect local manifests
+	// collect local manifests.
 	out := make([]PackageManifest, 0)
+
 	for name, vers := range r.index {
 		for _, pv := range vers {
 			out = append(out, PackageManifest{Name: name, Version: pv.Version, Dependencies: pv.Dependencies})
 		}
 	}
+
 	peers := append([]*InMemoryRegistry(nil), r.peers...)
 	r.mu.RUnlock()
 
@@ -319,24 +350,29 @@ func (r *InMemoryRegistry) All(ctx context.Context) ([]PackageManifest, error) {
 		}
 		p.mu.RUnlock()
 	}
-	// De-duplicate
+	// De-duplicate.
 	seen := make(map[string]bool, len(out))
 	uniq := out[:0]
+
 	for _, m := range out {
 		key := string(m.Name) + "@" + string(m.Version)
 		if !seen[key] {
 			seen[key] = true
+
 			uniq = append(uniq, m)
 		}
 	}
-	// Sort by name then version
+	// Sort by name then version.
 	sort.Slice(uniq, func(i, j int) bool {
 		if uniq[i].Name != uniq[j].Name {
 			return uniq[i].Name < uniq[j].Name
 		}
+
 		vi := mustSemver(uniq[i].Version)
 		vj := mustSemver(uniq[j].Version)
+
 		return vi.LessThan(vj)
 	})
+
 	return uniq, nil
 }

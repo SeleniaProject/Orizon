@@ -28,15 +28,12 @@ type BasicBlock struct {
 
 // Value represents an SSA-like value produced by an instruction or parameter.
 type Value struct {
-	Kind ValueKind
-	// For constants
+	StrVal  string
+	Ref     string
+	Kind    ValueKind
 	Int64   int64
 	Float64 float64
-	StrVal  string
-	// For instruction results (index into block/local numbering)
-	Ref string
-	// Lightweight type class hint for lowering (int/float/ptr/string)
-	Class ValueClass
+	Class   ValueClass
 }
 
 // ValueKind classifies the value category.
@@ -56,9 +53,9 @@ type Instr interface{ isInstr() }
 // BinOp represents a binary arithmetic or logical operation.
 type BinOp struct {
 	Dst string
-	Op  BinOpKind
 	LHS Value
 	RHS Value
+	Op  BinOpKind
 }
 
 // Ret returns from the current function with an optional value.
@@ -66,13 +63,12 @@ type Ret struct{ Val *Value }
 
 // Call represents a function call.
 type Call struct {
-	Dst       string
-	Callee    string // optional named callee
-	CalleeVal *Value // optional value callee (for indirect calls)
-	Args      []Value
-	// Optional: per-arg classes (e.g., int, f32, f64) and result class
-	ArgClasses []string
+	CalleeVal  *Value
+	Dst        string
+	Callee     string
 	RetClass   string
+	Args       []Value
+	ArgClasses []string
 }
 
 // Alloca allocates a local stack slot and returns its address (by reference name).
@@ -97,8 +93,8 @@ type IndexLoad struct {
 // FieldLoad loads a value from a struct field.
 type FieldLoad struct {
 	Dst    string
-	Object Value
 	Field  string
+	Object Value
 }
 
 // Store stores a value into an address.
@@ -124,9 +120,9 @@ type FieldStore struct {
 // Cmp represents a comparison producing a boolean-like value (0/1).
 type Cmp struct {
 	Dst  string
-	Pred CmpPred
 	LHS  Value
 	RHS  Value
+	Pred CmpPred
 }
 
 // Unconditional branch to a target basic block label.
@@ -134,9 +130,9 @@ type Br struct{ Target string }
 
 // Conditional branch based on a value treated as boolean (0=false, nonzero=true).
 type CondBr struct {
-	Cond  Value
 	True  string
 	False string
+	Cond  Value
 }
 
 // BinOpKind enumerates supported binary operations at MIR level.
@@ -196,12 +192,16 @@ func (m *Module) String() string {
 	if m == nil {
 		return "<nil-mir-module>"
 	}
+
 	var b strings.Builder
+
 	fmt.Fprintf(&b, "module %s\n", m.Name)
+
 	for _, f := range m.Functions {
 		b.WriteString(f.String())
 		b.WriteByte('\n')
 	}
+
 	return b.String()
 }
 
@@ -209,19 +209,27 @@ func (f *Function) String() string {
 	if f == nil {
 		return "<nil-func>"
 	}
+
 	var b strings.Builder
+
 	fmt.Fprintf(&b, "func %s(", f.Name)
+
 	for i := range f.Parameters {
 		if i > 0 {
 			b.WriteString(", ")
 		}
+
 		b.WriteString(valString(f.Parameters[i]))
 	}
+
 	b.WriteString(") {\n")
+
 	for _, bb := range f.Blocks {
 		b.WriteString(bb.String())
 	}
+
 	b.WriteString("}\n")
+
 	return b.String()
 }
 
@@ -229,19 +237,24 @@ func (bb *BasicBlock) String() string {
 	if bb == nil {
 		return ""
 	}
+
 	var b strings.Builder
 	if bb.Name != "" {
 		fmt.Fprintf(&b, "%s:\n", bb.Name)
 	}
+
 	for _, in := range bb.Instr {
 		b.WriteString("  ")
+
 		if s, ok := any(in).(fmt.Stringer); ok {
 			b.WriteString(s.String())
 		} else {
 			b.WriteString("<instr>")
 		}
+
 		b.WriteByte('\n')
 	}
+
 	return b.String()
 }
 
@@ -259,6 +272,7 @@ func valString(v Value) string {
 		if v.Ref == "" {
 			return "%ref?"
 		}
+
 		return v.Ref
 	default:
 		return "<invalid>"
@@ -269,41 +283,52 @@ func (i BinOp) String() string {
 	if i.Dst != "" {
 		return fmt.Sprintf("%s = %s %s, %s", i.Dst, i.Op, i.LHS, i.RHS)
 	}
+
 	return fmt.Sprintf("%s %s, %s", i.Op, i.LHS, i.RHS)
 }
+
 func (i Ret) String() string {
 	if i.Val == nil {
 		return "ret"
 	}
+
 	return fmt.Sprintf("ret %s", i.Val.String())
 }
+
 func (i Call) String() string {
 	var b strings.Builder
 	if i.Dst != "" {
 		fmt.Fprintf(&b, "%s = ", i.Dst)
 	}
-	// choose callee representation
+	// choose callee representation.
 	callee := i.Callee
 	if i.CalleeVal != nil {
 		callee = i.CalleeVal.String()
 	}
+
 	fmt.Fprintf(&b, "call %s(", callee)
+
 	for idx, a := range i.Args {
 		if idx > 0 {
 			b.WriteString(", ")
 		}
+
 		b.WriteString(a.String())
 	}
+
 	b.WriteString(")")
-	// Optionally annotate classes for diagnostics
+	// Optionally annotate classes for diagnostics.
 	if len(i.ArgClasses) > 0 || i.RetClass != "" {
 		b.WriteString(" ;")
+
 		if len(i.ArgClasses) > 0 {
 			b.WriteString(" args:")
+
 			for j, c := range i.ArgClasses {
 				if j > 0 {
 					b.WriteString(",")
 				}
+
 				if c == "" {
 					b.WriteString("?")
 				} else {
@@ -311,10 +336,12 @@ func (i Call) String() string {
 				}
 			}
 		}
+
 		if i.RetClass != "" {
 			fmt.Fprintf(&b, " ret:%s", i.RetClass)
 		}
 	}
+
 	return b.String()
 }
 
@@ -322,6 +349,7 @@ func (i Alloca) String() string {
 	if i.Name != "" {
 		return fmt.Sprintf("%s = alloca %s", i.Dst, i.Name)
 	}
+
 	return fmt.Sprintf("%s = alloca", i.Dst)
 }
 
@@ -353,20 +381,20 @@ func (i FieldStore) String() string {
 type CmpPred int
 
 const (
-	// Generic equality
+	// Generic equality.
 	CmpEQ CmpPred = iota
 	CmpNE
-	// Signed integer comparisons
+	// Signed integer comparisons.
 	CmpSLT
 	CmpSLE
 	CmpSGT
 	CmpSGE
-	// Unsigned integer (and pointer) comparisons
+	// Unsigned integer (and pointer) comparisons.
 	CmpULT
 	CmpULE
 	CmpUGT
 	CmpUGE
-	// Floating-point comparisons
+	// Floating-point comparisons.
 	CmpFLT
 	CmpFLE
 	CmpFGT
@@ -412,6 +440,7 @@ func (i Cmp) String() string {
 	if i.Dst != "" {
 		return fmt.Sprintf("%s = cmp.%s %s, %s", i.Dst, i.Pred, i.LHS, i.RHS)
 	}
+
 	return fmt.Sprintf("cmp.%s %s, %s", i.Pred, i.LHS, i.RHS)
 }
 

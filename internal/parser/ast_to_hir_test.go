@@ -8,15 +8,15 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 	transformer := NewASTToHIRTransformer()
 
 	t.Run("Symbol Table Operations", func(t *testing.T) {
-		// Test entering and exiting scopes
+		// Test entering and exiting scopes.
 		transformer.enterScope()
 
-		// Add a symbol
+		// Add a symbol.
 		intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 		variable := NewHIRVariable(Span{}, "test_var", intType)
 		transformer.addSymbol("test_var", variable)
 
-		// Look up symbol
+		// Look up symbol.
 		found := transformer.lookupSymbol("test_var")
 		if found == nil {
 			t.Error("Symbol should be found in current scope")
@@ -24,7 +24,7 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 
 		transformer.exitScope()
 
-		// Symbol should not be found after exiting scope
+		// Symbol should not be found after exiting scope.
 		found = transformer.lookupSymbol("test_var")
 		if found != nil {
 			t.Log("Symbol found in parent scope (expected behavior)")
@@ -34,13 +34,13 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 	})
 
 	t.Run("Module Transformation", func(t *testing.T) {
-		// Test basic module transformation
+		// Test basic module transformation.
 		astModule := &Program{
 			Span:         Span{},
 			Declarations: []Declaration{},
 		}
 
-		// Transform to HIR
+		// Transform to HIR.
 		hirModule, err := transformer.TransformModule(astModule)
 		if err != nil {
 			t.Fatalf("Failed to transform module: %v", err)
@@ -58,7 +58,7 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 	})
 
 	t.Run("Function Transformation", func(t *testing.T) {
-		// Create a simple function AST
+		// Create a simple function AST.
 		astFunction := &FunctionDeclaration{
 			Span:       Span{},
 			Name:       NewIdentifier(Span{}, "test_func"),
@@ -73,7 +73,7 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 			},
 		}
 
-		// Transform to HIR
+		// Transform to HIR.
 		hirFunction, err := transformer.transformFunction(astFunction)
 		if err != nil {
 			t.Fatalf("Failed to transform function: %v", err)
@@ -95,7 +95,7 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 	})
 
 	t.Run("Variable Declaration Transformation", func(t *testing.T) {
-		// Create a variable declaration AST
+		// Create a variable declaration AST.
 		astLet := &VariableDeclaration{
 			Span: Span{},
 			Name: NewIdentifier(Span{}, "x"),
@@ -106,7 +106,7 @@ func TestASTToHIRRealProgramTransformations(t *testing.T) {
 			Initializer: NewLiteral(Span{}, 42, LiteralInteger),
 		}
 
-		// Transform to HIR
+		// Transform to HIR.
 		hirVar, err := transformer.transformLetStatement(astLet)
 		if err != nil {
 			t.Fatalf("Failed to transform let statement: %v", err)
@@ -132,7 +132,7 @@ func TestASTToHIRExpressionTransformations(t *testing.T) {
 	transformer := NewASTToHIRTransformer()
 
 	t.Run("Literal Expression Transformation", func(t *testing.T) {
-		// Integer literal
+		// Integer literal.
 		astExpr := NewLiteral(Span{}, 42, LiteralInteger)
 
 		hirExpr := transformer.transformExpression(astExpr)
@@ -157,17 +157,18 @@ func TestASTToHIRExpressionTransformations(t *testing.T) {
 	})
 
 	t.Run("Variable Expression Transformation", func(t *testing.T) {
-		// Add a variable to the symbol table first
+		// Add a variable to the symbol table first.
 		intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 		variable := NewHIRVariable(Span{}, "x", intType)
+
 		transformer.enterScope()
 
-		// Debug: check scope state
+		// Debug: check scope state.
 		t.Logf("Current scope after enter: %v", transformer.currentScope != nil)
 
 		transformer.addSymbol("x", variable)
 
-		// Also add to current scope
+		// Also add to current scope.
 		if transformer.currentScope != nil {
 			transformer.currentScope.Variables["x"] = variable
 			t.Logf("Added variable to current scope, scope has %d variables", len(transformer.currentScope.Variables))
@@ -175,12 +176,12 @@ func TestASTToHIRExpressionTransformations(t *testing.T) {
 			t.Log("Current scope is nil!")
 		}
 
-		// Variable reference
+		// Variable reference.
 		astExpr := NewIdentifier(Span{}, "x")
 
 		hirExpr := transformer.transformExpression(astExpr)
 
-		// Debug: check lookup result
+		// Debug: check lookup result.
 		lookedUp := transformer.lookupVariable("x")
 		t.Logf("Lookup result for 'x': %v", lookedUp != nil)
 
@@ -198,7 +199,7 @@ func TestASTToHIRExpressionTransformations(t *testing.T) {
 	})
 
 	t.Run("Binary Expression Transformation", func(t *testing.T) {
-		// Binary expression: 1 + 2
+		// Binary expression: 1 + 2.
 		left := NewLiteral(Span{}, 1, LiteralInteger)
 		right := NewLiteral(Span{}, 2, LiteralInteger)
 		operator := NewOperator(Span{}, "+", 10, LeftAssociative, BinaryOp)
@@ -228,7 +229,7 @@ func TestASTToHIRStatementTransformations(t *testing.T) {
 	transformer := NewASTToHIRTransformer()
 
 	t.Run("Expression Statement Transformation", func(t *testing.T) {
-		// Expression statement containing a literal
+		// Expression statement containing a literal.
 		expr := NewLiteral(Span{}, 42, LiteralInteger)
 		astStmt := &ExpressionStatement{
 			Span:       Span{},
@@ -249,7 +250,7 @@ func TestASTToHIRStatementTransformations(t *testing.T) {
 	})
 
 	t.Run("Return Statement Transformation", func(t *testing.T) {
-		// Return statement with a value
+		// Return statement with a value.
 		returnValue := NewLiteral(Span{}, 42, LiteralInteger)
 		astStmt := &ReturnStatement{
 			Span:  Span{},
@@ -282,7 +283,7 @@ func TestASTToHIRAdvancedTransformations(t *testing.T) {
 	transformer := NewASTToHIRTransformer()
 
 	t.Run("Function with Parameters", func(t *testing.T) {
-		// Function with parameters
+		// Function with parameters.
 		param := &Parameter{
 			Span:     Span{},
 			Name:     NewIdentifier(Span{}, "param"),
@@ -320,14 +321,15 @@ func TestASTToHIRAdvancedTransformations(t *testing.T) {
 	})
 
 	t.Run("Complex Expression", func(t *testing.T) {
-		// Add a function to the symbol table first
+		// Add a function to the symbol table first.
 		intType := NewHIRType(Span{}, HIRTypePrimitive, &HIRPrimitiveType{Name: "int", Size: 8})
 		testFunc := NewHIRFunction(Span{}, "test_func")
 		testFunc.ReturnType = intType
+
 		transformer.enterScope()
 		transformer.addSymbol("test_func", testFunc)
 
-		// Also add to current scope if it exists
+		// Also add to current scope if it exists.
 		if transformer.currentScope != nil {
 			transformer.currentScope.Variables["test_func"] = &HIRVariable{
 				Span: Span{},
@@ -336,7 +338,7 @@ func TestASTToHIRAdvancedTransformations(t *testing.T) {
 			}
 		}
 
-		// Call expression: func(42)
+		// Call expression: func(42).
 		arg := NewLiteral(Span{}, 42, LiteralInteger)
 		funcName := NewIdentifier(Span{}, "test_func")
 
@@ -357,7 +359,7 @@ func TestASTToHIRAdvancedTransformations(t *testing.T) {
 	})
 
 	t.Run("If Statement", func(t *testing.T) {
-		// If statement: if (true) { return 1; }
+		// If statement: if (true) { return 1; }.
 		condition := NewLiteral(Span{}, true, LiteralBool)
 		returnStmt := &ReturnStatement{
 			Span:  Span{},
@@ -389,7 +391,7 @@ func TestASTToHIRAdvancedTransformations(t *testing.T) {
 	})
 
 	t.Run("While Statement", func(t *testing.T) {
-		// While statement: while (true) { break; }
+		// While statement: while (true) { break; }.
 		condition := NewLiteral(Span{}, true, LiteralBool)
 		body := &BlockStatement{
 			Span:       Span{},
@@ -420,7 +422,7 @@ func TestTransformationWithRealProgram(t *testing.T) {
 	transformer := NewASTToHIRTransformer()
 
 	t.Run("Complete Program Transformation", func(t *testing.T) {
-		// Create a complete program
+		// Create a complete program.
 		mainFunc := &FunctionDeclaration{
 			Span:       Span{},
 			Name:       NewIdentifier(Span{}, "main"),
@@ -452,7 +454,7 @@ func TestTransformationWithRealProgram(t *testing.T) {
 			},
 		}
 
-		// Transform to HIR
+		// Transform to HIR.
 		hirModule, errors := transformer.TransformProgram(program)
 
 		if len(errors) > 0 {

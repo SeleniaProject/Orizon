@@ -19,6 +19,7 @@ type KeyID string
 // Fingerprint computes the KeyID (sha256 hex) of a raw public key.
 func Fingerprint(pub ed25519.PublicKey) KeyID {
 	sum := sha256.Sum256(pub)
+
 	return KeyID(hex.EncodeToString(sum[:]))
 }
 
@@ -41,14 +42,14 @@ type Certificate struct {
 func (c *Certificate) tbsCertificate() ([]byte, error) {
 	// Note: The order of fields is fixed by the struct and json encoder.
 	tmp := struct {
+		NotBefore  time.Time         `json:"not_before"`
+		NotAfter   time.Time         `json:"not_after"`
+		Extensions map[string]string `json:"extensions,omitempty"`
 		Serial     string            `json:"serial"`
 		Subject    string            `json:"subject"`
 		Issuer     string            `json:"issuer"`
 		PublicKey  []byte            `json:"public_key"`
-		NotBefore  time.Time         `json:"not_before"`
-		NotAfter   time.Time         `json:"not_after"`
 		KeyUsage   []string          `json:"key_usage,omitempty"`
-		Extensions map[string]string `json:"extensions,omitempty"`
 	}{
 		Serial:     c.Serial,
 		Subject:    c.Subject,
@@ -59,22 +60,27 @@ func (c *Certificate) tbsCertificate() ([]byte, error) {
 		KeyUsage:   append([]string(nil), c.KeyUsage...),
 		Extensions: copyStringMap(c.Extensions),
 	}
-	// Ensure determinism: sort KeyUsage, Extensions
+	// Ensure determinism: sort KeyUsage, Extensions.
 	sort.Strings(tmp.KeyUsage)
+
 	if tmp.Extensions != nil {
-		// Marshal to ensure stable order of keys
-		// We will re-marshal after sorting keys by moving into a slice
+		// Marshal to ensure stable order of keys.
+		// We will re-marshal after sorting keys by moving into a slice.
 		keys := make([]string, 0, len(tmp.Extensions))
 		for k := range tmp.Extensions {
 			keys = append(keys, k)
 		}
+
 		sort.Strings(keys)
+
 		ordered := make(map[string]string, len(keys))
 		for _, k := range keys {
 			ordered[k] = tmp.Extensions[k]
 		}
+
 		tmp.Extensions = ordered
 	}
+
 	return json.Marshal(tmp)
 }
 
@@ -93,6 +99,7 @@ func NewTrustStore() *TrustStore {
 func (ts *TrustStore) AddRoot(pub ed25519.PublicKey) KeyID {
 	kid := Fingerprint(pub)
 	ts.roots[kid] = append(ed25519.PublicKey(nil), pub...)
+
 	return kid
 }
 
@@ -108,6 +115,7 @@ func GenerateEd25519Keypair() (ed25519.PublicKey, ed25519.PrivateKey, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return pub, priv, nil
 }
 
@@ -122,11 +130,14 @@ func SelfSignRoot(subject string, pub ed25519.PublicKey, priv ed25519.PrivateKey
 		NotAfter:  time.Now().Add(validity),
 		KeyUsage:  []string{"cert-sign", "package-sign", "lockfile-sign"},
 	}
+
 	tbs, err := cert.tbsCertificate()
 	if err != nil {
 		return Certificate{}, err
 	}
+
 	cert.Signature = ed25519.Sign(priv, tbs)
+
 	return cert, nil
 }
 
@@ -141,11 +152,14 @@ func IssueChild(parent Certificate, parentPriv ed25519.PrivateKey, childPub ed25
 		NotAfter:  time.Now().Add(validity),
 		KeyUsage:  append([]string(nil), usages...),
 	}
+
 	tbs, err := cert.tbsCertificate()
 	if err != nil {
 		return Certificate{}, err
 	}
+
 	cert.Signature = ed25519.Sign(parentPriv, tbs)
+
 	return cert, nil
 }
 
@@ -155,13 +169,16 @@ func VerifyCertificate(cert Certificate, issuerPub ed25519.PublicKey) error {
 	if err != nil {
 		return err
 	}
+
 	if !ed25519.Verify(issuerPub, tbs, cert.Signature) {
 		return errors.New("certificate signature invalid")
 	}
+
 	now := time.Now()
 	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
 		return errors.New("certificate is not within validity period")
 	}
+
 	return nil
 }
 
@@ -170,22 +187,25 @@ func (ts *TrustStore) VerifyChain(chain []Certificate) error {
 	if len(chain) == 0 {
 		return errors.New("empty certificate chain")
 	}
-	// Traverse up the chain
+	// Traverse up the chain.
 	for i := 0; i < len(chain)-1; i++ {
 		issuerPub := ed25519.PublicKey(chain[i+1].PublicKey)
 		if err := VerifyCertificate(chain[i], issuerPub); err != nil {
 			return fmt.Errorf("chain[%d] verification failed: %w", i, err)
 		}
 	}
-	// The last cert must be a trusted root
+	// The last cert must be a trusted root.
 	root := chain[len(chain)-1]
 	rootPub := ed25519.PublicKey(root.PublicKey)
+
 	if err := VerifyCertificate(root, rootPub); err != nil {
 		return fmt.Errorf("root self-signature invalid: %w", err)
 	}
+
 	if _, ok := ts.roots[Fingerprint(rootPub)]; !ok {
 		return errors.New("root is not trusted")
 	}
+
 	return nil
 }
 
@@ -200,14 +220,16 @@ type PackageDescriptor struct {
 
 // descriptorBytes produces canonical JSON for signing.
 func descriptorBytes(d PackageDescriptor) ([]byte, error) {
-	// Ensure deterministic dependency ordering
+	// Ensure deterministic dependency ordering.
 	deps := append([]Dependency(nil), d.Dependencies...)
 	sort.Slice(deps, func(i, j int) bool {
 		if deps[i].Name != deps[j].Name {
 			return deps[i].Name < deps[j].Name
 		}
+
 		return deps[i].Constraint < deps[j].Constraint
 	})
+
 	type canon struct {
 		Name    PackageID    `json:"name"`
 		Version Version      `json:"version"`
@@ -215,7 +237,9 @@ func descriptorBytes(d PackageDescriptor) ([]byte, error) {
 		SHA256  string       `json:"sha256"`
 		Deps    []Dependency `json:"dependencies,omitempty"`
 	}
+
 	obj := canon{Name: d.Name, Version: d.Version, CID: d.CID, SHA256: d.SHA256, Deps: deps}
+
 	return json.Marshal(obj)
 }
 
@@ -225,7 +249,9 @@ func BuildDescriptor(ctx context.Context, reg Registry, cid CID) (PackageDescrip
 	if err != nil {
 		return PackageDescriptor{}, err
 	}
+
 	sum := sha256.Sum256(blob.Data)
+
 	return PackageDescriptor{
 		Name:         blob.Manifest.Name,
 		Version:      blob.Manifest.Version,
@@ -249,12 +275,17 @@ func SignDescriptor(desc PackageDescriptor, signerPriv ed25519.PrivateKey, chain
 	if err != nil {
 		return SignatureBundle{}, err
 	}
+
 	sig := ed25519.Sign(signerPriv, b)
+
 	var leafPub ed25519.PublicKey
+
 	if len(chain) == 0 {
 		return SignatureBundle{}, errors.New("missing certificate chain")
 	}
+
 	leafPub = ed25519.PublicKey(chain[0].PublicKey)
+
 	return SignatureBundle{
 		Algorithm: "ed25519",
 		KeyID:     Fingerprint(leafPub),
@@ -268,25 +299,29 @@ func (ts *TrustStore) VerifyDescriptor(desc PackageDescriptor, bundle SignatureB
 	if bundle.Algorithm != "ed25519" {
 		return errors.New("unsupported algorithm")
 	}
+
 	if len(bundle.Chain) == 0 {
 		return errors.New("empty certificate chain")
 	}
-	// Validate chain
+	// Validate chain.
 	if err := ts.VerifyChain(bundle.Chain); err != nil {
 		return err
 	}
-	// Verify signature
+	// Verify signature.
 	b, err := descriptorBytes(desc)
 	if err != nil {
 		return err
 	}
+
 	leafPub := ed25519.PublicKey(bundle.Chain[0].PublicKey)
 	if !ed25519.Verify(leafPub, b, bundle.Signature) {
 		return errors.New("signature invalid")
 	}
+
 	if bundle.KeyID != Fingerprint(leafPub) {
 		return errors.New("key id mismatch")
 	}
+
 	return nil
 }
 
@@ -307,11 +342,13 @@ func NewInMemorySignatureStore() *InMemorySignatureStore {
 
 func (s *InMemorySignatureStore) Put(cid CID, sig SignatureBundle) error {
 	s.data[cid] = append(s.data[cid], sig)
+
 	return nil
 }
 
 func (s *InMemorySignatureStore) List(cid CID) ([]SignatureBundle, error) {
 	out := append([]SignatureBundle(nil), s.data[cid]...)
+
 	return out, nil
 }
 
@@ -321,13 +358,16 @@ func SignPackage(ctx context.Context, reg Registry, cid CID, priv ed25519.Privat
 	if err != nil {
 		return SignatureBundle{}, err
 	}
+
 	bundle, err := SignDescriptor(desc, priv, chain)
 	if err != nil {
 		return SignatureBundle{}, err
 	}
+
 	if err := store.Put(cid, bundle); err != nil {
 		return SignatureBundle{}, err
 	}
+
 	return bundle, nil
 }
 
@@ -337,14 +377,18 @@ func VerifyPackage(ctx context.Context, reg Registry, ts *TrustStore, cid CID, s
 	if err != nil {
 		return err
 	}
+
 	bundles, err := store.List(cid)
 	if err != nil {
 		return err
 	}
+
 	if len(bundles) == 0 {
 		return errors.New("no signatures found")
 	}
+
 	var lastErr error
+
 	for _, b := range bundles {
 		if err := ts.VerifyDescriptor(desc, b); err == nil {
 			return nil
@@ -352,6 +396,7 @@ func VerifyPackage(ctx context.Context, reg Registry, ts *TrustStore, cid CID, s
 			lastErr = err
 		}
 	}
+
 	return fmt.Errorf("no valid signatures: last error: %w", lastErr)
 }
 
@@ -376,6 +421,7 @@ func (s *InMemoryAdvisoryScanner) IsVulnerable(desc PackageDescriptor) (bool, st
 	if r, ok := s.advisories[key]; ok {
 		return true, r
 	}
+
 	return false, ""
 }
 
@@ -384,13 +430,16 @@ func ValidatePackageSecurity(ctx context.Context, reg Registry, ts *TrustStore, 
 	if err := VerifyPackage(ctx, reg, ts, cid, store); err != nil {
 		return err
 	}
+
 	desc, err := BuildDescriptor(ctx, reg, cid)
 	if err != nil {
 		return err
 	}
+
 	if ok, reason := scanner.IsVulnerable(desc); ok {
 		return fmt.Errorf("package flagged vulnerable: %s", reason)
 	}
+
 	return nil
 }
 
@@ -398,15 +447,18 @@ func copyStringMap(m map[string]string) map[string]string {
 	if m == nil {
 		return nil
 	}
+
 	out := make(map[string]string, len(m))
 	for k, v := range m {
 		out[k] = v
 	}
+
 	return out
 }
 
 func randomSerial() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])
+
 	return hex.EncodeToString(b[:])
 }

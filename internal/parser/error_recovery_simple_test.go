@@ -6,7 +6,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// TestErrorRecoveryValidation validates Phase 1.2.4 completion
+// TestErrorRecoveryValidation validates Phase 1.2.4 completion.
 func TestErrorRecoveryValidation(t *testing.T) {
 	input := "let x = 5\nfunc test() {\n  return x\n"
 
@@ -28,7 +28,7 @@ func TestErrorRecoveryValidation(t *testing.T) {
 		t.Errorf("Expected parser to recover and produce a program")
 	}
 
-	// Verify suggestion engine exists
+	// Verify suggestion engine exists.
 	if p.suggestionEngine == nil {
 		t.Errorf("SuggestionEngine not initialized")
 	}

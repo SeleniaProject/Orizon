@@ -1,5 +1,5 @@
-// Type-safe AST extensions for Orizon language
-// This file provides enhanced type safety, visitor pattern improvements,
+// Type-safe AST extensions for Orizon language.
+// This file provides enhanced type safety, visitor pattern improvements,.
 // and AST transformation infrastructure for the Orizon compiler.
 
 package parser
@@ -10,13 +10,13 @@ import (
 	"strings"
 )
 
-// ====== Enhanced Type Safety ======
+// ====== Enhanced Type Safety ======.
 
-// NodeKind represents the kind of AST node for type-safe operations
+// NodeKind represents the kind of AST node for type-safe operations.
 type NodeKind int
 
 const (
-	// Declaration kinds
+	// Declaration kinds.
 	NodeKindProgram NodeKind = iota
 	NodeKindFunctionDeclaration
 	NodeKindVariableDeclaration
@@ -29,7 +29,7 @@ const (
 	NodeKindImportDeclaration
 	NodeKindExportDeclaration
 
-	// Statement kinds
+	// Statement kinds.
 	NodeKindBlockStatement
 	NodeKindExpressionStatement
 	NodeKindReturnStatement
@@ -39,7 +39,7 @@ const (
 	NodeKindBreakStatement
 	NodeKindContinueStatement
 
-	// Expression kinds
+	// Expression kinds.
 	NodeKindIdentifier
 	NodeKindLiteral
 	NodeKindBinaryExpression
@@ -52,7 +52,7 @@ const (
 	NodeKindIndexExpression
 	NodeKindMemberExpression
 
-	// Type kinds
+	// Type kinds.
 	NodeKindBasicType
 	NodeKindArrayType
 	NodeKindFunctionType
@@ -63,7 +63,7 @@ const (
 	NodeKindReferenceType
 	NodeKindPointerType
 
-	// Macro-specific kinds
+	// Macro-specific kinds.
 	NodeKindMacroParameter
 	NodeKindMacroBody
 	NodeKindMacroTemplate
@@ -71,7 +71,7 @@ const (
 	NodeKindMacroPatternElement
 	NodeKindMacroArgument
 	NodeKindMacroContext
-	// Dependent type system node kinds
+	// Dependent type system node kinds.
 	NodeKindDependentFunctionType
 	NodeKindDependentParameter
 	NodeKindRefinementType
@@ -80,7 +80,7 @@ const (
 	NodeKindProofType
 )
 
-// String returns the string representation of the node kind
+// String returns the string representation of the node kind.
 func (nk NodeKind) String() string {
 	switch nk {
 	case NodeKindProgram:
@@ -192,24 +192,24 @@ func (nk NodeKind) String() string {
 	}
 }
 
-// TypeSafeNode extends the Node interface with type safety features
+// TypeSafeNode extends the Node interface with type safety features.
 type TypeSafeNode interface {
 	Node
-	// GetNodeKind returns the specific kind of this node
+	// GetNodeKind returns the specific kind of this node.
 	GetNodeKind() NodeKind
-	// Clone creates a deep copy of this node
+	// Clone creates a deep copy of this node.
 	Clone() TypeSafeNode
-	// Equals checks structural equality with another node
+	// Equals checks structural equality with another node.
 	Equals(other TypeSafeNode) bool
-	// GetChildren returns all child nodes
+	// GetChildren returns all child nodes.
 	GetChildren() []TypeSafeNode
-	// ReplaceChild replaces a child node at the given index
+	// ReplaceChild replaces a child node at the given index.
 	ReplaceChild(index int, newChild TypeSafeNode) error
 }
 
-// ====== Enhanced Visitor Pattern ======
+// ====== Enhanced Visitor Pattern ======.
 
-// TypedVisitor provides type-safe visitor methods with generic return types
+// TypedVisitor provides type-safe visitor methods with generic return types.
 type TypedVisitor[T any] interface {
 	VisitProgram(*Program) T
 	VisitFunctionDeclaration(*FunctionDeclaration) T
@@ -237,7 +237,7 @@ type TypedVisitor[T any] interface {
 	VisitMacroInvocation(*MacroInvocation) T
 	VisitMacroArgument(*MacroArgument) T
 	VisitMacroContext(*MacroContext) T
-	// Additional type nodes
+	// Additional type nodes.
 	VisitArrayType(*ArrayType) T
 	VisitFunctionType(*FunctionType) T
 	VisitStructType(*StructType) T
@@ -246,30 +246,30 @@ type TypedVisitor[T any] interface {
 	VisitGenericType(*GenericType) T
 	VisitReferenceType(*ReferenceType) T
 	VisitPointerType(*PointerType) T
-	// Additional expression nodes
+	// Additional expression nodes.
 	VisitArrayExpression(*ArrayExpression) T
 	VisitIndexExpression(*IndexExpression) T
 	VisitMemberExpression(*MemberExpression) T
-	// Additional statement nodes
+	// Additional statement nodes.
 	VisitForStatement(*ForStatement) T
 	VisitBreakStatement(*BreakStatement) T
 	VisitContinueStatement(*ContinueStatement) T
 }
 
-// WalkVisitor provides a default implementation for tree walking
+// WalkVisitor provides a default implementation for tree walking.
 type WalkVisitor struct {
 	PreVisit  func(Node) bool // Return false to skip subtree
 	PostVisit func(Node)      // Called after visiting subtree
 	OnError   func(error)     // Called when an error occurs
 }
 
-// Walk traverses the AST using the visitor
+// Walk traverses the AST using the visitor.
 func (w *WalkVisitor) Walk(node Node) {
 	if w.PreVisit != nil && !w.PreVisit(node) {
 		return
 	}
 
-	// Visit children based on node type
+	// Visit children based on node type.
 	switch n := node.(type) {
 	case *Program:
 		for _, decl := range n.Declarations {
@@ -279,9 +279,11 @@ func (w *WalkVisitor) Walk(node Node) {
 		for _, param := range n.Parameters {
 			w.Walk(param)
 		}
+
 		if n.ReturnType != nil {
 			w.Walk(n.ReturnType)
 		}
+
 		if n.Body != nil {
 			w.Walk(n.Body)
 		}
@@ -296,6 +298,7 @@ func (w *WalkVisitor) Walk(node Node) {
 		w.Walk(n.Operand)
 	case *CallExpression:
 		w.Walk(n.Function)
+
 		for _, arg := range n.Arguments {
 			w.Walk(arg)
 		}
@@ -309,6 +312,7 @@ func (w *WalkVisitor) Walk(node Node) {
 	case *IfStatement:
 		w.Walk(n.Condition)
 		w.Walk(n.ThenStmt)
+
 		if n.ElseStmt != nil {
 			w.Walk(n.ElseStmt)
 		}
@@ -325,6 +329,7 @@ func (w *WalkVisitor) Walk(node Node) {
 		if n.TypeSpec != nil {
 			w.Walk(n.TypeSpec)
 		}
+
 		if n.Initializer != nil {
 			w.Walk(n.Initializer)
 		}
@@ -332,11 +337,13 @@ func (w *WalkVisitor) Walk(node Node) {
 		for _, param := range n.Parameters {
 			w.Walk(param)
 		}
+
 		if n.Body != nil {
 			w.Walk(n.Body)
 		}
 	case *MacroInvocation:
 		w.Walk(n.Name)
+
 		for _, arg := range n.Arguments {
 			w.Walk(arg)
 		}
@@ -347,50 +354,51 @@ func (w *WalkVisitor) Walk(node Node) {
 	}
 }
 
-// ====== AST Transformation Infrastructure ======
+// ====== AST Transformation Infrastructure ======.
 
-// Transformer provides a framework for AST transformations
+// Transformer provides a framework for AST transformations.
 type Transformer interface {
-	// Transform applies a transformation to the given node
+	// Transform applies a transformation to the given node.
 	Transform(node Node) (Node, error)
-	// CanTransform checks if this transformer can handle the given node
+	// CanTransform checks if this transformer can handle the given node.
 	CanTransform(node Node) bool
-	// GetName returns the name of this transformer
+	// GetName returns the name of this transformer.
 	GetName() string
 }
 
-// TransformationPipeline manages a sequence of transformations
+// TransformationPipeline manages a sequence of transformations.
 type TransformationPipeline struct {
 	transformers []Transformer
 	options      TransformationOptions
 }
 
-// TransformationOptions configures the transformation pipeline
+// TransformationOptions configures the transformation pipeline.
 type TransformationOptions struct {
-	SkipErrors     bool // Continue on transformation errors
-	MaxIterations  int  // Maximum transformation iterations
-	DebugMode      bool // Enable debug output
-	PreserveSpans  bool // Preserve original source spans
-	ValidateOutput bool // Validate AST after each transformation
+	MaxIterations  int
+	SkipErrors     bool
+	DebugMode      bool
+	PreserveSpans  bool
+	ValidateOutput bool
 }
 
-// NewTransformationPipeline creates a new transformation pipeline
+// NewTransformationPipeline creates a new transformation pipeline.
 func NewTransformationPipeline(options TransformationOptions) *TransformationPipeline {
 	if options.MaxIterations <= 0 {
 		options.MaxIterations = 10
 	}
+
 	return &TransformationPipeline{
 		transformers: make([]Transformer, 0),
 		options:      options,
 	}
 }
 
-// AddTransformer adds a transformer to the pipeline
+// AddTransformer adds a transformer to the pipeline.
 func (tp *TransformationPipeline) AddTransformer(t Transformer) {
 	tp.transformers = append(tp.transformers, t)
 }
 
-// Transform applies all transformers to the AST
+// Transform applies all transformers to the AST.
 func (tp *TransformationPipeline) Transform(root Node) (Node, error) {
 	current := root
 	iteration := 0
@@ -410,6 +418,7 @@ func (tp *TransformationPipeline) Transform(root Node) (Node, error) {
 					if tp.options.SkipErrors {
 						continue
 					}
+
 					return nil, fmt.Errorf("transformation failed with %s: %w",
 						transformer.GetName(), err)
 				}
@@ -431,6 +440,7 @@ func (tp *TransformationPipeline) Transform(root Node) (Node, error) {
 		if !changed {
 			break
 		}
+
 		iteration++
 	}
 
@@ -442,9 +452,9 @@ func (tp *TransformationPipeline) Transform(root Node) (Node, error) {
 	return current, nil
 }
 
-// ====== AST Validation ======
+// ====== AST Validation ======.
 
-// ValidationError represents an AST validation error
+// ValidationError represents an AST validation error.
 type ValidationError struct {
 	Node    Node
 	Message string
@@ -455,14 +465,14 @@ func (ve *ValidationError) Error() string {
 	return fmt.Sprintf("validation error at %s: %s", ve.Span.String(), ve.Message)
 }
 
-// Validator provides AST validation functionality
+// Validator provides AST validation functionality.
 type Validator struct {
 	errors   []ValidationError
 	warnings []ValidationError
 	strict   bool // Strict mode treats warnings as errors
 }
 
-// NewValidator creates a new AST validator
+// NewValidator creates a new AST validator.
 func NewValidator(strict bool) *Validator {
 	return &Validator{
 		errors:   make([]ValidationError, 0),
@@ -471,22 +481,24 @@ func NewValidator(strict bool) *Validator {
 	}
 }
 
-// ValidateAST validates an AST node and its children
+// ValidateAST validates an AST node and its children.
 func ValidateAST(root Node) error {
 	validator := NewValidator(false)
+
 	return validator.Validate(root)
 }
 
-// Validate validates an AST node
+// Validate validates an AST node.
 func (v *Validator) Validate(node Node) error {
-	// Reset validation state
+	// Reset validation state.
 	v.errors = v.errors[:0]
 	v.warnings = v.warnings[:0]
 
-	// Walk the AST and validate each node
+	// Walk the AST and validate each node.
 	walker := &WalkVisitor{
 		PreVisit: func(n Node) bool {
 			v.validateNode(n)
+
 			return true
 		},
 		OnError: func(err error) {
@@ -500,22 +512,24 @@ func (v *Validator) Validate(node Node) error {
 
 	walker.Walk(node)
 
-	// Check for errors
+	// Check for errors.
 	if len(v.errors) > 0 {
 		messages := make([]string, len(v.errors))
 		for i, err := range v.errors {
 			messages[i] = err.Error()
 		}
+
 		return fmt.Errorf("validation failed with %d errors:\n%s",
 			len(v.errors), strings.Join(messages, "\n"))
 	}
 
-	// Check for warnings in strict mode
+	// Check for warnings in strict mode.
 	if v.strict && len(v.warnings) > 0 {
 		messages := make([]string, len(v.warnings))
 		for i, warn := range v.warnings {
 			messages[i] = warn.Error()
 		}
+
 		return fmt.Errorf("validation failed with %d warnings (strict mode):\n%s",
 			len(v.warnings), strings.Join(messages, "\n"))
 	}
@@ -523,7 +537,7 @@ func (v *Validator) Validate(node Node) error {
 	return nil
 }
 
-// validateNode validates a specific node
+// validateNode validates a specific node.
 func (v *Validator) validateNode(node Node) {
 	switch n := node.(type) {
 	case *Program:
@@ -534,6 +548,7 @@ func (v *Validator) validateNode(node Node) {
 		if n.Name == nil {
 			v.addError(n, "function declaration missing name")
 		}
+
 		if n.Body == nil {
 			v.addError(n, "function declaration missing body")
 		}
@@ -541,6 +556,7 @@ func (v *Validator) validateNode(node Node) {
 		if n.Name == nil {
 			v.addError(n, "variable declaration missing name")
 		}
+
 		if n.TypeSpec == nil && n.Initializer == nil {
 			v.addError(n, "variable declaration must have either type or initializer")
 		}
@@ -548,9 +564,11 @@ func (v *Validator) validateNode(node Node) {
 		if n.Left == nil {
 			v.addError(n, "binary expression missing left operand")
 		}
+
 		if n.Right == nil {
 			v.addError(n, "binary expression missing right operand")
 		}
+
 		if n.Operator == nil || n.Operator.Value == "" {
 			v.addError(n, "binary expression missing operator")
 		}
@@ -558,6 +576,7 @@ func (v *Validator) validateNode(node Node) {
 		if n.Operand == nil {
 			v.addError(n, "unary expression missing operand")
 		}
+
 		if n.Operator == nil || n.Operator.Value == "" {
 			v.addError(n, "unary expression missing operator")
 		}
@@ -573,6 +592,7 @@ func (v *Validator) validateNode(node Node) {
 		if n.Name == nil {
 			v.addError(n, "macro definition missing name")
 		}
+
 		if n.Body == nil {
 			v.addError(n, "macro definition missing body")
 		}
@@ -583,7 +603,7 @@ func (v *Validator) validateNode(node Node) {
 	}
 }
 
-// addError adds a validation error
+// addError adds a validation error.
 func (v *Validator) addError(node Node, message string) {
 	v.errors = append(v.errors, ValidationError{
 		Node:    node,
@@ -592,7 +612,7 @@ func (v *Validator) addError(node Node, message string) {
 	})
 }
 
-// addWarning adds a validation warning
+// addWarning adds a validation warning.
 func (v *Validator) addWarning(node Node, message string) {
 	v.warnings = append(v.warnings, ValidationError{
 		Node:    node,
@@ -601,7 +621,7 @@ func (v *Validator) addWarning(node Node, message string) {
 	})
 }
 
-// ====== AST Utility Functions ======
+// ====== AST Utility Functions ======.
 
 // CollectValidationReports walks the AST and returns validation errors and warnings without returning an error.
 // This is designed for tooling (e.g., LSP diagnostics) to surface all issues in one pass.
@@ -613,6 +633,7 @@ func CollectValidationReports(root Node) ([]ValidationError, []ValidationError) 
 	walker := &WalkVisitor{
 		PreVisit: func(n Node) bool {
 			v.validateNode(n)
+
 			return true
 		},
 		OnError: func(err error) {
@@ -630,39 +651,44 @@ func CollectValidationReports(root Node) ([]ValidationError, []ValidationError) 
 	copy(errs, v.errors)
 	warns := make([]ValidationError, len(v.warnings))
 	copy(warns, v.warnings)
+
 	return errs, warns
 }
 
-// GetNodeType returns the reflect.Type of an AST node
+// GetNodeType returns the reflect.Type of an AST node.
 func GetNodeType(node Node) reflect.Type {
 	return reflect.TypeOf(node)
 }
 
-// IsDeclaration checks if a node is a declaration
+// IsDeclaration checks if a node is a declaration.
 func IsDeclaration(node Node) bool {
 	_, ok := node.(Declaration)
+
 	return ok
 }
 
-// IsStatement checks if a node is a statement
+// IsStatement checks if a node is a statement.
 func IsStatement(node Node) bool {
 	_, ok := node.(Statement)
+
 	return ok
 }
 
-// IsExpression checks if a node is an expression
+// IsExpression checks if a node is an expression.
 func IsExpression(node Node) bool {
 	_, ok := node.(Expression)
+
 	return ok
 }
 
-// IsType checks if a node is a type
+// IsType checks if a node is a type.
 func IsType(node Node) bool {
 	_, ok := node.(Type)
+
 	return ok
 }
 
-// FindNodesByType finds all nodes of a specific type in the AST
+// FindNodesByType finds all nodes of a specific type in the AST.
 func FindNodesByType[T Node](root Node, nodeType reflect.Type) []T {
 	var results []T
 
@@ -673,28 +699,32 @@ func FindNodesByType[T Node](root Node, nodeType reflect.Type) []T {
 					results = append(results, typed)
 				}
 			}
+
 			return true
 		},
 	}
 
 	walker.Walk(root)
+
 	return results
 }
 
-// CountNodes counts the total number of nodes in the AST
+// CountNodes counts the total number of nodes in the AST.
 func CountNodes(root Node) int {
 	count := 0
 	walker := &WalkVisitor{
 		PreVisit: func(n Node) bool {
 			count++
+
 			return true
 		},
 	}
 	walker.Walk(root)
+
 	return count
 }
 
-// GetDepth calculates the maximum depth of the AST
+// GetDepth calculates the maximum depth of the AST.
 func GetDepth(root Node) int {
 	maxDepth := 0
 	currentDepth := 0
@@ -705,6 +735,7 @@ func GetDepth(root Node) int {
 			if currentDepth > maxDepth {
 				maxDepth = currentDepth
 			}
+
 			return true
 		},
 		PostVisit: func(n Node) {
@@ -713,5 +744,6 @@ func GetDepth(root Node) int {
 	}
 
 	walker.Walk(root)
+
 	return maxDepth
 }

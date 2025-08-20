@@ -17,10 +17,11 @@ import (
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
+
 	timex "github.com/orizon-lang/orizon/internal/stdlib/time"
 )
 
-// ---- Metrics / Logging ----
+// ---- Metrics / Logging ----.
 type endpointMetrics struct {
 	c2xx   uint64
 	c4xx   uint64
@@ -38,20 +39,22 @@ type endpointMetrics struct {
 }
 
 type metricsRecorder struct {
+	by        map[string]*endpointMetrics
 	inflight  int64
 	rlDrops   uint64
-	by        map[string]*endpointMetrics
 	accessLog bool
 }
 
 func newMetricsRecorder() *metricsRecorder {
 	mr := &metricsRecorder{by: make(map[string]*endpointMetrics)}
-	// default endpoints we know; map grows on demand as well
+	// default endpoints we know; map grows on demand as well.
 	for _, k := range []string{"healthz", "publish", "fetch", "find", "list", "all", "metrics"} {
 		mr.by[k] = &endpointMetrics{}
 	}
+
 	v := strings.TrimSpace(os.Getenv("ORIZON_REGISTRY_ACCESS_LOG"))
 	mr.accessLog = v == "1" || strings.EqualFold(v, "true")
+
 	return mr
 }
 
@@ -61,6 +64,7 @@ func (m *metricsRecorder) inc(name string, code int) {
 		em = &endpointMetrics{}
 		m.by[name] = em
 	}
+
 	switch code / 100 {
 	case 2:
 		atomic.AddUint64(&em.c2xx, 1)
@@ -85,10 +89,13 @@ func (s *statusWriter) Write(b []byte) (int, error) {
 	if s.code == 0 {
 		s.code = 200
 	}
+
 	n, err := s.rw.Write(b)
 	s.n += n
+
 	return n, err
 }
+
 func (s *statusWriter) Flush() {
 	if f, ok := s.rw.(http.Flusher); ok {
 		f.Flush()
@@ -98,32 +105,38 @@ func (s *statusWriter) Flush() {
 // wrap applies security headers, CORS, preflight, metrics, and optional access logging.
 func (m *metricsRecorder) wrap(name string, cors *corsCfg, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Security headers first for any response
+		// Security headers first for any response.
 		setSecurityHeaders(w, r)
-		// CORS headers and preflight
+		// CORS headers and preflight.
 		if cors != nil {
 			cors.apply(w, r)
 		}
+
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			m.inc(name, http.StatusNoContent)
+
 			return
 		}
-		// Request ID
+		// Request ID.
 		rid := r.Header.Get("X-Request-ID")
 		if rid == "" {
 			rid = genReqID()
 		}
+
 		w.Header().Set("X-Request-ID", rid)
 
 		start := time.Now()
+
 		atomic.AddInt64(&m.inflight, 1)
+
 		sw := &statusWriter{rw: w}
-		// Panic recovery to ensure 500
+		// Panic recovery to ensure 500.
 		func() {
 			defer func() {
 				if rec := recover(); rec != nil {
 					log.Printf("panic: %v request_id=%s", rec, rid)
+
 					if sw.code == 0 {
 						sw.WriteHeader(http.StatusInternalServerError)
 					}
@@ -131,11 +144,14 @@ func (m *metricsRecorder) wrap(name string, cors *corsCfg, h http.HandlerFunc) h
 			}()
 			h(sw, r)
 		}()
+
 		if sw.code == 0 {
 			sw.code = http.StatusOK
 		}
+
 		m.inc(name, sw.code)
 		atomic.AddInt64(&m.inflight, -1)
+
 		if m.accessLog {
 			dur := time.Since(start)
 			ua := r.Header.Get("User-Agent")
@@ -145,6 +161,7 @@ func (m *metricsRecorder) wrap(name string, cors *corsCfg, h http.HandlerFunc) h
 		if em, ok := m.by[name]; ok {
 			d := time.Since(start)
 			sec := d.Seconds()
+
 			switch {
 			case sec <= 0.01:
 				atomic.AddUint64(&em.b001, 1)
@@ -159,6 +176,7 @@ func (m *metricsRecorder) wrap(name string, cors *corsCfg, h http.HandlerFunc) h
 			default:
 				atomic.AddUint64(&em.bInf, 1)
 			}
+
 			atomic.AddUint64(&em.cnt, 1)
 			atomic.AddUint64(&em.sumNS, uint64(d.Nanoseconds()))
 		}
@@ -167,16 +185,19 @@ func (m *metricsRecorder) wrap(name string, cors *corsCfg, h http.HandlerFunc) h
 
 func (m *metricsRecorder) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+
 	var b strings.Builder
+
 	fmt.Fprintf(&b, "# TYPE orizon_inflight gauge\norizon_inflight %d\n", atomic.LoadInt64(&m.inflight))
 	fmt.Fprintf(&b, "# TYPE orizon_ratelimit_dropped_total counter\norizon_ratelimit_dropped_total %d\n", atomic.LoadUint64(&m.rlDrops))
 	fmt.Fprintf(&b, "# TYPE orizon_requests_total counter\n")
+
 	for name, em := range m.by {
 		fmt.Fprintf(&b, "orizon_requests_total{handler=\"%s\",class=\"2xx\"} %d\n", name, atomic.LoadUint64(&em.c2xx))
 		fmt.Fprintf(&b, "orizon_requests_total{handler=\"%s\",class=\"4xx\"} %d\n", name, atomic.LoadUint64(&em.c4xx))
 		fmt.Fprintf(&b, "orizon_requests_total{handler=\"%s\",class=\"5xx\"} %d\n", name, atomic.LoadUint64(&em.c5xx))
 		fmt.Fprintf(&b, "orizon_requests_total{handler=\"%s\",class=\"other\"} %d\n", name, atomic.LoadUint64(&em.cOther))
-		// latency buckets
+		// latency buckets.
 		fmt.Fprintf(&b, "# TYPE orizon_request_duration_seconds histogram\n")
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_bucket{handler=\"%s\",le=\"0.01\"} %d\n", name, atomic.LoadUint64(&em.b001))
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_bucket{handler=\"%s\",le=\"0.05\"} %d\n", name, atomic.LoadUint64(&em.b005))
@@ -184,10 +205,11 @@ func (m *metricsRecorder) serveMetrics(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_bucket{handler=\"%s\",le=\"0.5\"} %d\n", name, atomic.LoadUint64(&em.b050))
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_bucket{handler=\"%s\",le=\"1\"} %d\n", name, atomic.LoadUint64(&em.b100))
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_bucket{handler=\"%s\",le=\"+Inf\"} %d\n", name, atomic.LoadUint64(&em.bInf))
-		// sum and count
+		// sum and count.
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_sum{handler=\"%s\"} %.6f\n", name, float64(atomic.LoadUint64(&em.sumNS))/1e9)
 		fmt.Fprintf(&b, "orizon_request_duration_seconds_count{handler=\"%s\"} %d\n", name, atomic.LoadUint64(&em.cnt))
 	}
+
 	_, _ = w.Write([]byte(b.String()))
 }
 
@@ -197,10 +219,11 @@ func genReqID() string {
 	if _, err := rand.Read(b[:]); err != nil {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
+
 	return hex.EncodeToString(b[:])
 }
 
-// ---- CORS ----
+// ---- CORS ----.
 type corsCfg struct {
 	origins []string
 	any     bool
@@ -211,20 +234,25 @@ func getCORS() *corsCfg {
 	if v == "" {
 		return nil
 	}
+
 	if v == "*" {
 		return &corsCfg{any: true}
 	}
+
 	parts := strings.Split(v, ",")
 	out := make([]string, 0, len(parts))
+
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p != "" {
 			out = append(out, p)
 		}
 	}
+
 	if len(out) == 0 {
 		return nil
 	}
+
 	return &corsCfg{origins: out}
 }
 
@@ -232,14 +260,17 @@ func (c *corsCfg) allow(origin string) bool {
 	if c == nil {
 		return false
 	}
+
 	if c.any {
 		return true
 	}
+
 	for _, o := range c.origins {
 		if o == origin {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -247,10 +278,12 @@ func (c *corsCfg) apply(w http.ResponseWriter, r *http.Request) {
 	if c == nil {
 		return
 	}
+
 	o := r.Header.Get("Origin")
 	if o == "" {
 		return
 	}
+
 	if c.allow(o) {
 		if c.any {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -258,6 +291,7 @@ func (c *corsCfg) apply(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", o)
 			w.Header().Add("Vary", "Origin")
 		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,HEAD,OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,If-None-Match")
 		w.Header().Set("Access-Control-Max-Age", "600")
@@ -267,60 +301,69 @@ func (c *corsCfg) apply(w http.ResponseWriter, r *http.Request) {
 // buildHTTPMux builds the HTTP handlers for the registry.
 func buildHTTPMux(reg Registry) *http.ServeMux {
 	mux := http.NewServeMux()
-	// optional global rate limiter
+	// optional global rate limiter.
 	rl := getRateLimiter()
 	m := newMetricsRecorder()
 	cors := getCORS()
-	// optional bearer token via env ORIZON_REGISTRY_TOKEN or header-only mode if empty
+	// optional bearer token via env ORIZON_REGISTRY_TOKEN or header-only mode if empty.
 	token := ""
 	if v := httpTokenEnv(); v != "" {
 		token = v
 	}
-	// auth mode: "write" (default) protects only write ops; "readwrite" protects all endpoints
+	// auth mode: "write" (default) protects only write ops; "readwrite" protects all endpoints.
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("ORIZON_REGISTRY_AUTH_MODE")))
 	if mode != "readwrite" { // default
 		mode = "write"
 	}
+
 	maxPublish := getMaxPublishBytes()
 	authOK := func(r *http.Request) bool {
 		if token == "" {
 			return true
 		}
+
 		ah := r.Header.Get("Authorization")
+
 		const p = "Bearer "
+
 		if len(ah) <= len(p) || ah[:len(p)] != p {
-			// Log failed authentication attempt
+			// Log failed authentication attempt.
 			globalSecurityLogger.LogAuthenticationAttempt(false, r.Header.Get("User-Agent"), r.RemoteAddr, map[string]interface{}{
 				"reason": "invalid_authorization_header",
 				"method": r.Method,
 				"path":   r.URL.Path,
 			})
+
 			return false
 		}
-		// Use constant-time comparison to prevent timing attacks
+		// Use constant-time comparison to prevent timing attacks.
 		providedToken := ah[len(p):]
 		if !SecureCompare(providedToken, token) {
-			// Log failed authentication attempt
+			// Log failed authentication attempt.
 			globalSecurityLogger.LogAuthenticationAttempt(false, r.Header.Get("User-Agent"), r.RemoteAddr, map[string]interface{}{
 				"reason": "invalid_token",
 				"method": r.Method,
 				"path":   r.URL.Path,
 			})
+
 			return false
 		}
-		// Log successful authentication
+		// Log successful authentication.
 		globalSecurityLogger.LogAuthenticationAttempt(true, r.Header.Get("User-Agent"), r.RemoteAddr, map[string]interface{}{
 			"method": r.Method,
 			"path":   r.URL.Path,
 		})
+
 		return true
 	}
-	// simple health endpoint
+	// simple health endpoint.
 	mux.HandleFunc("/healthz", m.wrap("healthz", cors, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
 			return
 		}
+
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte("{\"ok\":true}"))
@@ -330,49 +373,60 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			w.Header().Set("Retry-After", "1")
 			atomic.AddUint64(&m.rlDrops, 1)
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
-			return
-		}
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", 405)
-			return
-		}
-		// publish is always protected when token is set
-		if token != "" && !authOK(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
 			return
 		}
 
-		// Validate request headers for security
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", 405)
+
+			return
+		}
+		// publish is always protected when token is set.
+		if token != "" && !authOK(r) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
+			return
+		}
+
+		// Validate request headers for security.
 		validator := NewInputValidator()
 		headers := make(map[string]string)
+
 		for name, values := range r.Header {
 			if len(values) > 0 {
 				headers[name] = values[0]
 			}
 		}
+
 		if err := validator.ValidateHTTPHeaders(headers); err != nil {
 			globalSecurityLogger.LogInputValidationFailure("http_headers", err.Error(), fmt.Sprintf("%v", headers))
 			http.Error(w, "invalid request headers", http.StatusBadRequest)
+
 			return
 		}
 
 		w = maybeGzip(w, r)
-		// limit request size
+		// limit request size.
 		r.Body = http.MaxBytesReader(w, r.Body, maxPublish)
 
-		// Read and validate JSON payload
+		// Read and validate JSON payload.
 		bodyBytes := make([]byte, maxPublish)
+
 		n, err := r.Body.Read(bodyBytes)
 		if err != nil && err.Error() != "EOF" {
 			http.Error(w, "failed to read request body", http.StatusBadRequest)
+
 			return
 		}
+
 		bodyBytes = bodyBytes[:n]
 
-		// Validate JSON input for security
+		// Validate JSON input for security.
 		if err := validator.ValidateJSON(bodyBytes); err != nil {
 			globalSecurityLogger.LogInputValidationFailure("json_payload", err.Error(), string(bodyBytes))
 			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
+
 			return
 		}
 
@@ -380,26 +434,32 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			Manifest PackageManifest `json:"manifest"`
 			Data     []byte          `json:"data"`
 		}
+
 		if err := json.Unmarshal(bodyBytes, &fb); err != nil {
 			http.Error(w, "JSON decode error", 400)
+
 			return
 		}
 
-		// Validate package manifest fields
+		// Validate package manifest fields.
 		if err := validator.ValidatePackageID(string(fb.Manifest.Name)); err != nil {
 			globalSecurityLogger.LogInputValidationFailure("package_name", err.Error(), string(fb.Manifest.Name))
 			http.Error(w, "invalid package name", http.StatusBadRequest)
-			return
-		}
-		if err := validator.ValidateVersion(string(fb.Manifest.Version)); err != nil {
-			globalSecurityLogger.LogInputValidationFailure("package_version", err.Error(), string(fb.Manifest.Version))
-			http.Error(w, "invalid package version", http.StatusBadRequest)
+
 			return
 		}
 
-		// Validate package data size
+		if err := validator.ValidateVersion(string(fb.Manifest.Version)); err != nil {
+			globalSecurityLogger.LogInputValidationFailure("package_version", err.Error(), string(fb.Manifest.Version))
+			http.Error(w, "invalid package version", http.StatusBadRequest)
+
+			return
+		}
+
+		// Validate package data size.
 		if len(fb.Data) > int(maxPublish) {
 			http.Error(w, "package data too large", http.StatusRequestEntityTooLarge)
+
 			return
 		}
 
@@ -407,9 +467,10 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 		if err != nil {
 			log.Printf("Publish error: %v", err)
 			http.Error(w, "internal server error", 500)
+
 			return
 		}
-		// No-store for publish responses
+		// No-store for publish responses.
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSONWithETag(w, r, struct {
 			CID CID `json:"cid"`
@@ -420,24 +481,30 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			w.Header().Set("Retry-After", "1")
 			atomic.AddUint64(&m.rlDrops, 1)
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
+
 			return
 		}
-		// protect reads only in readwrite mode
+		// protect reads only in readwrite mode.
 		if token != "" && mode == "readwrite" && !authOK(r) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
 			return
 		}
 
-		// Validate query parameters
+		// Validate query parameters.
 		validator := NewInputValidator()
+
 		cidParam := r.URL.Query().Get("cid")
 		if cidParam == "" {
 			http.Error(w, "missing cid parameter", http.StatusBadRequest)
+
 			return
 		}
+
 		if err := validator.ValidateCID(cidParam); err != nil {
 			log.Printf("Invalid CID in fetch request: %v", err)
 			http.Error(w, "invalid CID parameter", http.StatusBadRequest)
+
 			return
 		}
 
@@ -445,21 +512,27 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 		if token != "" && mode == "readwrite" {
 			w.Header().Add("Vary", "Authorization")
 		}
+
 		cid := CID(cidParam)
+
 		blob, err := reg.Fetch(r.Context(), cid)
 		if err != nil {
 			if err == ErrNotFound {
 				http.NotFound(w, r)
+
 				return
 			}
+
 			log.Printf("Fetch error for CID %s: %v", cidParam, err)
 			http.Error(w, "internal server error", 500)
+
 			return
 		}
-		// Always require revalidation when caches are involved
+		// Always require revalidation when caches are involved.
 		if w.Header().Get("Cache-Control") == "" {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
+
 		writeJSONWithETag(w, r, struct {
 			Manifest PackageManifest `json:"manifest"`
 			Data     []byte          `json:"data"`
@@ -470,23 +543,30 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			w.Header().Set("Retry-After", "1")
 			atomic.AddUint64(&m.rlDrops, 1)
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
-			return
-		}
-		if token != "" && mode == "readwrite" && !authOK(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
 			return
 		}
 
-		// Validate query parameters
+		if token != "" && mode == "readwrite" && !authOK(r) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
+			return
+		}
+
+		// Validate query parameters.
 		validator := NewInputValidator()
+
 		nameParam := r.URL.Query().Get("name")
 		if nameParam == "" {
 			http.Error(w, "missing name parameter", http.StatusBadRequest)
+
 			return
 		}
+
 		if err := validator.ValidatePackageID(nameParam); err != nil {
 			log.Printf("Invalid package name in find request: %v", err)
 			http.Error(w, "invalid name parameter", http.StatusBadRequest)
+
 			return
 		}
 
@@ -494,37 +574,50 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 		if token != "" && mode == "readwrite" {
 			w.Header().Add("Vary", "Authorization")
 		}
+
 		name := PackageID(nameParam)
 		cons := r.URL.Query().Get("constraint")
+
 		var c *semver.Constraints
+
 		if cons != "" {
-			// Validate constraint string
+			// Validate constraint string.
 			if err := validator.ValidateString(cons); err != nil {
 				log.Printf("Invalid constraint string in find request: %v", err)
 				http.Error(w, "invalid constraint parameter", http.StatusBadRequest)
+
 				return
 			}
+
 			cc, err := semver.NewConstraint(cons)
 			if err != nil {
 				log.Printf("Semver constraint parse error: %v", err)
 				http.Error(w, "invalid semantic version constraint", 400)
+
 				return
 			}
+
 			c = cc
 		}
+
 		cid, m, err := reg.Find(r.Context(), name, c)
 		if err != nil {
 			if err == ErrNotFound {
 				http.NotFound(w, r)
+
 				return
 			}
+
 			log.Printf("Find error for package %s: %v", nameParam, err)
 			http.Error(w, "internal server error", 500)
+
 			return
 		}
+
 		if w.Header().Get("Cache-Control") == "" {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
+
 		writeJSONWithETag(w, r, struct {
 			CID      CID             `json:"cid"`
 			Manifest PackageManifest `json:"manifest"`
@@ -535,25 +628,34 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			w.Header().Set("Retry-After", "1")
 			atomic.AddUint64(&m.rlDrops, 1)
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
+
 			return
 		}
+
 		if token != "" && mode == "readwrite" && !authOK(r) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
 			return
 		}
+
 		w = maybeGzip(w, r)
 		if token != "" && mode == "readwrite" {
 			w.Header().Add("Vary", "Authorization")
 		}
+
 		name := PackageID(r.URL.Query().Get("name"))
+
 		out, err := reg.List(r.Context(), name)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
+
 			return
 		}
+
 		if w.Header().Get("Cache-Control") == "" {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
+
 		writeJSONWithETag(w, r, out)
 	}))
 	mux.HandleFunc("/all", m.wrap("all", cors, func(w http.ResponseWriter, r *http.Request) {
@@ -561,34 +663,45 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 			w.Header().Set("Retry-After", "1")
 			atomic.AddUint64(&m.rlDrops, 1)
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
+
 			return
 		}
+
 		if token != "" && mode == "readwrite" && !authOK(r) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
 			return
 		}
+
 		w = maybeGzip(w, r)
 		if token != "" && mode == "readwrite" {
 			w.Header().Add("Vary", "Authorization")
 		}
+
 		out, err := reg.All(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), 500)
+
 			return
 		}
+
 		if w.Header().Get("Cache-Control") == "" {
 			w.Header().Set("Cache-Control", "no-cache")
 		}
+
 		writeJSONWithETag(w, r, out)
 	}))
-	// metrics endpoint (no rate limiting)
+	// metrics endpoint (no rate limiting).
 	mux.HandleFunc("/metrics", m.wrap("metrics", cors, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
 			return
 		}
+
 		m.serveMetrics(w, r)
 	}))
+
 	return mux
 }
 
@@ -596,6 +709,7 @@ func buildHTTPMux(reg Registry) *http.ServeMux {
 func StartHTTPServer(reg Registry, addr string) error {
 	mux := buildHTTPMux(reg)
 	s := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+
 	return s.ListenAndServe()
 }
 
@@ -603,6 +717,7 @@ func StartHTTPServer(reg Registry, addr string) error {
 func StartHTTPServerTLS(reg Registry, addr, certFile, keyFile string) error {
 	mux := buildHTTPMux(reg)
 	s := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+
 	return s.ListenAndServeTLS(certFile, keyFile)
 }
 
@@ -611,12 +726,15 @@ func StartHTTPServerGraceful(ctx context.Context, reg Registry, addr string) err
 	mux := buildHTTPMux(reg)
 	s := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	errCh := make(chan error, 1)
+
 	go func() { errCh <- s.ListenAndServe() }()
 	select {
 	case <-ctx.Done():
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
 		_ = s.Shutdown(shutCtx)
+
 		return nil
 	case err := <-errCh:
 		return err
@@ -628,12 +746,15 @@ func StartHTTPServerTLSGraceful(ctx context.Context, reg Registry, addr, certFil
 	mux := buildHTTPMux(reg)
 	s := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	errCh := make(chan error, 1)
+
 	go func() { errCh <- s.ListenAndServeTLS(certFile, keyFile) }()
 	select {
 	case <-ctx.Done():
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
 		_ = s.Shutdown(shutCtx)
+
 		return nil
 	case err := <-errCh:
 		return err
@@ -649,10 +770,12 @@ func maybeGzip(w http.ResponseWriter, r *http.Request) http.ResponseWriter {
 	if !strings.Contains(ae, "gzip") {
 		return w
 	}
+
 	gz := gzip.NewWriter(w)
 	rw := &gzipResponseWriter{rw: w, gz: gz}
 	w.Header().Set("Content-Encoding", "gzip")
 	w.Header().Add("Vary", "Accept-Encoding")
+
 	return rw
 }
 
@@ -672,6 +795,7 @@ func (g *gzipResponseWriter) WriteHeader(statusCode int) {
 
 func (g *gzipResponseWriter) Flush() {
 	_ = g.gz.Flush()
+
 	if f, ok := g.rw.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -694,26 +818,33 @@ func writeJSONWithETag(w http.ResponseWriter, r *http.Request, v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
+
 		return
 	}
+
 	sum := sha256.Sum256(b)
-	// Use a weak ETag to avoid ambiguity across different content-encodings (gzip vs identity)
+	// Use a weak ETag to avoid ambiguity across different content-encodings (gzip vs identity).
 	etag := fmt.Sprintf("W/\"%x\"", sum)
+
 	inm := r.Header.Get("If-None-Match")
 	if inm != "" {
-		// naive match: if any token equals our ETag
+		// naive match: if any token equals our ETag.
 		for _, t := range strings.Split(inm, ",") {
 			if strings.TrimSpace(t) == etag {
 				w.WriteHeader(http.StatusNotModified)
+
 				return
 			}
 		}
 	}
+
 	h := w.Header()
 	h.Set("ETag", etag)
+
 	if h.Get("Content-Type") == "" {
 		h.Set("Content-Type", "application/json")
 	}
+
 	if h.Get("Cache-Control") == "" {
 		h.Set("Cache-Control", "no-cache")
 	}
@@ -725,20 +856,20 @@ func writeJSONWithETag(w http.ResponseWriter, r *http.Request, v any) {
 func setSecurityHeaders(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	if r.TLS != nil {
-		// 2 years HSTS with preload and includeSubDomains
+		// 2 years HSTS with preload and includeSubDomains.
 		h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 	}
-	// Prevent MIME type sniffing
+	// Prevent MIME type sniffing.
 	h.Set("X-Content-Type-Options", "nosniff")
-	// Prevent clickjacking
+	// Prevent clickjacking.
 	h.Set("X-Frame-Options", "DENY")
-	// Control referrer information
+	// Control referrer information.
 	h.Set("Referrer-Policy", "no-referrer")
-	// Enable XSS protection in browsers that support it
+	// Enable XSS protection in browsers that support it.
 	h.Set("X-XSS-Protection", "1; mode=block")
-	// Content Security Policy (restrictive for API)
+	// Content Security Policy (restrictive for API).
 	h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none';")
-	// Prevent browsers from caching sensitive responses
+	// Prevent browsers from caching sensitive responses.
 	if !strings.Contains(r.URL.Path, "/healthz") {
 		h.Set("Cache-Control", "no-store, no-cache, must-revalidate, private")
 		h.Set("Pragma", "no-cache")
@@ -749,14 +880,17 @@ func setSecurityHeaders(w http.ResponseWriter, r *http.Request) {
 // getMaxPublishBytes reads ORIZON_REGISTRY_MAX_PUBLISH_BYTES or returns default 50MB.
 func getMaxPublishBytes() int64 {
 	const def = int64(50 * 1024 * 1024)
+
 	v := strings.TrimSpace(os.Getenv("ORIZON_REGISTRY_MAX_PUBLISH_BYTES"))
 	if v == "" {
 		return def
 	}
+
 	n, err := strconv.ParseInt(v, 10, 64)
 	if err != nil || n <= 0 {
 		return def
 	}
+
 	return n
 }
 
@@ -767,15 +901,19 @@ func getRateLimiter() *timex.TokenBucket {
 	if qpsStr == "" {
 		return nil
 	}
+
 	qps, err := strconv.ParseFloat(qpsStr, 64)
 	if err != nil || qps <= 0 {
 		return nil
 	}
+
 	burst := 1
+
 	if b := strings.TrimSpace(os.Getenv("ORIZON_REGISTRY_RATE_BURST")); b != "" {
 		if n, err := strconv.Atoi(b); err == nil && n >= 0 {
 			burst = n
 		}
 	}
+
 	return timex.NewTokenBucket(burst, qps)
 }

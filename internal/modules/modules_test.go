@@ -69,9 +69,11 @@ func TestModuleCreation(t *testing.T) {
 	if module.Path != path {
 		t.Errorf("Expected path %s, got %s", path, module.Path)
 	}
+
 	if module.Version.Compare(version) != 0 {
 		t.Errorf("Expected version %s, got %s", version.String(), module.Version.String())
 	}
+
 	if module.LoadStatus != ModuleStatusUnloaded {
 		t.Errorf("Expected status %s, got %s",
 			ModuleStatusUnloaded.String(), module.LoadStatus.String())
@@ -124,7 +126,7 @@ func TestDependencyGraphAddModule(t *testing.T) {
 		t.Error("Module not properly added to graph")
 	}
 
-	// Check that dependency lists are initialized
+	// Check that dependency lists are initialized.
 	if graph.Dependencies[module.Path] == nil {
 		t.Error("Dependencies list not initialized")
 	}
@@ -143,16 +145,16 @@ func TestDependencyGraphAddDependency(t *testing.T) {
 	graph.AddModule(moduleA)
 	graph.AddModule(moduleB)
 
-	// A depends on B
+	// A depends on B.
 	graph.AddDependency(moduleA.Path, moduleB.Path)
 
-	// Check forward dependency
+	// Check forward dependency.
 	deps := graph.GetDependencies(moduleA.Path)
 	if len(deps) != 1 || deps[0] != moduleB.Path {
 		t.Errorf("Expected A to depend on B, got dependencies: %v", deps)
 	}
 
-	// Check reverse dependency
+	// Check reverse dependency.
 	dependents := graph.GetDependents(moduleB.Path)
 	if len(dependents) != 1 || dependents[0] != moduleA.Path {
 		t.Errorf("Expected B to have A as dependent, got dependents: %v", dependents)
@@ -162,7 +164,7 @@ func TestDependencyGraphAddDependency(t *testing.T) {
 func TestDependencyGraphSimpleTopologicalSort(t *testing.T) {
 	graph := NewDependencyGraph()
 
-	// Create modules: A -> B -> C
+	// Create modules: A -> B -> C.
 	moduleA := &Module{Path: ModulePath("A")}
 	moduleB := &Module{Path: ModulePath("B")}
 	moduleC := &Module{Path: ModulePath("C")}
@@ -171,11 +173,11 @@ func TestDependencyGraphSimpleTopologicalSort(t *testing.T) {
 	graph.AddModule(moduleB)
 	graph.AddModule(moduleC)
 
-	// A depends on B, B depends on C
+	// A depends on B, B depends on C.
 	graph.AddDependency(moduleA.Path, moduleB.Path)
 	graph.AddDependency(moduleB.Path, moduleC.Path)
 
-	// Topological sort should give: C, B, A
+	// Topological sort should give: C, B, A.
 	order, err := graph.TopologicalSort()
 	if err != nil {
 		t.Fatalf("Topological sort failed: %v", err)
@@ -196,7 +198,7 @@ func TestDependencyGraphSimpleTopologicalSort(t *testing.T) {
 func TestDependencyGraphCycleDetection(t *testing.T) {
 	graph := NewDependencyGraph()
 
-	// Create modules with cycle: A -> B -> C -> A
+	// Create modules with cycle: A -> B -> C -> A.
 	moduleA := &Module{Path: ModulePath("A")}
 	moduleB := &Module{Path: ModulePath("B")}
 	moduleC := &Module{Path: ModulePath("C")}
@@ -205,7 +207,7 @@ func TestDependencyGraphCycleDetection(t *testing.T) {
 	graph.AddModule(moduleB)
 	graph.AddModule(moduleC)
 
-	// Create cycle
+	// Create cycle.
 	graph.AddDependency(moduleA.Path, moduleB.Path)
 	graph.AddDependency(moduleB.Path, moduleC.Path)
 	graph.AddDependency(moduleC.Path, moduleA.Path)
@@ -219,7 +221,7 @@ func TestDependencyGraphCycleDetection(t *testing.T) {
 		t.Error("Expected to detect at least one cycle")
 	}
 
-	// Topological sort should fail
+	// Topological sort should fail.
 	_, err = graph.TopologicalSort()
 	if err == nil {
 		t.Error("Expected topological sort to fail with cycles")
@@ -229,7 +231,7 @@ func TestDependencyGraphCycleDetection(t *testing.T) {
 func TestDependencyGraphNoCycles(t *testing.T) {
 	graph := NewDependencyGraph()
 
-	// Create modules without cycles: A -> B, A -> C, B -> D
+	// Create modules without cycles: A -> B, A -> C, B -> D.
 	moduleA := &Module{Path: ModulePath("A")}
 	moduleB := &Module{Path: ModulePath("B")}
 	moduleC := &Module{Path: ModulePath("C")}
@@ -257,7 +259,7 @@ func TestDependencyGraphNoCycles(t *testing.T) {
 func TestTransitiveDependencies(t *testing.T) {
 	graph := NewDependencyGraph()
 
-	// Create modules: A -> B -> C -> D
+	// Create modules: A -> B -> C -> D.
 	moduleA := &Module{Path: ModulePath("A")}
 	moduleB := &Module{Path: ModulePath("B")}
 	moduleC := &Module{Path: ModulePath("C")}
@@ -272,7 +274,7 @@ func TestTransitiveDependencies(t *testing.T) {
 	graph.AddDependency(moduleB.Path, moduleC.Path)
 	graph.AddDependency(moduleC.Path, moduleD.Path)
 
-	// Get transitive dependencies of A
+	// Get transitive dependencies of A.
 	transitive, err := graph.GetTransitiveDependencies(moduleA.Path)
 	if err != nil {
 		t.Fatalf("Failed to get transitive dependencies: %v", err)
@@ -283,15 +285,18 @@ func TestTransitiveDependencies(t *testing.T) {
 		t.Fatalf("Expected %d transitive dependencies, got %d", len(expected), len(transitive))
 	}
 
-	// Check that all expected dependencies are present
+	// Check that all expected dependencies are present.
 	for _, expectedDep := range expected {
 		found := false
+
 		for _, actualDep := range transitive {
 			if actualDep == expectedDep {
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			t.Errorf("Expected transitive dependency %s not found", expectedDep)
 		}
@@ -345,8 +350,8 @@ func TestModuleLoaderSearchPaths(t *testing.T) {
 
 func TestSymbolTypes(t *testing.T) {
 	tests := []struct {
-		symbolType SymbolType
 		expected   string
+		symbolType SymbolType
 	}{
 		{SymbolTypeFunction, "function"},
 		{SymbolTypeVariable, "variable"},
@@ -369,8 +374,8 @@ func TestSymbolTypes(t *testing.T) {
 
 func TestVisibilityLevels(t *testing.T) {
 	tests := []struct {
-		visibility VisibilityLevel
 		expected   string
+		visibility VisibilityLevel
 	}{
 		{VisibilityPrivate, "private"},
 		{VisibilityPackage, "package"},
@@ -511,7 +516,7 @@ func TestModuleRegistryGetAvailableVersions(t *testing.T) {
 		t.Errorf("Expected %d versions, got %d", len(versions), len(available))
 	}
 
-	// Check that versions are sorted (descending)
+	// Check that versions are sorted (descending).
 	for i := 1; i < len(available); i++ {
 		if available[i-1].Compare(available[i]) < 0 {
 			t.Errorf("Versions not properly sorted: %s should come before %s",
@@ -523,7 +528,7 @@ func TestModuleRegistryGetAvailableVersions(t *testing.T) {
 func TestModuleLoaderStatistics(t *testing.T) {
 	loader := NewModuleLoader()
 
-	// Add some test modules
+	// Add some test modules.
 	module1 := &Module{
 		Path:         ModulePath("module1"),
 		LoadStatus:   ModuleStatusLoaded,
@@ -579,13 +584,13 @@ func TestModuleLoaderStatistics(t *testing.T) {
 func TestComplexDependencyGraphScenario(t *testing.T) {
 	loader := NewModuleLoader()
 
-	// Create a complex dependency scenario:
-	// App -> (UI, Core)
-	// UI -> (Graphics, Utils)
-	// Core -> (Utils, Database)
-	// Graphics -> Utils
-	// Database -> Utils
-	// Utils -> (no dependencies)
+	// Create a complex dependency scenario:.
+	// App -> (UI, Core).
+	// UI -> (Graphics, Utils).
+	// Core -> (Utils, Database).
+	// Graphics -> Utils.
+	// Database -> Utils.
+	// Utils -> (no dependencies).
 
 	modules := map[string]*Module{
 		"App":      {Path: ModulePath("App"), LoadStatus: ModuleStatusLoaded},
@@ -596,12 +601,12 @@ func TestComplexDependencyGraphScenario(t *testing.T) {
 		"Database": {Path: ModulePath("Database"), LoadStatus: ModuleStatusLoaded},
 	}
 
-	// Add modules to graph
+	// Add modules to graph.
 	for _, module := range modules {
 		loader.Graph.AddModule(module)
 	}
 
-	// Add dependencies
+	// Add dependencies.
 	loader.Graph.AddDependency(ModulePath("App"), ModulePath("UI"))
 	loader.Graph.AddDependency(ModulePath("App"), ModulePath("Core"))
 	loader.Graph.AddDependency(ModulePath("UI"), ModulePath("Graphics"))
@@ -611,38 +616,39 @@ func TestComplexDependencyGraphScenario(t *testing.T) {
 	loader.Graph.AddDependency(ModulePath("Graphics"), ModulePath("Utils"))
 	loader.Graph.AddDependency(ModulePath("Database"), ModulePath("Utils"))
 
-	// Test cycle detection - should be no cycles
+	// Test cycle detection - should be no cycles.
 	cycles, err := loader.Graph.DetectCycles()
 	if err != nil {
 		t.Errorf("Unexpected error in cycle detection: %v", err)
 	}
+
 	if len(cycles) != 0 {
 		t.Errorf("Expected no cycles, found %d", len(cycles))
 	}
 
-	// Test topological sort
+	// Test topological sort.
 	order, err := loader.Graph.TopologicalSort()
 	if err != nil {
 		t.Fatalf("Topological sort failed: %v", err)
 	}
 
-	// Utils should come first (no dependencies)
+	// Utils should come first (no dependencies).
 	if order[0] != ModulePath("Utils") {
 		t.Errorf("Expected Utils to be first in load order, got %s", order[0])
 	}
 
-	// App should come last (depends on everything)
+	// App should come last (depends on everything).
 	if order[len(order)-1] != ModulePath("App") {
 		t.Errorf("Expected App to be last in load order, got %s", order[len(order)-1])
 	}
 
-	// Test transitive dependencies of App
+	// Test transitive dependencies of App.
 	transitive, err := loader.Graph.GetTransitiveDependencies(ModulePath("App"))
 	if err != nil {
 		t.Fatalf("Failed to get transitive dependencies: %v", err)
 	}
 
-	// App should transitively depend on all other modules
+	// App should transitively depend on all other modules.
 	expectedTransitive := []ModulePath{
 		ModulePath("UI"), ModulePath("Core"), ModulePath("Graphics"),
 		ModulePath("Utils"), ModulePath("Database"),

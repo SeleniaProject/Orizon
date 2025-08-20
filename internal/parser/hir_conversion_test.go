@@ -18,10 +18,9 @@ func TestHIRConversion_Basic(t *testing.T) {
 		t.Fatalf("Parse failed: %v", errors)
 	}
 
-	// Convert AST to HIR
+	// Convert AST to HIR.
 	transformer := NewASTToHIRTransformer()
 	hirModule, err := transformer.TransformModule(program)
-
 	if err != nil {
 		t.Fatalf("HIR transformation failed: %v", err)
 	}
@@ -30,7 +29,7 @@ func TestHIRConversion_Basic(t *testing.T) {
 		t.Fatal("HIR conversion failed")
 	}
 
-	// Check if we have any variables converted
+	// Check if we have any variables converted.
 	if len(hirModule.Variables) == 0 {
 		t.Error("Expected at least one variable")
 	}
@@ -49,25 +48,27 @@ func TestHIRConversion_StructDeclaration(t *testing.T) {
 		t.Fatalf("Parse failed: %v", err)
 	}
 
-	// Convert to HIR
+	// Convert to HIR.
 	hirModule, transformErr := transformer.TransformModule(ast)
 	if transformErr != nil {
 		t.Fatalf("HIR transformation failed: %v", transformErr)
 	}
+
 	if hirModule == nil {
 		t.Fatal("HIR conversion returned nil")
 	}
 
-	// Check that types were converted
+	// Check that types were converted.
 	if len(hirModule.Types) == 0 {
 		t.Error("No types found in HIR module")
 	}
 
-	// Verify type has expected structure
+	// Verify type has expected structure.
 	for _, hirType := range hirModule.Types {
 		if hirType.Name == "" {
 			t.Error("Type name is empty")
 		}
+
 		if hirType.Data == nil {
 			t.Error("Type data is nil")
 		}
@@ -109,17 +110,18 @@ func TestHIRConversion_ComplexTypes(t *testing.T) {
 				t.Fatalf("Parse failed: %v", err)
 			}
 
-			// Convert to HIR
+			// Convert to HIR.
 			hirModule, transformErr := transformer.TransformModule(ast)
 			if transformErr != nil {
 				t.Fatalf("HIR transformation failed: %v", transformErr)
 			}
+
 			if hirModule == nil {
 				t.Fatal("HIR conversion returned nil")
 			}
 
-			// For complex types, just verify we get some result
-			// Detailed validation would require checking specific HIR node types
+			// For complex types, just verify we get some result.
+			// Detailed validation would require checking specific HIR node types.
 			t.Logf("HIR conversion successful for %s", tt.name)
 		})
 	}

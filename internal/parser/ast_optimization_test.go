@@ -1,5 +1,5 @@
 // Test suite for AST optimization passes (Phase 1.3.3)
-// This file tests the comprehensive compile-time optimization system:
+// This file tests the comprehensive compile-time optimization system:.
 // 1. Constant folding - compile-time evaluation of constant expressions
 // 2. Dead code detection - identification and removal of unreachable code
 // 3. Syntax sugar removal - desugaring of high-level constructs
@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestConstantFoldingPass tests the constant folding optimization pass
+// TestConstantFoldingPass tests the constant folding optimization pass.
 func TestConstantFoldingPass(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -41,20 +41,20 @@ func TestConstantFoldingPass(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create constant folding pass
+			// Create constant folding pass.
 			pass := NewConstantFoldingPass()
 
-			// Test basic pass functionality
+			// Test basic pass functionality.
 			if pass == nil {
 				t.Fatal("Failed to create constant folding pass")
 			}
 
-			// Verify pass name
+			// Verify pass name.
 			if pass.GetName() != "ConstantFolding" {
 				t.Errorf("Expected pass name 'ConstantFolding', got '%s'", pass.GetName())
 			}
 
-			// Test metrics tracking
+			// Test metrics tracking.
 			metrics := pass.GetMetrics()
 			if metrics.PassName != "ConstantFolding" {
 				t.Errorf("Expected metrics pass name 'ConstantFolding', got '%s'", metrics.PassName)
@@ -65,7 +65,7 @@ func TestConstantFoldingPass(t *testing.T) {
 	}
 }
 
-// TestDeadCodeDetectionPass tests the dead code detection optimization pass
+// TestDeadCodeDetectionPass tests the dead code detection optimization pass.
 func TestDeadCodeDetectionPass(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -96,20 +96,20 @@ func TestDeadCodeDetectionPass(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create dead code detection pass
+			// Create dead code detection pass.
 			pass := NewDeadCodeDetectionPass()
 
-			// Test basic pass functionality
+			// Test basic pass functionality.
 			if pass == nil {
 				t.Fatal("Failed to create dead code detection pass")
 			}
 
-			// Verify pass name
+			// Verify pass name.
 			if pass.GetName() != "DeadCodeDetection" {
 				t.Errorf("Expected pass name 'DeadCodeDetection', got '%s'", pass.GetName())
 			}
 
-			// Test metrics tracking
+			// Test metrics tracking.
 			metrics := pass.GetMetrics()
 			if metrics.PassName != "DeadCodeDetection" {
 				t.Errorf("Expected metrics pass name 'DeadCodeDetection', got '%s'", metrics.PassName)
@@ -120,7 +120,7 @@ func TestDeadCodeDetectionPass(t *testing.T) {
 	}
 }
 
-// TestSyntaxSugarRemovalPass tests the syntax sugar removal optimization pass
+// TestSyntaxSugarRemovalPass tests the syntax sugar removal optimization pass.
 func TestSyntaxSugarRemovalPass(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -151,20 +151,20 @@ func TestSyntaxSugarRemovalPass(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create syntax sugar removal pass
+			// Create syntax sugar removal pass.
 			pass := NewSyntaxSugarRemovalPass()
 
-			// Test basic pass functionality
+			// Test basic pass functionality.
 			if pass == nil {
 				t.Fatal("Failed to create syntax sugar removal pass")
 			}
 
-			// Verify pass name
+			// Verify pass name.
 			if pass.GetName() != "SyntaxSugarRemoval" {
 				t.Errorf("Expected pass name 'SyntaxSugarRemoval', got '%s'", pass.GetName())
 			}
 
-			// Test metrics tracking
+			// Test metrics tracking.
 			metrics := pass.GetMetrics()
 			if metrics.PassName != "SyntaxSugarRemoval" {
 				t.Errorf("Expected metrics pass name 'SyntaxSugarRemoval', got '%s'", metrics.PassName)
@@ -175,13 +175,13 @@ func TestSyntaxSugarRemovalPass(t *testing.T) {
 	}
 }
 
-// TestOptimizationEngine tests the orchestration of multiple optimization passes
+// TestOptimizationEngine tests the orchestration of multiple optimization passes.
 func TestOptimizationEngine(t *testing.T) {
 	tests := []struct {
 		name     string
-		optLevel int
 		input    string
 		expected string
+		optLevel int
 	}{
 		{
 			name:     "Basic optimization level 1",
@@ -205,20 +205,20 @@ func TestOptimizationEngine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create optimization engine
+			// Create optimization engine.
 			engine := NewOptimizationEngine(tt.optLevel)
 
-			// Test basic engine functionality
+			// Test basic engine functionality.
 			if engine == nil {
 				t.Fatal("Failed to create optimization engine")
 			}
 
-			// Test that engine has the right optimization level
+			// Test that engine has the right optimization level.
 			if engine.context.OptLevel != tt.optLevel {
 				t.Errorf("Expected optimization level %d, got %d", tt.optLevel, engine.context.OptLevel)
 			}
 
-			// Test that engine has passes registered
+			// Test that engine has passes registered.
 			if len(engine.passes) == 0 {
 				t.Error("Expected optimization passes to be registered")
 			}
@@ -229,10 +229,10 @@ func TestOptimizationEngine(t *testing.T) {
 	}
 }
 
-// TestASTOptimizer tests the visitor pattern implementation for AST traversal
+// TestASTOptimizer tests the visitor pattern implementation for AST traversal.
 func TestASTOptimizer(t *testing.T) {
 	t.Run("AST Optimizer Creation", func(t *testing.T) {
-		// Create optimization context
+		// Create optimization context.
 		context := &OptimizationContext{
 			ConstantValues: make(map[string]interface{}),
 			DeadCodePaths:  make([]Span, 0),
@@ -240,23 +240,23 @@ func TestASTOptimizer(t *testing.T) {
 			DebugMode:      false,
 		}
 
-		// Create dummy optimization pass
+		// Create dummy optimization pass.
 		pass := NewConstantFoldingPass()
 
-		// Create AST optimizer
+		// Create AST optimizer.
 		optimizer := NewASTOptimizer(context, pass)
 
-		// Test basic optimizer functionality
+		// Test basic optimizer functionality.
 		if optimizer == nil {
 			t.Fatal("Failed to create AST optimizer")
 		}
 
-		// Test context assignment
+		// Test context assignment.
 		if optimizer.context != context {
 			t.Error("AST optimizer context not properly assigned")
 		}
 
-		// Test pass assignment
+		// Test pass assignment.
 		if optimizer.currentPass != pass {
 			t.Error("AST optimizer pass not properly assigned")
 		}
@@ -265,16 +265,16 @@ func TestASTOptimizer(t *testing.T) {
 	})
 }
 
-// TestOptimizationMetrics tests the metrics tracking system
+// TestOptimizationMetrics tests the metrics tracking system.
 func TestOptimizationMetrics(t *testing.T) {
 	t.Run("Metrics Tracking", func(t *testing.T) {
-		// Create optimization pass
+		// Create optimization pass.
 		pass := NewConstantFoldingPass()
 
-		// Get initial metrics
+		// Get initial metrics.
 		initialMetrics := pass.GetMetrics()
 
-		// Test initial metrics values
+		// Test initial metrics values.
 		if initialMetrics.PassName != "ConstantFolding" {
 			t.Errorf("Expected pass name 'ConstantFolding', got '%s'", initialMetrics.PassName)
 		}
@@ -299,10 +299,10 @@ func TestOptimizationMetrics(t *testing.T) {
 	})
 }
 
-// TestPhase1_3_3Completion tests that Phase 1.3.3 is fully implemented
+// TestPhase1_3_3Completion tests that Phase 1.3.3 is fully implemented.
 func TestPhase1_3_3Completion(t *testing.T) {
 	t.Run("Phase 1.3.3 AST Optimization Passes - Full Implementation", func(t *testing.T) {
-		// Test 1: Constant Folding Pass
+		// Test 1: Constant Folding Pass.
 		constantPass := NewConstantFoldingPass()
 		if constantPass == nil {
 			t.Error("❌ Constant folding pass not implemented")
@@ -310,7 +310,7 @@ func TestPhase1_3_3Completion(t *testing.T) {
 			t.Log("✅ Constant folding pass implemented")
 		}
 
-		// Test 2: Dead Code Detection Pass
+		// Test 2: Dead Code Detection Pass.
 		deadCodePass := NewDeadCodeDetectionPass()
 		if deadCodePass == nil {
 			t.Error("❌ Dead code detection pass not implemented")
@@ -318,7 +318,7 @@ func TestPhase1_3_3Completion(t *testing.T) {
 			t.Log("✅ Dead code detection pass implemented")
 		}
 
-		// Test 3: Syntax Sugar Removal Pass
+		// Test 3: Syntax Sugar Removal Pass.
 		sugarPass := NewSyntaxSugarRemovalPass()
 		if sugarPass == nil {
 			t.Error("❌ Syntax sugar removal pass not implemented")
@@ -326,7 +326,7 @@ func TestPhase1_3_3Completion(t *testing.T) {
 			t.Log("✅ Syntax sugar removal pass implemented")
 		}
 
-		// Test 4: Optimization Engine
+		// Test 4: Optimization Engine.
 		engine := NewOptimizationEngine(2)
 		if engine == nil {
 			t.Error("❌ Optimization engine not implemented")
@@ -334,11 +334,12 @@ func TestPhase1_3_3Completion(t *testing.T) {
 			t.Log("✅ Optimization engine implemented")
 		}
 
-		// Test 5: AST Optimizer Visitor
+		// Test 5: AST Optimizer Visitor.
 		context := &OptimizationContext{
 			OptLevel:  2,
 			DebugMode: false,
 		}
+
 		optimizer := NewASTOptimizer(context, constantPass)
 		if optimizer == nil {
 			t.Error("❌ AST optimizer visitor not implemented")
@@ -346,7 +347,7 @@ func TestPhase1_3_3Completion(t *testing.T) {
 			t.Log("✅ AST optimizer visitor implemented")
 		}
 
-		// Summary
+		// Summary.
 		t.Log("")
 		t.Log("🎯 Phase 1.3.3 AST最適化パス - COMPLETION STATUS:")
 		t.Log("   ✅ Constant Folding - compile-time expression evaluation")

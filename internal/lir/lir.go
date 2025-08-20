@@ -61,15 +61,16 @@ func (r Ret) String() string {
 	if r.Src == "" {
 		return "ret"
 	}
+
 	return fmt.Sprintf("ret %s", r.Src)
 }
 
 type Call struct {
 	Dst        string
 	Callee     string
+	RetClass   string
 	Args       []string
-	ArgClasses []string // optional: per-arg class ("int"|"float")
-	RetClass   string   // optional: return class
+	ArgClasses []string
 }
 
 func (Call) Op() string { return "call" }
@@ -78,37 +79,47 @@ func (c Call) String() string {
 	if c.Dst != "" {
 		fmt.Fprintf(&b, "%s = ", c.Dst)
 	}
+
 	fmt.Fprintf(&b, "call %s(", c.Callee)
+
 	for i, a := range c.Args {
 		if i > 0 {
 			b.WriteString(", ")
 		}
+
 		b.WriteString(a)
 	}
+
 	b.WriteString(")")
-	// Annotate classes as a comment for debugging
+	// Annotate classes as a comment for debugging.
 	if len(c.ArgClasses) > 0 || c.RetClass != "" {
 		b.WriteString(" ;")
+
 		if len(c.ArgClasses) > 0 {
 			b.WriteString(" args:")
+
 			for i, cl := range c.ArgClasses {
 				if i > 0 {
 					b.WriteString(",")
 				}
+
 				if cl == "" {
 					cl = "?"
 				}
+
 				b.WriteString(cl)
 			}
 		}
+
 		if c.RetClass != "" {
 			fmt.Fprintf(&b, " ret:%s", c.RetClass)
 		}
 	}
+
 	return b.String()
 }
 
-// Compare and branching
+// Compare and branching.
 type Cmp struct{ Dst, Pred, LHS, RHS string }
 
 func (Cmp) Op() string       { return "cmp" }
@@ -124,7 +135,7 @@ type BrCond struct{ Cond, True, False string }
 func (BrCond) Op() string       { return "brcond" }
 func (b BrCond) String() string { return fmt.Sprintf("brcond %s, %s, %s", b.Cond, b.True, b.False) }
 
-// Memory operations
+// Memory operations.
 type Alloc struct{ Dst, Name string }
 
 func (Alloc) Op() string { return "alloca" }
@@ -132,6 +143,7 @@ func (a Alloc) String() string {
 	if a.Name != "" {
 		return fmt.Sprintf("%s = alloca %s", a.Dst, a.Name)
 	}
+
 	return fmt.Sprintf("%s = alloca", a.Dst)
 }
 
@@ -147,21 +159,27 @@ func (s Store) String() string { return fmt.Sprintf("store %s, %s", s.Addr, s.Va
 
 func (m *Module) String() string {
 	var b strings.Builder
+
 	fmt.Fprintf(&b, "module %s\n", m.Name)
+
 	for _, f := range m.Functions {
 		b.WriteString(f.String())
 		b.WriteByte('\n')
 	}
+
 	return b.String()
 }
 
 func (f *Function) String() string {
 	var b strings.Builder
+
 	fmt.Fprintf(&b, "func %s() {\n", f.Name)
+
 	for _, bb := range f.Blocks {
 		if bb.Label != "" {
 			fmt.Fprintf(&b, "%s:\n", bb.Label)
 		}
+
 		for _, ins := range bb.Insns {
 			if s, ok := any(ins).(fmt.Stringer); ok {
 				b.WriteString("  ")
@@ -172,6 +190,8 @@ func (f *Function) String() string {
 			}
 		}
 	}
+
 	b.WriteString("}\n")
+
 	return b.String()
 }

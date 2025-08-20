@@ -35,7 +35,7 @@ func TestModuleResolverSearchPaths(t *testing.T) {
 		resolver.AddSearchPath(path)
 	}
 
-	// Verify paths were added to the module loader
+	// Verify paths were added to the module loader.
 	if len(resolver.ModuleLoader.SearchPaths) != len(paths) {
 		t.Errorf("Expected %d search paths, got %d",
 			len(paths), len(resolver.ModuleLoader.SearchPaths))
@@ -45,7 +45,7 @@ func TestModuleResolverSearchPaths(t *testing.T) {
 func TestModuleValidationBasic(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Create a simple module
+	// Create a simple module.
 	module := &Module{
 		Path:            ModulePath("test/module"),
 		Version:         Version{1, 0, 0, "", ""},
@@ -60,7 +60,7 @@ func TestModuleValidationBasic(t *testing.T) {
 		Span:            position.Span{},
 	}
 
-	// Create minimal HIR module
+	// Create minimal HIR module.
 	module.HIRModule = &hir.HIRModule{
 		ID:           generateNodeID(),
 		ModuleID:     generateModuleID(),
@@ -71,11 +71,11 @@ func TestModuleValidationBasic(t *testing.T) {
 		Span:         module.Span,
 	}
 
-	// Add to resolver
+	// Add to resolver.
 	resolver.ModuleLoader.Cache[module.Path] = module
 	resolver.ModuleLoader.Graph.AddModule(module)
 
-	// Validate - should pass
+	// Validate - should pass.
 	if err := resolver.validateModule(module); err != nil {
 		t.Errorf("Validation failed for valid module: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestModuleValidationBasic(t *testing.T) {
 func TestModuleValidationErrors(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Test module with error status but no error message
+	// Test module with error status but no error message.
 	errorModule := &Module{
 		Path:       ModulePath("error/module"),
 		LoadStatus: ModuleStatusError,
@@ -96,7 +96,7 @@ func TestModuleValidationErrors(t *testing.T) {
 		t.Error("Expected validation to fail for module with error status but no error message")
 	}
 
-	// Test loaded module without HIR
+	// Test loaded module without HIR.
 	loadedModule := &Module{
 		Path:       ModulePath("loaded/module"),
 		LoadStatus: ModuleStatusLoaded,
@@ -112,7 +112,7 @@ func TestModuleValidationErrors(t *testing.T) {
 func TestModuleValidationWithDependencies(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Create dependency module
+	// Create dependency module.
 	depModule := &Module{
 		Path:       ModulePath("dep/module"),
 		LoadStatus: ModuleStatusLoaded,
@@ -123,7 +123,7 @@ func TestModuleValidationWithDependencies(t *testing.T) {
 		},
 	}
 
-	// Create main module that depends on depModule
+	// Create main module that depends on depModule.
 	mainModule := &Module{
 		Path: ModulePath("main/module"),
 		Dependencies: []ModuleSpec{
@@ -137,18 +137,18 @@ func TestModuleValidationWithDependencies(t *testing.T) {
 		},
 	}
 
-	// Add both modules to resolver
+	// Add both modules to resolver.
 	resolver.ModuleLoader.Cache[depModule.Path] = depModule
 	resolver.ModuleLoader.Cache[mainModule.Path] = mainModule
 	resolver.ModuleLoader.Graph.AddModule(depModule)
 	resolver.ModuleLoader.Graph.AddModule(mainModule)
 
-	// Validation should pass
+	// Validation should pass.
 	if err := resolver.validateModule(mainModule); err != nil {
 		t.Errorf("Validation failed for module with valid dependencies: %v", err)
 	}
 
-	// Test with missing dependency
+	// Test with missing dependency.
 	missingDepModule := &Module{
 		Path: ModulePath("missing/module"),
 		Dependencies: []ModuleSpec{
@@ -173,7 +173,7 @@ func TestModuleValidationWithDependencies(t *testing.T) {
 func TestModuleSystemValidation(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Create modules: A -> B -> C (linear dependency chain)
+	// Create modules: A -> B -> C (linear dependency chain).
 	moduleC := &Module{
 		Path:            ModulePath("C"),
 		LoadStatus:      ModuleStatusLoaded,
@@ -220,7 +220,7 @@ func TestModuleSystemValidation(t *testing.T) {
 		},
 	}
 
-	// Add modules to resolver
+	// Add modules to resolver.
 	resolver.ModuleLoader.Cache[moduleA.Path] = moduleA
 	resolver.ModuleLoader.Cache[moduleB.Path] = moduleB
 	resolver.ModuleLoader.Cache[moduleC.Path] = moduleC
@@ -232,7 +232,7 @@ func TestModuleSystemValidation(t *testing.T) {
 	resolver.ModuleLoader.Graph.AddDependency(moduleA.Path, moduleB.Path)
 	resolver.ModuleLoader.Graph.AddDependency(moduleB.Path, moduleC.Path)
 
-	// Validation should pass
+	// Validation should pass.
 	if err := resolver.ValidateModuleSystem(); err != nil {
 		t.Errorf("Validation failed for valid module system: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestModuleSystemValidation(t *testing.T) {
 func TestModuleSystemValidationWithCycles(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Create modules with cycle: A -> B -> A
+	// Create modules with cycle: A -> B -> A.
 	moduleA := &Module{
 		Path:       ModulePath("A"),
 		LoadStatus: ModuleStatusLoaded,
@@ -268,7 +268,7 @@ func TestModuleSystemValidationWithCycles(t *testing.T) {
 		},
 	}
 
-	// Add modules to resolver
+	// Add modules to resolver.
 	resolver.ModuleLoader.Cache[moduleA.Path] = moduleA
 	resolver.ModuleLoader.Cache[moduleB.Path] = moduleB
 
@@ -278,7 +278,7 @@ func TestModuleSystemValidationWithCycles(t *testing.T) {
 	resolver.ModuleLoader.Graph.AddDependency(moduleA.Path, moduleB.Path)
 	resolver.ModuleLoader.Graph.AddDependency(moduleB.Path, moduleA.Path)
 
-	// Validation should fail due to cycle
+	// Validation should fail due to cycle.
 	err := resolver.ValidateModuleSystem()
 	if err == nil {
 		t.Error("Expected validation to fail for module system with cycles")
@@ -288,7 +288,7 @@ func TestModuleSystemValidationWithCycles(t *testing.T) {
 func TestResolveModuleProgramBasic(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Create a simple module
+	// Create a simple module.
 	module := &Module{
 		Path:            ModulePath("test/main"),
 		LoadStatus:      ModuleStatusLoaded,
@@ -302,18 +302,18 @@ func TestResolveModuleProgramBasic(t *testing.T) {
 		},
 	}
 
-	// Mock the module loader to return our module
+	// Mock the module loader to return our module.
 	resolver.ModuleLoader.Cache[module.Path] = module
 	resolver.ModuleLoader.Graph.AddModule(module)
 	resolver.ModuleLoader.Graph.LoadOrder = []ModulePath{module.Path}
 
-	// Manually call ResolveModules since we're mocking
+	// Manually call ResolveModules since we're mocking.
 	err := resolver.ModuleLoader.ResolveModules([]ModulePath{module.Path})
 	if err == nil {
-		// Expected to fail since we don't have real files, but continue with test
+		// Expected to fail since we don't have real files, but continue with test.
 	}
 
-	// Resolve program
+	// Resolve program.
 	program, err := resolver.ResolveModuleProgram([]ModulePath{module.Path})
 	if err != nil {
 		t.Fatalf("Failed to resolve module program: %v", err)
@@ -327,7 +327,7 @@ func TestResolveModuleProgramBasic(t *testing.T) {
 		t.Errorf("Expected 1 module in program, got %d", len(program.Modules))
 	}
 
-	// Check that our module is in the program
+	// Check that our module is in the program.
 	if program.Modules[module.HIRModule.ModuleID] != module.HIRModule {
 		t.Error("Module not properly added to program")
 	}
@@ -336,7 +336,7 @@ func TestResolveModuleProgramBasic(t *testing.T) {
 func TestModuleResolverStatistics(t *testing.T) {
 	resolver := NewModuleResolver()
 
-	// Create some test modules
+	// Create some test modules.
 	modules := []*Module{
 		{
 			Path:         ModulePath("module1"),
@@ -355,7 +355,7 @@ func TestModuleResolverStatistics(t *testing.T) {
 		},
 	}
 
-	// Add modules to cache and graph
+	// Add modules to cache and graph.
 	for _, module := range modules {
 		resolver.ModuleLoader.Cache[module.Path] = module
 		resolver.ModuleLoader.Graph.AddModule(module)

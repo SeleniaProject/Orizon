@@ -5,6 +5,7 @@ import "testing"
 func pos(file string, line, col, off int) Position {
 	return Position{File: file, Line: line, Column: col, Offset: off}
 }
+
 func spanAt(file string, line, col int) Span {
 	return Span{Start: pos(file, line, col, 0), End: pos(file, line, col+1, 1)}
 }
@@ -12,7 +13,7 @@ func spanAt(file string, line, col int) Span {
 func TestOptimizeViaAstPipe_ConstantFolding_ReturnLiteral(t *testing.T) {
 	file := "bridge_cf.oriz"
 
-	// return 2 * 3
+	// return 2 * 3.
 	ret := &ReturnStatement{
 		Span: spanAt(file, 2, 3),
 		Value: &BinaryExpression{
@@ -38,28 +39,34 @@ func TestOptimizeViaAstPipe_ConstantFolding_ReturnLiteral(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OptimizeViaAstPipe error: %v", err)
 	}
+
 	if len(optimized.Declarations) != 1 {
 		t.Fatalf("expected 1 decl, got %d", len(optimized.Declarations))
 	}
+
 	ofn, ok := optimized.Declarations[0].(*FunctionDeclaration)
 	if !ok {
 		t.Fatalf("expected FunctionDeclaration, got %T", optimized.Declarations[0])
 	}
+
 	if len(ofn.Body.Statements) != 1 {
 		t.Fatalf("expected 1 statement in body, got %d", len(ofn.Body.Statements))
 	}
+
 	oret, ok := ofn.Body.Statements[0].(*ReturnStatement)
 	if !ok {
 		t.Fatalf("expected ReturnStatement, got %T", ofn.Body.Statements[0])
 	}
+
 	olit, ok := oret.Value.(*Literal)
 	if !ok {
 		t.Fatalf("expected Literal after folding, got %T", oret.Value)
 	}
+
 	if olit.Kind != LiteralInteger {
 		t.Fatalf("expected integer literal, got kind=%v", olit.Kind)
 	}
-	// Value is int (parser literal)
+	// Value is int (parser literal).
 	if v, ok := olit.Value.(int); !ok || v != 6 {
 		t.Fatalf("expected value 6, got %#v", olit.Value)
 	}
@@ -68,7 +75,7 @@ func TestOptimizeViaAstPipe_ConstantFolding_ReturnLiteral(t *testing.T) {
 func TestOptimizeViaAstPipe_DeadCode_WhileFalseRemoved(t *testing.T) {
 	file := "bridge_dc.oriz"
 
-	// while (false) { 1 }  -> removed
+	// while (false) { 1 }  -> removed.
 	wl := &WhileStatement{
 		Span:      spanAt(file, 2, 1),
 		Condition: &Literal{Span: spanAt(file, 2, 8), Value: false, Kind: LiteralBool},
@@ -95,7 +102,7 @@ func TestOptimizeViaAstPipe_DeadCode_WhileFalseRemoved(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected FunctionDeclaration, got %T", optimized.Declarations[0])
 	}
-	// While(false) should be removed by dead code elimination -> empty block
+	// While(false) should be removed by dead code elimination -> empty block.
 	if len(ofn.Body.Statements) != 0 {
 		t.Fatalf("expected while(false) removed, statements=%d", len(ofn.Body.Statements))
 	}

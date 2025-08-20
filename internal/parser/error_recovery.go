@@ -1,4 +1,4 @@
-// Package parser implements advanced error recovery and suggestion system
+// Package parser implements advanced error recovery and suggestion system.
 // Phase 1.2.4: エラー回復とサジェスト機能実装
 package parser
 
@@ -10,46 +10,39 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// ErrorRecoveryMode defines different recovery strategies
+// ErrorRecoveryMode defines different recovery strategies.
 type ErrorRecoveryMode int
 
 const (
-	// PanicMode performs rapid token skipping to synchronization points
+	// PanicMode performs rapid token skipping to synchronization points.
 	PanicMode ErrorRecoveryMode = iota
-	// PhraseLevel attempts local error correction within statements
+	// PhraseLevel attempts local error correction within statements.
 	PhraseLevel
-	// GlobalCorrection performs comprehensive error analysis and correction
+	// GlobalCorrection performs comprehensive error analysis and correction.
 	GlobalCorrection
 )
 
-// SuggestionEngine provides intelligent code completion and error correction
+// SuggestionEngine provides intelligent code completion and error correction.
 type SuggestionEngine struct {
-	// Recovery strategy configuration
+	currentScope   *ScopeContext
+	tokenFrequency map[lexer.TokenType]int
+	pairFrequency  map[TokenPair]int
+	recentTokens   []lexer.Token
+	expectedTokens []lexer.TokenType
+	errorPatterns  []ErrorPattern
+	fixTemplates   []FixTemplate
 	mode           ErrorRecoveryMode
 	maxSuggestions int
 	confidence     float64
-
-	// Context tracking for intelligent suggestions
-	currentScope   *ScopeContext
-	recentTokens   []lexer.Token
-	expectedTokens []lexer.TokenType
-
-	// Pattern matching for common errors
-	errorPatterns []ErrorPattern
-	fixTemplates  []FixTemplate
-
-	// Statistical data for suggestion ranking
-	tokenFrequency map[lexer.TokenType]int
-	pairFrequency  map[TokenPair]int
 }
 
-// ScopeContext tracks the current parsing context for contextual suggestions
+// ScopeContext tracks the current parsing context for contextual suggestions.
 type ScopeContext struct {
-	Level        int                  // Current nesting level
-	Type         ScopeType            // Current scope type (function, struct, etc.)
-	Identifiers  map[string]IdentInfo // Available identifiers in scope
-	ExpectedNext []lexer.TokenType    // Tokens that make sense in this context
-	Parent       *ScopeContext        // Parent scope for identifier resolution
+	Identifiers  map[string]IdentInfo
+	Parent       *ScopeContext
+	ExpectedNext []lexer.TokenType
+	Level        int
+	Type         ScopeType
 }
 
 type ScopeType int
@@ -63,13 +56,13 @@ const (
 	MacroScope
 )
 
-// IdentInfo stores information about available identifiers
+// IdentInfo stores information about available identifiers.
 type IdentInfo struct {
 	Name       string
 	Type       string
+	LastUsed   Position
 	Kind       IdentifierKind
 	Confidence float64
-	LastUsed   Position
 }
 
 type IdentifierKind int
@@ -82,41 +75,41 @@ const (
 	MacroIdent
 )
 
-// TokenPair represents consecutive token combinations for pattern analysis
+// TokenPair represents consecutive token combinations for pattern analysis.
 type TokenPair struct {
 	First  lexer.TokenType
 	Second lexer.TokenType
 }
 
-// ErrorPattern defines common syntax error patterns and their fixes
+// ErrorPattern defines common syntax error patterns and their fixes.
 type ErrorPattern struct {
 	Name        string
 	Description string
-	Pattern     []lexer.TokenType // Token sequence that indicates this error
-	Context     ScopeType         // Scope where this error commonly occurs
-	Confidence  float64           // How confident we are this is the intended pattern
-	Fixes       []FixTemplate     // Possible fixes for this pattern
+	Pattern     []lexer.TokenType
+	Fixes       []FixTemplate
+	Context     ScopeType
+	Confidence  float64
 }
 
-// FixTemplate defines an automatic code correction template
+// FixTemplate defines an automatic code correction template.
 type FixTemplate struct {
 	Name        string
 	Description string
-	Replacement []lexer.TokenType // Tokens to insert/replace
-	InsertPos   int               // Position to insert relative to error (-1 = replace)
-	Confidence  float64           // Confidence in this fix
-	Example     string            // Example of the fix applied
+	Example     string
+	Replacement []lexer.TokenType
+	InsertPos   int
+	Confidence  float64
 }
 
-// Suggestion represents a single code suggestion or error fix
+// Suggestion represents a single code suggestion or error fix.
 type Suggestion struct {
-	Type        SuggestionType
+	Fix         *FixTemplate
 	Message     string
-	Position    Position
 	Replacement string
+	Position    Position
+	Type        SuggestionType
 	Confidence  float64
 	Category    SuggestionCategory
-	Fix         *FixTemplate
 }
 
 type SuggestionType int
@@ -139,7 +132,7 @@ const (
 	PerformanceHint
 )
 
-// NewSuggestionEngine creates a new error recovery and suggestion engine
+// NewSuggestionEngine creates a new error recovery and suggestion engine.
 func NewSuggestionEngine(mode ErrorRecoveryMode) *SuggestionEngine {
 	engine := &SuggestionEngine{
 		mode:           mode,
@@ -151,14 +144,14 @@ func NewSuggestionEngine(mode ErrorRecoveryMode) *SuggestionEngine {
 		pairFrequency:  make(map[TokenPair]int),
 	}
 
-	// Initialize with common error patterns
+	// Initialize with common error patterns.
 	engine.initializeErrorPatterns()
 	engine.initializeFixTemplates()
 
 	return engine
 }
 
-// initializeErrorPatterns sets up common syntax error recognition patterns
+// initializeErrorPatterns sets up common syntax error recognition patterns.
 func (se *SuggestionEngine) initializeErrorPatterns() {
 	se.errorPatterns = []ErrorPattern{
 		{
@@ -249,7 +242,7 @@ func (se *SuggestionEngine) initializeErrorPatterns() {
 	}
 }
 
-// initializeFixTemplates sets up common code fix templates
+// initializeFixTemplates sets up common code fix templates.
 func (se *SuggestionEngine) initializeFixTemplates() {
 	se.fixTemplates = []FixTemplate{
 		{
@@ -279,15 +272,15 @@ func (se *SuggestionEngine) initializeFixTemplates() {
 	}
 }
 
-// RecoverFromError attempts to recover from a parsing error using the configured strategy
+// RecoverFromError attempts to recover from a parsing error using the configured strategy.
 func (se *SuggestionEngine) RecoverFromError(p *Parser, err *ParseError) []Suggestion {
-	// Update context tracking
+	// Update context tracking.
 	se.updateContext(p)
 
-	// Generate suggestions based on error type and context
+	// Generate suggestions based on error type and context.
 	suggestions := se.generateSuggestions(p, err)
 
-	// Perform error recovery based on mode
+	// Perform error recovery based on mode.
 	switch se.mode {
 	case PanicMode:
 		se.performPanicRecovery(p, err)
@@ -297,38 +290,43 @@ func (se *SuggestionEngine) RecoverFromError(p *Parser, err *ParseError) []Sugge
 		se.performGlobalRecovery(p, err)
 	}
 
-	// Rank and filter suggestions (do this before filtering to get proper order)
+	// Rank and filter suggestions (do this before filtering to get proper order).
 	suggestions = se.rankSuggestions(suggestions)
+
 	return se.filterSuggestions(suggestions)
 }
 
-// AddExpectedToken adds a token type to the expected tokens for suggestions
+// AddExpectedToken adds a token type to the expected tokens for suggestions.
 func (se *SuggestionEngine) AddExpectedToken(tokenType lexer.TokenType) {
-	// Add to expected tokens if not already present
+	// Add to expected tokens if not already present.
 	found := false
+
 	for _, expected := range se.expectedTokens {
 		if expected == tokenType {
 			found = true
+
 			break
 		}
 	}
+
 	if !found {
 		se.expectedTokens = append(se.expectedTokens, tokenType)
 	}
 }
 
-// updateContext tracks the current parsing context for intelligent suggestions
+// updateContext tracks the current parsing context for intelligent suggestions.
 func (se *SuggestionEngine) updateContext(p *Parser) {
-	// Track recent tokens for pattern matching
+	// Track recent tokens for pattern matching.
 	if len(se.recentTokens) >= 10 {
 		se.recentTokens = se.recentTokens[1:]
 	}
+
 	se.recentTokens = append(se.recentTokens, p.current)
 
-	// Update token frequency statistics
+	// Update token frequency statistics.
 	se.tokenFrequency[p.current.Type]++
 
-	// Update token pair frequency
+	// Update token pair frequency.
 	if len(se.recentTokens) >= 2 {
 		pair := TokenPair{
 			First:  se.recentTokens[len(se.recentTokens)-2].Type,
@@ -337,15 +335,15 @@ func (se *SuggestionEngine) updateContext(p *Parser) {
 		se.pairFrequency[pair]++
 	}
 
-	// Determine expected tokens based on current context
+	// Determine expected tokens based on current context.
 	se.updateExpectedTokens(p)
 }
 
-// updateExpectedTokens determines what tokens would be valid in current context
+// updateExpectedTokens determines what tokens would be valid in current context.
 func (se *SuggestionEngine) updateExpectedTokens(p *Parser) {
 	se.expectedTokens = se.expectedTokens[:0] // Clear slice
 
-	// Based on recent tokens, predict what should come next
+	// Based on recent tokens, predict what should come next.
 	if len(se.recentTokens) > 0 {
 		current := se.recentTokens[len(se.recentTokens)-1]
 
@@ -370,11 +368,11 @@ func (se *SuggestionEngine) updateExpectedTokens(p *Parser) {
 	}
 }
 
-// generateSuggestions creates intelligent suggestions based on error context
+// generateSuggestions creates intelligent suggestions based on error context.
 func (se *SuggestionEngine) generateSuggestions(p *Parser, err *ParseError) []Suggestion {
 	var suggestions []Suggestion
 
-	// Check for pattern matches with known error types
+	// Check for pattern matches with known error types.
 	for _, pattern := range se.errorPatterns {
 		if se.matchesPattern(pattern, se.recentTokens) {
 			for _, fix := range pattern.Fixes {
@@ -392,7 +390,7 @@ func (se *SuggestionEngine) generateSuggestions(p *Parser, err *ParseError) []Su
 		}
 	}
 
-	// Generate completion suggestions based on expected tokens
+	// Generate completion suggestions based on expected tokens.
 	for _, expected := range se.expectedTokens {
 		if se.isCompletionCandidate(expected, p.current.Type) {
 			suggestion := Suggestion{
@@ -407,7 +405,7 @@ func (se *SuggestionEngine) generateSuggestions(p *Parser, err *ParseError) []Su
 		}
 	}
 
-	// If no specific expected tokens, generate common completion suggestions
+	// If no specific expected tokens, generate common completion suggestions.
 	if len(se.expectedTokens) == 0 {
 		commonTokens := []lexer.TokenType{
 			lexer.TokenIdentifier, lexer.TokenLet, lexer.TokenVar, lexer.TokenFunc,
@@ -428,24 +426,24 @@ func (se *SuggestionEngine) generateSuggestions(p *Parser, err *ParseError) []Su
 		}
 	}
 
-	// Generate typo corrections for identifiers
+	// Generate typo corrections for identifiers.
 	if p.current.Type == lexer.TokenIdentifier {
 		suggestions = append(suggestions, se.generateTypoCorrections(p.current.Literal)...)
 	}
 
-	// Generate scope-based suggestions
+	// Generate scope-based suggestions.
 	suggestions = append(suggestions, se.generateScopeBasedSuggestions(p)...)
 
 	return suggestions
 }
 
-// matchesPattern checks if recent tokens match a known error pattern
+// matchesPattern checks if recent tokens match a known error pattern.
 func (se *SuggestionEngine) matchesPattern(pattern ErrorPattern, tokens []lexer.Token) bool {
 	if len(tokens) < len(pattern.Pattern) {
 		return false
 	}
 
-	// Check if the last N tokens match the pattern
+	// Check if the last N tokens match the pattern.
 	start := len(tokens) - len(pattern.Pattern)
 	for i, expectedType := range pattern.Pattern {
 		if tokens[start+i].Type != expectedType {
@@ -456,23 +454,24 @@ func (se *SuggestionEngine) matchesPattern(pattern ErrorPattern, tokens []lexer.
 	return true
 }
 
-// generateReplacement creates the replacement text for a fix template
+// generateReplacement creates the replacement text for a fix template.
 func (se *SuggestionEngine) generateReplacement(fix FixTemplate) string {
 	var parts []string
 	for _, tokenType := range fix.Replacement {
 		parts = append(parts, tokenTypeToString(tokenType))
 	}
+
 	return strings.Join(parts, " ")
 }
 
-// isCompletionCandidate determines if a token type is a valid completion option
+// isCompletionCandidate determines if a token type is a valid completion option.
 func (se *SuggestionEngine) isCompletionCandidate(expected, current lexer.TokenType) bool {
-	// Don't suggest if we already have the expected token
+	// Don't suggest if we already have the expected token.
 	if expected == current {
 		return false
 	}
 
-	// Don't suggest whitespace or comments
+	// Don't suggest whitespace or comments.
 	if expected == lexer.TokenWhitespace || expected == lexer.TokenComment {
 		return false
 	}
@@ -480,11 +479,11 @@ func (se *SuggestionEngine) isCompletionCandidate(expected, current lexer.TokenT
 	return true
 }
 
-// generateTypoCorrections suggests corrections for potentially misspelled identifiers
+// generateTypoCorrections suggests corrections for potentially misspelled identifiers.
 func (se *SuggestionEngine) generateTypoCorrections(input string) []Suggestion {
 	var suggestions []Suggestion
 
-	// Common keyword typos
+	// Common keyword typos.
 	keywordCorrections := map[string]string{
 		"function": "func",
 		"var":      "let",
@@ -504,7 +503,7 @@ func (se *SuggestionEngine) generateTypoCorrections(input string) []Suggestion {
 		"while":    "while",
 	}
 
-	// Check for exact matches first
+	// Check for exact matches first.
 	if correction, exists := keywordCorrections[input]; exists {
 		suggestion := Suggestion{
 			Type:        ErrorFix,
@@ -517,7 +516,7 @@ func (se *SuggestionEngine) generateTypoCorrections(input string) []Suggestion {
 		suggestions = append(suggestions, suggestion)
 	}
 
-	// Check for fuzzy matches using edit distance
+	// Check for fuzzy matches using edit distance.
 	for typo, correction := range keywordCorrections {
 		distance := editDistance(input, typo)
 		if distance <= 2 && distance > 0 { // Allow up to 2 character differences
@@ -539,13 +538,13 @@ func (se *SuggestionEngine) generateTypoCorrections(input string) []Suggestion {
 	return suggestions
 }
 
-// generateScopeBasedSuggestions creates suggestions based on current scope context
+// generateScopeBasedSuggestions creates suggestions based on current scope context.
 func (se *SuggestionEngine) generateScopeBasedSuggestions(p *Parser) []Suggestion {
 	var suggestions []Suggestion
 
-	// If we have a current scope context
+	// If we have a current scope context.
 	if se.currentScope != nil {
-		// Suggest available identifiers in scope
+		// Suggest available identifiers in scope.
 		for name, info := range se.currentScope.Identifiers {
 			if info.Confidence > 0.5 {
 				suggestion := Suggestion{
@@ -564,9 +563,9 @@ func (se *SuggestionEngine) generateScopeBasedSuggestions(p *Parser) []Suggestio
 	return suggestions
 }
 
-// performPanicRecovery implements panic-mode error recovery
+// performPanicRecovery implements panic-mode error recovery.
 func (se *SuggestionEngine) performPanicRecovery(p *Parser, err *ParseError) {
-	// Define synchronization tokens where parsing can safely resume
+	// Define synchronization tokens where parsing can safely resume.
 	syncTokens := []lexer.TokenType{
 		lexer.TokenSemicolon,
 		lexer.TokenNewline,
@@ -581,23 +580,24 @@ func (se *SuggestionEngine) performPanicRecovery(p *Parser, err *ParseError) {
 		lexer.TokenReturn,
 	}
 
-	// Skip tokens until we find a synchronization point
+	// Skip tokens until we find a synchronization point.
 	for p.current.Type != lexer.TokenEOF {
 		for _, syncToken := range syncTokens {
 			if p.current.Type == syncToken {
 				return // Found synchronization point
 			}
 		}
+
 		p.nextToken()
 	}
 }
 
-// performPhraseRecovery implements phrase-level error recovery
+// performPhraseRecovery implements phrase-level error recovery.
 func (se *SuggestionEngine) performPhraseRecovery(p *Parser, err *ParseError) {
-	// Try to complete the current phrase intelligently
+	// Try to complete the current phrase intelligently.
 	switch p.current.Type {
 	case lexer.TokenIdentifier:
-		// If we're at a top-level declaration head like 'func <ident>' or 'let <ident>',
+		// If we're at a top-level declaration head like 'func <ident>' or 'let <ident>',.
 		// avoid aggressive scanning that can skip over valid declarations.
 		if len(se.recentTokens) >= 2 {
 			prev := se.recentTokens[len(se.recentTokens)-2]
@@ -605,9 +605,9 @@ func (se *SuggestionEngine) performPhraseRecovery(p *Parser, err *ParseError) {
 				break // fall through to panic recovery below
 			}
 		}
-		// If we have an identifier, try to complete a declaration or expression
+		// If we have an identifier, try to complete a declaration or expression.
 		if len(se.expectedTokens) > 0 {
-			// Skip to the most likely next valid token
+			// Skip to the most likely next valid token.
 			for _, expected := range se.expectedTokens {
 				if se.advanceToToken(p, expected) {
 					return
@@ -615,32 +615,31 @@ func (se *SuggestionEngine) performPhraseRecovery(p *Parser, err *ParseError) {
 			}
 		}
 	case lexer.TokenLParen:
-		// If we have an unclosed parenthesis, try to balance it
+		// If we have an unclosed parenthesis, try to balance it.
 		se.balanceDelimiters(p, lexer.TokenLParen, lexer.TokenRParen)
 	case lexer.TokenLBrace:
-		// If we have an unclosed brace, try to balance it
+		// If we have an unclosed brace, try to balance it.
 		se.balanceDelimiters(p, lexer.TokenLBrace, lexer.TokenRBrace)
 	}
 
-	// Fall back to panic recovery if phrase recovery fails
+	// Fall back to panic recovery if phrase recovery fails.
 	se.performPanicRecovery(p, err)
 }
 
-// performGlobalRecovery implements comprehensive error analysis and recovery
+// performGlobalRecovery implements comprehensive error analysis and recovery.
 func (se *SuggestionEngine) performGlobalRecovery(p *Parser, err *ParseError) {
-	// Analyze the entire error context and make intelligent decisions
-
-	// First, try phrase-level recovery
+	// Analyze the entire error context and make intelligent decisions.
+	// First, try phrase-level recovery.
 	se.performPhraseRecovery(p, err)
 
-	// If that doesn't work, update our understanding and try again
+	// If that doesn't work, update our understanding and try again.
 	se.updateErrorPatterns(err)
 
-	// Finally, fall back to panic recovery
+	// Finally, fall back to panic recovery.
 	se.performPanicRecovery(p, err)
 }
 
-// advanceToToken safely advances parser to a specific token type
+// advanceToToken safely advances parser to a specific token type.
 func (se *SuggestionEngine) advanceToToken(p *Parser, target lexer.TokenType) bool {
 	maxAdvance := 10 // Limit how far we look ahead
 
@@ -648,18 +647,20 @@ func (se *SuggestionEngine) advanceToToken(p *Parser, target lexer.TokenType) bo
 		if p.current.Type == target {
 			return true
 		}
+
 		p.nextToken()
 	}
 
 	return false
 }
 
-// balanceDelimiters attempts to balance unmatched delimiters
+// balanceDelimiters attempts to balance unmatched delimiters.
 func (se *SuggestionEngine) balanceDelimiters(p *Parser, open, close lexer.TokenType) {
 	depth := 1 // We've seen one opening delimiter
 
 	for p.current.Type != lexer.TokenEOF && depth > 0 {
 		p.nextToken()
+
 		if p.current.Type == open {
 			depth++
 		} else if p.current.Type == close {
@@ -668,50 +669,52 @@ func (se *SuggestionEngine) balanceDelimiters(p *Parser, open, close lexer.Token
 	}
 }
 
-// updateErrorPatterns learns from new errors to improve future suggestions
+// updateErrorPatterns learns from new errors to improve future suggestions.
 func (se *SuggestionEngine) updateErrorPatterns(err *ParseError) {
-	// This would implement machine learning to improve error recognition
-	// For now, we just log the error pattern for future analysis
-	// In a production system, this could update confidence scores
-	// or add new patterns based on recurring errors
+	// This would implement machine learning to improve error recognition.
+	// For now, we just log the error pattern for future analysis.
+	// In a production system, this could update confidence scores.
+	// or add new patterns based on recurring errors.
 }
 
-// rankSuggestions sorts suggestions by confidence and relevance
+// rankSuggestions sorts suggestions by confidence and relevance.
 func (se *SuggestionEngine) rankSuggestions(suggestions []Suggestion) []Suggestion {
 	sort.Slice(suggestions, func(i, j int) bool {
-		// Primary sort by confidence (descending)
+		// Primary sort by confidence (descending).
 		if suggestions[i].Confidence != suggestions[j].Confidence {
 			return suggestions[i].Confidence > suggestions[j].Confidence
 		}
 
-		// Secondary sort by suggestion type (fixes first, then completions)
+		// Secondary sort by suggestion type (fixes first, then completions).
 		return suggestions[i].Type < suggestions[j].Type
 	})
 
 	return suggestions
 }
 
-// filterSuggestions removes low-quality and duplicate suggestions
+// filterSuggestions removes low-quality and duplicate suggestions.
 func (se *SuggestionEngine) filterSuggestions(suggestions []Suggestion) []Suggestion {
 	var filtered []Suggestion
+
 	seen := make(map[string]bool)
 
 	for _, suggestion := range suggestions {
-		// Skip low-confidence suggestions
+		// Skip low-confidence suggestions.
 		if suggestion.Confidence < se.confidence {
 			continue
 		}
 
-		// Skip duplicates
+		// Skip duplicates.
 		key := suggestion.Message + suggestion.Replacement
 		if seen[key] {
 			continue
 		}
+
 		seen[key] = true
 
 		filtered = append(filtered, suggestion)
 
-		// Limit number of suggestions
+		// Limit number of suggestions.
 		if len(filtered) >= se.maxSuggestions {
 			break
 		}
@@ -720,28 +723,30 @@ func (se *SuggestionEngine) filterSuggestions(suggestions []Suggestion) []Sugges
 	return filtered
 }
 
-// Helper functions
+// Helper functions.
 
-// editDistance calculates the Levenshtein distance between two strings
+// editDistance calculates the Levenshtein distance between two strings.
 func editDistance(a, b string) int {
 	if len(a) == 0 {
 		return len(b)
 	}
+
 	if len(b) == 0 {
 		return len(a)
 	}
 
-	// Create matrix
+	// Create matrix.
 	matrix := make([][]int, len(a)+1)
 	for i := range matrix {
 		matrix[i] = make([]int, len(b)+1)
 		matrix[i][0] = i
 	}
+
 	for j := range matrix[0] {
 		matrix[0][j] = j
 	}
 
-	// Fill matrix
+	// Fill matrix.
 	for i := 1; i <= len(a); i++ {
 		for j := 1; j <= len(b); j++ {
 			cost := 0
@@ -760,18 +765,20 @@ func editDistance(a, b string) int {
 	return matrix[len(a)][len(b)]
 }
 
-// min returns the minimum of three integers
+// min returns the minimum of three integers.
 func min(a, b, c int) int {
 	if a <= b && a <= c {
 		return a
 	}
+
 	if b <= c {
 		return b
 	}
+
 	return c
 }
 
-// tokenTypeToString converts token type to readable string
+// tokenTypeToString converts token type to readable string.
 func tokenTypeToString(tokenType lexer.TokenType) string {
 	switch tokenType {
 	case lexer.TokenFunc:
@@ -817,7 +824,7 @@ func tokenTypeToString(tokenType lexer.TokenType) string {
 	}
 }
 
-// identifierKindToString converts identifier kind to readable string
+// identifierKindToString converts identifier kind to readable string.
 func identifierKindToString(kind IdentifierKind) string {
 	switch kind {
 	case VariableIdent:

@@ -1,7 +1,7 @@
-// Borrow checking system for Orizon MIR
-// This file implements the borrow checker that ensures memory safety
+// Borrow checking system for Orizon MIR.
+// This file implements the borrow checker that ensures memory safety.
 // by tracking borrows, validating borrow rules, and preventing data races.
-// It provides:
+// It provides:.
 // 1. Borrow tracking and validation
 // 2. Mutable and immutable borrow rules enforcement
 // 3. Lifetime-based access checking
@@ -14,9 +14,9 @@ import (
 	"strings"
 )
 
-// ====== Borrow Core Types ======
+// ====== Borrow Core Types ======.
 
-// BorrowKind represents the type of borrow
+// BorrowKind represents the type of borrow.
 type BorrowKind int
 
 const (
@@ -38,37 +38,37 @@ func (bk BorrowKind) String() string {
 	}
 }
 
-// Borrow represents a borrow operation in MIR
+// Borrow represents a borrow operation in MIR.
 type Borrow struct {
-	ID          BorrowID      // Unique identifier for this borrow
-	Kind        BorrowKind    // Type of borrow
-	Borrowed    Value         // The value being borrowed
-	Borrower    Value         // The reference value created
-	Lifetime    LifetimeID    // Lifetime of the borrow
-	Region      *BorrowRegion // Region where borrow is active
-	Origin      BorrowOrigin  // Where the borrow originated
+	Region      *BorrowRegion
+	Origin      BorrowOrigin
+	ID          BorrowID
+	Lifetime    LifetimeID
+	Borrowed    Value
+	Borrower    Value
 	Constraints []*BorrowConstraint
+	Kind        BorrowKind
 }
 
-// BorrowID represents a unique borrow identifier
+// BorrowID represents a unique borrow identifier.
 type BorrowID string
 
-// BorrowOrigin tracks where a borrow comes from
+// BorrowOrigin tracks where a borrow comes from.
 type BorrowOrigin struct {
 	Function string
 	Block    string
+	Source   string
 	Stmt     int
-	Source   string // Human-readable source location
 }
 
-// BorrowRegion represents the region where a borrow is active
+// BorrowRegion represents the region where a borrow is active.
 type BorrowRegion struct {
 	Start BorrowPoint // Where borrow becomes active
 	End   BorrowPoint // Where borrow expires
 	Kind  RegionKind  // Type of region
 }
 
-// BorrowPoint represents a specific point in the control flow
+// BorrowPoint represents a specific point in the control flow.
 type BorrowPoint struct {
 	Function string
 	Block    string
@@ -79,7 +79,7 @@ func (bp BorrowPoint) String() string {
 	return fmt.Sprintf("%s::%s[%d]", bp.Function, bp.Block, bp.Stmt)
 }
 
-// RegionKind classifies different types of borrow regions
+// RegionKind classifies different types of borrow regions.
 type RegionKind int
 
 const (
@@ -89,17 +89,17 @@ const (
 	RegionTemp                     // Temporary expression region
 )
 
-// ====== Borrow Constraints ======
+// ====== Borrow Constraints ======.
 
-// BorrowConstraint represents a constraint on borrows
+// BorrowConstraint represents a constraint on borrows.
 type BorrowConstraint struct {
-	Kind   BorrowConstraintKind
 	Borrow BorrowID
-	Target Value
 	Reason string
+	Target Value
+	Kind   BorrowConstraintKind
 }
 
-// BorrowConstraintKind represents different types of borrow constraints
+// BorrowConstraintKind represents different types of borrow constraints.
 type BorrowConstraintKind int
 
 const (
@@ -124,18 +124,18 @@ func (bck BorrowConstraintKind) String() string {
 	}
 }
 
-// ====== Borrow Checker ======
+// ====== Borrow Checker ======.
 
-// BorrowChecker performs borrow checking for MIR
+// BorrowChecker performs borrow checking for MIR.
 type BorrowChecker struct {
 	lifetimeManager *LifetimeManager
 	borrows         map[BorrowID]*Borrow
-	activeBarrows   map[Value][]*Borrow // Value -> active borrows
-	borrowCounter   int
+	activeBarrows   map[Value][]*Borrow
 	errors          []error
+	borrowCounter   int
 }
 
-// NewBorrowChecker creates a new borrow checker
+// NewBorrowChecker creates a new borrow checker.
 func NewBorrowChecker(lm *LifetimeManager) *BorrowChecker {
 	return &BorrowChecker{
 		lifetimeManager: lm,
@@ -146,15 +146,16 @@ func NewBorrowChecker(lm *LifetimeManager) *BorrowChecker {
 	}
 }
 
-// GenerateBorrowID generates a unique borrow ID
+// GenerateBorrowID generates a unique borrow ID.
 func (bc *BorrowChecker) GenerateBorrowID() BorrowID {
 	bc.borrowCounter++
+
 	return BorrowID(fmt.Sprintf("borrow_%d", bc.borrowCounter))
 }
 
-// ====== Borrow Tracking ======
+// ====== Borrow Tracking ======.
 
-// CreateBorrow creates and tracks a new borrow
+// CreateBorrow creates and tracks a new borrow.
 func (bc *BorrowChecker) CreateBorrow(kind BorrowKind, borrowed, borrower Value, lifetime LifetimeID, origin BorrowOrigin) *Borrow {
 	id := bc.GenerateBorrowID()
 
@@ -170,48 +171,51 @@ func (bc *BorrowChecker) CreateBorrow(kind BorrowKind, borrowed, borrower Value,
 
 	bc.borrows[id] = borrow
 
-	// Track active borrows
+	// Track active borrows.
 	if _, exists := bc.activeBarrows[borrowed]; !exists {
 		bc.activeBarrows[borrowed] = make([]*Borrow, 0)
 	}
+
 	bc.activeBarrows[borrowed] = append(bc.activeBarrows[borrowed], borrow)
 
 	return borrow
 }
 
-// GetBorrow retrieves a borrow by ID
+// GetBorrow retrieves a borrow by ID.
 func (bc *BorrowChecker) GetBorrow(id BorrowID) (*Borrow, bool) {
 	borrow, exists := bc.borrows[id]
+
 	return borrow, exists
 }
 
-// GetActiveBorrows returns all active borrows for a value
+// GetActiveBorrows returns all active borrows for a value.
 func (bc *BorrowChecker) GetActiveBorrows(value Value) []*Borrow {
 	if borrows, exists := bc.activeBarrows[value]; exists {
 		return borrows
 	}
+
 	return make([]*Borrow, 0)
 }
 
-// ====== Borrow Validation ======
+// ====== Borrow Validation ======.
 
-// CheckFunction performs borrow checking for an entire function
+// CheckFunction performs borrow checking for an entire function.
 func (bc *BorrowChecker) CheckFunction(function *Function) error {
 	if function == nil {
 		return fmt.Errorf("cannot check borrows for nil function")
 	}
 
-	// Check each block
+	// Check each block.
 	for _, block := range function.Blocks {
 		if err := bc.checkBlock(block, function.Name); err != nil {
-			return fmt.Errorf("borrow check failed in block %s: %v", block.Name, err)
+			return fmt.Errorf("borrow check failed in block %s: %w", block.Name, err)
 		}
 	}
 
 	return nil
 }
 
-// checkBlock performs borrow checking for a basic block
+// checkBlock performs borrow checking for a basic block.
 func (bc *BorrowChecker) checkBlock(block *BasicBlock, functionName string) error {
 	for i, instr := range block.Instr {
 		point := BorrowPoint{
@@ -224,10 +228,11 @@ func (bc *BorrowChecker) checkBlock(block *BasicBlock, functionName string) erro
 			bc.errors = append(bc.errors, err)
 		}
 	}
+
 	return nil
 }
 
-// checkInstruction performs borrow checking for a single instruction
+// checkInstruction performs borrow checking for a single instruction.
 func (bc *BorrowChecker) checkInstruction(instr Instr, point BorrowPoint) error {
 	switch inst := instr.(type) {
 	case Load:
@@ -239,14 +244,14 @@ func (bc *BorrowChecker) checkInstruction(instr Instr, point BorrowPoint) error 
 	case BinOp:
 		return bc.checkBinOp(inst, point)
 	default:
-		// Other instructions don't directly affect borrows
+		// Other instructions don't directly affect borrows.
 		return nil
 	}
 }
 
-// checkLoad checks borrow rules for load instructions
+// checkLoad checks borrow rules for load instructions.
 func (bc *BorrowChecker) checkLoad(load Load, point BorrowPoint) error {
-	// Check if the loaded value has any active mutable borrows
+	// Check if the loaded value has any active mutable borrows.
 	activeBorrows := bc.GetActiveBorrows(load.Addr)
 
 	for _, borrow := range activeBorrows {
@@ -259,9 +264,9 @@ func (bc *BorrowChecker) checkLoad(load Load, point BorrowPoint) error {
 	return nil
 }
 
-// checkStore checks borrow rules for store instructions
+// checkStore checks borrow rules for store instructions.
 func (bc *BorrowChecker) checkStore(store Store, point BorrowPoint) error {
-	// Check if the stored-to location has any active borrows
+	// Check if the stored-to location has any active borrows.
 	activeBorrows := bc.GetActiveBorrows(store.Addr)
 
 	for _, borrow := range activeBorrows {
@@ -269,6 +274,7 @@ func (bc *BorrowChecker) checkStore(store Store, point BorrowPoint) error {
 			return fmt.Errorf("cannot store to %s: value is immutably borrowed at %s",
 				store.Addr.Ref, point)
 		}
+
 		if borrow.Kind == BorrowMutable {
 			return fmt.Errorf("cannot store to %s: value is already mutably borrowed at %s",
 				store.Addr.Ref, point)
@@ -278,28 +284,29 @@ func (bc *BorrowChecker) checkStore(store Store, point BorrowPoint) error {
 	return nil
 }
 
-// checkCall checks borrow rules for function calls
+// checkCall checks borrow rules for function calls.
 func (bc *BorrowChecker) checkCall(call Call, point BorrowPoint) error {
-	// Check each argument for borrow conflicts
+	// Check each argument for borrow conflicts.
 	for i, arg := range call.Args {
 		if err := bc.checkCallArgument(arg, i, point); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-// checkCallArgument checks borrow rules for a function call argument
+// checkCallArgument checks borrow rules for a function call argument.
 func (bc *BorrowChecker) checkCallArgument(arg Value, argIndex int, point BorrowPoint) error {
-	// If the argument is a borrowed value, check for conflicts
+	// If the argument is a borrowed value, check for conflicts.
 	activeBorrows := bc.GetActiveBorrows(arg)
 
-	// For now, assume all function arguments can potentially be borrowed
-	// More sophisticated analysis would check function signatures
+	// For now, assume all function arguments can potentially be borrowed.
+	// More sophisticated analysis would check function signatures.
 	for _, borrow := range activeBorrows {
 		if borrow.Kind == BorrowMutable {
-			// Mutable borrows generally cannot be passed to functions
-			// unless the function signature explicitly allows it
+			// Mutable borrows generally cannot be passed to functions.
+			// unless the function signature explicitly allows it.
 			return fmt.Errorf("cannot pass mutably borrowed value %s to function at %s",
 				arg.Ref, point)
 		}
@@ -308,26 +315,28 @@ func (bc *BorrowChecker) checkCallArgument(arg Value, argIndex int, point Borrow
 	return nil
 }
 
-// checkBinOp checks borrow rules for binary operations
+// checkBinOp checks borrow rules for binary operations.
 func (bc *BorrowChecker) checkBinOp(binop BinOp, point BorrowPoint) error {
-	// Check both operands for borrow conflicts
+	// Check both operands for borrow conflicts.
 	if err := bc.checkValueUsage(binop.LHS, point); err != nil {
 		return err
 	}
+
 	if err := bc.checkValueUsage(binop.RHS, point); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// checkValueUsage checks if a value can be used at a given point
+// checkValueUsage checks if a value can be used at a given point.
 func (bc *BorrowChecker) checkValueUsage(value Value, point BorrowPoint) error {
 	activeBorrows := bc.GetActiveBorrows(value)
 
 	for _, borrow := range activeBorrows {
-		// Check if the borrow is still active at this point
+		// Check if the borrow is still active at this point.
 		if bc.isBorrowActiveAt(borrow, point) {
-			// Value is borrowed, check if this usage is allowed
+			// Value is borrowed, check if this usage is allowed.
 			if borrow.Kind == BorrowMutable {
 				return fmt.Errorf("cannot use value %s: mutably borrowed at %s", value.Ref, point)
 			}
@@ -337,25 +346,26 @@ func (bc *BorrowChecker) checkValueUsage(value Value, point BorrowPoint) error {
 	return nil
 }
 
-// isBorrowActiveAt checks if a borrow is active at a given point
+// isBorrowActiveAt checks if a borrow is active at a given point.
 func (bc *BorrowChecker) isBorrowActiveAt(borrow *Borrow, point BorrowPoint) bool {
 	if borrow.Region == nil {
-		// If no region specified, assume it's active
+		// If no region specified, assume it's active.
 		return true
 	}
 
-	// Check if point is within the borrow region
-	// This is a simplified check - real implementation would need
-	// more sophisticated control flow analysis
+	// Check if point is within the borrow region.
+	// This is a simplified check - real implementation would need.
+	// more sophisticated control flow analysis.
 	return bc.isPointInRegion(point, borrow.Region)
 }
 
-// isPointInRegion checks if a point is within a borrow region
+// isPointInRegion checks if a point is within a borrow region.
 func (bc *BorrowChecker) isPointInRegion(point BorrowPoint, region *BorrowRegion) bool {
-	// Simplified check: same function and block, statement in range
+	// Simplified check: same function and block, statement in range.
 	if point.Function != region.Start.Function {
 		return false
 	}
+
 	if point.Block != region.Start.Block {
 		return false
 	}
@@ -363,18 +373,18 @@ func (bc *BorrowChecker) isPointInRegion(point BorrowPoint, region *BorrowRegion
 	return point.Stmt >= region.Start.Stmt && point.Stmt <= region.End.Stmt
 }
 
-// ====== Borrow Rules Enforcement ======
+// ====== Borrow Rules Enforcement ======.
 
-// ValidateBorrowRules validates all borrow rules for a module
+// ValidateBorrowRules validates all borrow rules for a module.
 func (bc *BorrowChecker) ValidateBorrowRules(module *Module) error {
 	if module == nil {
 		return fmt.Errorf("cannot validate borrow rules for nil module")
 	}
 
-	// Check each function
+	// Check each function.
 	for _, function := range module.Functions {
 		if err := bc.CheckFunction(function); err != nil {
-			return fmt.Errorf("borrow validation failed for function %s: %v", function.Name, err)
+			return fmt.Errorf("borrow validation failed for function %s: %w", function.Name, err)
 		}
 	}
 
@@ -385,7 +395,7 @@ func (bc *BorrowChecker) ValidateBorrowRules(module *Module) error {
 	return nil
 }
 
-// CheckBorrowRules checks the core borrow checker rules
+// CheckBorrowRules checks the core borrow checker rules.
 func (bc *BorrowChecker) CheckBorrowRules() error {
 	for _, borrow := range bc.borrows {
 		if err := bc.validateBorrow(borrow); err != nil {
@@ -400,15 +410,15 @@ func (bc *BorrowChecker) CheckBorrowRules() error {
 	return nil
 }
 
-// validateBorrow validates a single borrow against all rules
+// validateBorrow validates a single borrow against all rules.
 func (bc *BorrowChecker) validateBorrow(borrow *Borrow) error {
-	// Rule 1: At any given time, you can have either one mutable reference
-	// or any number of immutable references
+	// Rule 1: At any given time, you can have either one mutable reference.
+	// or any number of immutable references.
 	if err := bc.checkExclusiveMutableBorrow(borrow); err != nil {
 		return err
 	}
 
-	// Rule 2: References must always be valid (lifetime checking)
+	// Rule 2: References must always be valid (lifetime checking).
 	if err := bc.checkBorrowLifetime(borrow); err != nil {
 		return err
 	}
@@ -416,7 +426,7 @@ func (bc *BorrowChecker) validateBorrow(borrow *Borrow) error {
 	return nil
 }
 
-// checkExclusiveMutableBorrow ensures mutable borrows are exclusive
+// checkExclusiveMutableBorrow ensures mutable borrows are exclusive.
 func (bc *BorrowChecker) checkExclusiveMutableBorrow(borrow *Borrow) error {
 	if borrow.Kind != BorrowMutable {
 		return nil // Only applies to mutable borrows
@@ -426,7 +436,7 @@ func (bc *BorrowChecker) checkExclusiveMutableBorrow(borrow *Borrow) error {
 
 	for _, other := range activeBorrows {
 		if other.ID != borrow.ID {
-			// Another borrow exists for the same value
+			// Another borrow exists for the same value.
 			return fmt.Errorf("mutable borrow %s conflicts with existing borrow %s",
 				borrow.ID, other.ID)
 		}
@@ -435,9 +445,9 @@ func (bc *BorrowChecker) checkExclusiveMutableBorrow(borrow *Borrow) error {
 	return nil
 }
 
-// checkBorrowLifetime ensures borrow lifetime is valid
+// checkBorrowLifetime ensures borrow lifetime is valid.
 func (bc *BorrowChecker) checkBorrowLifetime(borrow *Borrow) error {
-	// Check with lifetime manager
+	// Check with lifetime manager.
 	if bc.lifetimeManager != nil {
 		lifetime, exists := bc.lifetimeManager.GetLifetime(borrow.Lifetime)
 		if !exists {
@@ -445,7 +455,7 @@ func (bc *BorrowChecker) checkBorrowLifetime(borrow *Borrow) error {
 				borrow.ID, borrow.Lifetime)
 		}
 
-		// Ensure lifetime is valid for the borrow's usage
+		// Ensure lifetime is valid for the borrow's usage.
 		if lifetime.Kind == LifetimeTemp && borrow.Kind == BorrowMutable {
 			return fmt.Errorf("mutable borrow %s cannot use temporary lifetime %s",
 				borrow.ID, borrow.Lifetime)
@@ -455,70 +465,77 @@ func (bc *BorrowChecker) checkBorrowLifetime(borrow *Borrow) error {
 	return nil
 }
 
-// ====== Error Management ======
+// ====== Error Management ======.
 
-// GetErrors returns all accumulated errors
+// GetErrors returns all accumulated errors.
 func (bc *BorrowChecker) GetErrors() []error {
 	return bc.errors
 }
 
-// ClearErrors clears all accumulated errors
+// ClearErrors clears all accumulated errors.
 func (bc *BorrowChecker) ClearErrors() {
 	bc.errors = make([]error, 0)
 }
 
-// ====== Debug and Reporting ======
+// ====== Debug and Reporting ======.
 
-// String returns a string representation of the borrow checker
+// String returns a string representation of the borrow checker.
 func (bc *BorrowChecker) String() string {
 	var b strings.Builder
+
 	b.WriteString("BorrowChecker {\n")
 
 	b.WriteString("  Borrows:\n")
+
 	for id, borrow := range bc.borrows {
 		b.WriteString(fmt.Sprintf("    %s: %s %s -> %s (lifetime: %s)\n",
 			id, borrow.Kind, borrow.Borrowed.Ref, borrow.Borrower.Ref, borrow.Lifetime))
 	}
 
 	b.WriteString("  Active Borrows:\n")
+
 	for value, borrows := range bc.activeBarrows {
 		b.WriteString(fmt.Sprintf("    %s: [", value.Ref))
+
 		for i, borrow := range borrows {
 			if i > 0 {
 				b.WriteString(", ")
 			}
+
 			b.WriteString(string(borrow.ID))
 		}
+
 		b.WriteString("]\n")
 	}
 
 	b.WriteString("}\n")
+
 	return b.String()
 }
 
-// ====== Integration with HIR-to-MIR Transformer ======
+// ====== Integration with HIR-to-MIR Transformer ======.
 
-// AnalyzeBorrows performs borrow analysis during HIR-to-MIR transformation
+// AnalyzeBorrows performs borrow analysis during HIR-to-MIR transformation.
 func (bc *BorrowChecker) AnalyzeBorrows(instr Instr, point BorrowPoint) error {
-	// Automatically detect and track borrows during transformation
+	// Automatically detect and track borrows during transformation.
 	switch inst := instr.(type) {
 	case Load:
-		// Load operations might create implicit borrows
+		// Load operations might create implicit borrows.
 		return bc.analyzeBorrowFromLoad(inst, point)
 	case Store:
-		// Store operations affect borrow validity
+		// Store operations affect borrow validity.
 		return bc.analyzeBorrowFromStore(inst, point)
 	case Call:
-		// Function calls might create or invalidate borrows
+		// Function calls might create or invalidate borrows.
 		return bc.analyzeBorrowFromCall(inst, point)
 	default:
 		return nil
 	}
 }
 
-// analyzeBorrowFromLoad analyzes borrows created by load operations
+// analyzeBorrowFromLoad analyzes borrows created by load operations.
 func (bc *BorrowChecker) analyzeBorrowFromLoad(load Load, point BorrowPoint) error {
-	// Create an implicit immutable borrow for the loaded value
+	// Create an implicit immutable borrow for the loaded value.
 	origin := BorrowOrigin{
 		Function: point.Function,
 		Block:    point.Block,
@@ -526,7 +543,7 @@ func (bc *BorrowChecker) analyzeBorrowFromLoad(load Load, point BorrowPoint) err
 		Source:   fmt.Sprintf("load at %s", point),
 	}
 
-	// For now, create a temporary lifetime
+	// For now, create a temporary lifetime.
 	lifetimeID := bc.lifetimeManager.GenerateLifetimeID()
 
 	bc.CreateBorrow(BorrowImmutable, load.Addr, Value{Kind: ValRef, Ref: "temp_ref"}, lifetimeID, origin)
@@ -534,14 +551,14 @@ func (bc *BorrowChecker) analyzeBorrowFromLoad(load Load, point BorrowPoint) err
 	return nil
 }
 
-// analyzeBorrowFromStore analyzes borrows affected by store operations
+// analyzeBorrowFromStore analyzes borrows affected by store operations.
 func (bc *BorrowChecker) analyzeBorrowFromStore(store Store, point BorrowPoint) error {
-	// Store operations might invalidate existing borrows
+	// Store operations might invalidate existing borrows.
 	activeBorrows := bc.GetActiveBorrows(store.Addr)
 
 	for _, borrow := range activeBorrows {
 		if borrow.Kind == BorrowImmutable {
-			// Invalidate immutable borrows when storing
+			// Invalidate immutable borrows when storing.
 			bc.invalidateBorrow(borrow, point)
 		}
 	}
@@ -549,12 +566,12 @@ func (bc *BorrowChecker) analyzeBorrowFromStore(store Store, point BorrowPoint) 
 	return nil
 }
 
-// analyzeBorrowFromCall analyzes borrows created or affected by function calls
+// analyzeBorrowFromCall analyzes borrows created or affected by function calls.
 func (bc *BorrowChecker) analyzeBorrowFromCall(call Call, point BorrowPoint) error {
-	// Function calls might create borrows through their arguments
+	// Function calls might create borrows through their arguments.
 	for i, arg := range call.Args {
 		if arg.Kind == ValRef {
-			// Argument might be borrowed by the function
+			// Argument might be borrowed by the function.
 			origin := BorrowOrigin{
 				Function: point.Function,
 				Block:    point.Block,
@@ -570,16 +587,18 @@ func (bc *BorrowChecker) analyzeBorrowFromCall(call Call, point BorrowPoint) err
 	return nil
 }
 
-// invalidateBorrow marks a borrow as invalid/expired
+// invalidateBorrow marks a borrow as invalid/expired.
 func (bc *BorrowChecker) invalidateBorrow(borrow *Borrow, point BorrowPoint) {
-	// Remove from active borrows
+	// Remove from active borrows.
 	if borrows, exists := bc.activeBarrows[borrow.Borrowed]; exists {
 		filtered := make([]*Borrow, 0)
+
 		for _, b := range borrows {
 			if b.ID != borrow.ID {
 				filtered = append(filtered, b)
 			}
 		}
+
 		bc.activeBarrows[borrow.Borrowed] = filtered
 	}
 }

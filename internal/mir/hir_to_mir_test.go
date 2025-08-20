@@ -9,15 +9,15 @@ import (
 func TestHIRToMIRTransformer_Basic(t *testing.T) {
 	transformer := NewHIRToMIRTransformer()
 
-	// Keep optimizations enabled to test the complete pipeline
+	// Keep optimizations enabled to test the complete pipeline.
 
-	// Create a simple HIR module for testing
+	// Create a simple HIR module for testing.
 	hirModule := &parser.HIRModule{
 		Name:      "test",
 		Functions: make([]*parser.HIRFunction, 0),
 	}
 
-	// Create a simple function that returns 42
+	// Create a simple function that returns 42.
 	hirFunc := &parser.HIRFunction{
 		Name:       "test_func",
 		Parameters: make([]*parser.HIRParameter, 0),
@@ -25,26 +25,27 @@ func TestHIRToMIRTransformer_Basic(t *testing.T) {
 	}
 	hirModule.Functions = append(hirModule.Functions, hirFunc)
 
-	// Transform to MIR
+	// Transform to MIR.
 	mirModule, err := transformer.TransformModule(hirModule)
 
-	// Debug: Print errors if any
+	// Debug: Print errors if any.
 	if len(transformer.GetErrors()) > 0 {
 		t.Logf("Transformation errors: %v", transformer.GetErrors())
 	}
 
 	if err != nil {
 		t.Logf("Transform error: %v", err)
-		// Continue with tests even if there are errors to see what was produced
+		// Continue with tests even if there are errors to see what was produced.
 	}
 
-	// Verify the result
+	// Verify the result.
 	if mirModule == nil {
 		t.Fatal("MIR module is nil")
 	}
 
 	if len(mirModule.Functions) != 1 {
 		t.Errorf("Expected 1 function, got %d", len(mirModule.Functions))
+
 		return
 	}
 
@@ -53,12 +54,12 @@ func TestHIRToMIRTransformer_Basic(t *testing.T) {
 		t.Errorf("Expected function name 'test_func', got '%s'", mirFunc.Name)
 	}
 
-	// Verify basic blocks
+	// Verify basic blocks.
 	if len(mirFunc.Blocks) == 0 {
 		t.Error("Function should have at least one basic block")
 	}
 
-	// Verify entry block exists
+	// Verify entry block exists.
 	entryBlock := mirFunc.Blocks[0]
 	if entryBlock.Name != "entry_0" {
 		t.Errorf("Expected entry block name 'entry_0', got '%s'", entryBlock.Name)
@@ -69,13 +70,13 @@ func TestHIRToMIRTransformer_ConstantPropagation(t *testing.T) {
 	transformer := NewHIRToMIRTransformer()
 	transformer.optimizations.ConstantPropagation = true
 
-	// Create HIR module with constant arithmetic
+	// Create HIR module with constant arithmetic.
 	hirModule := &parser.HIRModule{
 		Name:      "test",
 		Functions: make([]*parser.HIRFunction, 0),
 	}
 
-	// Create function with constant arithmetic (2 + 3)
+	// Create function with constant arithmetic (2 + 3).
 	hirFunc := &parser.HIRFunction{
 		Name:       "const_test",
 		Parameters: make([]*parser.HIRParameter, 0),
@@ -83,18 +84,18 @@ func TestHIRToMIRTransformer_ConstantPropagation(t *testing.T) {
 	}
 	hirModule.Functions = append(hirModule.Functions, hirFunc)
 
-	// Transform to MIR
+	// Transform to MIR.
 	mirModule, err := transformer.TransformModule(hirModule)
 	if err != nil {
 		t.Fatalf("Transformation failed: %v", err)
 	}
 
-	// Verify optimizations were applied
+	// Verify optimizations were applied.
 	if mirModule == nil {
 		t.Fatal("MIR module is nil")
 	}
 
-	// Check that the function exists
+	// Check that the function exists.
 	if len(mirModule.Functions) != 1 {
 		t.Errorf("Expected 1 function, got %d", len(mirModule.Functions))
 	}
@@ -105,13 +106,13 @@ func TestHIRToMIRTransformer_ConstantPropagation(t *testing.T) {
 func TestHIRToMIRTransformer_ControlFlow(t *testing.T) {
 	transformer := NewHIRToMIRTransformer()
 
-	// Create HIR module with if statement
+	// Create HIR module with if statement.
 	hirModule := &parser.HIRModule{
 		Name:      "test",
 		Functions: make([]*parser.HIRFunction, 0),
 	}
 
-	// Create function with if statement
+	// Create function with if statement.
 	hirFunc := &parser.HIRFunction{
 		Name:       "if_test",
 		Parameters: make([]*parser.HIRParameter, 0),
@@ -119,20 +120,20 @@ func TestHIRToMIRTransformer_ControlFlow(t *testing.T) {
 	}
 	hirModule.Functions = append(hirModule.Functions, hirFunc)
 
-	// Transform to MIR
+	// Transform to MIR.
 	mirModule, err := transformer.TransformModule(hirModule)
 	if err != nil {
 		t.Fatalf("Transformation failed: %v", err)
 	}
 
-	// Verify control flow blocks were created
+	// Verify control flow blocks were created.
 	if mirModule == nil {
 		t.Fatal("MIR module is nil")
 	}
 
 	mirFunc := mirModule.Functions[0]
 
-	// Should have multiple blocks for if statement
+	// Should have multiple blocks for if statement.
 	if len(mirFunc.Blocks) < 3 {
 		t.Errorf("Expected at least 3 blocks for if statement, got %d", len(mirFunc.Blocks))
 	}
@@ -140,10 +141,10 @@ func TestHIRToMIRTransformer_ControlFlow(t *testing.T) {
 	t.Logf("Control flow MIR output: %s", mirModule.String())
 }
 
-// Helper functions to create test HIR structures
+// Helper functions to create test HIR structures.
 
 func createTestBody() *parser.HIRBlock {
-	// Create a simple return statement
+	// Create a simple return statement.
 	retStmt := &parser.HIRStatement{
 		Kind: parser.HIRStmtReturn,
 		Data: &parser.HIRReturnStatement{
@@ -157,7 +158,7 @@ func createTestBody() *parser.HIRBlock {
 }
 
 func createConstantArithmeticBody() *parser.HIRBlock {
-	// Create 2 + 3 expression
+	// Create 2 + 3 expression.
 	binaryExpr := &parser.HIRExpression{
 		Kind: parser.HIRExprBinary,
 		Data: &parser.HIRBinaryExpression{
@@ -180,7 +181,7 @@ func createConstantArithmeticBody() *parser.HIRBlock {
 }
 
 func createIfStatementBody() *parser.HIRBlock {
-	// Create if true { return 1 } else { return 0 }
+	// Create if true { return 1 } else { return 0 }.
 	condition := createBoolLiteral(true)
 
 	thenBlock := &parser.HIRBlock{
@@ -242,13 +243,13 @@ func createBoolLiteral(value bool) *parser.HIRExpression {
 func TestHIRToMIRTransformer_SSAForm(t *testing.T) {
 	transformer := NewHIRToMIRTransformer()
 
-	// Create HIR module with variable declarations and assignments
+	// Create HIR module with variable declarations and assignments.
 	hirModule := &parser.HIRModule{
 		Name:      "test",
 		Functions: make([]*parser.HIRFunction, 0),
 	}
 
-	// Create function with variable operations
+	// Create function with variable operations.
 	hirFunc := &parser.HIRFunction{
 		Name:       "ssa_test",
 		Parameters: make([]*parser.HIRParameter, 0),
@@ -256,21 +257,22 @@ func TestHIRToMIRTransformer_SSAForm(t *testing.T) {
 	}
 	hirModule.Functions = append(hirModule.Functions, hirFunc)
 
-	// Transform to MIR
+	// Transform to MIR.
 	mirModule, err := transformer.TransformModule(hirModule)
 	if err != nil {
 		t.Fatalf("Transformation failed: %v", err)
 	}
 
-	// Verify SSA-like properties
+	// Verify SSA-like properties.
 	if mirModule == nil {
 		t.Fatal("MIR module is nil")
 	}
 
 	mirFunc := mirModule.Functions[0]
 
-	// Count alloca instructions (one per variable)
+	// Count alloca instructions (one per variable).
 	allocaCount := 0
+
 	for _, block := range mirFunc.Blocks {
 		for _, instr := range block.Instr {
 			if _, ok := instr.(Alloca); ok {
@@ -287,9 +289,8 @@ func TestHIRToMIRTransformer_SSAForm(t *testing.T) {
 }
 
 func createSSATestBody() *parser.HIRBlock {
-	// Create: let x = 10; let y = x + 5; return y;
-
-	// let x = 10
+	// Create: let x = 10; let y = x + 5; return y;.
+	// let x = 10.
 	xVar := &parser.HIRVariable{
 		Name: "x",
 	}
@@ -301,7 +302,7 @@ func createSSATestBody() *parser.HIRBlock {
 		},
 	}
 
-	// let y = x + 5
+	// let y = x + 5.
 	xRef := &parser.HIRExpression{
 		Kind: parser.HIRExprVariable,
 		Data: &parser.HIRVariableExpression{
@@ -329,7 +330,7 @@ func createSSATestBody() *parser.HIRBlock {
 		},
 	}
 
-	// return y
+	// return y.
 	yRetRef := &parser.HIRExpression{
 		Kind: parser.HIRExprVariable,
 		Data: &parser.HIRVariableExpression{
@@ -350,7 +351,7 @@ func createSSATestBody() *parser.HIRBlock {
 }
 
 func TestMIROptimizations(t *testing.T) {
-	// Test dead code elimination
+	// Test dead code elimination.
 	t.Run("DeadCodeElimination", func(t *testing.T) {
 		transformer := NewHIRToMIRTransformer()
 		transformer.optimizations.DeadCodeElimination = true
@@ -371,11 +372,11 @@ func TestMIROptimizations(t *testing.T) {
 			t.Fatalf("Transformation failed: %v", err)
 		}
 
-		// Verify that dead code was removed
+		// Verify that dead code was removed.
 		t.Logf("Dead code elimination MIR: %s", mirModule.String())
 	})
 
-	// Test basic block merging
+	// Test basic block merging.
 	t.Run("BasicBlockMerging", func(t *testing.T) {
 		transformer := NewHIRToMIRTransformer()
 		transformer.optimizations.BasicBlockMerging = true
@@ -401,7 +402,7 @@ func TestMIROptimizations(t *testing.T) {
 }
 
 func createDeadCodeBody() *parser.HIRBlock {
-	// Create code with unused variable
+	// Create code with unused variable.
 	unusedVar := &parser.HIRVariable{
 		Name: "unused",
 	}
@@ -428,13 +429,13 @@ func createDeadCodeBody() *parser.HIRBlock {
 func TestHIRToMIRTransformer_WithMemorySafety(t *testing.T) {
 	transformer := NewHIRToMIRTransformer()
 
-	// Create a simple HIR module for testing memory safety
+	// Create a simple HIR module for testing memory safety.
 	hirModule := &parser.HIRModule{
 		Name:      "memory_safety_test",
 		Functions: make([]*parser.HIRFunction, 0),
 	}
 
-	// Create a function that tests various memory safety scenarios
+	// Create a function that tests various memory safety scenarios.
 	hirFunc := &parser.HIRFunction{
 		Name:       "memory_test",
 		Parameters: make([]*parser.HIRParameter, 0),
@@ -442,30 +443,31 @@ func TestHIRToMIRTransformer_WithMemorySafety(t *testing.T) {
 	}
 	hirModule.Functions = append(hirModule.Functions, hirFunc)
 
-	// Transform to MIR with memory safety validation
+	// Transform to MIR with memory safety validation.
 	mirModule, err := transformer.TransformModule(hirModule)
 
-	// Debug: Check transformation errors
+	// Debug: Check transformation errors.
 	if len(transformer.GetErrors()) > 0 {
 		t.Logf("Transformation errors: %v", transformer.GetErrors())
 	}
 
 	if err != nil {
 		t.Logf("Transform error: %v", err)
-		// Continue with tests to see what was produced
+		// Continue with tests to see what was produced.
 	}
 
-	// Verify the result
+	// Verify the result.
 	if mirModule == nil {
 		t.Fatal("MIR module is nil")
 	}
 
 	if len(mirModule.Functions) != 1 {
 		t.Errorf("Expected 1 function, got %d", len(mirModule.Functions))
+
 		return
 	}
 
-	// Check that memory safety systems were engaged
+	// Check that memory safety systems were engaged.
 	lm := transformer.GetLifetimeManager()
 	bc := transformer.GetBorrowChecker()
 	om := transformer.GetOwnershipManager()
@@ -474,9 +476,10 @@ func TestHIRToMIRTransformer_WithMemorySafety(t *testing.T) {
 	t.Logf("Borrow checker: %d borrows", len(bc.borrows))
 	t.Logf("Ownership manager: %d ownerships", len(om.ownerships))
 
-	// Print any errors found
+	// Print any errors found.
 	if len(transformer.GetErrors()) > 0 {
 		t.Logf("Memory safety validation found %d issues:", len(transformer.GetErrors()))
+
 		for i, err := range transformer.GetErrors() {
 			t.Logf("  Issue %d: %v", i+1, err)
 		}
@@ -484,13 +487,13 @@ func TestHIRToMIRTransformer_WithMemorySafety(t *testing.T) {
 		t.Log("Memory safety validation passed")
 	}
 
-	// Print the resulting MIR
+	// Print the resulting MIR.
 	t.Logf("Memory safety MIR output: %s", mirModule.String())
 }
 
-// createMemorySafetyTestBody creates a test body with various memory operations
+// createMemorySafetyTestBody creates a test body with various memory operations.
 func createMemorySafetyTestBody() *parser.HIRBlock {
-	// Create a simple return statement like other tests
+	// Create a simple return statement like other tests.
 	retStmt := &parser.HIRStatement{
 		Kind: parser.HIRStmtReturn,
 		Data: &parser.HIRReturnStatement{
