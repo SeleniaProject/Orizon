@@ -15,10 +15,10 @@ func TestSpanAccuracy(t *testing.T) {
 	lexer := New(source)
 
 	expectedSpans := []struct {
-		literal   string
 		tokenType TokenType
 		startCol  int
 		endCol    int
+		literal   string
 	}{
 		{TokenLet, 1, 4, "let"},       // "let" starts at column 1, ends at 4
 		{TokenIdentifier, 5, 6, "x"},  // "x" starts at column 5, ends at 6

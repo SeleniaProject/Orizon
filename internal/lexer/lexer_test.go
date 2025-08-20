@@ -1,4 +1,4 @@
-package lexer
+﻿package lexer
 
 import "testing"
 
@@ -8,8 +8,8 @@ func TestBasicTokens(t *testing.T) {
 }`
 
 	tests := []struct {
-		expectedValue string
 		expectedType  TokenType
+		expectedValue string
 	}{
 		{TokenFunc, "func"},
 		{TokenIdentifier, "main"},
@@ -48,8 +48,8 @@ func TestKeywords(t *testing.T) {
 	input := `func let var const struct enum trait impl`
 
 	tests := []struct {
-		expectedValue string
 		expectedType  TokenType
+		expectedValue string
 	}{
 		{TokenFunc, "func"},
 		{TokenLet, "let"},

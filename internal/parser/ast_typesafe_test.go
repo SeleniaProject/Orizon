@@ -8,8 +8,8 @@ import (
 func TestTypeNodeKindEnum(t *testing.T) {
 	tests := []struct {
 		name     string
-		expected string
 		nodeKind NodeKind
+		expected string
 	}{
 		{"Program", NodeKindProgram, "Program"},
 		{"FunctionDeclaration", NodeKindFunctionDeclaration, "FunctionDeclaration"},

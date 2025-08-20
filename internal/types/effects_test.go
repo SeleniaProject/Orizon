@@ -1,4 +1,4 @@
-// Package types provides comprehensive tests for the effect type system.
+﻿// Package types provides comprehensive tests for the effect type system.
 // This module tests effect tracking, inference, masking, and composition functionality.
 package types
 
@@ -10,8 +10,8 @@ import (
 func TestEffectKind(t *testing.T) {
 	// Test effect kind string representation.
 	tests := []struct {
-		expected string
 		kind     EffectKind
+		expected string
 	}{
 		{EffectPure, "Pure"},
 		{EffectIO, "IO"},

@@ -345,8 +345,8 @@ func TestEngine_IntegratedWorkflow(t *testing.T) {
 
 func TestAllocationType_String(t *testing.T) {
 	tests := []struct {
-		expected  string
 		allocType AllocType
+		expected  string
 	}{
 		{StackAlloc, "stack"},
 		{RefCountAlloc, "refcount"},

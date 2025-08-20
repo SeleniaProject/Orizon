@@ -48,8 +48,8 @@ func TestModuleValidationBasic(t *testing.T) {
 	// Create a simple module.
 	module := &Module{
 		Path:            ModulePath("test/module"),
-		Version:         Version{1, 0, 0, "", ""},
 		Name:            "testmodule",
+		Version:         Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0},
 		Dependencies:    []ModuleSpec{},
 		DevDependencies: []ModuleSpec{},
 		PublicSymbols:   make(map[string]*ExportedSymbol),
@@ -127,7 +127,7 @@ func TestModuleValidationWithDependencies(t *testing.T) {
 	mainModule := &Module{
 		Path: ModulePath("main/module"),
 		Dependencies: []ModuleSpec{
-			{Path: depModule.Path, Version: Version{1, 0, 0, "", ""}},
+			{Path: depModule.Path, Version: Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}},
 		},
 		LoadStatus: ModuleStatusLoaded,
 		HIRModule: &hir.HIRModule{
@@ -152,7 +152,7 @@ func TestModuleValidationWithDependencies(t *testing.T) {
 	missingDepModule := &Module{
 		Path: ModulePath("missing/module"),
 		Dependencies: []ModuleSpec{
-			{Path: ModulePath("nonexistent/module"), Version: Version{1, 0, 0, "", ""}},
+			{Path: ModulePath("nonexistent/module"), Version: Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}},
 		},
 		LoadStatus: ModuleStatusLoaded,
 		HIRModule: &hir.HIRModule{
@@ -192,7 +192,7 @@ func TestModuleSystemValidation(t *testing.T) {
 		Path:       ModulePath("B"),
 		LoadStatus: ModuleStatusLoaded,
 		Dependencies: []ModuleSpec{
-			{Path: ModulePath("C"), Version: Version{1, 0, 0, "", ""}},
+			{Path: ModulePath("C"), Version: Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}},
 		},
 		PublicSymbols:   make(map[string]*ExportedSymbol),
 		ImportedSymbols: make(map[string]*ImportedSymbol),
@@ -208,7 +208,7 @@ func TestModuleSystemValidation(t *testing.T) {
 		Path:       ModulePath("A"),
 		LoadStatus: ModuleStatusLoaded,
 		Dependencies: []ModuleSpec{
-			{Path: ModulePath("B"), Version: Version{1, 0, 0, "", ""}},
+			{Path: ModulePath("B"), Version: Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}},
 		},
 		PublicSymbols:   make(map[string]*ExportedSymbol),
 		ImportedSymbols: make(map[string]*ImportedSymbol),
@@ -246,7 +246,7 @@ func TestModuleSystemValidationWithCycles(t *testing.T) {
 		Path:       ModulePath("A"),
 		LoadStatus: ModuleStatusLoaded,
 		Dependencies: []ModuleSpec{
-			{Path: ModulePath("B"), Version: Version{1, 0, 0, "", ""}},
+			{Path: ModulePath("B"), Version: Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}},
 		},
 		HIRModule: &hir.HIRModule{
 			ID:       generateNodeID(),
@@ -259,7 +259,7 @@ func TestModuleSystemValidationWithCycles(t *testing.T) {
 		Path:       ModulePath("B"),
 		LoadStatus: ModuleStatusLoaded,
 		Dependencies: []ModuleSpec{
-			{Path: ModulePath("A"), Version: Version{1, 0, 0, "", ""}},
+			{Path: ModulePath("A"), Version: Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}},
 		},
 		HIRModule: &hir.HIRModule{
 			ID:       generateNodeID(),

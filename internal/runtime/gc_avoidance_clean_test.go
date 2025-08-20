@@ -345,8 +345,8 @@ func TestGCAvoidanceEngine_IntegratedWorkflow(t *testing.T) {
 
 func TestAllocationType_String(t *testing.T) {
 	tests := []struct {
-		expected  string
 		allocType CleanAllocType
+		expected  string
 	}{
 		{CleanStackAlloc, "stack"},
 		{CleanRefCountAlloc, "refcount"},

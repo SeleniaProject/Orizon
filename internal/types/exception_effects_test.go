@@ -1,4 +1,4 @@
-// Package types provides comprehensive tests for the exception effect system.
+﻿// Package types provides comprehensive tests for the exception effect system.
 // This module tests exception tracking, try-catch typing, and exception safety.
 package types
 
@@ -10,8 +10,8 @@ import (
 func TestExceptionKind(t *testing.T) {
 	// Test exception kind string representation.
 	tests := []struct {
-		expected string
 		kind     ExceptionKind
+		expected string
 	}{
 		{ExceptionNone, "None"},
 		{ExceptionRuntime, "Runtime"},
@@ -37,8 +37,9 @@ func TestExceptionKind(t *testing.T) {
 func TestExceptionSeverity(t *testing.T) {
 	// Test severity string representation.
 	tests := []struct {
-		expected string
 		severity ExceptionSeverity
+
+		expected string
 	}{
 		{ExceptionSeverityInfo, "Info"},
 		{ExceptionSeverityWarning, "Warning"},
@@ -349,8 +350,8 @@ func TestExceptionAnalyzer(t *testing.T) {
 func TestExceptionRecovery(t *testing.T) {
 	// Test recovery string representation.
 	tests := []struct {
-		expected string
 		recovery ExceptionRecovery
+		expected string
 	}{
 		{RecoveryNone, "None"},
 		{RecoveryRetry, "Retry"},

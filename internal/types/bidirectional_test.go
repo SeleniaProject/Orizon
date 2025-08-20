@@ -365,8 +365,8 @@ func TestTypeAnnotationParsing(t *testing.T) {
 	checker := NewBidirectionalChecker(engine)
 
 	testCases := []struct {
-		expectedType *Type
 		annotation   string
+		expectedType *Type
 	}{
 		{"Int32", TypeInt32},
 		{"Int64", TypeInt64},

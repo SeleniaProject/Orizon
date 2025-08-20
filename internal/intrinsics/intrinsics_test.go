@@ -1,4 +1,4 @@
-package intrinsics
+﻿package intrinsics
 
 import (
 	"testing"
@@ -180,8 +180,8 @@ func TestHIRIntegration(t *testing.T) {
 func TestIntrinsicTypes(t *testing.T) {
 	// Test intrinsic type conversions.
 	testCases := []struct {
-		expected      string
 		intrinsicType IntrinsicType
+		expected      string
 	}{
 		{IntrinsicVoid, "void"},
 		{IntrinsicBool, "bool"},
@@ -210,8 +210,8 @@ func TestIntrinsicTypes(t *testing.T) {
 func TestPlatformSupport(t *testing.T) {
 	// Test platform support classifications.
 	testCases := []struct {
-		expected string
 		platform PlatformSupport
+		expected string
 	}{
 		{PlatformAll, "all"},
 		{PlatformX64, "x64"},
@@ -229,8 +229,8 @@ func TestPlatformSupport(t *testing.T) {
 func TestCallingConventions(t *testing.T) {
 	// Test calling convention strings.
 	testCases := []struct {
-		expected   string
 		convention CallingConvention
+		expected   string
 	}{
 		{CallingC, "C"},
 		{CallingStdcall, "stdcall"},

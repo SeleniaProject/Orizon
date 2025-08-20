@@ -1,4 +1,4 @@
-// Package types provides comprehensive testing for the I/O effects system.
+﻿// Package types provides comprehensive testing for the I/O effects system.
 // This module tests I/O effect tracking, pure function guarantees,
 // and I/O monad functionality.
 package types
@@ -12,8 +12,8 @@ import (
 // Test I/O effect kind string representation.
 func TestIOEffectKind_String(t *testing.T) {
 	tests := []struct {
-		expected string
 		kind     IOEffectKind
+		expected string
 	}{
 		{IOEffectPure, "Pure"},
 		{IOEffectFileRead, "FileRead"},
@@ -34,8 +34,8 @@ func TestIOEffectKind_String(t *testing.T) {
 // Test I/O effect permission string representation.
 func TestIOEffectPermission_String(t *testing.T) {
 	tests := []struct {
-		expected   string
 		permission IOEffectPermission
+		expected   string
 	}{
 		{IOPermissionNone, "None"},
 		{IOPermissionRead, "Read"},
@@ -54,8 +54,8 @@ func TestIOEffectPermission_String(t *testing.T) {
 // Test I/O effect behavior string representation.
 func TestIOEffectBehavior_String(t *testing.T) {
 	tests := []struct {
-		expected string
 		behavior IOEffectBehavior
+		expected string
 	}{
 		{IOBehaviorDeterministic, "Deterministic"},
 		{IOBehaviorNonDeterministic, "NonDeterministic"},

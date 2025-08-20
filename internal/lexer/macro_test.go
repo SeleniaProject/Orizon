@@ -98,8 +98,8 @@ func TestMacroKeywordRecognition(t *testing.T) {
 	l := New(input)
 
 	tests := []struct {
-		expectedLiteral string
 		expectedType    TokenType
+		expectedLiteral string
 	}{
 		{TokenMacro, "macro"},
 		{TokenIdentifier, "test_macro"},

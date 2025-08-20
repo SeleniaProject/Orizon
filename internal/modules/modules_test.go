@@ -1,4 +1,4 @@
-package modules
+﻿package modules
 
 import (
 	"testing"
@@ -12,12 +12,12 @@ func TestVersionComparison(t *testing.T) {
 		v2       Version
 		expected int
 	}{
-		{Version{1, 0, 0, "", ""}, Version{1, 0, 0, "", ""}, 0},
-		{Version{1, 0, 0, "", ""}, Version{2, 0, 0, "", ""}, -1},
-		{Version{2, 0, 0, "", ""}, Version{1, 0, 0, "", ""}, 1},
-		{Version{1, 1, 0, "", ""}, Version{1, 0, 0, "", ""}, 1},
-		{Version{1, 0, 1, "", ""}, Version{1, 0, 0, "", ""}, 1},
-		{Version{1, 2, 3, "", ""}, Version{1, 2, 4, "", ""}, -1},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, 0},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, Version{PreRelease: "", BuildMetadata: "", Major: 2, Minor: 0, Patch: 0}, -1},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 2, Minor: 0, Patch: 0}, Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, 1},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 1, Patch: 0}, Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, 1},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 1}, Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, 1},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 2, Patch: 3}, Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 2, Patch: 4}, -1},
 	}
 
 	for i, test := range tests {
@@ -34,11 +34,11 @@ func TestVersionString(t *testing.T) {
 		version  Version
 		expected string
 	}{
-		{Version{1, 0, 0, "", ""}, "1.0.0"},
-		{Version{1, 2, 3, "", ""}, "1.2.3"},
-		{Version{1, 0, 0, "alpha", ""}, "1.0.0-alpha"},
-		{Version{1, 0, 0, "", "build123"}, "1.0.0+build123"},
-		{Version{1, 0, 0, "beta", "build456"}, "1.0.0-beta+build456"},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, "1.0.0"},
+		{Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 2, Patch: 3}, "1.2.3"},
+		{Version{PreRelease: "alpha", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}, "1.0.0-alpha"},
+		{Version{PreRelease: "", BuildMetadata: "build123", Major: 1, Minor: 0, Patch: 0}, "1.0.0+build123"},
+		{Version{PreRelease: "beta", BuildMetadata: "build456", Major: 1, Minor: 0, Patch: 0}, "1.0.0-beta+build456"},
 	}
 
 	for i, test := range tests {
@@ -51,7 +51,7 @@ func TestVersionString(t *testing.T) {
 
 func TestModuleCreation(t *testing.T) {
 	path := ModulePath("test/module")
-	version := Version{1, 0, 0, "", ""}
+	version := Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0}
 
 	module := &Module{
 		Path:            path,
@@ -105,7 +105,7 @@ func TestDependencyGraphAddModule(t *testing.T) {
 
 	module := &Module{
 		Path:            ModulePath("test/module"),
-		Version:         Version{1, 0, 0, "", ""},
+		Version:         Version{PreRelease: "", BuildMetadata: "", Major: 1, Minor: 0, Patch: 0},
 		Name:            "testmodule",
 		Dependencies:    []ModuleSpec{},
 		DevDependencies: []ModuleSpec{},
@@ -350,8 +350,8 @@ func TestModuleLoaderSearchPaths(t *testing.T) {
 
 func TestSymbolTypes(t *testing.T) {
 	tests := []struct {
-		expected   string
 		symbolType SymbolType
+		expected   string
 	}{
 		{SymbolTypeFunction, "function"},
 		{SymbolTypeVariable, "variable"},
@@ -374,8 +374,8 @@ func TestSymbolTypes(t *testing.T) {
 
 func TestVisibilityLevels(t *testing.T) {
 	tests := []struct {
-		expected   string
 		visibility VisibilityLevel
+		expected   string
 	}{
 		{VisibilityPrivate, "private"},
 		{VisibilityPackage, "package"},
@@ -442,8 +442,8 @@ func TestModuleRegistryRegisterModule(t *testing.T) {
 		Author:        "Test Author",
 		License:       "MIT",
 		Keywords:      []string{"test", "example"},
-		Versions:      []Version{{1, 0, 0, "", ""}},
-		LatestVersion: Version{1, 0, 0, "", ""},
+		Versions:      []Version{{Major: 1, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""}},
+		LatestVersion: Version{Major: 1, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""},
 		Dependencies:  make(map[Version][]ModuleSpec),
 	}
 
@@ -469,8 +469,8 @@ func TestModuleRegistryGetLatestVersion(t *testing.T) {
 	metadata := &ModuleMetadata{
 		Path:          ModulePath("test/module"),
 		Name:          "Test Module",
-		Versions:      []Version{{1, 0, 0, "", ""}, {1, 1, 0, "", ""}, {2, 0, 0, "", ""}},
-		LatestVersion: Version{2, 0, 0, "", ""},
+		Versions:      []Version{{Major: 1, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""}, {Major: 1, Minor: 1, Patch: 0, PreRelease: "", BuildMetadata: ""}, {Major: 2, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""}},
+		LatestVersion: Version{Major: 2, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""},
 		Dependencies:  make(map[Version][]ModuleSpec),
 	}
 
@@ -481,7 +481,7 @@ func TestModuleRegistryGetLatestVersion(t *testing.T) {
 		t.Fatalf("Failed to get latest version: %v", err)
 	}
 
-	expected := Version{2, 0, 0, "", ""}
+	expected := Version{PreRelease: "", BuildMetadata: "", Major: 2, Minor: 0, Patch: 0}
 	if latest.Compare(expected) != 0 {
 		t.Errorf("Expected latest version %s, got %s", expected.String(), latest.String())
 	}
@@ -491,17 +491,17 @@ func TestModuleRegistryGetAvailableVersions(t *testing.T) {
 	registry := NewModuleRegistry()
 
 	versions := []Version{
-		{1, 0, 0, "", ""},
-		{1, 1, 0, "", ""},
-		{2, 0, 0, "", ""},
-		{1, 0, 1, "", ""},
+		{Major: 1, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""},
+		{Major: 1, Minor: 1, Patch: 0, PreRelease: "", BuildMetadata: ""},
+		{Major: 2, Minor: 0, Patch: 0, PreRelease: "", BuildMetadata: ""},
+		{Major: 1, Minor: 0, Patch: 1, PreRelease: "", BuildMetadata: ""},
 	}
 
 	metadata := &ModuleMetadata{
 		Path:          ModulePath("test/module"),
 		Name:          "Test Module",
 		Versions:      versions,
-		LatestVersion: Version{2, 0, 0, "", ""},
+		LatestVersion: Version{PreRelease: "", BuildMetadata: "", Major: 2, Minor: 0, Patch: 0},
 		Dependencies:  make(map[Version][]ModuleSpec),
 	}
 

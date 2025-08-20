@@ -521,8 +521,8 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 	t.Run("OperatorStringRepresentation", func(t *testing.T) {
 		// Test binary operator string representations.
 		operators := []struct {
-			expected string
 			op       BinaryIndexOperator
+			expected string
 		}{
 			{IndexOpAdd, "+"},
 			{IndexOpSub, "-"},

@@ -20,9 +20,9 @@ func TestPositionIntegrationWithAST(t *testing.T) {
 	// Test position calculations for various parts of the code.
 	tests := []struct {
 		name     string
-		expected string
 		line     int
 		column   int
+		expected string
 	}{
 		{"function keyword", 1, 1, "func"},
 		{"function name", 1, 6, "fibonacci"},
