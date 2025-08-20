@@ -1,5 +1,5 @@
-// Basic type system implementation for Orizon language
-// This module provides the foundation for all type operations
+// Basic type system implementation for Orizon language.
+// This module provides the foundation for all type operations.
 
 package types
 
@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-// ====== Core Type System ======
+// ====== Core Type System ======.
 
-// TypeKind represents the kind of a type in the Orizon type system
+// TypeKind represents the kind of a type in the Orizon type system.
 type TypeKind int
 
 const (
-	// Primitive types
+	// Primitive types.
 	TypeKindVoid TypeKind = iota
 	TypeKindBool
 	TypeKindInt8
@@ -30,7 +30,7 @@ const (
 	TypeKindChar
 	TypeKindString
 
-	// Compound types
+	// Compound types.
 	TypeKindArray
 	TypeKindSlice
 	TypeKindPointer
@@ -41,7 +41,7 @@ const (
 	TypeKindFunction
 	TypeKindChannel
 
-	// Advanced types
+	// Advanced types.
 	TypeKindGeneric
 	TypeKindTypeVar
 	TypeKindRefinement
@@ -50,13 +50,13 @@ const (
 	TypeKindDependent
 	TypeKindTrait
 
-	// Special types
+	// Special types.
 	TypeKindAny
 	TypeKindNever
 	TypeKindUnknown
 )
 
-// String returns the string representation of a TypeKind
+// String returns the string representation of a TypeKind.
 func (tk TypeKind) String() string {
 	switch tk {
 	case TypeKindVoid:
@@ -130,93 +130,93 @@ func (tk TypeKind) String() string {
 	}
 }
 
-// Type represents a type in the Orizon type system
+// Type represents a type in the Orizon type system.
 type Type struct {
+	Data interface{}
 	Kind TypeKind
-	Size int         // Size in bytes, 0 for dynamic/unknown size
-	Data interface{} // Type-specific data
+	Size int
 }
 
-// ====== Primitive Types ======
+// ====== Primitive Types ======.
 
-// PrimitiveType represents a primitive type
+// PrimitiveType represents a primitive type.
 type PrimitiveType struct {
 	Name   string
 	Size   int
 	Signed bool // For integer types
 }
 
-// ====== Compound Types ======
+// ====== Compound Types ======.
 
-// ArrayType represents a fixed-size array type
+// ArrayType represents a fixed-size array type.
 type ArrayType struct {
 	ElementType *Type
 	Length      int
 }
 
-// SliceType represents a dynamic slice type
+// SliceType represents a dynamic slice type.
 type SliceType struct {
 	ElementType *Type
 }
 
-// PointerType represents a pointer type
+// PointerType represents a pointer type.
 type PointerType struct {
 	PointeeType *Type
 	IsNullable  bool
 }
 
-// StructType represents a struct type
+// StructType represents a struct type.
 type StructType struct {
 	Name   string
 	Fields []StructField
 }
 
-// StructField represents a field in a struct
+// StructField represents a field in a struct.
 type StructField struct {
 	Name string
 	Type *Type
 	Tag  string // Optional metadata
 }
 
-// EnumType represents an enumeration type
+// EnumType represents an enumeration type.
 type EnumType struct {
 	Name     string
 	Variants []EnumVariant
 }
 
-// EnumVariant represents a variant in an enum
+// EnumVariant represents a variant in an enum.
 type EnumVariant struct {
+	Value interface{}
+	Type  *Type
 	Name  string
-	Value interface{} // Optional associated value
-	Type  *Type       // Optional associated type
 }
 
-// UnionType represents a union type
+// UnionType represents a union type.
 type UnionType struct {
 	Name    string
 	Members []UnionMember
 }
 
-// UnionMember represents a member of a union
+// UnionMember represents a member of a union.
 type UnionMember struct {
-	Name string
 	Type *Type
+	Name string
 }
 
-// TupleType represents a tuple type
+// TupleType represents a tuple type.
 type TupleType struct {
 	Elements []*Type
 }
 
-// FunctionType represents a function type
+// FunctionType represents a function type.
 type FunctionType struct {
-	Parameters []*Type
 	ReturnType *Type
+	Parameters []*Type
 	IsVariadic bool
 	IsAsync    bool
 }
 
-// ChannelType represents a channel type for concurrency
+// ChannelType represents a channel type for concurrency.
 type ChannelType struct {
 	ElementType *Type
 	Direction   ChannelDirection
@@ -224,7 +224,7 @@ type ChannelType struct {
 	BufferSize  int
 }
 
-// ChannelDirection represents the direction of a channel
+// ChannelDirection represents the direction of a channel.
 type ChannelDirection int
 
 const (
@@ -233,16 +233,16 @@ const (
 	ChannelReceiveOnly
 )
 
-// ====== Advanced Types ======
+// ====== Advanced Types ======.
 
-// GenericType represents a generic type parameter
+// GenericType represents a generic type parameter.
 type GenericType struct {
 	Name        string
 	Constraints []*Type
 	Variance    Variance
 }
 
-// Variance represents the variance of a generic type parameter
+// Variance represents the variance of a generic type parameter.
 type Variance int
 
 const (
@@ -251,50 +251,50 @@ const (
 	VarianceContravariant
 )
 
-// TypeVar represents a type variable during type inference
+// TypeVar represents a type variable during type inference.
 type TypeVar struct {
-	ID          int
+	Bound       *Type
 	Name        string
 	Constraints []*Type
-	Bound       *Type // Set during unification
+	ID          int
 }
 
-// LinearType represents a linear type (used exactly once)
+// LinearType represents a linear type (used exactly once).
 type LinearType struct {
 	BaseType   *Type
 	UsageCount int
 	IsConsumed bool
 }
 
-// EffectType represents an effect type
+// EffectType represents an effect type.
 type EffectType struct {
 	BaseType *Type
 	Effects  []Effect
 }
 
-// Effect represents a computational effect
+// Effect represents a computational effect.
 type Effect struct {
 	Name       string
+	Handler    string
 	Parameters []string
-	Handler    string // Optional handler
 }
 
-// DependentType represents a dependent type
+// DependentType represents a dependent type.
 type DependentType struct {
 	BaseType   *Type
-	Parameters []DependentParam
 	Constraint string
+	Parameters []DependentParam
 }
 
-// DependentParam represents a parameter in a dependent type
+// DependentParam represents a parameter in a dependent type.
 type DependentParam struct {
-	Name string
 	Type *Type
+	Name string
 }
 
-// ====== Type Construction Functions ======
+// ====== Type Construction Functions ======.
 
-// NewPrimitiveType creates a new primitive type
+// NewPrimitiveType creates a new primitive type.
 func NewPrimitiveType(kind TypeKind, size int, signed bool) *Type {
 	return &Type{
 		Kind: kind,
@@ -307,7 +307,7 @@ func NewPrimitiveType(kind TypeKind, size int, signed bool) *Type {
 	}
 }
 
-// NewArrayType creates a new array type
+// NewArrayType creates a new array type.
 func NewArrayType(elementType *Type, length int) *Type {
 	size := 0
 	if elementType.Size > 0 {
@@ -324,7 +324,7 @@ func NewArrayType(elementType *Type, length int) *Type {
 	}
 }
 
-// NewSliceType creates a new slice type
+// NewSliceType creates a new slice type.
 func NewSliceType(elementType *Type) *Type {
 	return &Type{
 		Kind: TypeKindSlice,
@@ -335,7 +335,7 @@ func NewSliceType(elementType *Type) *Type {
 	}
 }
 
-// NewPointerType creates a new pointer type
+// NewPointerType creates a new pointer type.
 func NewPointerType(pointeeType *Type, nullable bool) *Type {
 	return &Type{
 		Kind: TypeKindPointer,
@@ -347,9 +347,9 @@ func NewPointerType(pointeeType *Type, nullable bool) *Type {
 	}
 }
 
-// NewStructType creates a new struct type
+// NewStructType creates a new struct type.
 func NewStructType(name string, fields []StructField) *Type {
-	// Calculate struct size (simple alignment)
+	// Calculate struct size (simple alignment).
 	size := 0
 	for _, field := range fields {
 		size += field.Type.Size
@@ -365,9 +365,9 @@ func NewStructType(name string, fields []StructField) *Type {
 	}
 }
 
-// NewEnumType creates a new enum type
+// NewEnumType creates a new enum type.
 func NewEnumType(name string, variants []EnumVariant) *Type {
-	// Enum size is typically the size of the largest variant + discriminant
+	// Enum size is typically the size of the largest variant + discriminant.
 	maxSize := 8 // Discriminant size
 	for _, variant := range variants {
 		if variant.Type != nil && variant.Type.Size > maxSize-8 {
@@ -385,9 +385,9 @@ func NewEnumType(name string, variants []EnumVariant) *Type {
 	}
 }
 
-// NewUnionType creates a new union type
+// NewUnionType creates a new union type.
 func NewUnionType(name string, members []UnionMember) *Type {
-	// Union size is the size of the largest member
+	// Union size is the size of the largest member.
 	maxSize := 0
 	for _, member := range members {
 		if member.Type.Size > maxSize {
@@ -405,9 +405,9 @@ func NewUnionType(name string, members []UnionMember) *Type {
 	}
 }
 
-// NewTupleType creates a new tuple type
+// NewTupleType creates a new tuple type.
 func NewTupleType(elements []*Type) *Type {
-	// Calculate tuple size
+	// Calculate tuple size.
 	size := 0
 	for _, element := range elements {
 		size += element.Size
@@ -422,7 +422,7 @@ func NewTupleType(elements []*Type) *Type {
 	}
 }
 
-// NewFunctionType creates a new function type
+// NewFunctionType creates a new function type.
 func NewFunctionType(parameters []*Type, returnType *Type, variadic bool, async bool) *Type {
 	return &Type{
 		Kind: TypeKindFunction,
@@ -436,7 +436,7 @@ func NewFunctionType(parameters []*Type, returnType *Type, variadic bool, async 
 	}
 }
 
-// NewChannelType creates a new channel type
+// NewChannelType creates a new channel type.
 func NewChannelType(elementType *Type, direction ChannelDirection, buffered bool, bufferSize int) *Type {
 	return &Type{
 		Kind: TypeKindChannel,
@@ -450,7 +450,7 @@ func NewChannelType(elementType *Type, direction ChannelDirection, buffered bool
 	}
 }
 
-// NewGenericType creates a new generic type parameter
+// NewGenericType creates a new generic type parameter.
 func NewGenericType(name string, constraints []*Type, variance Variance) *Type {
 	return &Type{
 		Kind: TypeKindGeneric,
@@ -463,7 +463,7 @@ func NewGenericType(name string, constraints []*Type, variance Variance) *Type {
 	}
 }
 
-// NewTypeVar creates a new type variable
+// NewTypeVar creates a new type variable.
 func NewTypeVar(id int, name string, constraints []*Type) *Type {
 	return &Type{
 		Kind: TypeKindTypeVar,
@@ -477,16 +477,16 @@ func NewTypeVar(id int, name string, constraints []*Type) *Type {
 	}
 }
 
-// NewRefinementType creates a new refinement type using proper refinement predicate
+// NewRefinementType creates a new refinement type using proper refinement predicate.
 func NewRefinementType(baseType *Type, predicate string, variables []string) *Type {
-	// Parse the predicate string into a proper RefinementPredicate
+	// Parse the predicate string into a proper RefinementPredicate.
 	var refinementPred RefinementPredicate
 	if predicate == "true" {
 		refinementPred = &TruePredicate{}
 	} else if predicate == "false" {
 		refinementPred = &FalsePredicate{}
 	} else {
-		// Default to true predicate for now - in practice would parse the string
+		// Default to true predicate for now - in practice would parse the string.
 		refinementPred = &TruePredicate{}
 	}
 
@@ -501,10 +501,10 @@ func NewRefinementType(baseType *Type, predicate string, variables []string) *Ty
 	}
 }
 
-// ====== Built-in Types ======
+// ====== Built-in Types ======.
 
 var (
-	// Primitive types
+	// Primitive types.
 	TypeVoid    = NewPrimitiveType(TypeKindVoid, 0, false)
 	TypeBool    = NewPrimitiveType(TypeKindBool, 1, false)
 	TypeInt8    = NewPrimitiveType(TypeKindInt8, 1, true)
@@ -520,15 +520,15 @@ var (
 	TypeChar    = NewPrimitiveType(TypeKindChar, 4, false)    // UTF-32
 	TypeString  = NewPrimitiveType(TypeKindString, 16, false) // String header
 
-	// Special types
+	// Special types.
 	TypeAny     = &Type{Kind: TypeKindAny, Size: 0, Data: nil}
 	TypeNever   = &Type{Kind: TypeKindNever, Size: 0, Data: nil}
 	TypeUnknown = &Type{Kind: TypeKindUnknown, Size: 0, Data: nil}
 )
 
-// ====== Type Equivalence ======
+// ====== Type Equivalence ======.
 
-// Equals checks if two types are equivalent
+// Equals checks if two types are equivalent.
 func (t *Type) Equals(other *Type) bool {
 	if t == nil || other == nil {
 		return t == other
@@ -548,114 +548,130 @@ func (t *Type) Equals(other *Type) bool {
 	case TypeKindArray:
 		tArray := t.Data.(*ArrayType)
 		oArray := other.Data.(*ArrayType)
+
 		return tArray.Length == oArray.Length && tArray.ElementType.Equals(oArray.ElementType)
 
 	case TypeKindSlice:
 		tSlice := t.Data.(*SliceType)
 		oSlice := other.Data.(*SliceType)
+
 		return tSlice.ElementType.Equals(oSlice.ElementType)
 
 	case TypeKindPointer:
 		tPointer := t.Data.(*PointerType)
 		oPointer := other.Data.(*PointerType)
+
 		return tPointer.IsNullable == oPointer.IsNullable &&
 			tPointer.PointeeType.Equals(oPointer.PointeeType)
 
 	case TypeKindStruct:
 		tStruct := t.Data.(*StructType)
 		oStruct := other.Data.(*StructType)
+
 		if tStruct.Name != oStruct.Name || len(tStruct.Fields) != len(oStruct.Fields) {
 			return false
 		}
+
 		for i, field := range tStruct.Fields {
 			otherField := oStruct.Fields[i]
 			if field.Name != otherField.Name || !field.Type.Equals(otherField.Type) {
 				return false
 			}
 		}
+
 		return true
 
 	case TypeKindTuple:
 		tTuple := t.Data.(*TupleType)
 		oTuple := other.Data.(*TupleType)
+
 		if len(tTuple.Elements) != len(oTuple.Elements) {
 			return false
 		}
+
 		for i, element := range tTuple.Elements {
 			if !element.Equals(oTuple.Elements[i]) {
 				return false
 			}
 		}
+
 		return true
 
 	case TypeKindFunction:
 		tFunc := t.Data.(*FunctionType)
 		oFunc := other.Data.(*FunctionType)
+
 		if len(tFunc.Parameters) != len(oFunc.Parameters) ||
 			tFunc.IsVariadic != oFunc.IsVariadic ||
 			tFunc.IsAsync != oFunc.IsAsync ||
 			!tFunc.ReturnType.Equals(oFunc.ReturnType) {
 			return false
 		}
+
 		for i, param := range tFunc.Parameters {
 			if !param.Equals(oFunc.Parameters[i]) {
 				return false
 			}
 		}
+
 		return true
 
 	case TypeKindTypeVar:
 		tVar := t.Data.(*TypeVar)
 		oVar := other.Data.(*TypeVar)
+
 		return tVar.ID == oVar.ID
 
 	default:
-		// For other types, use pointer equality as a fallback
+		// For other types, use pointer equality as a fallback.
 		return t == other
 	}
 }
 
-// ====== Type Conversion Rules ======
+// ====== Type Conversion Rules ======.
 
-// CanConvertTo checks if this type can be converted to another type
+// CanConvertTo checks if this type can be converted to another type.
 func (t *Type) CanConvertTo(target *Type) bool {
 	if t.Equals(target) {
 		return true
 	}
 
-	// Numeric conversions
+	// Numeric conversions.
 	if t.IsNumeric() && target.IsNumeric() {
 		return true // All numeric types can convert to each other
 	}
 
-	// Pointer conversions
+	// Pointer conversions.
 	if t.Kind == TypeKindPointer && target.Kind == TypeKindPointer {
 		tPtr := t.Data.(*PointerType)
 		targetPtr := target.Data.(*PointerType)
-		// Nullable pointer can convert to non-nullable pointer (null check required)
-		// Non-nullable pointer cannot convert to nullable pointer (would break non-null guarantee)
+		// Nullable pointer can convert to non-nullable pointer (null check required).
+		// Non-nullable pointer cannot convert to nullable pointer (would break non-null guarantee).
 		if tPtr.IsNullable && !targetPtr.IsNullable {
 			return tPtr.PointeeType.Equals(targetPtr.PointeeType) // nullable -> non-nullable with runtime check
 		}
+
 		if !tPtr.IsNullable && targetPtr.IsNullable {
 			return false // non-nullable -> nullable breaks non-null guarantee
 		}
+
 		return tPtr.PointeeType.Equals(targetPtr.PointeeType) // same nullability, check element type
 	}
 
-	// Array to slice conversion
+	// Array to slice conversion.
 	if t.Kind == TypeKindArray && target.Kind == TypeKindSlice {
 		tArray := t.Data.(*ArrayType)
 		targetSlice := target.Data.(*SliceType)
+
 		return tArray.ElementType.Equals(targetSlice.ElementType)
 	}
 
-	// Any type can convert to Any
+	// Any type can convert to Any.
 	if target.Kind == TypeKindAny {
 		return true
 	}
 
-	// Never can convert to any type
+	// Never can convert to any type.
 	if t.Kind == TypeKindNever {
 		return true
 	}
@@ -663,9 +679,9 @@ func (t *Type) CanConvertTo(target *Type) bool {
 	return false
 }
 
-// ====== Type Properties ======
+// ====== Type Properties ======.
 
-// IsNumeric checks if the type is a numeric type
+// IsNumeric checks if the type is a numeric type.
 func (t *Type) IsNumeric() bool {
 	switch t.Kind {
 	case TypeKindInt8, TypeKindInt16, TypeKindInt32, TypeKindInt64,
@@ -677,7 +693,7 @@ func (t *Type) IsNumeric() bool {
 	}
 }
 
-// IsInteger checks if the type is an integer type
+// IsInteger checks if the type is an integer type.
 func (t *Type) IsInteger() bool {
 	switch t.Kind {
 	case TypeKindInt8, TypeKindInt16, TypeKindInt32, TypeKindInt64,
@@ -688,7 +704,7 @@ func (t *Type) IsInteger() bool {
 	}
 }
 
-// IsFloat checks if the type is a floating-point type
+// IsFloat checks if the type is a floating-point type.
 func (t *Type) IsFloat() bool {
 	switch t.Kind {
 	case TypeKindFloat32, TypeKindFloat64:
@@ -698,7 +714,7 @@ func (t *Type) IsFloat() bool {
 	}
 }
 
-// IsSigned checks if the type is signed
+// IsSigned checks if the type is signed.
 func (t *Type) IsSigned() bool {
 	if !t.IsNumeric() {
 		return false
@@ -711,12 +727,12 @@ func (t *Type) IsSigned() bool {
 	return false
 }
 
-// IsPointer checks if the type is a pointer type
+// IsPointer checks if the type is a pointer type.
 func (t *Type) IsPointer() bool {
 	return t.Kind == TypeKindPointer
 }
 
-// IsAggregate checks if the type is an aggregate type
+// IsAggregate checks if the type is an aggregate type.
 func (t *Type) IsAggregate() bool {
 	switch t.Kind {
 	case TypeKindArray, TypeKindStruct, TypeKindTuple, TypeKindUnion:
@@ -726,14 +742,14 @@ func (t *Type) IsAggregate() bool {
 	}
 }
 
-// IsCallable checks if the type is callable (function or function pointer)
+// IsCallable checks if the type is callable (function or function pointer).
 func (t *Type) IsCallable() bool {
 	return t.Kind == TypeKindFunction
 }
 
-// ====== String Representation ======
+// ====== String Representation ======.
 
-// String returns the string representation of the type
+// String returns the string representation of the type.
 func (t *Type) String() string {
 	if t == nil {
 		return "<nil>"
@@ -748,18 +764,22 @@ func (t *Type) String() string {
 
 	case TypeKindArray:
 		array := t.Data.(*ArrayType)
+
 		return fmt.Sprintf("[%d]%s", array.Length, array.ElementType.String())
 
 	case TypeKindSlice:
 		slice := t.Data.(*SliceType)
+
 		return fmt.Sprintf("[]%s", slice.ElementType.String())
 
 	case TypeKindPointer:
 		pointer := t.Data.(*PointerType)
 		nullable := ""
+
 		if pointer.IsNullable {
 			nullable = "?"
 		}
+
 		return fmt.Sprintf("*%s%s", pointer.PointeeType.String(), nullable)
 
 	case TypeKindStruct:
@@ -772,27 +792,35 @@ func (t *Type) String() string {
 		for _, field := range structType.Fields {
 			fields = append(fields, fmt.Sprintf("%s: %s", field.Name, field.Type.String()))
 		}
+
 		return fmt.Sprintf("struct { %s }", strings.Join(fields, ", "))
 
 	case TypeKindEnum:
 		enumType := t.Data.(*EnumType)
+
 		return enumType.Name
 
 	case TypeKindUnion:
 		unionType := t.Data.(*UnionType)
+
 		return unionType.Name
 
 	case TypeKindTuple:
 		tuple := t.Data.(*TupleType)
+
 		var elements []string
+
 		for _, element := range tuple.Elements {
 			elements = append(elements, element.String())
 		}
+
 		return fmt.Sprintf("(%s)", strings.Join(elements, ", "))
 
 	case TypeKindFunction:
 		function := t.Data.(*FunctionType)
+
 		var params []string
+
 		for _, param := range function.Parameters {
 			params = append(params, param.String())
 		}
@@ -812,6 +840,7 @@ func (t *Type) String() string {
 	case TypeKindChannel:
 		channel := t.Data.(*ChannelType)
 		dirStr := ""
+
 		switch channel.Direction {
 		case ChannelSendOnly:
 			dirStr = "send "
@@ -836,6 +865,7 @@ func (t *Type) String() string {
 		for _, constraint := range generic.Constraints {
 			constraints = append(constraints, constraint.String())
 		}
+
 		return fmt.Sprintf("%s: %s", generic.Name, strings.Join(constraints, " + "))
 
 	case TypeKindTypeVar:
@@ -843,10 +873,12 @@ func (t *Type) String() string {
 		if typeVar.Bound != nil {
 			return typeVar.Bound.String()
 		}
+
 		return fmt.Sprintf("'%s", typeVar.Name)
 
 	case TypeKindRefinement:
 		refinement := t.Data.(*RefinementType)
+
 		return fmt.Sprintf("%s{%s}", refinement.BaseType.String(), refinement.Predicate)
 
 	default:
@@ -854,22 +886,22 @@ func (t *Type) String() string {
 	}
 }
 
-// ====== Type Registry ======
+// ====== Type Registry ======.
 
-// TypeRegistry maintains a registry of all types in the system
+// TypeRegistry maintains a registry of all types in the system.
 type TypeRegistry struct {
 	types         map[string]*Type
 	nextTypeVarID int
 }
 
-// NewTypeRegistry creates a new type registry
+// NewTypeRegistry creates a new type registry.
 func NewTypeRegistry() *TypeRegistry {
 	registry := &TypeRegistry{
 		types:         make(map[string]*Type),
 		nextTypeVarID: 0,
 	}
 
-	// Register built-in types
+	// Register built-in types.
 	registry.RegisterType("void", TypeVoid)
 	registry.RegisterType("bool", TypeBool)
 	registry.RegisterType("int8", TypeInt8)
@@ -890,29 +922,32 @@ func NewTypeRegistry() *TypeRegistry {
 	return registry
 }
 
-// RegisterType registers a type with the given name
+// RegisterType registers a type with the given name.
 func (tr *TypeRegistry) RegisterType(name string, typeObj *Type) {
 	tr.types[name] = typeObj
 }
 
-// LookupType looks up a type by name
+// LookupType looks up a type by name.
 func (tr *TypeRegistry) LookupType(name string) (*Type, bool) {
 	typeObj, exists := tr.types[name]
+
 	return typeObj, exists
 }
 
-// NewTypeVar creates a new type variable with a unique ID
+// NewTypeVar creates a new type variable with a unique ID.
 func (tr *TypeRegistry) NewTypeVar(name string, constraints []*Type) *Type {
 	id := tr.nextTypeVarID
 	tr.nextTypeVarID++
+
 	return NewTypeVar(id, name, constraints)
 }
 
-// GetAllTypes returns all registered types
+// GetAllTypes returns all registered types.
 func (tr *TypeRegistry) GetAllTypes() map[string]*Type {
 	result := make(map[string]*Type)
 	for name, typeObj := range tr.types {
 		result[name] = typeObj
 	}
+
 	return result
 }

@@ -6,8 +6,7 @@ import (
 )
 
 func TestSimpleIndexParser(t *testing.T) {
-	// Debug the parser step by step
-
+	// Debug the parser step by step.
 	t.Run("SingleCharacter", func(t *testing.T) {
 		parser := NewIndexExpressionParser("i")
 		fmt.Printf("Input: %q\n", parser.input)
