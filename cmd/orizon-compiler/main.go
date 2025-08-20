@@ -39,7 +39,7 @@ func main() {
 		outELF      = flag.String("emit-elf", "", "write minimal ELF64 object bundling DWARF to the given path")
 		outCOFF     = flag.String("emit-coff", "", "write minimal COFF object bundling DWARF to the given path")
 		outMachO    = flag.String("emit-macho", "", "write minimal Mach-O object bundling DWARF to the given path")
-		// Diagnostic x64 emission
+		// Diagnostic x64 emission.
 		emitX64 = flag.Bool("emit-x64", false, "emit diagnostic x64-like assembly from LIR (stdout)")
 		x64Out  = flag.String("x64-out", "", "write diagnostic x64 assembly to a file instead of stdout")
 		emitMIR = flag.Bool("emit-mir", false, "emit MIR textual dump (stdout)")
@@ -51,11 +51,13 @@ func main() {
 	if *showVersion {
 		fmt.Printf("Orizon Compiler v%s (%s)\n", version, commit)
 		fmt.Println("The Future of Systems Programming")
+
 		return
 	}
 
 	if *showHelp {
 		showUsage()
+
 		return
 	}
 
@@ -66,7 +68,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Security validation
+	// Security validation.
 	validator := NewSecurityValidator()
 
 	inputFile := args[0]
@@ -168,12 +170,12 @@ func showUsage() {
 }
 
 func compileFile(filename string, debugLexer bool, doParse bool, optLevel string, emitDebug bool, emitSrcMap bool, debugOut string, smOut string, dwarfDir string, outELF string, outCOFF string, outMachO string, emitMIR bool, emitLIR bool, emitX64 bool, x64Out string) error {
-	// ファイル存在チェック
+	// ファイル存在チェック.
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return fmt.Errorf("file not found: %s", filename)
 	}
 
-	// ファイル読み込み
+	// ファイル読み込み.
 	source, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
@@ -200,10 +202,12 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 				break
 			}
 		}
+
 		fmt.Println(strings.Repeat("=", 50))
 	} else if !doParse && optLevel == "" && !(emitDebug || emitSrcMap || emitMIR || emitLIR) {
-		// 通常のコンパイル（現在は字句解析のみ）
+		// 通常のコンパイル（現在は字句解析のみ）.
 		tokenCount := 0
+
 		for {
 			token := l.NextToken()
 			tokenCount++
@@ -212,7 +216,7 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 				break
 			}
 
-			// エラートークンのチェック
+			// エラートークンのチェック.
 			if token.Type == lexer.TokenError {
 				return fmt.Errorf("lexer error at %d:%d: %s",
 					token.Line, token.Column, token.Literal)
@@ -221,18 +225,20 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 
 		fmt.Printf("✅ Lexing completed: %d tokens processed\n", tokenCount)
 	} else {
-		// Parse phase (optional) and optional optimization via AST bridge
+		// Parse phase (optional) and optional optimization via AST bridge.
 		pr := p.NewParser(lexer.NewWithFilename(string(source), filename), filename)
+
 		program, parseErrors := pr.Parse()
 		if len(parseErrors) > 0 {
 			for _, e := range parseErrors {
 				fmt.Fprintf(os.Stderr, "Parse error: %v\n", e)
 			}
+
 			return fmt.Errorf("parse failed with %d error(s)", len(parseErrors))
 		}
 
 		if doParse && optLevel == "" {
-			// Print parser AST
+			// Print parser AST.
 			fmt.Println("📦 Parsed AST (parser):")
 			fmt.Println(p.PrettyPrint(program))
 		}
@@ -242,6 +248,7 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 			if err != nil {
 				return fmt.Errorf("optimization failed: %w", err)
 			}
+
 			fmt.Printf("✨ Optimized via AST pipeline (level=%s)\n", strings.ToLower(optLevel))
 			fmt.Println(p.PrettyPrint(optimized))
 			program = optimized
@@ -253,28 +260,34 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 			if err != nil {
 				return fmt.Errorf("ast bridge failed: %w", err)
 			}
+
 			conv := hir.NewASTToHIRConverter()
 			hirProg, _ := conv.ConvertProgram(astProg)
 
 			// Optional MIR/LIR/x64 dumps using stub lowering pipeline
 			if emitMIR || emitLIR || emitX64 || (x64Out != "") {
 				mirMod := codegen.LowerToMIR(hirProg)
+
 				if emitMIR {
 					fmt.Println("--- MIR ---")
 					fmt.Println(mirMod.String())
 				}
+
 				if emitLIR || emitX64 || (x64Out != "") {
 					lirMod := codegen.SelectToLIR(mirMod)
+
 					if emitLIR {
 						fmt.Println("--- LIR ---")
 						fmt.Println(lirMod.String())
 					}
+
 					if emitX64 || (x64Out != "") {
 						asm := codegen.EmitX64(lirMod)
 						if x64Out != "" {
 							if err := os.WriteFile(x64Out, []byte(asm), 0o644); err != nil {
 								return fmt.Errorf("write x64 failed: %w", err)
 							}
+
 							fmt.Printf("[x64] wrote %s (%d bytes)\n", x64Out, len(asm))
 						} else {
 							fmt.Println("--- X64 (diagnostic) ---")
@@ -286,58 +299,72 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 
 			if emitDebug {
 				em := debug.NewEmitter()
+
 				dbg, err := em.Emit(hirProg)
 				if err != nil {
 					return fmt.Errorf("emit debug failed: %w", err)
 				}
+
 				js, err := debug.Serialize(dbg)
 				if err != nil {
 					return fmt.Errorf("serialize debug failed: %w", err)
 				}
+
 				if debugOut != "" {
 					if err := os.WriteFile(debugOut, js, 0o644); err != nil {
 						return fmt.Errorf("write debug json failed: %w", err)
 					}
+
 					fmt.Printf("[debug-json] wrote %s (%d bytes)\n", debugOut, len(js))
 				} else {
 					fmt.Println("--- DEBUG-JSON ---")
 					os.Stdout.Write(js)
 					fmt.Println()
 				}
+
 				fmt.Println("--- DWARF SECTIONS ---")
+
 				secs, err := debug.BuildDWARF(dbg)
 				if err != nil {
 					return fmt.Errorf("build dwarf failed: %w", err)
 				}
+
 				printSection := func(name string, b []byte) { fmt.Printf("[%s] %d bytes\n", name, len(b)) }
 				printSection(".debug_abbrev", secs.Abbrev)
 				printSection(".debug_info", secs.Info)
 				printSection(".debug_line", secs.Line)
 				printSection(".debug_str", secs.Str)
+
 				if dwarfDir != "" || outELF != "" || outCOFF != "" || outMachO != "" || os.Getenv("ORIZON_DEBUG_OBJ_OUT") != "" {
 					if err := os.MkdirAll(dwarfDir, 0o755); err != nil {
 						return fmt.Errorf("mkdir dwarf dir failed: %w", err)
 					}
+
 					write := func(name string, b []byte) error {
 						p := filepath.Join(dwarfDir, name)
+
 						return os.WriteFile(p, b, 0o644)
 					}
 					if dwarfDir != "" {
 						if err := write("debug_abbrev.bin", secs.Abbrev); err != nil {
 							return err
 						}
+
 						if err := write("debug_info.bin", secs.Info); err != nil {
 							return err
 						}
+
 						if err := write("debug_line.bin", secs.Line); err != nil {
 							return err
 						}
+
 						if err := write("debug_str.bin", secs.Str); err != nil {
 							return err
 						}
+
 						fmt.Printf("[dwarf] wrote raw sections to %s\n", dwarfDir)
 					}
-					// Auto-select object format by OS when ORIZON_DEBUG_OBJ_OUT is given
+					// Auto-select object format by OS when ORIZON_DEBUG_OBJ_OUT is given.
 					if auto := os.Getenv("ORIZON_DEBUG_OBJ_OUT"); auto != "" {
 						switch f := os.Getenv("ORIZON_DEBUG_OBJ_FORMAT"); f {
 						case "elf":
@@ -357,22 +384,28 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 							}
 						}
 					}
+
 					if outELF != "" {
 						if err := debug.WriteELFWithDWARF(outELF, secs); err != nil {
 							return fmt.Errorf("write ELF failed: %w", err)
 						}
+
 						fmt.Printf("[dwarf] wrote ELF object: %s\n", outELF)
 					}
+
 					if outCOFF != "" {
 						if err := debug.WriteCOFFWithDWARF(outCOFF, secs); err != nil {
 							return fmt.Errorf("write COFF failed: %w", err)
 						}
+
 						fmt.Printf("[dwarf] wrote COFF object: %s\n", outCOFF)
 					}
+
 					if outMachO != "" {
 						if err := debug.WriteMachOWithDWARF(outMachO, secs); err != nil {
 							return fmt.Errorf("write Mach-O failed: %w", err)
 						}
+
 						fmt.Printf("[dwarf] wrote Mach-O object: %s\n", outMachO)
 					}
 				}
@@ -383,14 +416,17 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 				if err != nil {
 					return fmt.Errorf("generate sourcemap failed: %w", err)
 				}
+
 				js, err := debug.SerializeSourceMap(sm)
 				if err != nil {
 					return fmt.Errorf("serialize sourcemap failed: %w", err)
 				}
+
 				if smOut != "" {
 					if err := os.WriteFile(smOut, js, 0o644); err != nil {
 						return fmt.Errorf("write sourcemap failed: %w", err)
 					}
+
 					fmt.Printf("[sourcemap] wrote %s (%d bytes)\n", smOut, len(js))
 				} else {
 					fmt.Println("--- SOURCE-MAP ---")
@@ -405,10 +441,10 @@ func compileFile(filename string, debugLexer bool, doParse bool, optLevel string
 }
 
 // repeat はGo 1.21以前での文字列繰り返し関数（現在は不要）
-// func repeat(s string, count int) string {
-// 	result := ""
-// 	for i := 0; i < count; i++ {
-// 		result += s
-// 	}
-// 	return result
-// }
+// func repeat(s string, count int) string {.
+// 	result := "".
+// 	for i := 0; i < count; i++ {.
+// 		result += s.
+// 	}.
+// 	return result.
+// }.

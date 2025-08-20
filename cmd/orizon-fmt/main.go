@@ -1,5 +1,5 @@
-//go:build ignore
-// +build ignore
+//go:build ignore.
+// +build ignore.
 
 package main
 
@@ -14,18 +14,18 @@ import (
 	orifmt "github.com/orizon-lang/orizon/internal/format"
 )
 
-// orizon-fmt (enhanced):
+// orizon-fmt (enhanced):.
 // - Basic mode: trims trailing spaces/tabs per line, ensures exactly one trailing newline
-// - AST mode: provides comprehensive AST-based formatting with proper indentation
-// - Diff mode: shows differences between original and formatted code
-// Flags:
+// - AST mode: provides comprehensive AST-based formatting with proper indentation.
+// - Diff mode: shows differences between original and formatted code.
+// Flags:.
 //
 //	-w      write result to (source) file.
 //	-l      list files whose formatting differs (exit 0 like gofmt).
 //	-stdin  read from stdin instead of files, write formatted to stdout.
 //	-ast    use AST-based formatting (enhanced mode).
 //	-diff   show diff output instead of formatted code.
-//	-mode   diff mode: unified (default), context, side-by-side
+//	-mode   diff mode: unified (default), context, side-by-side.
 func main() {
 	var (
 		writeInPlace bool
@@ -52,7 +52,7 @@ func main() {
 
 		var out []byte
 		if useAST {
-			// Use AST-based formatting
+			// Use AST-based formatting.
 			options := orifmt.DefaultASTFormattingOptions()
 			formatted, err := orifmt.FormatSourceWithAST(string(in), options)
 			if err != nil {
@@ -61,12 +61,12 @@ func main() {
 			}
 			out = []byte(formatted)
 		} else {
-			// Use basic formatting
+			// Use basic formatting.
 			out = orifmt.FormatBytes(in, orifmt.Options{PreserveNewlineStyle: false})
 		}
 
 		if showDiff {
-			// Show diff instead of formatted output
+			// Show diff instead of formatted output.
 			var diffOptions orifmt.DiffOptions
 			switch diffMode {
 			case "context":
@@ -103,7 +103,7 @@ func main() {
 		return
 	}
 
-	// Process files provided as args
+	// Process files provided as args.
 	exitCode := 0
 	for _, path := range flag.Args() {
 		data, err := os.ReadFile(path)
@@ -115,7 +115,7 @@ func main() {
 
 		var out []byte
 		if useAST {
-			// Use AST-based formatting
+			// Use AST-based formatting.
 			options := orifmt.DefaultASTFormattingOptions()
 			formatted, err := orifmt.FormatSourceWithAST(string(data), options)
 			if err != nil {
@@ -125,12 +125,12 @@ func main() {
 			}
 			out = []byte(formatted)
 		} else {
-			// Use basic formatting - preserve newline style on files
+			// Use basic formatting - preserve newline style on files.
 			out = orifmt.FormatBytes(data, orifmt.Options{PreserveNewlineStyle: true})
 		}
 
 		if showDiff {
-			// Show diff output
+			// Show diff output.
 			var diffOptions orifmt.DiffOptions
 			switch diffMode {
 			case "context":
@@ -177,7 +177,7 @@ func main() {
 			}
 			continue
 		}
-		// Default: print formatted content to stdout
+		// Default: print formatted content to stdout.
 		if _, err := os.Stdout.Write(out); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			exitCode = 1

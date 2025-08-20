@@ -10,7 +10,7 @@ import (
 	orifmt "github.com/orizon-lang/orizon/internal/format"
 )
 
-// Enhanced orizon-fmt demo with AST formatting and diff support
+// Enhanced orizon-fmt demo with AST formatting and diff support.
 func main() {
 	var (
 		showDemo   bool
@@ -37,11 +37,13 @@ func main() {
 
 	if showDemo {
 		runDemo()
+
 		return
 	}
 
 	if testFile != "" {
 		processTestFile(testFile, useAST, showDiff, indentSize, useTabs, maxLine)
+
 		return
 	}
 
@@ -56,9 +58,9 @@ func main() {
 }
 
 func runDemo() {
-	// Demo source code with formatting issues
+	// Demo source code with formatting issues.
 	demoSource := `
-// Sample Orizon code with formatting issues
+// Sample Orizon code with formatting issues.
 struct   Point {
 x:i32,
 y:   i32   ,
@@ -84,7 +86,7 @@ fn display(&self)->String;
 	fmt.Println(demoSource)
 	fmt.Println(strings.Repeat("-", 50))
 
-	// Basic formatting
+	// Basic formatting.
 	basicOptions := orifmt.Options{PreserveNewlineStyle: false}
 	basicFormatted := orifmt.FormatBytes([]byte(demoSource), basicOptions)
 
@@ -93,14 +95,14 @@ fn display(&self)->String;
 	fmt.Println(string(basicFormatted))
 	fmt.Println(strings.Repeat("-", 50))
 
-	// AST formatting (would be used if AST parsing was working)
+	// AST formatting (would be used if AST parsing was working).
 	fmt.Println("\nAST formatting would provide:")
 	fmt.Println("- Proper indentation alignment")
 	fmt.Println("- Consistent spacing around operators")
 	fmt.Println("- Aligned struct fields")
 	fmt.Println("- Proper line breaks and formatting")
 
-	// Diff demo
+	// Diff demo.
 	diffOptions := orifmt.DiffOptions{
 		Mode:        orifmt.DiffModeUnified,
 		Context:     3,
@@ -113,6 +115,7 @@ fn display(&self)->String;
 	if result.HasChanges {
 		fmt.Println("\nDiff output:")
 		fmt.Println(strings.Repeat("-", 50))
+
 		diff := diffFormatter.FormatDiff("demo.oriz", result)
 		fmt.Print(diff)
 		fmt.Println(strings.Repeat("-", 50))
@@ -123,19 +126,19 @@ fn display(&self)->String;
 }
 
 func processTestFile(filename string, useAST, showDiff bool, indentSize int, useTabs bool, maxLine int) {
-	// Check if file exists
+	// Check if file exists.
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		fmt.Printf("Error: File %s does not exist\n", filename)
 		os.Exit(1)
 	}
 
-	// Check if it's an Orizon file
+	// Check if it's an Orizon file.
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext != ".oriz" && ext != ".orizon" {
 		fmt.Printf("Warning: %s doesn't appear to be an Orizon source file\n", filename)
 	}
 
-	// Read file
+	// Read file.
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
@@ -143,6 +146,7 @@ func processTestFile(filename string, useAST, showDiff bool, indentSize int, use
 	}
 
 	original := string(data)
+
 	fmt.Printf("Processing file: %s\n", filename)
 	fmt.Printf("Original size: %d bytes, %d lines\n",
 		len(original), strings.Count(original, "\n")+1)
@@ -175,6 +179,7 @@ func processTestFile(filename string, useAST, showDiff bool, indentSize int, use
 		}
 	} else {
 		fmt.Println("Using basic formatting...")
+
 		basicOptions := orifmt.Options{PreserveNewlineStyle: true}
 		basicFormatted := orifmt.FormatBytes(data, basicOptions)
 		formatted = string(basicFormatted)
@@ -185,6 +190,7 @@ func processTestFile(filename string, useAST, showDiff bool, indentSize int, use
 
 	if formatted == original {
 		fmt.Println("No changes needed - file is already properly formatted")
+
 		return
 	}
 

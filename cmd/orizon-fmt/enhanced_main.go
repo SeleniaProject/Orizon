@@ -12,13 +12,13 @@ import (
 	orifmt "github.com/orizon-lang/orizon/internal/format"
 )
 
-// orizon-fmt (enhanced):
+// orizon-fmt (enhanced):.
 // - Basic formatting: trims trailing spaces/tabs per line, ensures exactly one trailing newline
-// - AST-based formatting: comprehensive code formatting using parsed AST
-// - Diff mode: shows differences between original and formatted code
-// - Preserves original newline style (CRLF vs LF) when writing files
+// - AST-based formatting: comprehensive code formatting using parsed AST.
+// - Diff mode: shows differences between original and formatted code.
+// - Preserves original newline style (CRLF vs LF) when writing files.
 //
-// Flags:
+// Flags:.
 //   -w         write result to (source) file.
 //   -l         list files whose formatting differs (exit 0 like gofmt).
 //   -d         display diffs instead of rewriting files.
@@ -53,7 +53,7 @@ func main() {
 
 	flag.Parse()
 
-	// Create formatting options
+	// Create formatting options.
 	basicOptions := orifmt.Options{
 		PreserveNewlineStyle: !fromStdin, // Don't preserve for stdin
 	}
@@ -78,10 +78,11 @@ func main() {
 
 	if fromStdin {
 		handleStdin(basicOptions, astOptions, useAST)
+
 		return
 	}
 
-	// Process files provided as args
+	// Process files provided as args.
 	files := flag.Args()
 	if len(files) == 0 {
 		fmt.Fprintln(os.Stderr, "No input files specified")
@@ -89,10 +90,12 @@ func main() {
 	}
 
 	exitCode := 0
+
 	for _, path := range files {
 		if err := processFile(path, basicOptions, astOptions, diffOptions,
 			writeInPlace, listOnly, showDiff, useAST); err != nil {
 			fmt.Fprintf(os.Stderr, "Error processing %s: %v\n", path, err)
+
 			exitCode = 1
 		}
 	}
@@ -100,7 +103,7 @@ func main() {
 	os.Exit(exitCode)
 }
 
-// handleStdin processes input from stdin
+// handleStdin processes input from stdin.
 func handleStdin(basicOptions orifmt.Options, astOptions orifmt.ASTFormattingOptions, useAST bool) {
 	input, err := io.ReadAll(os.Stdin)
 	if err != nil {
@@ -113,7 +116,7 @@ func handleStdin(basicOptions orifmt.Options, astOptions orifmt.ASTFormattingOpt
 	if useAST {
 		formatted, err := orifmt.FormatSourceWithAST(string(input), astOptions)
 		if err != nil {
-			// Fallback to basic formatting on AST parsing errors
+			// Fallback to basic formatting on AST parsing errors.
 			output = orifmt.FormatBytes(input, basicOptions)
 		} else {
 			output = []byte(formatted)
@@ -128,11 +131,11 @@ func handleStdin(basicOptions orifmt.Options, astOptions orifmt.ASTFormattingOpt
 	}
 }
 
-// processFile processes a single file
+// processFile processes a single file.
 func processFile(path string, basicOptions orifmt.Options, astOptions orifmt.ASTFormattingOptions,
-	diffOptions orifmt.DiffOptions, writeInPlace, listOnly, showDiff, useAST bool) error {
-
-	// Check if file is a valid Orizon source file
+	diffOptions orifmt.DiffOptions, writeInPlace, listOnly, showDiff, useAST bool,
+) error {
+	// Check if file is a valid Orizon source file.
 	if !isOrizonFile(path) {
 		return fmt.Errorf("not an Orizon source file: %s", path)
 	}
@@ -143,13 +146,14 @@ func processFile(path string, basicOptions orifmt.Options, astOptions orifmt.AST
 	}
 
 	original := string(data)
+
 	var formatted string
 
 	if useAST {
-		// Try AST-based formatting first
+		// Try AST-based formatting first.
 		astFormatted, err := orifmt.FormatSourceWithAST(original, astOptions)
 		if err != nil {
-			// Fallback to basic formatting on AST parsing errors
+			// Fallback to basic formatting on AST parsing errors.
 			basicFormatted := orifmt.FormatBytes(data, basicOptions)
 			formatted = string(basicFormatted)
 
@@ -160,18 +164,19 @@ func processFile(path string, basicOptions orifmt.Options, astOptions orifmt.AST
 			formatted = astFormatted
 		}
 	} else {
-		// Use basic formatting
+		// Use basic formatting.
 		basicFormatted := orifmt.FormatBytes(data, basicOptions)
 		formatted = string(basicFormatted)
 	}
 
-	// Check if there are changes
+	// Check if there are changes.
 	hasChanges := formatted != original
 
 	if listOnly {
 		if hasChanges {
 			fmt.Println(path)
 		}
+
 		return nil
 	}
 
@@ -182,30 +187,34 @@ func processFile(path string, basicOptions orifmt.Options, astOptions orifmt.AST
 			diff := diffFormatter.FormatDiff(path, result)
 			fmt.Print(diff)
 		}
+
 		return nil
 	}
 
 	if writeInPlace {
 		if hasChanges {
-			return os.WriteFile(path, []byte(formatted), 0666)
+			return os.WriteFile(path, []byte(formatted), 0o666)
 		}
+
 		return nil
 	}
 
-	// Default: print formatted content to stdout
+	// Default: print formatted content to stdout.
 	fmt.Print(formatted)
+
 	return nil
 }
 
-// isOrizonFile checks if a file is a valid Orizon source file
+// isOrizonFile checks if a file is a valid Orizon source file.
 func isOrizonFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
+
 	return ext == ".oriz" || ext == ".orizon"
 }
 
-// Additional utility functions for advanced formatting
+// Additional utility functions for advanced formatting.
 
-// formatDirectory recursively formats all Orizon files in a directory
+// formatDirectory recursively formats all Orizon files in a directory.
 func formatDirectory(dir string, options orifmt.Options, recursive bool) error {
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -216,6 +225,7 @@ func formatDirectory(dir string, options orifmt.Options, recursive bool) error {
 			if !recursive && path != dir {
 				return filepath.SkipDir
 			}
+
 			return nil
 		}
 
@@ -228,40 +238,41 @@ func formatDirectory(dir string, options orifmt.Options, recursive bool) error {
 	})
 }
 
-// validateSyntax checks if the formatted code is syntactically valid
+// validateSyntax checks if the formatted code is syntactically valid.
 func validateSyntax(source string) error {
-	// This would integrate with the parser to validate syntax
-	// For now, just return nil
+	// This would integrate with the parser to validate syntax.
+	// For now, just return nil.
 	return nil
 }
 
-// formatWithBackup creates a backup of the original file before formatting
+// formatWithBackup creates a backup of the original file before formatting.
 func formatWithBackup(path string, formatted []byte) error {
 	backupPath := path + ".backup"
 
-	// Read original file
+	// Read original file.
 	original, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	// Create backup
-	if err := os.WriteFile(backupPath, original, 0666); err != nil {
-		return fmt.Errorf("failed to create backup: %v", err)
+	// Create backup.
+	if err := os.WriteFile(backupPath, original, 0o666); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
-	// Write formatted content
-	if err := os.WriteFile(path, formatted, 0666); err != nil {
-		// Restore from backup on failure
-		os.WriteFile(path, original, 0666)
+	// Write formatted content.
+	if err := os.WriteFile(path, formatted, 0o666); err != nil {
+		// Restore from backup on failure.
+		os.WriteFile(path, original, 0o666)
 		os.Remove(backupPath)
-		return fmt.Errorf("failed to write formatted file: %v", err)
+
+		return fmt.Errorf("failed to write formatted file: %w", err)
 	}
 
 	return nil
 }
 
-// Statistics tracking for batch operations
+// Statistics tracking for batch operations.
 type FormatStats struct {
 	FilesProcessed int
 	FilesChanged   int
@@ -270,17 +281,19 @@ type FormatStats struct {
 	Errors         int
 }
 
-// String returns a formatted string representation of the stats
+// String returns a formatted string representation of the stats.
 func (fs FormatStats) String() string {
 	return fmt.Sprintf("Processed: %d files, Changed: %d files, +%d -%d lines, Errors: %d",
 		fs.FilesProcessed, fs.FilesChanged, fs.LinesAdded, fs.LinesRemoved, fs.Errors)
 }
 
-// copyStream keeps the stream copying functionality for backward compatibility
+// copyStream keeps the stream copying functionality for backward compatibility.
 func copyStream(r io.Reader, w io.Writer) error {
 	br := bufio.NewReader(r)
+
 	bw := bufio.NewWriter(w)
 	defer bw.Flush()
 	_, err := br.WriteTo(bw)
+
 	return err
 }

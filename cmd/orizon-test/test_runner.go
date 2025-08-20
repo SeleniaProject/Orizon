@@ -10,13 +10,13 @@ import (
 	"github.com/orizon-lang/orizon/internal/testing"
 )
 
-// TestRunner orchestrates the execution of all test suites
+// TestRunner orchestrates the execution of all test suites.
 type TestRunner struct {
 	config    *testing.TestConfig
 	generator *testing.ReportGenerator
 }
 
-// NewTestRunner creates a new test runner
+// NewTestRunner creates a new test runner.
 func NewTestRunner(config *testing.TestConfig) *TestRunner {
 	return &TestRunner{
 		config:    config,
@@ -24,12 +24,12 @@ func NewTestRunner(config *testing.TestConfig) *TestRunner {
 	}
 }
 
-// RunAllTests executes all test suites and generates comprehensive reports
+// RunAllTests executes all test suites and generates comprehensive reports.
 func (tr *TestRunner) RunAllTests() error {
 	fmt.Println("Starting Orizon Compiler Test Suite")
 	fmt.Println("====================================")
 
-	// Set environment information
+	// Set environment information.
 	env := &testing.TestEnvironment{
 		CompilerVersion: "1.0.0-dev",
 		Platform:        runtime.GOOS,
@@ -42,32 +42,33 @@ func (tr *TestRunner) RunAllTests() error {
 	}
 	tr.generator.SetEnvironment(env)
 
-	// Run unit tests
+	// Run unit tests.
 	if err := tr.runUnitTests(); err != nil {
-		return fmt.Errorf("unit tests failed: %v", err)
+		return fmt.Errorf("unit tests failed: %w", err)
 	}
 
-	// Run integration tests
+	// Run integration tests.
 	if err := tr.runIntegrationTests(); err != nil {
-		return fmt.Errorf("integration tests failed: %v", err)
+		return fmt.Errorf("integration tests failed: %w", err)
 	}
 
-	// Run end-to-end tests
+	// Run end-to-end tests.
 	if err := tr.runE2ETests(); err != nil {
-		return fmt.Errorf("e2e tests failed: %v", err)
+		return fmt.Errorf("e2e tests failed: %w", err)
 	}
 
-	// Run benchmark tests
+	// Run benchmark tests.
 	if err := tr.runBenchmarkTests(); err != nil {
-		return fmt.Errorf("benchmark tests failed: %v", err)
+		return fmt.Errorf("benchmark tests failed: %w", err)
 	}
 
-	// Finalize and generate reports
+	// Finalize and generate reports.
 	tr.generator.Finalize()
+
 	return tr.generateReports()
 }
 
-// runUnitTests executes unit test suite
+// runUnitTests executes unit test suite.
 func (tr *TestRunner) runUnitTests() error {
 	fmt.Println("\nRunning Unit Tests...")
 
@@ -77,17 +78,17 @@ func (tr *TestRunner) runUnitTests() error {
 	}
 	start := time.Now()
 
-	// Create test framework
+	// Create test framework.
 	framework, err := testing.NewTestFramework(tr.config)
 	if err != nil {
 		return err
 	}
 	defer framework.Cleanup()
 
-	// Define unit tests
+	// Define unit tests.
 	unitTests := tr.createUnitTests()
 
-	// Execute each test
+	// Execute each test.
 	for _, test := range unitTests {
 		result := framework.RunTest(test)
 		testCase := testing.ConvertTestResultToCase(test, result)
@@ -95,11 +96,13 @@ func (tr *TestRunner) runUnitTests() error {
 
 		if result.Success {
 			suite.Passed++
+
 			if tr.config.Verbose {
 				fmt.Printf("  ✓ %s (%.2fs)\n", test.Name, result.Duration.Seconds())
 			}
 		} else {
 			suite.Failed++
+
 			fmt.Printf("  ✗ %s (%.2fs): %v\n", test.Name, result.Duration.Seconds(), result.Error)
 		}
 	}
@@ -113,7 +116,7 @@ func (tr *TestRunner) runUnitTests() error {
 	return nil
 }
 
-// runIntegrationTests executes integration test suite
+// runIntegrationTests executes integration test suite.
 func (tr *TestRunner) runIntegrationTests() error {
 	fmt.Println("\nRunning Integration Tests...")
 
@@ -123,17 +126,17 @@ func (tr *TestRunner) runIntegrationTests() error {
 	}
 	start := time.Now()
 
-	// Create test framework
+	// Create test framework.
 	framework, err := testing.NewTestFramework(tr.config)
 	if err != nil {
 		return err
 	}
 	defer framework.Cleanup()
 
-	// Define integration tests
+	// Define integration tests.
 	integrationTests := tr.createIntegrationTests()
 
-	// Execute each test
+	// Execute each test.
 	for _, test := range integrationTests {
 		result := framework.RunTest(test)
 		testCase := testing.ConvertTestResultToCase(test, result)
@@ -141,11 +144,13 @@ func (tr *TestRunner) runIntegrationTests() error {
 
 		if result.Success {
 			suite.Passed++
+
 			if tr.config.Verbose {
 				fmt.Printf("  ✓ %s (%.2fs)\n", test.Name, result.Duration.Seconds())
 			}
 		} else {
 			suite.Failed++
+
 			fmt.Printf("  ✗ %s (%.2fs): %v\n", test.Name, result.Duration.Seconds(), result.Error)
 		}
 	}
@@ -159,7 +164,7 @@ func (tr *TestRunner) runIntegrationTests() error {
 	return nil
 }
 
-// runE2ETests executes end-to-end test suite
+// runE2ETests executes end-to-end test suite.
 func (tr *TestRunner) runE2ETests() error {
 	fmt.Println("\nRunning End-to-End Tests...")
 
@@ -169,17 +174,17 @@ func (tr *TestRunner) runE2ETests() error {
 	}
 	start := time.Now()
 
-	// Create test framework
+	// Create test framework.
 	framework, err := testing.NewTestFramework(tr.config)
 	if err != nil {
 		return err
 	}
 	defer framework.Cleanup()
 
-	// Define e2e tests
+	// Define e2e tests.
 	e2eTests := tr.createE2ETests()
 
-	// Execute each test
+	// Execute each test.
 	for _, test := range e2eTests {
 		result := framework.RunTest(test)
 		testCase := testing.ConvertTestResultToCase(test, result)
@@ -187,11 +192,13 @@ func (tr *TestRunner) runE2ETests() error {
 
 		if result.Success {
 			suite.Passed++
+
 			if tr.config.Verbose {
 				fmt.Printf("  ✓ %s (%.2fs)\n", test.Name, result.Duration.Seconds())
 			}
 		} else {
 			suite.Failed++
+
 			fmt.Printf("  ✗ %s (%.2fs): %v\n", test.Name, result.Duration.Seconds(), result.Error)
 		}
 	}
@@ -205,11 +212,11 @@ func (tr *TestRunner) runE2ETests() error {
 	return nil
 }
 
-// runBenchmarkTests executes benchmark test suite
+// runBenchmarkTests executes benchmark test suite.
 func (tr *TestRunner) runBenchmarkTests() error {
 	fmt.Println("\nRunning Benchmark Tests...")
 
-	// Skip benchmark tests if benchmark framework is not fully implemented
+	// Skip benchmark tests if benchmark framework is not fully implemented.
 	fmt.Println("  Skipping benchmark tests (implementation pending)")
 
 	suite := &testing.TestSuite{
@@ -220,7 +227,7 @@ func (tr *TestRunner) runBenchmarkTests() error {
 		Skipped: 1,
 	}
 
-	// Add a placeholder test case
+	// Add a placeholder test case.
 	testCase := &testing.TestCase{
 		Name:      "benchmark_placeholder",
 		ClassName: "BenchmarkTest",
@@ -234,44 +241,48 @@ func (tr *TestRunner) runBenchmarkTests() error {
 	tr.generator.AddSuite(suite)
 
 	fmt.Printf("Benchmark Tests: skipped (implementation pending)\n")
+
 	return nil
 }
 
-// generateReports creates comprehensive test reports
+// generateReports creates comprehensive test reports.
 func (tr *TestRunner) generateReports() error {
 	fmt.Println("\nGenerating Test Reports...")
 
-	// Ensure reports directory exists
+	// Ensure reports directory exists.
 	reportsDir := "test_reports"
-	if err := os.MkdirAll(reportsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create reports directory: %v", err)
+	if err := os.MkdirAll(reportsDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create reports directory: %w", err)
 	}
 
-	// Generate JSON report
+	// Generate JSON report.
 	jsonFile := filepath.Join(reportsDir, "test_report.json")
 	if err := tr.generator.SaveToFile(jsonFile, "json"); err != nil {
-		return fmt.Errorf("failed to generate JSON report: %v", err)
+		return fmt.Errorf("failed to generate JSON report: %w", err)
 	}
+
 	fmt.Printf("  Generated JSON report: %s\n", jsonFile)
 
-	// Generate XML report (JUnit format)
+	// Generate XML report (JUnit format).
 	xmlFile := filepath.Join(reportsDir, "test_report.xml")
 	if err := tr.generator.SaveToFile(xmlFile, "xml"); err != nil {
-		return fmt.Errorf("failed to generate XML report: %v", err)
+		return fmt.Errorf("failed to generate XML report: %w", err)
 	}
+
 	fmt.Printf("  Generated XML report: %s\n", xmlFile)
 
-	// Generate HTML report
+	// Generate HTML report.
 	htmlFile := filepath.Join(reportsDir, "test_report.html")
 	if err := tr.generator.SaveToFile(htmlFile, "html"); err != nil {
-		return fmt.Errorf("failed to generate HTML report: %v", err)
+		return fmt.Errorf("failed to generate HTML report: %w", err)
 	}
+
 	fmt.Printf("  Generated HTML report: %s\n", htmlFile)
 
 	return nil
 }
 
-// createUnitTests defines basic unit tests
+// createUnitTests defines basic unit tests.
 func (tr *TestRunner) createUnitTests() []*testing.CompilerTest {
 	return []*testing.CompilerTest{
 		{
@@ -310,7 +321,7 @@ fn main() {
 	}
 }
 
-// createIntegrationTests defines integration tests
+// createIntegrationTests defines integration tests.
 func (tr *TestRunner) createIntegrationTests() []*testing.CompilerTest {
 	return []*testing.CompilerTest{
 		{
@@ -345,7 +356,7 @@ fn main() {
 	}
 }
 
-// createE2ETests defines end-to-end tests
+// createE2ETests defines end-to-end tests.
 func (tr *TestRunner) createE2ETests() []*testing.CompilerTest {
 	return []*testing.CompilerTest{
 		{
@@ -367,7 +378,7 @@ fn main() {
 	}
 }
 
-// createBenchmarkTests defines benchmark tests
+// createBenchmarkTests defines benchmark tests.
 func (tr *TestRunner) createBenchmarkTests() []*testing.BenchmarkTest {
 	return []*testing.BenchmarkTest{
 		{
@@ -381,7 +392,7 @@ fn main() {
 	}
 }
 
-// RunTestsWithConfig runs all tests with the given configuration
+// RunTestsWithConfig runs all tests with the given configuration.
 func RunTestsWithConfig(config *testing.TestConfig) error {
 	runner := NewTestRunner(config)
 
@@ -391,11 +402,12 @@ func RunTestsWithConfig(config *testing.TestConfig) error {
 	fmt.Printf("Verbose: %v\n", config.Verbose)
 	fmt.Println()
 
-	// Run all tests
+	// Run all tests.
 	if err := runner.RunAllTests(); err != nil {
-		return fmt.Errorf("test execution failed: %v", err)
+		return fmt.Errorf("test execution failed: %w", err)
 	}
 
 	fmt.Println("\nTest execution completed successfully!")
+
 	return nil
 }

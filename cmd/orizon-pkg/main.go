@@ -27,7 +27,7 @@ func main() {
 
 	command = args[0]
 
-	// Change to working directory
+	// Change to working directory.
 	if workDir != "." {
 		if err := os.Chdir(workDir); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to change directory to %s: %v\n", workDir, err)
@@ -95,6 +95,7 @@ func handleInit(args []string) {
 	}
 
 	name := args[0]
+
 	version := "1.0.0"
 	if len(args) > 1 {
 		version = args[1]
@@ -121,7 +122,7 @@ func handleAdd(args []string) {
 	version := "latest"
 	dev := false
 
-	// Parse remaining arguments
+	// Parse remaining arguments.
 	for i := 1; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--dev" {
@@ -141,6 +142,7 @@ func handleAdd(args []string) {
 	if dev {
 		depType = "dev dependency"
 	}
+
 	fmt.Printf("Added %s '%s' version %s\n", depType, name, version)
 }
 
@@ -171,6 +173,7 @@ func handleInstall(args []string) {
 
 	resolved := pm.GetResolvedDependencies()
 	fmt.Printf("Installed %d dependencies:\n", len(resolved))
+
 	for name, dep := range resolved {
 		fmt.Printf("  %s@%s (%s) -> %s\n", name, dep.Version, dep.Source, dep.Path)
 	}
@@ -199,6 +202,7 @@ func handleClean(args []string) {
 
 func handleList(args []string) {
 	pm := packagemanager.NewLocalManager(".")
+
 	packages, err := pm.ListPackages()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to list packages: %v\n", err)
@@ -207,10 +211,12 @@ func handleList(args []string) {
 
 	if len(packages) == 0 {
 		fmt.Println("No packages found in workspace")
+
 		return
 	}
 
 	fmt.Printf("Found %d packages in workspace:\n", len(packages))
+
 	for _, pkg := range packages {
 		absPath, _ := filepath.Abs(pkg)
 		fmt.Printf("  %s (%s)\n", pkg, absPath)

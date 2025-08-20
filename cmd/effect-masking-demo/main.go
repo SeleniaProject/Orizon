@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// EffectKind represents different categories of side effects
+// EffectKind represents different categories of side effects.
 type EffectKind int
 
 const (
@@ -32,10 +32,11 @@ func (ek EffectKind) String() string {
 	if int(ek) < len(names) {
 		return names[ek]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(ek))
 }
 
-// EffectLevel represents the severity/impact level of an effect
+// EffectLevel represents the severity/impact level of an effect.
 type EffectLevel int
 
 const (
@@ -51,14 +52,15 @@ func (el EffectLevel) String() string {
 	if int(el) < len(names) {
 		return names[el]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(el))
 }
 
-// SideEffect represents a single side effect
+// SideEffect represents a single side effect.
 type SideEffect struct {
+	Description string
 	Kind        EffectKind
 	Level       EffectLevel
-	Description string
 }
 
 func NewSideEffect(kind EffectKind, level EffectLevel) *SideEffect {
@@ -69,7 +71,7 @@ func (e *SideEffect) String() string {
 	return fmt.Sprintf("%s[%s]", e.Kind.String(), e.Level.String())
 }
 
-// EffectSet represents a collection of side effects
+// EffectSet represents a collection of side effects.
 type EffectSet struct {
 	effects map[EffectKind]*SideEffect
 }
@@ -84,6 +86,7 @@ func (es *EffectSet) Add(effect *SideEffect) {
 
 func (es *EffectSet) Contains(kind EffectKind) bool {
 	_, exists := es.effects[kind]
+
 	return exists
 }
 
@@ -103,10 +106,12 @@ func (es *EffectSet) String() string {
 	if es.IsEmpty() {
 		return "Pure"
 	}
+
 	var effects []string
 	for _, effect := range es.effects {
 		effects = append(effects, effect.String())
 	}
+
 	return fmt.Sprintf("{%v}", effects)
 }
 
@@ -115,16 +120,17 @@ func (es *EffectSet) ToSlice() []*SideEffect {
 	for _, effect := range es.effects {
 		effects = append(effects, effect)
 	}
+
 	return effects
 }
 
-// EffectMask represents effect masking capabilities
+// EffectMask represents effect masking capabilities.
 type EffectMask struct {
+	ExpiresAt   *time.Time
+	Name        string
 	MaskedKinds []EffectKind
 	Active      bool
 	Temporary   bool
-	ExpiresAt   *time.Time
-	Name        string
 }
 
 func NewEffectMask(name string, kinds []EffectKind) *EffectMask {
@@ -152,18 +158,23 @@ func (em *EffectMask) Apply(effects *EffectSet) *EffectSet {
 	}
 
 	result := NewEffectSet()
+
 	for _, effect := range effects.ToSlice() {
 		masked := false
+
 		for _, kind := range em.MaskedKinds {
 			if effect.Kind == kind {
 				masked = true
+
 				break
 			}
 		}
+
 		if !masked {
 			result.Add(effect)
 		}
 	}
+
 	return result
 }
 
@@ -178,7 +189,7 @@ func (em *EffectMask) String() string {
 	return fmt.Sprintf("Mask[%s](%s): %v", em.Name, status, em.MaskedKinds)
 }
 
-// EffectScope represents a scope for effect tracking and masking
+// EffectScope represents a scope for effect tracking and masking.
 type EffectScope struct {
 	Name     string
 	Effects  *EffectSet
@@ -214,12 +225,12 @@ func (es *EffectScope) AddMask(mask *EffectMask) {
 func (es *EffectScope) GetEffectiveEffects() *EffectSet {
 	result := NewEffectSet()
 
-	// Start with all effects
+	// Start with all effects.
 	for _, effect := range es.Effects.ToSlice() {
 		result.Add(effect)
 	}
 
-	// Apply all active masks
+	// Apply all active masks.
 	for _, mask := range es.Masks {
 		result = mask.Apply(result)
 	}
@@ -234,13 +245,13 @@ func (es *EffectScope) String() string {
 		es.GetEffectiveEffects().String())
 }
 
-// MaskCondition represents conditions for effect masking
+// MaskCondition represents conditions for effect masking.
 type MaskCondition interface {
 	Evaluate() bool
 	String() string
 }
 
-// TimeMaskCondition masks effects based on time
+// TimeMaskCondition masks effects based on time.
 type TimeMaskCondition struct {
 	ValidFrom time.Time
 	ValidTo   time.Time
@@ -248,6 +259,7 @@ type TimeMaskCondition struct {
 
 func (tmc *TimeMaskCondition) Evaluate() bool {
 	now := time.Now()
+
 	return now.After(tmc.ValidFrom) && now.Before(tmc.ValidTo)
 }
 
@@ -255,7 +267,7 @@ func (tmc *TimeMaskCondition) String() string {
 	return fmt.Sprintf("TimeCondition[%v to %v]", tmc.ValidFrom, tmc.ValidTo)
 }
 
-// ConditionalEffectMask represents conditional effect masking
+// ConditionalEffectMask represents conditional effect masking.
 type ConditionalEffectMask struct {
 	*EffectMask
 	Conditions []MaskCondition
@@ -269,7 +281,7 @@ func NewConditionalEffectMask(name string, kinds []EffectKind, conditions []Mask
 }
 
 func (cem *ConditionalEffectMask) Apply(effects *EffectSet) *EffectSet {
-	// Check all conditions
+	// Check all conditions.
 	for _, condition := range cem.Conditions {
 		if !condition.Evaluate() {
 			return effects // Don't apply mask if conditions not met
@@ -283,10 +295,10 @@ func main() {
 	fmt.Println("🎭 Orizon Effect Masking System Demo")
 	fmt.Println("====================================")
 
-	// Demo 1: Basic Effect Masking
+	// Demo 1: Basic Effect Masking.
 	fmt.Println("\n📍 Demo 1: Basic Effect Masking")
 
-	// Create some effects
+	// Create some effects.
 	effects := NewEffectSet()
 	effects.Add(NewSideEffect(EffectFileRead, EffectLevelMedium))
 	effects.Add(NewSideEffect(EffectFileWrite, EffectLevelMedium))
@@ -295,20 +307,20 @@ func main() {
 
 	fmt.Printf("Original Effects: %s\n", effects)
 
-	// Create a mask that blocks file operations
+	// Create a mask that blocks file operations.
 	fileMask := NewEffectMask("FileOperationMask", []EffectKind{EffectFileRead, EffectFileWrite})
 	maskedEffects := fileMask.Apply(effects)
 
 	fmt.Printf("Mask: %s\n", fileMask)
 	fmt.Printf("After File Mask: %s\n", maskedEffects)
 
-	// Demo 2: Multiple Masks
+	// Demo 2: Multiple Masks.
 	fmt.Println("\n📍 Demo 2: Multiple Masks")
 
 	networkMask := NewEffectMask("NetworkMask", []EffectKind{EffectNetworkRead, EffectNetworkWrite})
 	memoryMask := NewEffectMask("MemoryMask", []EffectKind{EffectMemoryWrite})
 
-	// Apply masks sequentially
+	// Apply masks sequentially.
 	step1 := fileMask.Apply(effects)
 	step2 := networkMask.Apply(step1)
 	step3 := memoryMask.Apply(step2)
@@ -318,7 +330,7 @@ func main() {
 	fmt.Printf("After Network Mask: %s\n", step2)
 	fmt.Printf("After Memory Mask: %s\n", step3)
 
-	// Demo 3: Temporary Masks
+	// Demo 3: Temporary Masks.
 	fmt.Println("\n📍 Demo 3: Temporary Masks")
 
 	tempMask := NewEffectMask("TemporaryMask", []EffectKind{EffectFileRead})
@@ -327,29 +339,29 @@ func main() {
 	fmt.Printf("Temporary Mask: %s\n", tempMask)
 	fmt.Printf("Before expiry: %s\n", tempMask.Apply(effects))
 
-	// Simulate time passing
+	// Simulate time passing.
 	fmt.Println("⏰ Waiting for mask to expire...")
 	time.Sleep(3 * time.Second)
 
 	fmt.Printf("After expiry: %s\n", tempMask.Apply(effects))
 	fmt.Printf("Mask status: %s\n", tempMask)
 
-	// Demo 4: Effect Scopes with Masking
+	// Demo 4: Effect Scopes with Masking.
 	fmt.Println("\n📍 Demo 4: Effect Scopes with Masking")
 
-	// Create a hierarchical scope structure
+	// Create a hierarchical scope structure.
 	globalScope := NewEffectScope("Global", nil)
 	moduleScope := NewEffectScope("Module", globalScope)
 	functionScope := NewEffectScope("Function", moduleScope)
 
-	// Add effects to different scopes
+	// Add effects to different scopes.
 	globalScope.AddEffect(NewSideEffect(EffectSystemCall, EffectLevelCritical))
 	moduleScope.AddEffect(NewSideEffect(EffectFileRead, EffectLevelMedium))
 	moduleScope.AddEffect(NewSideEffect(EffectFileWrite, EffectLevelMedium))
 	functionScope.AddEffect(NewSideEffect(EffectMemoryWrite, EffectLevelLow))
 	functionScope.AddEffect(NewSideEffect(EffectNetworkRead, EffectLevelHigh))
 
-	// Add masks to different scopes
+	// Add masks to different scopes.
 	moduleScope.AddMask(NewEffectMask("ModuleSafety", []EffectKind{EffectSystemCall}))
 	functionScope.AddMask(NewEffectMask("FunctionSafety", []EffectKind{EffectNetworkRead}))
 
@@ -357,10 +369,10 @@ func main() {
 	fmt.Printf("%s\n", moduleScope)
 	fmt.Printf("%s\n", functionScope)
 
-	// Demo 5: Conditional Masking
+	// Demo 5: Conditional Masking.
 	fmt.Println("\n📍 Demo 5: Conditional Masking")
 
-	// Create time-based condition
+	// Create time-based condition.
 	now := time.Now()
 	timeCondition := &TimeMaskCondition{
 		ValidFrom: now.Add(-1 * time.Hour), // Valid from 1 hour ago
@@ -382,7 +394,7 @@ func main() {
 	fmt.Printf("Time Condition: %s\n", timeCondition)
 	fmt.Printf("Conditional Mask Applied: %s\n", conditionalMask.Apply(secureEffects))
 
-	// Demo 6: Mask Management
+	// Demo 6: Mask Management.
 	fmt.Println("\n📍 Demo 6: Mask Management")
 
 	maskManager := struct {
@@ -395,7 +407,7 @@ func main() {
 		},
 	}
 
-	// Make testing mask inactive
+	// Make testing mask inactive.
 	maskManager.masks[1].Active = false
 
 	testEffects := NewEffectSet()
@@ -407,20 +419,21 @@ func main() {
 	fmt.Printf("Test Effects: %s\n", testEffects)
 
 	result := testEffects
+
 	for _, mask := range maskManager.masks {
 		fmt.Printf("Applying %s\n", mask)
 		result = mask.Apply(result)
 		fmt.Printf("  Result: %s\n", result)
 	}
 
-	// Demo 7: Real-world Scenarios
+	// Demo 7: Real-world Scenarios.
 	fmt.Println("\n📍 Demo 7: Real-world Scenarios")
 
 	scenarios := []struct {
-		name        string
 		effects     *EffectSet
-		masks       []*EffectMask
+		name        string
 		description string
+		masks       []*EffectMask
 	}{
 		{
 			name: "WebServer",
@@ -430,6 +443,7 @@ func main() {
 				es.Add(NewSideEffect(EffectNetworkWrite, EffectLevelHigh))
 				es.Add(NewSideEffect(EffectFileRead, EffectLevelMedium))
 				es.Add(NewSideEffect(EffectMemoryWrite, EffectLevelLow))
+
 				return es
 			}(),
 			masks: []*EffectMask{
@@ -445,6 +459,7 @@ func main() {
 				es.Add(NewSideEffect(EffectFileWrite, EffectLevelMedium))
 				es.Add(NewSideEffect(EffectNetworkRead, EffectLevelHigh))
 				es.Add(NewSideEffect(EffectSystemCall, EffectLevelCritical))
+
 				return es
 			}(),
 			masks: []*EffectMask{

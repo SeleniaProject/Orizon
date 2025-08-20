@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// デバッグ用のテストプログラム
+// デバッグ用のテストプログラム.
 func debugSecurity() {
 	validator := NewSecurityValidator()
 
@@ -21,22 +21,24 @@ func debugSecurity() {
 	for _, testCase := range testCases {
 		err := validator.ValidateInputFile(testCase)
 		fmt.Printf("Testing: %s\n", testCase)
+
 		if err != nil {
 			fmt.Printf("  Error: %v\n", err)
 		} else {
 			fmt.Printf("  OK\n")
 		}
 
-		// Clean pathをデバッグ
+		// Clean pathをデバッグ.
 		cleanPath := filepath.Clean(testCase)
 		fmt.Printf("  Clean path: %s\n", cleanPath)
 
-		// パターンマッチング詳細
+		// パターンマッチング詳細.
 		for _, pattern := range validator.blockedPatterns {
 			if strings.Contains(strings.ToLower(cleanPath), strings.ToLower(pattern)) {
 				fmt.Printf("  Matched pattern: %s\n", pattern)
 			}
 		}
+
 		fmt.Println()
 	}
 }

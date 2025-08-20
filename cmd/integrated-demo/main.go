@@ -1,5 +1,5 @@
 // Package main demonstrates the integrated effect system capabilities in Orizon.
-// This demo shows the integration of side effects and exception tracking
+// This demo shows the integration of side effects and exception tracking.
 // for comprehensive type-level safety analysis.
 package main
 
@@ -11,13 +11,15 @@ import (
 	ns "github.com/orizon-lang/orizon/internal/runtime/netstack"
 )
 
-// Effect system types (simplified for demo)
+// Effect system types (simplified for demo).
 
-type EffectKind int
-type EffectLevel int
-type ExceptionKind int
-type ExceptionSeverity int
-type ExceptionSafety int
+type (
+	EffectKind        int
+	EffectLevel       int
+	ExceptionKind     int
+	ExceptionSeverity int
+	ExceptionSafety   int
+)
 
 const (
 	EffectPure EffectKind = iota
@@ -70,6 +72,7 @@ func (ek EffectKind) String() string {
 	if int(ek) < len(names) {
 		return names[ek]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(ek))
 }
 
@@ -78,15 +81,19 @@ func (el EffectLevel) String() string {
 	if int(el) < len(names) {
 		return names[el]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(el))
 }
 
 func (ek ExceptionKind) String() string {
-	names := []string{"None", "Runtime", "IOError", "NullPointer", "FileNotFound",
-		"PermissionDenied", "NetworkTimeout", "ConnectionFailed", "Deadlock"}
+	names := []string{
+		"None", "Runtime", "IOError", "NullPointer", "FileNotFound",
+		"PermissionDenied", "NetworkTimeout", "ConnectionFailed", "Deadlock",
+	}
 	if int(ek) < len(names) {
 		return names[ek]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(ek))
 }
 
@@ -95,6 +102,7 @@ func (es ExceptionSeverity) String() string {
 	if int(es) < len(names) {
 		return names[es]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(es))
 }
 
@@ -103,16 +111,17 @@ func (es ExceptionSafety) String() string {
 	if int(es) < len(names) {
 		return names[es]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(es))
 }
 
-// Core data structures
+// Core data structures.
 
 type SideEffect struct {
-	Kind        EffectKind
-	Level       EffectLevel
 	Description string
 	Context     string
+	Kind        EffectKind
+	Level       EffectLevel
 }
 
 func NewSideEffect(kind EffectKind, level EffectLevel) *SideEffect {
@@ -127,10 +136,10 @@ func (se *SideEffect) String() string {
 }
 
 type ExceptionSpec struct {
-	Kind     ExceptionKind
-	Severity ExceptionSeverity
 	Message  string
 	TypeName string
+	Kind     ExceptionKind
+	Severity ExceptionSeverity
 }
 
 func NewExceptionSpec(kind ExceptionKind, severity ExceptionSeverity) *ExceptionSpec {
@@ -165,6 +174,7 @@ func (ie *IntegratedEffect) String() string {
 	} else if ie.ExceptionSpec != nil {
 		return ie.ExceptionSpec.String()
 	}
+
 	return "NoEffect"
 }
 
@@ -235,6 +245,7 @@ func (ies *IntegratedEffectSet) ToSlice() []*IntegratedEffect {
 	for _, effect := range ies.effects {
 		effects = append(effects, effect)
 	}
+
 	return effects
 }
 
@@ -252,11 +263,11 @@ func (ies *IntegratedEffectSet) String() string {
 }
 
 type IntegratedEffectSignature struct {
-	FunctionName string
 	Effects      *IntegratedEffectSet
+	FunctionName string
 	Safety       ExceptionSafety
-	Purity       bool
 	MaxSeverity  EffectLevel
+	Purity       bool
 }
 
 func NewIntegratedEffectSignature(name string) *IntegratedEffectSignature {
@@ -272,19 +283,19 @@ func NewIntegratedEffectSignature(name string) *IntegratedEffectSignature {
 func (ies *IntegratedEffectSignature) AddEffect(effect *IntegratedEffect) {
 	ies.Effects.Add(effect)
 
-	// Update purity
+	// Update purity.
 	if effect.SideEffect != nil && effect.SideEffect.Kind != EffectPure {
 		ies.Purity = false
 	}
 
-	// Update safety
+	// Update safety.
 	if effect.ExceptionSpec != nil && effect.ExceptionSpec.Kind != ExceptionNone {
 		if ies.Safety == SafetyNoThrow {
 			ies.Safety = SafetyBasic
 		}
 	}
 
-	// Update max severity
+	// Update max severity.
 	effectSeverity := effect.GetSeverity()
 	if effectSeverity > ies.MaxSeverity {
 		ies.MaxSeverity = effectSeverity
@@ -321,19 +332,19 @@ func (iea *IntegratedEffectAnalyzer) RegisterFunction(signature *IntegratedEffec
 func (iea *IntegratedEffectAnalyzer) CheckCompatibility(caller, callee *IntegratedEffectSignature) []string {
 	var issues []string
 
-	// Check purity compatibility
+	// Check purity compatibility.
 	if caller.IsPure() && !callee.IsPure() {
 		issues = append(issues, fmt.Sprintf("pure function %s cannot call impure function %s",
 			caller.FunctionName, callee.FunctionName))
 	}
 
-	// Check exception safety compatibility
+	// Check exception safety compatibility.
 	if caller.IsNoThrow() && !callee.IsNoThrow() {
 		issues = append(issues, fmt.Sprintf("no-throw function %s cannot call throwing function %s",
 			caller.FunctionName, callee.FunctionName))
 	}
 
-	// Check severity compatibility
+	// Check severity compatibility.
 	if caller.MaxSeverity < callee.MaxSeverity {
 		issues = append(issues, fmt.Sprintf("function %s (severity %s) cannot call function %s (severity %s)",
 			caller.FunctionName, caller.MaxSeverity.String(),
@@ -345,6 +356,7 @@ func (iea *IntegratedEffectAnalyzer) CheckCompatibility(caller, callee *Integrat
 
 func (iea *IntegratedEffectAnalyzer) GetSignature(functionName string) (*IntegratedEffectSignature, bool) {
 	sig, exists := iea.signatures[functionName]
+
 	return sig, exists
 }
 
@@ -352,25 +364,26 @@ func main() {
 	fmt.Println("🔗 Orizon Integrated Effect System Demo")
 	fmt.Println("=======================================")
 
-	// Start a lightweight metrics server exposing runtime counters for manual inspection
+	// Start a lightweight metrics server exposing runtime counters for manual inspection.
 	if addr, stop, err := rt.StartMetricsServer(":0", map[string]rt.MetricFunc{
 		"runtime_tcp": func() map[string]float64 { return ns.TCPMetricsForExport() },
 	}); err == nil {
 		fmt.Println("📊 Metrics server listening on", addr)
+
 		defer func() { _ = stop(context.Background()) }()
 	}
 
-	// Demo 1: Basic Integrated Effects
+	// Demo 1: Basic Integrated Effects.
 	fmt.Println("\n📍 Demo 1: Basic Integrated Effects")
 
-	// Create individual effects
+	// Create individual effects.
 	ioEffect := NewSideEffect(EffectIO, EffectLevelMedium)
 	ioEffect.Description = "General I/O operation"
 
 	ioException := NewExceptionSpec(ExceptionIOError, ExceptionSeverityError)
 	ioException.Message = "I/O operation failed"
 
-	// Create integrated effect
+	// Create integrated effect.
 	integrated := NewIntegratedEffect(ioEffect, ioException)
 	integrated.Context = "File processing"
 
@@ -380,7 +393,7 @@ func main() {
 	fmt.Printf("Severity: %s\n", integrated.GetSeverity())
 	fmt.Printf("Is Empty: %v\n", integrated.IsEmpty())
 
-	// Demo 2: Effect Combinations
+	// Demo 2: Effect Combinations.
 	fmt.Println("\n📍 Demo 2: Effect Combinations")
 
 	combinations := []struct {
@@ -430,17 +443,17 @@ func main() {
 		fmt.Printf("  Is Empty: %v\n", effect.IsEmpty())
 	}
 
-	// Demo 3: Function Signatures
+	// Demo 3: Function Signatures.
 	fmt.Println("\n📍 Demo 3: Function Signatures")
 
 	analyzer := NewIntegratedEffectAnalyzer()
 
-	// Create various function signatures
+	// Create various function signatures.
 	functions := []struct {
 		name        string
+		description string
 		effects     []*IntegratedEffect
 		safety      ExceptionSafety
-		description string
 	}{
 		{
 			name: "pureMath",
@@ -512,7 +525,7 @@ func main() {
 		fmt.Printf("  Description: %s\n", fn.description)
 		fmt.Printf("  Signature: %s\n", signature)
 
-		// Analyze properties
+		// Analyze properties.
 		if signature.IsPure() {
 			fmt.Printf("  ✅ Pure function - no side effects\n")
 		} else {
@@ -528,7 +541,7 @@ func main() {
 		fmt.Printf("  🎯 Max Severity: %s\n", signature.MaxSeverity)
 	}
 
-	// Demo 4: Compatibility Analysis
+	// Demo 4: Compatibility Analysis.
 	fmt.Println("\n📍 Demo 4: Compatibility Analysis")
 
 	testCases := []struct {
@@ -548,29 +561,32 @@ func main() {
 
 		if !callerExists || !calleeExists {
 			fmt.Printf("❌ Cannot find signatures for %s -> %s\n", test.caller, test.callee)
+
 			continue
 		}
 
 		issues := analyzer.CheckCompatibility(caller, callee)
 
 		fmt.Printf("\nCompatibility: %s -> %s\n", test.caller, test.callee)
+
 		if len(issues) == 0 {
 			fmt.Printf("  ✅ Compatible - call is safe\n")
 		} else {
 			fmt.Printf("  ❌ Incompatible - issues found:\n")
+
 			for _, issue := range issues {
 				fmt.Printf("    • %s\n", issue)
 			}
 		}
 	}
 
-	// Demo 5: Real-world Integration Scenarios
+	// Demo 5: Real-world Integration Scenarios.
 	fmt.Println("\n📍 Demo 5: Real-world Integration Scenarios")
 
 	scenarios := []struct {
+		signature   *IntegratedEffectSignature
 		name        string
 		description string
-		signature   *IntegratedEffectSignature
 	}{
 		{
 			name:        "WebServerHandler",
@@ -601,18 +617,20 @@ func main() {
 
 		effects := scenario.signature.Effects.ToSlice()
 		fmt.Printf("  Effects (%d):\n", len(effects))
+
 		for i, effect := range effects {
 			fmt.Printf("    %d. %s\n", i+1, effect)
 		}
 
-		// Risk assessment
+		// Risk assessment.
 		riskLevel := assessRiskLevel(scenario.signature)
 		fmt.Printf("  🎯 Risk Assessment: %s\n", riskLevel)
 
-		// Recommendations
+		// Recommendations.
 		recommendations := generateRecommendations(scenario.signature)
 		if len(recommendations) > 0 {
 			fmt.Printf("  💡 Recommendations:\n")
+
 			for _, rec := range recommendations {
 				fmt.Printf("    • %s\n", rec)
 			}
@@ -640,13 +658,13 @@ func createWebServerSignature() *IntegratedEffectSignature {
 		NewExceptionSpec(ExceptionNetworkTimeout, ExceptionSeverityWarning),
 	))
 
-	// File system access for static content
+	// File system access for static content.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectFileRead, EffectLevelLow),
 		NewExceptionSpec(ExceptionFileNotFound, ExceptionSeverityWarning),
 	))
 
-	// Database queries
+	// Database queries.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectIO, EffectLevelMedium),
 		NewExceptionSpec(ExceptionConnectionFailed, ExceptionSeverityError),
@@ -665,13 +683,13 @@ func createDatabaseSignature() *IntegratedEffectSignature {
 		NewExceptionSpec(ExceptionConnectionFailed, ExceptionSeverityError),
 	))
 
-	// Transaction deadlocks
+	// Transaction deadlocks.
 	sig.AddEffect(NewIntegratedEffect(
 		nil,
 		NewExceptionSpec(ExceptionDeadlock, ExceptionSeverityError),
 	))
 
-	// Memory allocation for result sets
+	// Memory allocation for result sets.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectMemoryAlloc, EffectLevelMedium),
 		nil,
@@ -684,19 +702,19 @@ func createFileProcessorSignature() *IntegratedEffectSignature {
 	sig := NewIntegratedEffectSignature("FileProcessor")
 	sig.Safety = SafetyBasic
 
-	// File reading
+	// File reading.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectFileRead, EffectLevelMedium),
 		NewExceptionSpec(ExceptionFileNotFound, ExceptionSeverityWarning),
 	))
 
-	// File writing
+	// File writing.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectFileWrite, EffectLevelMedium),
 		NewExceptionSpec(ExceptionPermissionDenied, ExceptionSeverityError),
 	))
 
-	// Memory for buffering
+	// Memory for buffering.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectMemoryAlloc, EffectLevelHigh),
 		nil,
@@ -709,13 +727,13 @@ func createCryptoSignature() *IntegratedEffectSignature {
 	sig := NewIntegratedEffectSignature("CryptoModule")
 	sig.Safety = SafetyNoThrow
 
-	// Memory allocation for secure buffers
+	// Memory allocation for secure buffers.
 	sig.AddEffect(NewIntegratedEffect(
 		NewSideEffect(EffectMemoryAlloc, EffectLevelMedium),
 		nil,
 	))
 
-	// No exceptions for crypto operations (fail-safe design)
+	// No exceptions for crypto operations (fail-safe design).
 
 	return sig
 }

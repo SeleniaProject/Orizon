@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// ExceptionKind represents different categories of exceptions
+// ExceptionKind represents different categories of exceptions.
 type ExceptionKind int
 
 const (
@@ -36,10 +36,11 @@ func (ek ExceptionKind) String() string {
 	if int(ek) < len(names) {
 		return names[ek]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(ek))
 }
 
-// ExceptionSeverity represents the severity level of an exception
+// ExceptionSeverity represents the severity level of an exception.
 type ExceptionSeverity int
 
 const (
@@ -55,10 +56,11 @@ func (es ExceptionSeverity) String() string {
 	if int(es) < len(names) {
 		return names[es]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(es))
 }
 
-// ExceptionRecovery represents recovery strategies
+// ExceptionRecovery represents recovery strategies.
 type ExceptionRecovery int
 
 const (
@@ -76,10 +78,11 @@ func (er ExceptionRecovery) String() string {
 	if int(er) < len(names) {
 		return names[er]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(er))
 }
 
-// ExceptionSafety represents exception safety levels
+// ExceptionSafety represents exception safety levels.
 type ExceptionSafety int
 
 const (
@@ -95,18 +98,19 @@ func (es ExceptionSafety) String() string {
 	if int(es) < len(names) {
 		return names[es]
 	}
+
 	return fmt.Sprintf("Unknown(%d)", int(es))
 }
 
-// ExceptionSpec represents an exception specification
+// ExceptionSpec represents an exception specification.
 type ExceptionSpec struct {
+	Parent   *ExceptionSpec
+	Message  string
+	TypeName string
+	Children []*ExceptionSpec
 	Kind     ExceptionKind
 	Severity ExceptionSeverity
 	Recovery ExceptionRecovery
-	Message  string
-	TypeName string
-	Parent   *ExceptionSpec
-	Children []*ExceptionSpec
 }
 
 func NewExceptionSpec(kind ExceptionKind, severity ExceptionSeverity) *ExceptionSpec {
@@ -137,13 +141,14 @@ func (es *ExceptionSpec) IsSubtypeOf(other *ExceptionSpec) bool {
 		if current.Kind == other.Kind {
 			return true
 		}
+
 		current = current.Parent
 	}
 
 	return false
 }
 
-// ExceptionSet represents a collection of exception specifications
+// ExceptionSet represents a collection of exception specifications.
 type ExceptionSet struct {
 	exceptions map[ExceptionKind]*ExceptionSpec
 }
@@ -158,6 +163,7 @@ func (es *ExceptionSet) Add(exception *ExceptionSpec) {
 
 func (es *ExceptionSet) Contains(kind ExceptionKind) bool {
 	_, exists := es.exceptions[kind]
+
 	return exists
 }
 
@@ -174,6 +180,7 @@ func (es *ExceptionSet) ToSlice() []*ExceptionSpec {
 	for _, exception := range es.exceptions {
 		exceptions = append(exceptions, exception)
 	}
+
 	return exceptions
 }
 
@@ -181,10 +188,12 @@ func (es *ExceptionSet) String() string {
 	if es.IsEmpty() {
 		return "NoExceptions"
 	}
+
 	var specs []string
 	for _, spec := range es.exceptions {
 		specs = append(specs, spec.String())
 	}
+
 	return fmt.Sprintf("{%v}", specs)
 }
 
@@ -193,21 +202,23 @@ func (es *ExceptionSet) Union(other *ExceptionSet) *ExceptionSet {
 	for _, exception := range es.exceptions {
 		result.Add(exception)
 	}
+
 	for _, exception := range other.exceptions {
 		result.Add(exception)
 	}
+
 	return result
 }
 
-// TryBlock represents a try-catch-finally construct
+// TryBlock represents a try-catch-finally construct.
 type TryBlock struct {
-	Name         string
 	Throws       *ExceptionSet
 	Catches      *ExceptionSet
 	Propagates   *ExceptionSet
+	Name         string
+	Resources    []string
 	Safety       ExceptionSafety
 	FinallyBlock bool
-	Resources    []string
 }
 
 func NewTryBlock(name string) *TryBlock {
@@ -234,10 +245,10 @@ func (tb *TryBlock) String() string {
 		tb.Name, tb.Throws.String(), tb.Catches.String(), tb.Safety.String())
 }
 
-// CatchBlock represents a catch clause
+// CatchBlock represents a catch clause.
 type CatchBlock struct {
-	ExceptionTypes []*ExceptionSpec
 	Parameter      string
+	ExceptionTypes []*ExceptionSpec
 	Recovery       ExceptionRecovery
 }
 
@@ -255,6 +266,7 @@ func (cb *CatchBlock) CanHandle(exception *ExceptionSpec) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -263,17 +275,18 @@ func (cb *CatchBlock) String() string {
 	for _, t := range cb.ExceptionTypes {
 		types = append(types, t.String())
 	}
+
 	return fmt.Sprintf("catch(%s %s)", cb.Parameter, types)
 }
 
-// ExceptionSignature represents the complete exception signature of a function
+// ExceptionSignature represents the complete exception signature of a function.
 type ExceptionSignature struct {
-	FunctionName string
 	Throws       *ExceptionSet
 	Catches      *ExceptionSet
 	Propagates   *ExceptionSet
-	Safety       ExceptionSafety
+	FunctionName string
 	Guarantees   []string
+	Safety       ExceptionSafety
 }
 
 func NewExceptionSignature(name string) *ExceptionSignature {
@@ -296,10 +309,10 @@ func main() {
 	fmt.Println("🎭 Orizon Exception Effect System Demo")
 	fmt.Println("======================================")
 
-	// Demo 1: Exception Hierarchy and Specifications
+	// Demo 1: Exception Hierarchy and Specifications.
 	fmt.Println("\n📍 Demo 1: Exception Hierarchy")
 
-	// Create exception hierarchy
+	// Create exception hierarchy.
 	runtime := NewExceptionSpec(ExceptionRuntime, SeverityError)
 	nullPointer := NewExceptionSpec(ExceptionNullPointer, SeverityError)
 	indexBounds := NewExceptionSpec(ExceptionIndexOutOfBounds, SeverityError)
@@ -315,12 +328,12 @@ func main() {
 	fmt.Printf("    ├─ %s\n", indexBounds)
 	fmt.Printf("    └─ %s\n", divisionByZero)
 
-	// Test subtype relationships
+	// Test subtype relationships.
 	fmt.Printf("\nSubtype Tests:\n")
 	fmt.Printf("  NullPointer is subtype of Runtime: %v\n", nullPointer.IsSubtypeOf(runtime))
 	fmt.Printf("  Runtime is subtype of NullPointer: %v\n", runtime.IsSubtypeOf(nullPointer))
 
-	// Demo 2: Exception Sets and Operations
+	// Demo 2: Exception Sets and Operations.
 	fmt.Println("\n📍 Demo 2: Exception Sets")
 
 	set1 := NewExceptionSet()
@@ -337,10 +350,10 @@ func main() {
 	union := set1.Union(set2)
 	fmt.Printf("Union: %s\n", union)
 
-	// Demo 3: Try-Catch-Finally Blocks
+	// Demo 3: Try-Catch-Finally Blocks.
 	fmt.Println("\n📍 Demo 3: Try-Catch-Finally Blocks")
 
-	// Create try blocks for different scenarios
+	// Create try blocks for different scenarios.
 	fileOperations := NewTryBlock("FileOperations")
 	fileOperations.AddThrows(NewExceptionSpec(ExceptionFileNotFound, SeverityError))
 	fileOperations.AddThrows(NewExceptionSpec(ExceptionPermissionDenied, SeverityError))
@@ -357,10 +370,10 @@ func main() {
 	fmt.Printf("%s\n", fileOperations)
 	fmt.Printf("%s\n", networkOperations)
 
-	// Demo 4: Catch Block Handling
+	// Demo 4: Catch Block Handling.
 	fmt.Println("\n📍 Demo 4: Catch Block Handling")
 
-	// Create catch blocks
+	// Create catch blocks.
 	runtimeCatch := NewCatchBlock([]*ExceptionSpec{runtime}, "e")
 	runtimeCatch.Recovery = RecoveryLog
 
@@ -371,21 +384,21 @@ func main() {
 	fmt.Printf("  %s (recovery: %s)\n", runtimeCatch, runtimeCatch.Recovery)
 	fmt.Printf("  %s (recovery: %s)\n", ioCatch, ioCatch.Recovery)
 
-	// Test exception handling
+	// Test exception handling.
 	fmt.Printf("\nException Handling Tests:\n")
 	fmt.Printf("  Runtime catch can handle NullPointer: %v\n", runtimeCatch.CanHandle(nullPointer))
 	fmt.Printf("  Runtime catch can handle IOError: %v\n", runtimeCatch.CanHandle(NewExceptionSpec(ExceptionIOError, SeverityError)))
 	fmt.Printf("  IO catch can handle FileNotFound: %v\n", ioCatch.CanHandle(NewExceptionSpec(ExceptionFileNotFound, SeverityError)))
 
-	// Demo 5: Exception Safety Levels
+	// Demo 5: Exception Safety Levels.
 	fmt.Println("\n📍 Demo 5: Exception Safety Levels")
 
 	functions := []struct {
 		name    string
+		desc    string
 		throws  []*ExceptionSpec
 		catches []*ExceptionSpec
 		safety  ExceptionSafety
-		desc    string
 	}{
 		{
 			name:   "PureMathFunction",
@@ -423,9 +436,11 @@ func main() {
 		for _, spec := range fn.throws {
 			signature.Throws.Add(spec)
 		}
+
 		for _, spec := range fn.catches {
 			signature.Catches.Add(spec)
 		}
+
 		signature.Safety = fn.safety
 
 		fmt.Printf("\nFunction: %s\n", fn.name)
@@ -433,7 +448,7 @@ func main() {
 		fmt.Printf("  Signature: %s\n", signature)
 		fmt.Printf("  Safety Level: %s\n", fn.safety)
 
-		// Analyze safety
+		// Analyze safety.
 		if signature.Throws.IsEmpty() {
 			fmt.Printf("  ✅ No exceptions thrown - highest safety\n")
 		} else if signature.Catches.Size() >= signature.Throws.Size() {
@@ -445,13 +460,13 @@ func main() {
 		}
 	}
 
-	// Demo 6: Exception Propagation Analysis
+	// Demo 6: Exception Propagation Analysis.
 	fmt.Println("\n📍 Demo 6: Exception Propagation Analysis")
 
 	callChain := []struct {
-		name    string
 		throws  *ExceptionSet
 		catches *ExceptionSet
+		name    string
 	}{
 		{
 			name: "lowLevelFunction",
@@ -459,6 +474,7 @@ func main() {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionFileNotFound, SeverityError))
 				set.Add(NewExceptionSpec(ExceptionPermissionDenied, SeverityError))
+
 				return set
 			}(),
 			catches: NewExceptionSet(),
@@ -469,11 +485,13 @@ func main() {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionPermissionDenied, SeverityError))
 				set.Add(NewExceptionSpec(ExceptionIOError, SeverityError))
+
 				return set
 			}(),
 			catches: func() *ExceptionSet {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionFileNotFound, SeverityError))
+
 				return set
 			}(),
 		},
@@ -484,12 +502,14 @@ func main() {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionIOError, SeverityError))
 				set.Add(NewExceptionSpec(ExceptionPermissionDenied, SeverityError))
+
 				return set
 			}(),
 		},
 	}
 
 	fmt.Printf("Exception Propagation Chain:\n")
+
 	propagated := NewExceptionSet()
 
 	for i, fn := range callChain {
@@ -497,25 +517,26 @@ func main() {
 		fmt.Printf("     Throws: %s\n", fn.throws)
 		fmt.Printf("     Catches: %s\n", fn.catches)
 
-		// Calculate propagated exceptions
+		// Calculate propagated exceptions.
 		combined := propagated.Union(fn.throws)
 		for _, caught := range fn.catches.ToSlice() {
 			if combined.Contains(caught.Kind) {
 				delete(combined.exceptions, caught.Kind)
 			}
 		}
+
 		propagated = combined
 
 		fmt.Printf("     Propagates: %s\n", propagated)
 	}
 
-	// Demo 7: Real-world Exception Scenarios
+	// Demo 7: Real-world Exception Scenarios.
 	fmt.Println("\n📍 Demo 7: Real-world Scenarios")
 
 	scenarios := []struct {
+		exceptions  *ExceptionSet
 		name        string
 		description string
-		exceptions  *ExceptionSet
 		safety      ExceptionSafety
 		recovery    ExceptionRecovery
 	}{
@@ -526,6 +547,7 @@ func main() {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionNetworkTimeout, SeverityWarning))
 				set.Add(NewExceptionSpec(ExceptionPermissionDenied, SeverityError))
+
 				return set
 			}(),
 			safety:   SafetyStrong,
@@ -538,6 +560,7 @@ func main() {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionDeadlock, SeverityError))
 				set.Add(NewExceptionSpec(ExceptionSystemError, SeverityCritical))
+
 				return set
 			}(),
 			safety:   SafetyStrong,
@@ -550,6 +573,7 @@ func main() {
 				set := NewExceptionSet()
 				set.Add(NewExceptionSpec(ExceptionFileNotFound, SeverityWarning))
 				set.Add(NewExceptionSpec(ExceptionOutOfMemory, SeverityFatal))
+
 				return set
 			}(),
 			safety:   SafetyBasic,
@@ -571,15 +595,17 @@ func main() {
 		fmt.Printf("  Safety: %s\n", scenario.safety)
 		fmt.Printf("  Recovery: %s\n", scenario.recovery)
 
-		// Risk assessment
+		// Risk assessment.
 		if scenario.exceptions.IsEmpty() {
 			fmt.Printf("  🟢 Risk Level: Very Low (No exceptions)\n")
 		} else {
 			riskLevel := "Low"
 			hasHighSeverity := false
+
 			for _, spec := range scenario.exceptions.ToSlice() {
 				if spec.Severity >= SeverityCritical {
 					hasHighSeverity = true
+
 					break
 				}
 			}

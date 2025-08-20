@@ -37,6 +37,7 @@ func main() {
 		cleanupSnapshots bool
 		goldenTests      bool
 	)
+
 	flag.StringVar(&pkgs, "packages", "./...", "comma-separated package patterns (e.g. ./...,./internal/...)")
 	flag.StringVar(&runPat, "run", "", "regex to select tests (forwarded to go test -run)")
 	flag.IntVar(&par, "p", 0, "parallel package workers (default: GOMAXPROCS)")
@@ -92,12 +93,14 @@ func main() {
 		GoldenTests:      goldenTests,
 	})
 	ctx := context.Background()
+
 	res, err := runner.Run(ctx, os.Stdout)
 	if err != nil {
-		// non-zero exit on failure
+		// non-zero exit on failure.
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+
 	_ = res
 }
 
@@ -105,13 +108,16 @@ func splitNonEmpty(s, sep string) []string {
 	if strings.TrimSpace(s) == "" {
 		return nil
 	}
+
 	parts := strings.Split(s, sep)
 	out := make([]string, 0, len(parts))
+
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p != "" {
 			out = append(out, p)
 		}
 	}
+
 	return out
 }

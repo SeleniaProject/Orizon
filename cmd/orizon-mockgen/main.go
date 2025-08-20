@@ -41,6 +41,7 @@ func main() {
 		tags    string
 		lang    string
 	)
+
 	flag.StringVar(&iface, "interface", "", "interface name to mock (required)")
 	flag.StringVar(&genPkg, "pkg", "", "generated package name (default: <src pkg>mock)")
 	flag.StringVar(&out, "out", "", "destination file path (writes to file when set)")
@@ -56,14 +57,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, L.usage)
 		os.Exit(2)
 	}
+
 	var src []string
+
 	for _, p := range strings.Split(sources, ",") {
 		p = strings.TrimSpace(p)
 		if p != "" {
 			src = append(src, p)
 		}
 	}
+
 	var tagSlice []string
+
 	for _, t := range strings.Split(tags, ",") {
 		t = strings.TrimSpace(t)
 		if t != "" {
@@ -85,7 +90,9 @@ func main() {
 
 	if out != "" {
 		fmt.Fprintln(os.Stdout, L.okGenerated(out))
+
 		return
 	}
+
 	fmt.Fprintln(os.Stdout, code)
 }

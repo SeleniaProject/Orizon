@@ -12,8 +12,8 @@ func TestSecurityValidator_ValidateInputFile(t *testing.T) {
 	tests := []struct {
 		name        string
 		filename    string
-		expectError bool
 		errorMsg    string
+		expectError bool
 	}{
 		{
 			name:        "valid_orizon_file",
@@ -70,8 +70,10 @@ func TestSecurityValidator_ValidateInputFile(t *testing.T) {
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
+
 					return
 				}
+
 				if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("expected error message to contain '%s', got: %s", tt.errorMsg, err.Error())
 				}
@@ -90,8 +92,8 @@ func TestSecurityValidator_ValidateOutputPath(t *testing.T) {
 	tests := []struct {
 		name        string
 		outputPath  string
-		expectError bool
 		errorMsg    string
+		expectError bool
 	}{
 		{
 			name:        "empty_path_stdout",
@@ -129,8 +131,10 @@ func TestSecurityValidator_ValidateOutputPath(t *testing.T) {
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
+
 					return
 				}
+
 				if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("expected error message to contain '%s', got: %s", tt.errorMsg, err.Error())
 				}
@@ -253,7 +257,7 @@ func TestSecurityValidator_SanitizeString(t *testing.T) {
 func TestSecurityValidator_PlatformSpecific(t *testing.T) {
 	validator := NewSecurityValidator()
 
-	// Test platform-specific blocked patterns
+	// Test platform-specific blocked patterns.
 	if runtime.GOOS == "windows" {
 		err := validator.ValidateInputFile("C:\\Windows\\System32\\kernel32.dll")
 		if err == nil {
@@ -272,6 +276,7 @@ func BenchmarkSecurityValidator_ValidateInputFile(b *testing.B) {
 	filename := "test.oriz"
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_ = validator.ValidateInputFile(filename)
 	}
