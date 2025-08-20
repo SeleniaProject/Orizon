@@ -644,8 +644,8 @@ func TestLayoutIntegration(t *testing.T) {
 	}
 
 	fields := []FieldInfo{
-		{Name: "A", Type: "i8", Size: 1, Alignment: 1},
 		{Name: "B", Type: "i32", Size: 4, Alignment: 4},
+		{Name: "A", Type: "i8", Size: 1, Alignment: 1},
 		{Name: "C", Type: "i8", Size: 1, Alignment: 1},
 	}
 
