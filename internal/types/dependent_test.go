@@ -1,5 +1,5 @@
-// Test suite for dependent type functionality
-// This module provides comprehensive testing for dependent types in the Orizon type system
+// Test suite for dependent type functionality.
+// This module provides comprehensive testing for dependent types in the Orizon type system.
 
 package types
 
@@ -7,18 +7,17 @@ import (
 	"testing"
 )
 
-// TestBasicDependentType tests basic dependent type creation and validation
+// TestBasicDependentType tests basic dependent type creation and validation.
 func TestBasicDependentType(t *testing.T) {
-	// Create a basic dependent type for testing
-	// For now, we'll use the existing type system structures
-
-	// Test creating a basic type
+	// Create a basic dependent type for testing.
+	// For now, we'll use the existing type system structures.
+	// Test creating a basic type.
 	intType := &Type{Kind: TypeKindInt32, Size: 4}
 	if intType == nil {
 		t.Error("Failed to create basic integer type")
 	}
 
-	// Test type properties
+	// Test type properties.
 	if intType.Kind != TypeKindInt32 {
 		t.Errorf("Expected TypeKindInt32, got %s", intType.Kind.String())
 	}
@@ -28,9 +27,9 @@ func TestBasicDependentType(t *testing.T) {
 	}
 }
 
-// TestArrayDependentType tests dependent types with array structures
+// TestArrayDependentType tests dependent types with array structures.
 func TestArrayDependentType(t *testing.T) {
-	// Test array type with dependent size
+	// Test array type with dependent size.
 	elementType := &Type{Kind: TypeKindInt32, Size: 4}
 	arrayType := &ArrayType{
 		ElementType: elementType,
@@ -46,9 +45,9 @@ func TestArrayDependentType(t *testing.T) {
 	}
 }
 
-// TestGenericTypeDependencies tests generic type constraints and dependencies
+// TestGenericTypeDependencies tests generic type constraints and dependencies.
 func TestGenericTypeDependencies(t *testing.T) {
-	// Create a generic type with constraints
+	// Create a generic type with constraints.
 	constraint1 := &Type{Kind: TypeKindInt32}
 	constraint2 := &Type{Kind: TypeKindFloat64}
 	constraints := []*Type{constraint1, constraint2}
@@ -72,13 +71,13 @@ func TestGenericTypeDependencies(t *testing.T) {
 	}
 }
 
-// TestTypeVariableConstraints tests type variable constraint handling
+// TestTypeVariableConstraints tests type variable constraint handling.
 func TestTypeVariableConstraints(t *testing.T) {
-	// Create constraints for type variable
+	// Create constraints for type variable.
 	intConstraint := &Type{Kind: TypeKindInt32}
 	constraints := []*Type{intConstraint}
 
-	// Create type variable with constraints
+	// Create type variable with constraints.
 	typeVar := &TypeVar{
 		ID:          1,
 		Name:        "T1",
@@ -103,14 +102,14 @@ func TestTypeVariableConstraints(t *testing.T) {
 	}
 }
 
-// TestDependentTypeValidation tests validation of dependent type relationships
+// TestDependentTypeValidation tests validation of dependent type relationships.
 func TestDependentTypeValidation(t *testing.T) {
-	// Test creating function type with dependent return type
+	// Test creating function type with dependent return type.
 	paramType := &Type{Kind: TypeKindInt32}
 	returnType := &Type{Kind: TypeKindBool}
 
-	// Create a function type structure (simulated)
-	// In a full implementation, this would be more complex
+	// Create a function type structure (simulated).
+	// In a full implementation, this would be more complex.
 	funcData := map[string]interface{}{
 		"parameters": []*Type{paramType},
 		"return":     returnType,
@@ -130,12 +129,12 @@ func TestDependentTypeValidation(t *testing.T) {
 	}
 }
 
-// TestEffectTypeDependency tests effect types with dependencies
+// TestEffectTypeDependency tests effect types with dependencies.
 func TestEffectTypeDependency(t *testing.T) {
-	// Create base type for effect
+	// Create base type for effect.
 	baseType := &Type{Kind: TypeKindInt32}
 
-	// Create effects
+	// Create effects.
 	effect1 := Effect{
 		Name:       "IO",
 		Parameters: []string{"input", "output"},
@@ -150,7 +149,7 @@ func TestEffectTypeDependency(t *testing.T) {
 
 	effects := []Effect{effect1, effect2}
 
-	// Create effect type
+	// Create effect type.
 	effectType := &EffectType{
 		BaseType: baseType,
 		Effects:  effects,
@@ -164,7 +163,7 @@ func TestEffectTypeDependency(t *testing.T) {
 		t.Errorf("Expected 2 effects, got %d", len(effectType.Effects))
 	}
 
-	// Test individual effects
+	// Test individual effects.
 	if effectType.Effects[0].Name != "IO" {
 		t.Errorf("Expected first effect name 'IO', got '%s'", effectType.Effects[0].Name)
 	}
@@ -174,12 +173,12 @@ func TestEffectTypeDependency(t *testing.T) {
 	}
 }
 
-// TestLinearTypeDependency tests linear type dependency tracking
+// TestLinearTypeDependency tests linear type dependency tracking.
 func TestLinearTypeDependency(t *testing.T) {
-	// Create base type for linear type
+	// Create base type for linear type.
 	baseType := &Type{Kind: TypeKindInt32}
 
-	// Create linear type
+	// Create linear type.
 	linearType := &LinearType{
 		BaseType:   baseType,
 		UsageCount: 0,
@@ -198,7 +197,7 @@ func TestLinearTypeDependency(t *testing.T) {
 		t.Error("Expected linear type to not be consumed initially")
 	}
 
-	// Simulate usage
+	// Simulate usage.
 	linearType.UsageCount++
 	linearType.IsConsumed = true
 

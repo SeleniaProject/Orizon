@@ -4,21 +4,21 @@ import (
 	"github.com/orizon-lang/orizon/internal/mir"
 )
 
-// CoreTypeMIRIntegration provides MIR-level code generation for core type operations
+// CoreTypeMIRIntegration provides MIR-level code generation for core type operations.
 type CoreTypeMIRIntegration struct {
 	module *mir.Module
 }
 
-// NewCoreTypeMIRIntegration creates a new core type MIR integration
+// NewCoreTypeMIRIntegration creates a new core type MIR integration.
 func NewCoreTypeMIRIntegration(module *mir.Module) *CoreTypeMIRIntegration {
 	return &CoreTypeMIRIntegration{
 		module: module,
 	}
 }
 
-// GenerateOptionOperations creates MIR functions for Option type operations
+// GenerateOptionOperations creates MIR functions for Option type operations.
 func (ctm *CoreTypeMIRIntegration) GenerateOptionOperations() []*mir.Function {
-	// Placeholder for Option operations
+	// Placeholder for Option operations.
 	someFunc := &mir.Function{
 		Name: "option_some",
 		Parameters: []mir.Value{
@@ -38,7 +38,7 @@ func (ctm *CoreTypeMIRIntegration) GenerateOptionOperations() []*mir.Function {
 	return []*mir.Function{someFunc}
 }
 
-// GenerateResultOperations creates MIR functions for Result type operations
+// GenerateResultOperations creates MIR functions for Result type operations.
 func (ctm *CoreTypeMIRIntegration) GenerateResultOperations() []*mir.Function {
 	okFunc := &mir.Function{
 		Name: "result_ok",
@@ -59,7 +59,7 @@ func (ctm *CoreTypeMIRIntegration) GenerateResultOperations() []*mir.Function {
 	return []*mir.Function{okFunc}
 }
 
-// GetAllCoreFunctions returns all core type MIR functions
+// GetAllCoreFunctions returns all core type MIR functions.
 func (ctm *CoreTypeMIRIntegration) GetAllCoreFunctions() []*mir.Function {
 	var functions []*mir.Function
 
@@ -69,10 +69,8 @@ func (ctm *CoreTypeMIRIntegration) GetAllCoreFunctions() []*mir.Function {
 	return functions
 }
 
-// RegisterCoreFunctions registers all core type functions with the MIR module
+// RegisterCoreFunctions registers all core type functions with the MIR module.
 func (ctm *CoreTypeMIRIntegration) RegisterCoreFunctions() {
 	functions := ctm.GetAllCoreFunctions()
-	for _, function := range functions {
-		ctm.module.Functions = append(ctm.module.Functions, function)
-	}
+	ctm.module.Functions = append(ctm.module.Functions, functions...)
 }

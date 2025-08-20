@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-// TestExceptionKind tests exception kind functionality
+// TestExceptionKind tests exception kind functionality.
 func TestExceptionKind(t *testing.T) {
-	// Test exception kind string representation
+	// Test exception kind string representation.
 	tests := []struct {
-		kind     ExceptionKind
 		expected string
+		kind     ExceptionKind
 	}{
 		{ExceptionNone, "None"},
 		{ExceptionRuntime, "Runtime"},
@@ -33,12 +33,12 @@ func TestExceptionKind(t *testing.T) {
 	}
 }
 
-// TestExceptionSeverity tests exception severity functionality
+// TestExceptionSeverity tests exception severity functionality.
 func TestExceptionSeverity(t *testing.T) {
-	// Test severity string representation
+	// Test severity string representation.
 	tests := []struct {
-		severity ExceptionSeverity
 		expected string
+		severity ExceptionSeverity
 	}{
 		{ExceptionSeverityInfo, "Info"},
 		{ExceptionSeverityWarning, "Warning"},
@@ -55,24 +55,25 @@ func TestExceptionSeverity(t *testing.T) {
 	}
 }
 
-// TestExceptionSpec tests exception specification functionality
+// TestExceptionSpec tests exception specification functionality.
 func TestExceptionSpec(t *testing.T) {
-	// Test exception spec creation
+	// Test exception spec creation.
 	spec := NewExceptionSpec(ExceptionNullPointer, ExceptionSeverityError)
 	if spec.Kind != ExceptionNullPointer {
 		t.Errorf("NewExceptionSpec kind = %v, expected %v", spec.Kind, ExceptionNullPointer)
 	}
+
 	if spec.Severity != ExceptionSeverityError {
 		t.Errorf("NewExceptionSpec severity = %v, expected %v", spec.Severity, ExceptionSeverityError)
 	}
 
-	// Test string representation
+	// Test string representation.
 	expected := "NullPointer[Error]"
 	if spec.String() != expected {
 		t.Errorf("ExceptionSpec.String() = %s, expected %s", spec.String(), expected)
 	}
 
-	// Test subtype relationships
+	// Test subtype relationships.
 	parent := NewExceptionSpec(ExceptionRuntime, ExceptionSeverityError)
 	child := NewExceptionSpec(ExceptionNullPointer, ExceptionSeverityError)
 
@@ -87,66 +88,75 @@ func TestExceptionSpec(t *testing.T) {
 	}
 }
 
-// TestExceptionSet tests exception set functionality
+// TestExceptionSet tests exception set functionality.
 func TestExceptionSet(t *testing.T) {
 	set := NewExceptionSet()
 
-	// Test empty set
+	// Test empty set.
 	if !set.IsEmpty() {
 		t.Error("New ExceptionSet should be empty")
 	}
+
 	if set.Size() != 0 {
 		t.Errorf("Empty set size = %d, expected 0", set.Size())
 	}
 
-	// Test adding exceptions
+	// Test adding exceptions.
 	spec1 := NewExceptionSpec(ExceptionNullPointer, ExceptionSeverityError)
 	spec2 := NewExceptionSpec(ExceptionIOError, ExceptionSeverityCritical)
 
 	set.Add(spec1)
+
 	if set.IsEmpty() {
 		t.Error("Set should not be empty after adding exception")
 	}
+
 	if set.Size() != 1 {
 		t.Errorf("Set size = %d, expected 1", set.Size())
 	}
 
 	set.Add(spec2)
+
 	if set.Size() != 2 {
 		t.Errorf("Set size = %d, expected 2", set.Size())
 	}
 
-	// Test contains
+	// Test contains.
 	if !set.Contains(ExceptionNullPointer) {
 		t.Error("Set should contain ExceptionNullPointer")
 	}
+
 	if !set.Contains(ExceptionIOError) {
 		t.Error("Set should contain ExceptionIOError")
 	}
+
 	if set.Contains(ExceptionDeadlock) {
 		t.Error("Set should not contain ExceptionDeadlock")
 	}
 
-	// Test get
+	// Test get.
 	retrieved, exists := set.Get(ExceptionNullPointer)
 	if !exists {
 		t.Error("Should be able to get existing exception")
 	}
+
 	if retrieved.Kind != ExceptionNullPointer {
 		t.Errorf("Retrieved exception kind = %v, expected %v", retrieved.Kind, ExceptionNullPointer)
 	}
 
-	// Test remove
+	// Test remove.
 	set.Remove(ExceptionNullPointer)
+
 	if set.Contains(ExceptionNullPointer) {
 		t.Error("Set should not contain removed exception")
 	}
+
 	if set.Size() != 1 {
 		t.Errorf("Set size = %d, expected 1 after removal", set.Size())
 	}
 }
 
-// TestExceptionSetOperations tests exception set operations
+// TestExceptionSetOperations tests exception set operations.
 func TestExceptionSetOperations(t *testing.T) {
 	set1 := NewExceptionSet()
 	set2 := NewExceptionSet()
@@ -161,37 +171,40 @@ func TestExceptionSetOperations(t *testing.T) {
 	set2.Add(spec2)
 	set2.Add(spec3)
 
-	// Test union
+	// Test union.
 	union := set1.Union(set2)
 	if union.Size() != 3 {
 		t.Errorf("Union size = %d, expected 3", union.Size())
 	}
+
 	if !union.Contains(ExceptionNullPointer) || !union.Contains(ExceptionIOError) || !union.Contains(ExceptionDeadlock) {
 		t.Error("Union should contain all exceptions from both sets")
 	}
 
-	// Test intersection
+	// Test intersection.
 	intersection := set1.Intersection(set2)
 	if intersection.Size() != 1 {
 		t.Errorf("Intersection size = %d, expected 1", intersection.Size())
 	}
+
 	if !intersection.Contains(ExceptionIOError) {
 		t.Error("Intersection should contain common exception")
 	}
 
-	// Test subtraction
+	// Test subtraction.
 	subtract := set1.Subtract(set2)
 	if subtract.Size() != 1 {
 		t.Errorf("Subtract size = %d, expected 1", subtract.Size())
 	}
+
 	if !subtract.Contains(ExceptionNullPointer) {
 		t.Error("Subtract should contain unique exception from first set")
 	}
 }
 
-// TestTryBlock tests try block functionality
+// TestTryBlock tests try block functionality.
 func TestTryBlock(t *testing.T) {
-	// Create a simple expression for testing
+	// Create a simple expression for testing.
 	body := &Expression{
 		BaseNode: BaseNode{
 			Location: &SourceLocation{
@@ -213,7 +226,7 @@ func TestTryBlock(t *testing.T) {
 		t.Error("New TryBlock should have no catch blocks")
 	}
 
-	// Test adding catch block
+	// Test adding catch block.
 	exceptionTypes := []*ExceptionSpec{
 		NewExceptionSpec(ExceptionNullPointer, ExceptionSeverityError),
 	}
@@ -224,7 +237,7 @@ func TestTryBlock(t *testing.T) {
 		t.Errorf("TryBlock should have 1 catch block, got %d", len(tryBlock.CatchBlocks))
 	}
 
-	// Test finally block
+	// Test finally block.
 	finallyBlock := NewFinallyBlock(body)
 	tryBlock.SetFinallyBlock(finallyBlock)
 
@@ -233,7 +246,7 @@ func TestTryBlock(t *testing.T) {
 	}
 }
 
-// TestCatchBlock tests catch block functionality
+// TestCatchBlock tests catch block functionality.
 func TestCatchBlock(t *testing.T) {
 	body := &Expression{
 		BaseNode: BaseNode{
@@ -246,37 +259,37 @@ func TestCatchBlock(t *testing.T) {
 		Value: "test",
 	}
 
-	// Create exception hierarchy
+	// Create exception hierarchy.
 	runtime := NewExceptionSpec(ExceptionRuntime, ExceptionSeverityError)
 	nullPointer := NewExceptionSpec(ExceptionNullPointer, ExceptionSeverityError)
 	runtime.AddChild(nullPointer)
 
-	// Test catch block that handles runtime exceptions
+	// Test catch block that handles runtime exceptions.
 	exceptionTypes := []*ExceptionSpec{runtime}
 	catchBlock := NewCatchBlock(exceptionTypes, "e", body)
 
-	// Should handle runtime exception
+	// Should handle runtime exception.
 	if !catchBlock.CanHandle(runtime) {
 		t.Error("Catch block should handle runtime exception")
 	}
 
-	// Should handle null pointer exception (subtype of runtime)
+	// Should handle null pointer exception (subtype of runtime).
 	if !catchBlock.CanHandle(nullPointer) {
 		t.Error("Catch block should handle null pointer exception")
 	}
 
-	// Should not handle unrelated exception
+	// Should not handle unrelated exception.
 	ioError := NewExceptionSpec(ExceptionIOError, ExceptionSeverityError)
 	if catchBlock.CanHandle(ioError) {
 		t.Error("Catch block should not handle IO error")
 	}
 }
 
-// TestExceptionSignature tests exception signature functionality
+// TestExceptionSignature tests exception signature functionality.
 func TestExceptionSignature(t *testing.T) {
 	signature := NewExceptionSignature()
 
-	// Test new signature
+	// Test new signature.
 	if !signature.Throws.IsEmpty() {
 		t.Error("New signature should have no thrown exceptions")
 	}
@@ -285,7 +298,7 @@ func TestExceptionSignature(t *testing.T) {
 		t.Errorf("New signature safety = %v, expected %v", signature.Safety, SafetyBasic)
 	}
 
-	// Test adding exceptions
+	// Test adding exceptions.
 	spec := NewExceptionSpec(ExceptionNullPointer, ExceptionSeverityError)
 	signature.Throws.Add(spec)
 
@@ -293,18 +306,18 @@ func TestExceptionSignature(t *testing.T) {
 		t.Error("Signature should have thrown exceptions after adding")
 	}
 
-	// Test safety levels
+	// Test safety levels.
 	signature.Safety = SafetyNoThrow
 	if signature.Safety.String() != "NoThrow" {
 		t.Errorf("Safety string = %s, expected NoThrow", signature.Safety.String())
 	}
 }
 
-// TestExceptionAnalyzer tests exception analyzer functionality
+// TestExceptionAnalyzer tests exception analyzer functionality.
 func TestExceptionAnalyzer(t *testing.T) {
 	analyzer := NewExceptionAnalyzer()
 
-	// Create a simple expression for testing
+	// Create a simple expression for testing.
 	node := &Expression{
 		BaseNode: BaseNode{
 			Location: &SourceLocation{
@@ -325,19 +338,19 @@ func TestExceptionAnalyzer(t *testing.T) {
 		t.Error("Exception analysis should return a signature")
 	}
 
-	// Check statistics
+	// Check statistics.
 	stats := analyzer.statistics.GetStats()
 	if stats.TotalAnalyses == 0 {
 		t.Error("Statistics should show analysis was performed")
 	}
 }
 
-// TestExceptionRecovery tests exception recovery functionality
+// TestExceptionRecovery tests exception recovery functionality.
 func TestExceptionRecovery(t *testing.T) {
-	// Test recovery string representation
+	// Test recovery string representation.
 	tests := []struct {
-		recovery ExceptionRecovery
 		expected string
+		recovery ExceptionRecovery
 	}{
 		{RecoveryNone, "None"},
 		{RecoveryRetry, "Retry"},
@@ -357,12 +370,12 @@ func TestExceptionRecovery(t *testing.T) {
 	}
 }
 
-// BenchmarkExceptionSetOperations benchmarks exception set operations
+// BenchmarkExceptionSetOperations benchmarks exception set operations.
 func BenchmarkExceptionSetOperations(b *testing.B) {
 	set := NewExceptionSet()
 	specs := make([]*ExceptionSpec, 100)
 
-	// Prepare exception specs
+	// Prepare exception specs.
 	for i := 0; i < 100; i++ {
 		kind := ExceptionKind(i%20 + 1)      // Cycle through first 20 exception kinds
 		severity := ExceptionSeverity(i % 5) // Cycle through severities
@@ -392,17 +405,18 @@ func BenchmarkExceptionSetOperations(b *testing.B) {
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			set.Union(other)
 		}
 	})
 }
 
-// BenchmarkExceptionAnalysis benchmarks exception analysis performance
+// BenchmarkExceptionAnalysis benchmarks exception analysis performance.
 func BenchmarkExceptionAnalysis(b *testing.B) {
 	analyzer := NewExceptionAnalyzer()
 
-	// Create a simple AST node for testing
+	// Create a simple AST node for testing.
 	node := &Expression{
 		BaseNode: BaseNode{
 			Location: &SourceLocation{

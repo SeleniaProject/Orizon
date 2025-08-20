@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// LinearityKind represents different kinds of linearity
+// LinearityKind represents different kinds of linearity.
 type LinearityKind int
 
 const (
@@ -17,7 +17,7 @@ const (
 	LinearKindUnrestricted                      // Use any number of times
 )
 
-// String returns a string representation of the linearity kind
+// String returns a string representation of the linearity kind.
 func (lk LinearityKind) String() string {
 	switch lk {
 	case LinearKindAffine:
@@ -33,19 +33,20 @@ func (lk LinearityKind) String() string {
 	}
 }
 
-// LinearTypeWrapper represents a linear type with usage constraints
+// LinearTypeWrapper represents a linear type with usage constraints.
 type LinearTypeWrapper struct {
 	BaseType      *Type
+	UniqueId      string
 	Linearity     LinearityKind
 	UsageCount    int
 	IsConsumed    bool
 	MoveSemantics bool
-	UniqueId      string
 }
 
-// String returns a string representation of the linear type
+// String returns a string representation of the linear type.
 func (lt *LinearTypeWrapper) String() string {
 	suffix := ""
+
 	switch lt.Linearity {
 	case LinearKindAffine:
 		suffix = "?"
@@ -65,7 +66,7 @@ func (lt *LinearTypeWrapper) String() string {
 	return fmt.Sprintf("%s%s%s", lt.BaseType.String(), suffix, consumed)
 }
 
-// CanUse checks if the linear type can be used again
+// CanUse checks if the linear type can be used again.
 func (lt *LinearTypeWrapper) CanUse() bool {
 	if lt.IsConsumed {
 		return false
@@ -85,7 +86,7 @@ func (lt *LinearTypeWrapper) CanUse() bool {
 	}
 }
 
-// Use marks the linear type as used
+// Use marks the linear type as used.
 func (lt *LinearTypeWrapper) Use() error {
 	if !lt.CanUse() {
 		return fmt.Errorf("linear type %s cannot be used (already consumed or used)", lt.String())
@@ -101,7 +102,7 @@ func (lt *LinearTypeWrapper) Use() error {
 	return nil
 }
 
-// Clone creates a copy of the linear type (for move semantics)
+// Clone creates a copy of the linear type (for move semantics).
 func (lt *LinearTypeWrapper) Clone() *LinearTypeWrapper {
 	return &LinearTypeWrapper{
 		BaseType:      lt.BaseType,
@@ -113,31 +114,32 @@ func (lt *LinearTypeWrapper) Clone() *LinearTypeWrapper {
 	}
 }
 
-// IsLinearlyEquivalent checks if two linear types are equivalent
+// IsLinearlyEquivalent checks if two linear types are equivalent.
 func (lt *LinearTypeWrapper) IsLinearlyEquivalent(other *LinearTypeWrapper) bool {
 	return lt.BaseType.Equals(other.BaseType) && lt.Linearity == other.Linearity
 }
 
-// LinearVariable represents a variable with linear constraints
+// LinearVariable represents a variable with linear constraints.
 type LinearVariable struct {
-	Name     string
 	Type     *LinearTypeWrapper
+	Name     string
+	Borrows  []*LinearBorrow
 	Location SourceLocation
 	LastUsed SourceLocation
 	IsMoved  bool
-	Borrows  []*LinearBorrow
 }
 
-// String returns a string representation of the linear variable
+// String returns a string representation of the linear variable.
 func (lv *LinearVariable) String() string {
 	moved := ""
 	if lv.IsMoved {
 		moved = " (moved)"
 	}
+
 	return fmt.Sprintf("%s: %s%s", lv.Name, lv.Type.String(), moved)
 }
 
-// CanBorrow checks if the variable can be borrowed
+// CanBorrow checks if the variable can be borrowed.
 func (lv *LinearVariable) CanBorrow(borrowKind BorrowKind) bool {
 	if lv.IsMoved {
 		return false
@@ -147,7 +149,7 @@ func (lv *LinearVariable) CanBorrow(borrowKind BorrowKind) bool {
 		return false
 	}
 
-	// Check for conflicting borrows
+	// Check for conflicting borrows.
 	for _, borrow := range lv.Borrows {
 		if borrow.IsActive && borrow.ConflictsWith(borrowKind) {
 			return false
@@ -157,7 +159,7 @@ func (lv *LinearVariable) CanBorrow(borrowKind BorrowKind) bool {
 	return true
 }
 
-// BorrowKind represents different kinds of borrows
+// BorrowKind represents different kinds of borrows.
 type BorrowKind int
 
 const (
@@ -166,7 +168,7 @@ const (
 	BorrowKindUniqueRef                   // &uniq T
 )
 
-// String returns a string representation of the borrow kind
+// String returns a string representation of the borrow kind.
 func (bk BorrowKind) String() string {
 	switch bk {
 	case BorrowKindShared:
@@ -180,37 +182,37 @@ func (bk BorrowKind) String() string {
 	}
 }
 
-// ConflictsWith checks if this borrow conflicts with another
+// ConflictsWith checks if this borrow conflicts with another.
 func (bk BorrowKind) ConflictsWith(other BorrowKind) bool {
-	// Mutable borrows conflict with everything
+	// Mutable borrows conflict with everything.
 	if bk == BorrowKindMutable || other == BorrowKindMutable {
 		return true
 	}
 
-	// Unique borrows conflict with everything
+	// Unique borrows conflict with everything.
 	if bk == BorrowKindUniqueRef || other == BorrowKindUniqueRef {
 		return true
 	}
 
-	// Shared borrows don't conflict with each other
+	// Shared borrows don't conflict with each other.
 	return false
 }
 
-// LinearBorrow represents a borrow of a linear variable
+// LinearBorrow represents a borrow of a linear variable.
 type LinearBorrow struct {
-	Kind     BorrowKind
+	Lifetime *Lifetime
 	Borrower string
 	Location SourceLocation
+	Kind     BorrowKind
 	IsActive bool
-	Lifetime *Lifetime
 }
 
-// ConflictsWith checks if this borrow conflicts with a borrow kind
+// ConflictsWith checks if this borrow conflicts with a borrow kind.
 func (lb *LinearBorrow) ConflictsWith(kind BorrowKind) bool {
 	return lb.Kind.ConflictsWith(kind)
 }
 
-// Lifetime represents the lifetime of a borrow
+// Lifetime represents the lifetime of a borrow.
 type Lifetime struct {
 	Name     string
 	Start    SourceLocation
@@ -218,15 +220,16 @@ type Lifetime struct {
 	IsStatic bool
 }
 
-// String returns a string representation of the lifetime
+// String returns a string representation of the lifetime.
 func (l *Lifetime) String() string {
 	if l.IsStatic {
 		return "'static"
 	}
+
 	return fmt.Sprintf("'%s", l.Name)
 }
 
-// Contains checks if this lifetime contains another
+// Contains checks if this lifetime contains another.
 func (l *Lifetime) Contains(other *Lifetime) bool {
 	if l.IsStatic {
 		return true
@@ -236,27 +239,29 @@ func (l *Lifetime) Contains(other *Lifetime) bool {
 		return false
 	}
 
-	// Simplified lifetime containment check
+	// Simplified lifetime containment check.
 	return l.Start.IsBefore(other.Start) && l.End.IsAfter(other.End)
 }
 
-// IsBefore checks if this location is before another
+// IsBefore checks if this location is before another.
 func (sl SourceLocation) IsBefore(other SourceLocation) bool {
 	if sl.File != other.File {
 		return sl.File < other.File
 	}
+
 	if sl.Line != other.Line {
 		return sl.Line < other.Line
 	}
+
 	return sl.Column < other.Column
 }
 
-// IsAfter checks if this location is after another
+// IsAfter checks if this location is after another.
 func (sl SourceLocation) IsAfter(other SourceLocation) bool {
 	return other.IsBefore(sl)
 }
 
-// LinearContext represents the context for linear type checking
+// LinearContext represents the context for linear type checking.
 type LinearContext struct {
 	Variables map[string]*LinearVariable
 	Borrows   map[string]*LinearBorrow
@@ -265,7 +270,7 @@ type LinearContext struct {
 	Scope     string
 }
 
-// NewLinearContext creates a new linear context
+// NewLinearContext creates a new linear context.
 func NewLinearContext() *LinearContext {
 	return &LinearContext{
 		Variables: make(map[string]*LinearVariable),
@@ -276,7 +281,7 @@ func NewLinearContext() *LinearContext {
 	}
 }
 
-// Extend creates a new child context
+// Extend creates a new child context.
 func (lc *LinearContext) Extend(scope string) *LinearContext {
 	return &LinearContext{
 		Variables: make(map[string]*LinearVariable),
@@ -287,7 +292,7 @@ func (lc *LinearContext) Extend(scope string) *LinearContext {
 	}
 }
 
-// AddVariable adds a linear variable to the context
+// AddVariable adds a linear variable to the context.
 func (lc *LinearContext) AddVariable(name string, varType *LinearTypeWrapper, location SourceLocation) error {
 	if _, exists := lc.Variables[name]; exists {
 		return fmt.Errorf("variable %s already exists in scope %s", name, lc.Scope)
@@ -304,7 +309,7 @@ func (lc *LinearContext) AddVariable(name string, varType *LinearTypeWrapper, lo
 	return nil
 }
 
-// LookupVariable looks up a variable in the context hierarchy
+// LookupVariable looks up a variable in the context hierarchy.
 func (lc *LinearContext) LookupVariable(name string) (*LinearVariable, bool) {
 	if variable, exists := lc.Variables[name]; exists {
 		return variable, true
@@ -317,7 +322,7 @@ func (lc *LinearContext) LookupVariable(name string) (*LinearVariable, bool) {
 	return nil, false
 }
 
-// UseVariable marks a variable as used
+// UseVariable marks a variable as used.
 func (lc *LinearContext) UseVariable(name string, location SourceLocation) error {
 	variable, exists := lc.LookupVariable(name)
 	if !exists {
@@ -331,14 +336,15 @@ func (lc *LinearContext) UseVariable(name string, location SourceLocation) error
 
 	err := variable.Type.Use()
 	if err != nil {
-		return fmt.Errorf("cannot use variable %s: %v", name, err)
+		return fmt.Errorf("cannot use variable %s: %w", name, err)
 	}
 
 	variable.LastUsed = location
+
 	return nil
 }
 
-// MoveVariable marks a variable as moved
+// MoveVariable marks a variable as moved.
 func (lc *LinearContext) MoveVariable(name string, location SourceLocation) error {
 	variable, exists := lc.LookupVariable(name)
 	if !exists {
@@ -356,7 +362,7 @@ func (lc *LinearContext) MoveVariable(name string, location SourceLocation) erro
 	variable.IsMoved = true
 	lc.Moves[name] = location
 
-	// Invalidate all borrows
+	// Invalidate all borrows.
 	for _, borrow := range variable.Borrows {
 		borrow.IsActive = false
 	}
@@ -364,7 +370,7 @@ func (lc *LinearContext) MoveVariable(name string, location SourceLocation) erro
 	return nil
 }
 
-// BorrowVariable creates a borrow of a variable
+// BorrowVariable creates a borrow of a variable.
 func (lc *LinearContext) BorrowVariable(name string, borrowKind BorrowKind, borrower string, location SourceLocation) (*LinearBorrow, error) {
 	variable, exists := lc.LookupVariable(name)
 	if !exists {
@@ -393,22 +399,22 @@ func (lc *LinearContext) BorrowVariable(name string, borrowKind BorrowKind, borr
 	return borrow, nil
 }
 
-// LinearityChecker performs linear type checking
+// LinearityChecker performs linear type checking.
 type LinearityChecker struct {
 	context       *LinearContext
-	constraints   []LinearityConstraint
 	moveSemantics map[*Type]bool
+	constraints   []LinearityConstraint
 }
 
-// LinearityConstraint represents a constraint in linear type checking
+// LinearityConstraint represents a constraint in linear type checking.
 type LinearityConstraint struct {
-	Kind        LinearityConstraintKind
 	Variable    string
-	Location    SourceLocation
 	Description string
+	Location    SourceLocation
+	Kind        LinearityConstraintKind
 }
 
-// LinearityConstraintKind represents kinds of linearity constraints
+// LinearityConstraintKind represents kinds of linearity constraints.
 type LinearityConstraintKind int
 
 const (
@@ -418,7 +424,7 @@ const (
 	ConstraintKindNoMove
 )
 
-// String returns a string representation of the constraint kind
+// String returns a string representation of the constraint kind.
 func (lck LinearityConstraintKind) String() string {
 	switch lck {
 	case ConstraintKindMustUse:
@@ -434,7 +440,7 @@ func (lck LinearityConstraintKind) String() string {
 	}
 }
 
-// NewLinearityChecker creates a new linearity checker
+// NewLinearityChecker creates a new linearity checker.
 func NewLinearityChecker() *LinearityChecker {
 	return &LinearityChecker{
 		context:       NewLinearContext(),
@@ -443,15 +449,15 @@ func NewLinearityChecker() *LinearityChecker {
 	}
 }
 
-// LinearMoveExpr represents a move expression
+// LinearMoveExpr represents a move expression.
 type LinearMoveExpr struct {
 	Variable string
 	Location SourceLocation
 }
 
-// Accept implements the Expr interface
+// Accept implements the Expr interface.
 func (e *LinearMoveExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// Linear move expressions require special handling
+	// Linear move expressions require special handling.
 	return nil, fmt.Errorf("linear move expressions require linear type checker")
 }
 
@@ -459,16 +465,16 @@ func (e *LinearMoveExpr) String() string {
 	return fmt.Sprintf("move %s", e.Variable)
 }
 
-// LinearBorrowExpr represents a borrow expression
+// LinearBorrowExpr represents a borrow expression.
 type LinearBorrowExpr struct {
 	Variable string
-	Kind     BorrowKind
 	Location SourceLocation
+	Kind     BorrowKind
 }
 
-// Accept implements the Expr interface
+// Accept implements the Expr interface.
 func (e *LinearBorrowExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// Linear borrow expressions require special handling
+	// Linear borrow expressions require special handling.
 	return nil, fmt.Errorf("linear borrow expressions require linear type checker")
 }
 
@@ -476,16 +482,16 @@ func (e *LinearBorrowExpr) String() string {
 	return fmt.Sprintf("%s %s", e.Kind.String(), e.Variable)
 }
 
-// LinearAssignmentExpr represents a linear assignment expression
+// LinearAssignmentExpr represents a linear assignment expression.
 type LinearAssignmentExpr struct {
 	Target   string
 	Value    Expr
 	Location SourceLocation
 }
 
-// Accept implements the Expr interface
+// Accept implements the Expr interface.
 func (e *LinearAssignmentExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// Linear assignment expressions require special handling
+	// Linear assignment expressions require special handling.
 	return nil, fmt.Errorf("linear assignment expressions require linear type checker")
 }
 
@@ -493,16 +499,16 @@ func (e *LinearAssignmentExpr) String() string {
 	return fmt.Sprintf("%s = %s", e.Target, e.Value.String())
 }
 
-// LinearFunctionCallExpr represents a linear function call expression
+// LinearFunctionCallExpr represents a linear function call expression.
 type LinearFunctionCallExpr struct {
 	Function  string
 	Arguments []Expr
 	Location  SourceLocation
 }
 
-// Accept implements the Expr interface
+// Accept implements the Expr interface.
 func (e *LinearFunctionCallExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// Linear function call expressions require special handling
+	// Linear function call expressions require special handling.
 	return nil, fmt.Errorf("linear function call expressions require linear type checker")
 }
 
@@ -511,10 +517,11 @@ func (e *LinearFunctionCallExpr) String() string {
 	for i, arg := range e.Arguments {
 		args[i] = arg.String()
 	}
+
 	return fmt.Sprintf("%s(%s)", e.Function, strings.Join(args, ", "))
 }
 
-// CheckLinearity performs linearity checking on an expression
+// CheckLinearity performs linearity checking on an expression.
 func (lc *LinearityChecker) CheckLinearity(expr Expr) error {
 	switch e := expr.(type) {
 	case *VariableExpr:
@@ -528,36 +535,38 @@ func (lc *LinearityChecker) CheckLinearity(expr Expr) error {
 	case *LinearFunctionCallExpr:
 		return lc.checkLinearFunctionCall(e)
 	default:
-		// Recursively check subexpressions
+		// Recursively check subexpressions.
 		return lc.checkSubExpressions(expr)
 	}
 }
 
-// checkVariableUsage checks the usage of a variable
+// checkVariableUsage checks the usage of a variable.
 func (lc *LinearityChecker) checkVariableUsage(expr *VariableExpr) error {
 	// Note: VariableExpr from algorithm_w.go doesn't have Location field
-	// We'll use a default location for now
+	// We'll use a default location for now.
 	defaultLocation := SourceLocation{File: "unknown", Line: 0, Column: 0}
+
 	return lc.context.UseVariable(expr.Name, defaultLocation)
 }
 
-// checkLinearMoveExpression checks a move expression
+// checkLinearMoveExpression checks a move expression.
 func (lc *LinearityChecker) checkLinearMoveExpression(expr *LinearMoveExpr) error {
 	return lc.context.MoveVariable(expr.Variable, expr.Location)
 }
 
-// checkLinearBorrowExpression checks a borrow expression
+// checkLinearBorrowExpression checks a borrow expression.
 func (lc *LinearityChecker) checkLinearBorrowExpression(expr *LinearBorrowExpr) error {
 	borrowId := fmt.Sprintf("borrow_%s_%d", expr.Variable, expr.Location.Line)
 	_, err := lc.context.BorrowVariable(expr.Variable, expr.Kind, borrowId, expr.Location)
+
 	return err
 }
 
-// checkLinearAssignment checks an assignment for linearity violations
+// checkLinearAssignment checks an assignment for linearity violations.
 func (lc *LinearityChecker) checkLinearAssignment(expr *LinearAssignmentExpr) error {
-	// Check if the assigned value is linear
+	// Check if the assigned value is linear.
 	if lc.isLinearExpression(expr.Value) {
-		// Linear values must be moved, not copied
+		// Linear values must be moved, not copied.
 		if moveExpr, ok := expr.Value.(*LinearMoveExpr); ok {
 			return lc.checkLinearMoveExpression(moveExpr)
 		} else {
@@ -568,16 +577,16 @@ func (lc *LinearityChecker) checkLinearAssignment(expr *LinearAssignmentExpr) er
 	return lc.CheckLinearity(expr.Value)
 }
 
-// checkLinearFunctionCall checks a function call for linearity
+// checkLinearFunctionCall checks a function call for linearity.
 func (lc *LinearityChecker) checkLinearFunctionCall(expr *LinearFunctionCallExpr) error {
-	// Check each argument
+	// Check each argument.
 	for i, arg := range expr.Arguments {
 		err := lc.CheckLinearity(arg)
 		if err != nil {
-			return fmt.Errorf("argument %d: %v", i, err)
+			return fmt.Errorf("argument %d: %w", i, err)
 		}
 
-		// Check if linear arguments are properly moved
+		// Check if linear arguments are properly moved.
 		if lc.isLinearExpression(arg) {
 			if _, ok := arg.(*LinearMoveExpr); !ok {
 				return fmt.Errorf("linear argument %d must be explicitly moved", i)
@@ -588,25 +597,25 @@ func (lc *LinearityChecker) checkLinearFunctionCall(expr *LinearFunctionCallExpr
 	return nil
 }
 
-// checkSubExpressions recursively checks subexpressions
+// checkSubExpressions recursively checks subexpressions.
 func (lc *LinearityChecker) checkSubExpressions(expr Expr) error {
-	// This would be implemented based on the specific AST structure
-	// For now, return nil (simplified)
+	// This would be implemented based on the specific AST structure.
+	// For now, return nil (simplified).
 	return nil
 }
 
-// isLinearExpression checks if an expression has linear type
+// isLinearExpression checks if an expression has linear type.
 func (lc *LinearityChecker) isLinearExpression(expr Expr) bool {
-	// This would check the type of the expression
-	// For now, simplified implementation
+	// This would check the type of the expression.
+	// For now, simplified implementation.
 	return false
 }
 
-// ValidateLinearity validates all linearity constraints
+// ValidateLinearity validates all linearity constraints.
 func (lc *LinearityChecker) ValidateLinearity() []LinearityError {
 	var errors []LinearityError
 
-	// Check that all linear variables have been used
+	// Check that all linear variables have been used.
 	for name, variable := range lc.context.Variables {
 		if variable.Type.Linearity == LinearKindLinear && variable.Type.UsageCount == 0 {
 			errors = append(errors, LinearityError{
@@ -627,7 +636,7 @@ func (lc *LinearityChecker) ValidateLinearity() []LinearityError {
 		}
 	}
 
-	// Check for active borrows at end of scope
+	// Check for active borrows at end of scope.
 	for borrower, borrow := range lc.context.Borrows {
 		if borrow.IsActive {
 			errors = append(errors, LinearityError{
@@ -642,15 +651,15 @@ func (lc *LinearityChecker) ValidateLinearity() []LinearityError {
 	return errors
 }
 
-// LinearityError represents a linearity checking error
+// LinearityError represents a linearity checking error.
 type LinearityError struct {
-	Kind     LinearityErrorKind
 	Variable string
-	Location SourceLocation
 	Message  string
+	Location SourceLocation
+	Kind     LinearityErrorKind
 }
 
-// LinearityErrorKind represents kinds of linearity errors
+// LinearityErrorKind represents kinds of linearity errors.
 type LinearityErrorKind int
 
 const (
@@ -662,7 +671,7 @@ const (
 	ErrorKindActiveBorrow
 )
 
-// String returns a string representation of the error kind
+// String returns a string representation of the error kind.
 func (lek LinearityErrorKind) String() string {
 	switch lek {
 	case ErrorKindUnusedLinear:
@@ -682,26 +691,26 @@ func (lek LinearityErrorKind) String() string {
 	}
 }
 
-// Error implements the error interface
+// Error implements the error interface.
 func (le LinearityError) Error() string {
 	return fmt.Sprintf("Linearity error (%s) at %s:%d:%d: %s",
 		le.Kind.String(), le.Location.File, le.Location.Line, le.Location.Column, le.Message)
 }
 
-// LinearityAnalyzer performs static analysis for linearity
+// LinearityAnalyzer performs static analysis for linearity.
 type LinearityAnalyzer struct {
 	checker   *LinearityChecker
 	flowGraph *ControlFlowGraph
 	reachable map[string]bool
 }
 
-// ControlFlowGraph represents the control flow of a program
+// ControlFlowGraph represents the control flow of a program.
 type ControlFlowGraph struct {
 	Nodes map[string]*CFGNode
 	Edges map[string][]*CFGEdge
 }
 
-// CFGNode represents a node in the control flow graph
+// CFGNode represents a node in the control flow graph.
 type CFGNode struct {
 	Id           string
 	Statement    interface{} // Generic statement interface
@@ -710,14 +719,14 @@ type CFGNode struct {
 	Predecessors []*CFGNode
 }
 
-// CFGEdge represents an edge in the control flow graph
+// CFGEdge represents an edge in the control flow graph.
 type CFGEdge struct {
 	From      *CFGNode
 	To        *CFGNode
 	Condition Expr
 }
 
-// NewLinearityAnalyzer creates a new linearity analyzer
+// NewLinearityAnalyzer creates a new linearity analyzer.
 func NewLinearityAnalyzer() *LinearityAnalyzer {
 	return &LinearityAnalyzer{
 		checker: NewLinearityChecker(),
@@ -729,52 +738,52 @@ func NewLinearityAnalyzer() *LinearityAnalyzer {
 	}
 }
 
-// AnalyzeFunction analyzes a function for linearity
+// AnalyzeFunction analyzes a function for linearity.
 func (la *LinearityAnalyzer) AnalyzeFunction(function *Function) []LinearityError {
-	// Build control flow graph
+	// Build control flow graph.
 	la.buildControlFlowGraph(function)
 
-	// Perform reachability analysis
+	// Perform reachability analysis.
 	la.computeReachability()
 
-	// Check linearity constraints
+	// Check linearity constraints.
 	return la.checkLinearityConstraints()
 }
 
-// buildControlFlowGraph constructs the control flow graph
+// buildControlFlowGraph constructs the control flow graph.
 func (la *LinearityAnalyzer) buildControlFlowGraph(function *Function) {
-	// This would build the CFG from the function's statements
-	// Simplified implementation
+	// This would build the CFG from the function's statements.
+	// Simplified implementation.
 }
 
-// computeReachability computes reachable nodes
+// computeReachability computes reachable nodes.
 func (la *LinearityAnalyzer) computeReachability() {
-	// This would perform reachability analysis
-	// Simplified implementation
+	// This would perform reachability analysis.
+	// Simplified implementation.
 }
 
-// checkLinearityConstraints checks all linearity constraints
+// checkLinearityConstraints checks all linearity constraints.
 func (la *LinearityAnalyzer) checkLinearityConstraints() []LinearityError {
 	return la.checker.ValidateLinearity()
 }
 
-// Function represents a function for analysis
+// Function represents a function for analysis.
 type Function struct {
+	ReturnType *Type
 	Name       string
 	Parameters []*Parameter
-	Body       []interface{} // Generic statement list
-	ReturnType *Type
+	Body       []interface{}
 }
 
-// Parameter represents a function parameter
+// Parameter represents a function parameter.
 type Parameter struct {
-	Name string
 	Type *LinearTypeWrapper
+	Name string
 }
 
-// Common linear type constructors
+// Common linear type constructors.
 
-// NewLinearTypeWrapper creates a new linear type
+// NewLinearTypeWrapper creates a new linear type.
 func NewLinearTypeWrapper(baseType *Type, linearity LinearityKind) *LinearTypeWrapper {
 	return &LinearTypeWrapper{
 		BaseType:      baseType,
@@ -786,51 +795,51 @@ func NewLinearTypeWrapper(baseType *Type, linearity LinearityKind) *LinearTypeWr
 	}
 }
 
-// NewAffineType creates a new affine type (use at most once)
+// NewAffineType creates a new affine type (use at most once).
 func NewAffineType(baseType *Type) *LinearTypeWrapper {
 	return NewLinearTypeWrapper(baseType, LinearKindAffine)
 }
 
-// NewStrictLinearType creates a new linear type (use exactly once)
+// NewStrictLinearType creates a new linear type (use exactly once).
 func NewStrictLinearType(baseType *Type) *LinearTypeWrapper {
 	return NewLinearTypeWrapper(baseType, LinearKindLinear)
 }
 
-// NewRelevantType creates a new relevant type (use at least once)
+// NewRelevantType creates a new relevant type (use at least once).
 func NewRelevantType(baseType *Type) *LinearTypeWrapper {
 	return NewLinearTypeWrapper(baseType, LinearKindRelevant)
 }
 
-// NewUnrestrictedType creates a new unrestricted type
+// NewUnrestrictedType creates a new unrestricted type.
 func NewUnrestrictedType(baseType *Type) *LinearTypeWrapper {
 	return NewLinearTypeWrapper(baseType, LinearKindUnrestricted)
 }
 
-// generateUniqueId generates a unique identifier
+// generateUniqueId generates a unique identifier.
 func generateUniqueId() string {
-	// Simplified unique ID generation
+	// Simplified unique ID generation.
 	return fmt.Sprintf("id_%d", len("temp"))
 }
 
-// LinearTypeKind represents linear type kinds in the type system
+// LinearTypeKind represents linear type kinds in the type system.
 const (
 	TypeKindLinearWrapper TypeKind = 200
 )
 
-// Remove conflicting type constant
+// Remove conflicting type constant.
 
-// Resource management types
+// Resource management types.
 
-// ResourceType represents a type that manages resources
+// ResourceType represents a type that manages resources.
 type ResourceType struct {
 	BaseType   *Type
-	Resource   ResourceKind
 	Finalizer  string
+	Resource   ResourceKind
 	IsAcquired bool
 	IsReleased bool
 }
 
-// ResourceKind represents different kinds of resources
+// ResourceKind represents different kinds of resources.
 type ResourceKind int
 
 const (
@@ -841,7 +850,7 @@ const (
 	ResourceKindDatabase
 )
 
-// String returns a string representation of the resource kind
+// String returns a string representation of the resource kind.
 func (rk ResourceKind) String() string {
 	switch rk {
 	case ResourceKindFile:
@@ -859,28 +868,33 @@ func (rk ResourceKind) String() string {
 	}
 }
 
-// AcquireResource marks a resource as acquired
+// AcquireResource marks a resource as acquired.
 func (rt *ResourceType) AcquireResource() error {
 	if rt.IsAcquired {
 		return fmt.Errorf("resource %s already acquired", rt.Resource.String())
 	}
+
 	rt.IsAcquired = true
+
 	return nil
 }
 
-// ReleaseResource marks a resource as released
+// ReleaseResource marks a resource as released.
 func (rt *ResourceType) ReleaseResource() error {
 	if !rt.IsAcquired {
 		return fmt.Errorf("resource %s not acquired", rt.Resource.String())
 	}
+
 	if rt.IsReleased {
 		return fmt.Errorf("resource %s already released", rt.Resource.String())
 	}
+
 	rt.IsReleased = true
+
 	return nil
 }
 
-// NewResourceType creates a new resource type
+// NewResourceType creates a new resource type.
 func NewResourceType(baseType *Type, resource ResourceKind, finalizer string) *ResourceType {
 	return &ResourceType{
 		BaseType:   baseType,
@@ -891,33 +905,33 @@ func NewResourceType(baseType *Type, resource ResourceKind, finalizer string) *R
 	}
 }
 
-// LinearityInference performs inference for linear types
+// LinearityInference performs inference for linear types.
 type LinearityInference struct {
 	context     *LinearContext
-	constraints []LinearityConstraint
 	unification *LinearUnification
+	constraints []LinearityConstraint
 }
 
-// LinearUnification handles unification of linear types
+// LinearUnification handles unification of linear types.
 type LinearUnification struct {
 	substitutions map[string]*LinearTypeWrapper
 }
 
-// NewLinearUnification creates a new linear type unification system
+// NewLinearUnification creates a new linear type unification system.
 func NewLinearUnification() *LinearUnification {
 	return &LinearUnification{
 		substitutions: make(map[string]*LinearTypeWrapper),
 	}
 }
 
-// UnifyLinear attempts to unify two linear types
+// UnifyLinear attempts to unify two linear types.
 func (lu *LinearUnification) UnifyLinear(type1, type2 *LinearTypeWrapper) error {
 	if !type1.BaseType.Equals(type2.BaseType) {
 		return fmt.Errorf("cannot unify linear types with different base types: %s and %s",
 			type1.BaseType.String(), type2.BaseType.String())
 	}
 
-	// Unify linearity kinds (more restrictive wins)
+	// Unify linearity kinds (more restrictive wins).
 	unifiedLinearity := lu.unifyLinearity(type1.Linearity, type2.Linearity)
 
 	type1.Linearity = unifiedLinearity
@@ -926,23 +940,23 @@ func (lu *LinearUnification) UnifyLinear(type1, type2 *LinearTypeWrapper) error 
 	return nil
 }
 
-// unifyLinearity unifies two linearity kinds
+// unifyLinearity unifies two linearity kinds.
 func (lu *LinearUnification) unifyLinearity(l1, l2 LinearityKind) LinearityKind {
-	// Linear is most restrictive
+	// Linear is most restrictive.
 	if l1 == LinearKindLinear || l2 == LinearKindLinear {
 		return LinearKindLinear
 	}
 
-	// Affine is next most restrictive
+	// Affine is next most restrictive.
 	if l1 == LinearKindAffine || l2 == LinearKindAffine {
 		return LinearKindAffine
 	}
 
-	// Relevant requires at least one use
+	// Relevant requires at least one use.
 	if l1 == LinearKindRelevant || l2 == LinearKindRelevant {
 		return LinearKindRelevant
 	}
 
-	// Unrestricted is least restrictive
+	// Unrestricted is least restrictive.
 	return LinearKindUnrestricted
 }

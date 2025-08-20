@@ -1,5 +1,5 @@
-// Function type system implementation for Orizon language
-// This module provides advanced function types, closures, and higher-order function support
+// Function type system implementation for Orizon language.
+// This module provides advanced function types, closures, and higher-order function support.
 
 package types
 
@@ -8,25 +8,25 @@ import (
 	"strings"
 )
 
-// ====== Advanced Function Types ======
+// ====== Advanced Function Types ======.
 
-// ClosureType represents a closure type with captured variables
+// ClosureType represents a closure type with captured variables.
 type ClosureType struct {
 	BaseFunction *FunctionType
+	Environment  *ClosureEnvironment
 	CapturedVars []CapturedVariable
 	CaptureMode  CaptureMode
-	Environment  *ClosureEnvironment
 }
 
-// CapturedVariable represents a variable captured by a closure
+// CapturedVariable represents a variable captured by a closure.
 type CapturedVariable struct {
-	Name        string
 	Type        *Type
+	Source      *Type
+	Name        string
 	CaptureKind CaptureKind
-	Source      *Type // Type of the source variable
 }
 
-// CaptureKind represents how a variable is captured
+// CaptureKind represents how a variable is captured.
 type CaptureKind int
 
 const (
@@ -35,7 +35,7 @@ const (
 	CaptureByMove
 )
 
-// CaptureMode represents the overall capture strategy
+// CaptureMode represents the overall capture strategy.
 type CaptureMode int
 
 const (
@@ -44,47 +44,47 @@ const (
 	CaptureModeMove
 )
 
-// ClosureEnvironment represents the runtime environment of a closure
+// ClosureEnvironment represents the runtime environment of a closure.
 type ClosureEnvironment struct {
 	Variables map[string]*Type
 	Parent    *ClosureEnvironment
 	Size      int // Runtime size of environment
 }
 
-// HigherOrderType represents higher-order function types
+// HigherOrderType represents higher-order function types.
 type HigherOrderType struct {
 	BaseFunction *FunctionType
 	TypeParams   []GenericParameter
 	Constraints  []*Type
 }
 
-// PartiallyAppliedType represents a partially applied function
+// PartiallyAppliedType represents a partially applied function.
 type PartiallyAppliedType struct {
 	OriginalFunction *FunctionType
+	ResultType       *Type
 	AppliedArgs      []*Type
 	RemainingParams  []*Type
-	ResultType       *Type
 }
 
-// AsyncFunctionType represents asynchronous function types
+// AsyncFunctionType represents asynchronous function types.
 type AsyncFunctionType struct {
 	BaseFunction *FunctionType
 	AwaitType    *Type // Type that can be awaited
 	ErrorType    *Type // Possible error type
 }
 
-// GeneratorType represents generator function types
+// GeneratorType represents generator function types.
 type GeneratorType struct {
 	YieldType  *Type
 	ReturnType *Type
 	SendType   *Type // Type that can be sent to generator
 }
 
-// ====== Function Type Construction ======
+// ====== Function Type Construction ======.
 
-// NewClosureType creates a new closure type
+// NewClosureType creates a new closure type.
 func NewClosureType(baseFunc *FunctionType, capturedVars []CapturedVariable, mode CaptureMode) *Type {
-	// Calculate closure size (function pointer + environment)
+	// Calculate closure size (function pointer + environment).
 	envSize := 8 // Base environment pointer
 	for _, captured := range capturedVars {
 		envSize += captured.Type.Size
@@ -106,7 +106,7 @@ func NewClosureType(baseFunc *FunctionType, capturedVars []CapturedVariable, mod
 	}
 }
 
-// NewHigherOrderType creates a new higher-order function type
+// NewHigherOrderType creates a new higher-order function type.
 func NewHigherOrderType(baseFunc *FunctionType, typeParams []GenericParameter) *Type {
 	return &Type{
 		Kind: TypeKindFunction,
@@ -119,10 +119,10 @@ func NewHigherOrderType(baseFunc *FunctionType, typeParams []GenericParameter) *
 	}
 }
 
-// NewPartiallyAppliedType creates a new partially applied function type
+// NewPartiallyAppliedType creates a new partially applied function type.
 func NewPartiallyAppliedType(originalFunc *FunctionType, appliedArgs []*Type) *Type {
 	if len(appliedArgs) >= len(originalFunc.Parameters) {
-		// Fully applied
+		// Fully applied.
 		return originalFunc.ReturnType
 	}
 
@@ -140,7 +140,7 @@ func NewPartiallyAppliedType(originalFunc *FunctionType, appliedArgs []*Type) *T
 	}
 }
 
-// NewAsyncFunctionType creates a new async function type
+// NewAsyncFunctionType creates a new async function type.
 func NewAsyncFunctionType(baseFunc *FunctionType, awaitType *Type, errorType *Type) *Type {
 	return &Type{
 		Kind: TypeKindFunction,
@@ -153,7 +153,7 @@ func NewAsyncFunctionType(baseFunc *FunctionType, awaitType *Type, errorType *Ty
 	}
 }
 
-// NewGeneratorType creates a new generator type
+// NewGeneratorType creates a new generator type.
 func NewGeneratorType(yieldType, returnType, sendType *Type) *Type {
 	return &Type{
 		Kind: TypeKindFunction,
@@ -166,9 +166,9 @@ func NewGeneratorType(yieldType, returnType, sendType *Type) *Type {
 	}
 }
 
-// ====== Function Type Operations ======
+// ====== Function Type Operations ======.
 
-// IsCallableWith checks if a function can be called with given argument types
+// IsCallableWith checks if a function can be called with given argument types.
 func (t *Type) IsCallableWith(argTypes []*Type) bool {
 	if !t.IsCallable() {
 		return false
@@ -191,7 +191,7 @@ func (t *Type) IsCallableWith(argTypes []*Type) bool {
 		return t.checkFunctionCallability(data.BaseFunction, argTypes)
 
 	case *GeneratorType:
-		// Generators are not directly callable with arguments
+		// Generators are not directly callable with arguments.
 		return false
 
 	default:
@@ -199,48 +199,50 @@ func (t *Type) IsCallableWith(argTypes []*Type) bool {
 	}
 }
 
-// checkFunctionCallability checks if a function type can be called with given arguments
+// checkFunctionCallability checks if a function type can be called with given arguments.
 func (t *Type) checkFunctionCallability(funcType *FunctionType, argTypes []*Type) bool {
 	if funcType.IsVariadic {
-		// Variadic function: at least N-1 args, where N is param count
+		// Variadic function: at least N-1 args, where N is param count.
 		if len(argTypes) < len(funcType.Parameters)-1 {
 			return false
 		}
-		// For variadic, last parameter can accept multiple arguments
+		// For variadic, last parameter can accept multiple arguments.
 		requiredParams := len(funcType.Parameters) - 1
 		if len(argTypes) < requiredParams {
 			return false
 		}
 	} else {
-		// Regular function: exact parameter count
+		// Regular function: exact parameter count.
 		if len(argTypes) != len(funcType.Parameters) {
 			return false
 		}
 	}
 
-	// Check parameter types
+	// Check parameter types.
 	for i, paramType := range funcType.Parameters {
 		if i >= len(argTypes) {
 			if !funcType.IsVariadic || i < len(funcType.Parameters)-1 {
 				return false
 			}
+
 			break // Variadic parameter can be omitted
 		}
 
 		argType := argTypes[i]
 
-		// For variadic parameter (last parameter), check if it's compatible
+		// For variadic parameter (last parameter), check if it's compatible.
 		if funcType.IsVariadic && i == len(funcType.Parameters)-1 {
-			// Variadic parameter accepts any number of arguments of compatible type
+			// Variadic parameter accepts any number of arguments of compatible type.
 			for j := i; j < len(argTypes); j++ {
 				if !argTypes[j].IsAssignableFrom(paramType) && !argTypes[j].CanConvertTo(paramType) {
 					return false
 				}
 			}
+
 			break
 		}
 
-		// Regular parameter type check
+		// Regular parameter type check.
 		if !argType.IsAssignableFrom(paramType) && !argType.CanConvertTo(paramType) {
 			return false
 		}
@@ -249,19 +251,19 @@ func (t *Type) checkFunctionCallability(funcType *FunctionType, argTypes []*Type
 	return true
 }
 
-// checkHigherOrderCallability checks higher-order function callability
+// checkHigherOrderCallability checks higher-order function callability.
 func (t *Type) checkHigherOrderCallability(hoType *HigherOrderType, argTypes []*Type) bool {
-	// For higher-order functions, we need to check if type parameters can be inferred
-	// This is a simplified check - full implementation would involve constraint solving
+	// For higher-order functions, we need to check if type parameters can be inferred.
+	// This is a simplified check - full implementation would involve constraint solving.
 	return t.checkFunctionCallability(hoType.BaseFunction, argTypes)
 }
 
-// checkPartiallyAppliedCallability checks partially applied function callability
+// checkPartiallyAppliedCallability checks partially applied function callability.
 func (t *Type) checkPartiallyAppliedCallability(paType *PartiallyAppliedType, argTypes []*Type) bool {
 	return len(argTypes) <= len(paType.RemainingParams)
 }
 
-// ApplyPartially applies arguments to a function type, returning a new function type
+// ApplyPartially applies arguments to a function type, returning a new function type.
 func (t *Type) ApplyPartially(argTypes []*Type) (*Type, error) {
 	if !t.IsCallable() {
 		return nil, fmt.Errorf("type %s is not callable", t.String())
@@ -270,20 +272,23 @@ func (t *Type) ApplyPartially(argTypes []*Type) (*Type, error) {
 	switch data := t.Data.(type) {
 	case *FunctionType:
 		if len(argTypes) >= len(data.Parameters) {
-			// Fully applied
+			// Fully applied.
 			return data.ReturnType, nil
 		}
+
 		return NewPartiallyAppliedType(data, argTypes), nil
 
 	case *ClosureType:
 		if len(argTypes) >= len(data.BaseFunction.Parameters) {
-			// Fully applied
+			// Fully applied.
 			return data.BaseFunction.ReturnType, nil
 		}
+
 		return NewPartiallyAppliedType(data.BaseFunction, argTypes), nil
 
 	case *PartiallyAppliedType:
 		totalApplied := append(data.AppliedArgs, argTypes...)
+
 		return NewPartiallyAppliedType(data.OriginalFunction, totalApplied), nil
 
 	default:
@@ -306,7 +311,7 @@ func (t *Type) GetCallResultType(argTypes []*Type) (*Type, error) {
 		if len(argTypes) == len(data.RemainingParams) {
 			return data.OriginalFunction.ReturnType, nil
 		}
-		// Return partially applied function
+		// Return partially applied function.
 		return t.ApplyPartially(argTypes)
 
 	case *AsyncFunctionType:
@@ -318,32 +323,35 @@ func (t *Type) GetCallResultType(argTypes []*Type) (*Type, error) {
 	}
 }
 
-// ====== Closure Analysis ======
+// ====== Closure Analysis ======.
 
-// AnalyzeClosure analyzes a closure and determines captured variables
+// AnalyzeClosure analyzes a closure and determines captured variables.
 func AnalyzeClosure(funcType *FunctionType, environment *ClosureEnvironment,
-	freeVars []string) (*Type, error) {
-
+	freeVars []string,
+) (*Type, error) {
 	var capturedVars []CapturedVariable
 
 	for _, varName := range freeVars {
-		// Look for variable in current environment or parent environments
+		// Look for variable in current environment or parent environments.
 		var varType *Type
+
 		currentEnv := environment
 		for currentEnv != nil {
 			if vType, exists := currentEnv.Variables[varName]; exists {
 				varType = vType
+
 				break
 			}
+
 			currentEnv = currentEnv.Parent
 		}
 
 		if varType != nil {
-			// Determine capture kind based on variable usage
+			// Determine capture kind based on variable usage.
 			captureKind := CaptureByReference // Default
 
-			// In a real implementation, you'd analyze usage patterns
-			// For now, we use simple heuristics
+			// In a real implementation, you'd analyze usage patterns.
+			// For now, we use simple heuristics.
 			if varType.IsAggregate() {
 				captureKind = CaptureByReference
 			} else if varType.IsNumeric() || varType.Kind == TypeKindString || varType.Kind == TypeKindBool {
@@ -362,27 +370,30 @@ func AnalyzeClosure(funcType *FunctionType, environment *ClosureEnvironment,
 	return NewClosureType(funcType, capturedVars, CaptureModeImplicit), nil
 } // ====== Function Type Inference ======
 
-// InferFunctionType infers the type of a function from usage context
+// InferFunctionType infers the type of a function from usage context.
 func InferFunctionType(paramTypes []*Type, returnType *Type, context *InferenceContext) *Type {
-	// Basic function type inference
+	// Basic function type inference.
 	if returnType == nil {
 		returnType = TypeVoid
 	}
 
 	funcType := NewFunctionType(paramTypes, returnType, false, false)
 
-	// Check if this should be a higher-order function
+	// Check if this should be a higher-order function.
 	hasGenericParams := false
+
 	for _, paramType := range paramTypes {
 		if paramType.Kind == TypeKindTypeVar || paramType.Kind == TypeKindGeneric {
 			hasGenericParams = true
+
 			break
 		}
 	}
 
 	if hasGenericParams {
-		// Extract generic parameters (avoid duplicates)
+		// Extract generic parameters (avoid duplicates).
 		var typeParams []GenericParameter
+
 		seen := make(map[string]bool)
 
 		for _, paramType := range paramTypes {
@@ -399,7 +410,7 @@ func InferFunctionType(paramTypes []*Type, returnType *Type, context *InferenceC
 			}
 		}
 
-		// Also check return type for generics
+		// Also check return type for generics.
 		if returnType.Kind == TypeKindGeneric {
 			genericData := returnType.Data.(*GenericType)
 			if !seen[genericData.Name] {
@@ -413,13 +424,14 @@ func InferFunctionType(paramTypes []*Type, returnType *Type, context *InferenceC
 		}
 
 		funcData := funcType.Data.(*FunctionType)
+
 		return NewHigherOrderType(funcData, typeParams)
 	}
 
 	return funcType
 }
 
-// InferenceContext provides context for type inference
+// InferenceContext provides context for type inference.
 type InferenceContext struct {
 	Variables   map[string]*Type
 	Functions   map[string]*Type
@@ -427,14 +439,14 @@ type InferenceContext struct {
 	Constraints []Constraint
 }
 
-// Constraint represents a type constraint during inference
+// Constraint represents a type constraint during inference.
 type Constraint struct {
 	Left  *Type
 	Right *Type
 	Kind  ConstraintKind
 }
 
-// ConstraintKind represents different kinds of type constraints
+// ConstraintKind represents different kinds of type constraints.
 type ConstraintKind int
 
 const (
@@ -444,9 +456,9 @@ const (
 	ConstraintUnify
 )
 
-// ====== Function Composition ======
+// ====== Function Composition ======.
 
-// ComposeFunction composes two function types f(g(x))
+// ComposeFunction composes two function types f(g(x)).
 func ComposeFunction(f, g *Type) (*Type, error) {
 	if !f.IsCallable() || !g.IsCallable() {
 		return nil, fmt.Errorf("both types must be callable for composition")
@@ -459,7 +471,7 @@ func ComposeFunction(f, g *Type) (*Type, error) {
 		return nil, fmt.Errorf("invalid function types for composition")
 	}
 
-	// Check compatibility: f's input must match g's output
+	// Check compatibility: f's input must match g's output.
 	if len(fFunc.Parameters) != 1 {
 		return nil, fmt.Errorf("first function must take exactly one parameter")
 	}
@@ -468,11 +480,11 @@ func ComposeFunction(f, g *Type) (*Type, error) {
 		return nil, fmt.Errorf("function output/input types not compatible")
 	}
 
-	// Create composed function type: g's params -> f's return
+	// Create composed function type: g's params -> f's return.
 	return NewFunctionType(gFunc.Parameters, fFunc.ReturnType, false, false), nil
 }
 
-// getFunctionTypeData extracts FunctionType data from various function-like types
+// getFunctionTypeData extracts FunctionType data from various function-like types.
 func getFunctionTypeData(t *Type) *FunctionType {
 	switch data := t.Data.(type) {
 	case *FunctionType:
@@ -488,9 +500,9 @@ func getFunctionTypeData(t *Type) *FunctionType {
 	}
 }
 
-// ====== Function Type Utilities ======
+// ====== Function Type Utilities ======.
 
-// GetArity returns the arity (number of parameters) of a function type
+// GetArity returns the arity (number of parameters) of a function type.
 func (t *Type) GetArity() int {
 	if !t.IsCallable() {
 		return -1
@@ -508,56 +520,57 @@ func (t *Type) GetArity() int {
 	}
 }
 
-// IsPure checks if a function type represents a pure function
+// IsPure checks if a function type represents a pure function.
 func (t *Type) IsPure() bool {
-	// In a full implementation, this would check for effect annotations
-	// For now, we use simple heuristics
+	// In a full implementation, this would check for effect annotations.
+	// For now, we use simple heuristics.
 	if !t.IsCallable() {
 		return false
 	}
 
 	switch data := t.Data.(type) {
 	case *FunctionType:
-		// Pure if no side effects (would need effect system)
+		// Pure if no side effects (would need effect system).
 		return true // Simplified
 	case *ClosureType:
-		// Closures with mutable captures are not pure
+		// Closures with mutable captures are not pure.
 		for _, captured := range data.CapturedVars {
 			if captured.CaptureKind == CaptureByReference {
 				return false
 			}
 		}
+
 		return true
 	case *AsyncFunctionType:
-		// Async functions are generally not pure
+		// Async functions are generally not pure.
 		return false
 	default:
 		return false
 	}
 }
 
-// IsRecursive checks if a function type might be recursive
+// IsRecursive checks if a function type might be recursive.
 func (t *Type) IsRecursive() bool {
-	// This is a placeholder - real implementation would need call graph analysis
+	// This is a placeholder - real implementation would need call graph analysis.
 	return false
 }
 
-// ====== Higher-Order Function Utilities ======
+// ====== Higher-Order Function Utilities ======.
 
-// CreateMap creates a map function type: (T -> U) -> [T] -> [U]
+// CreateMap creates a map function type: (T -> U) -> [T] -> [U].
 func CreateMapType() *Type {
-	// Create generic type parameters
+	// Create generic type parameters.
 	tParam := NewGenericType("T", []*Type{}, VarianceInvariant)
 	uParam := NewGenericType("U", []*Type{}, VarianceInvariant)
 
-	// Create function type T -> U
+	// Create function type T -> U.
 	mapperFunc := NewFunctionType([]*Type{tParam}, uParam, false, false)
 
-	// Create array types
+	// Create array types.
 	inputArray := NewSliceType(tParam)
 	outputArray := NewSliceType(uParam)
 
-	// Create map function: (T -> U) -> [T] -> [U]
+	// Create map function: (T -> U) -> [T] -> [U].
 	mapType := NewFunctionType([]*Type{mapperFunc, inputArray}, outputArray, false, false)
 
 	return NewHigherOrderType(mapType.Data.(*FunctionType), []GenericParameter{
@@ -566,7 +579,7 @@ func CreateMapType() *Type {
 	})
 }
 
-// CreateFilter creates a filter function type: (T -> bool) -> [T] -> [T]
+// CreateFilter creates a filter function type: (T -> bool) -> [T] -> [T].
 func CreateFilterType() *Type {
 	tParam := NewGenericType("T", []*Type{}, VarianceInvariant)
 
@@ -580,7 +593,7 @@ func CreateFilterType() *Type {
 	})
 }
 
-// CreateReduce creates a reduce function type: (acc -> T -> acc) -> acc -> [T] -> acc
+// CreateReduce creates a reduce function type: (acc -> T -> acc) -> acc -> [T] -> acc.
 func CreateReduceType() *Type {
 	tParam := NewGenericType("T", []*Type{}, VarianceInvariant)
 	accParam := NewGenericType("Acc", []*Type{}, VarianceInvariant)
@@ -596,9 +609,9 @@ func CreateReduceType() *Type {
 	})
 }
 
-// ====== Function Type String Representation ======
+// ====== Function Type String Representation ======.
 
-// Enhanced string representation for function types
+// Enhanced string representation for function types.
 func (t *Type) FunctionString() string {
 	if !t.IsCallable() {
 		return t.String()
@@ -610,8 +623,10 @@ func (t *Type) FunctionString() string {
 
 	case *ClosureType:
 		captured := []string{}
+
 		for _, cap := range data.CapturedVars {
 			captureSymbol := ""
+
 			switch cap.CaptureKind {
 			case CaptureByValue:
 				captureSymbol = "="
@@ -620,8 +635,10 @@ func (t *Type) FunctionString() string {
 			case CaptureByMove:
 				captureSymbol = "move"
 			}
+
 			captured = append(captured, fmt.Sprintf("%s%s: %s", captureSymbol, cap.Name, cap.Type.String()))
 		}
+
 		return fmt.Sprintf("closure[%s] %s", strings.Join(captured, ", "),
 			t.functionTypeString(data.BaseFunction))
 
@@ -630,6 +647,7 @@ func (t *Type) FunctionString() string {
 		for _, param := range data.TypeParams {
 			typeParams = append(typeParams, param.Name)
 		}
+
 		return fmt.Sprintf("<%s> %s", strings.Join(typeParams, ", "),
 			t.functionTypeString(data.BaseFunction))
 
@@ -638,6 +656,7 @@ func (t *Type) FunctionString() string {
 		for _, arg := range data.AppliedArgs {
 			appliedTypes = append(appliedTypes, arg.String())
 		}
+
 		return fmt.Sprintf("partial(%s) %s", strings.Join(appliedTypes, ", "),
 			data.ResultType.String())
 
@@ -655,7 +674,7 @@ func (t *Type) FunctionString() string {
 	}
 }
 
-// functionTypeString creates string representation for basic function types
+// functionTypeString creates string representation for basic function types.
 func (t *Type) functionTypeString(funcType *FunctionType) string {
 	var params []string
 	for _, param := range funcType.Parameters {
@@ -675,25 +694,25 @@ func (t *Type) functionTypeString(funcType *FunctionType) string {
 	return fmt.Sprintf("%sfn(%s) -> %s", asyncStr, paramStr, funcType.ReturnType.String())
 }
 
-// ====== Function Type Registry ======
+// ====== Function Type Registry ======.
 
-// FunctionTypeRegistry manages common function types
+// FunctionTypeRegistry manages common function types.
 type FunctionTypeRegistry struct {
 	CommonTypes map[string]*Type
 }
 
-// NewFunctionTypeRegistry creates a new function type registry
+// NewFunctionTypeRegistry creates a new function type registry.
 func NewFunctionTypeRegistry() *FunctionTypeRegistry {
 	registry := &FunctionTypeRegistry{
 		CommonTypes: make(map[string]*Type),
 	}
 
-	// Register common higher-order function types
+	// Register common higher-order function types.
 	registry.CommonTypes["map"] = CreateMapType()
 	registry.CommonTypes["filter"] = CreateFilterType()
 	registry.CommonTypes["reduce"] = CreateReduceType()
 
-	// Register common function signatures
+	// Register common function signatures.
 	registry.CommonTypes["unary_int"] = NewFunctionType([]*Type{TypeInt32}, TypeInt32, false, false)
 	registry.CommonTypes["binary_int"] = NewFunctionType([]*Type{TypeInt32, TypeInt32}, TypeInt32, false, false)
 	registry.CommonTypes["predicate"] = NewFunctionType([]*Type{TypeAny}, TypeBool, false, false)
@@ -701,13 +720,14 @@ func NewFunctionTypeRegistry() *FunctionTypeRegistry {
 	return registry
 }
 
-// GetCommonType retrieves a common function type by name
+// GetCommonType retrieves a common function type by name.
 func (ftr *FunctionTypeRegistry) GetCommonType(name string) (*Type, bool) {
 	typeObj, exists := ftr.CommonTypes[name]
+
 	return typeObj, exists
 }
 
-// RegisterCommonType registers a new common function type
+// RegisterCommonType registers a new common function type.
 func (ftr *FunctionTypeRegistry) RegisterCommonType(name string, funcType *Type) {
 	if funcType.IsCallable() {
 		ftr.CommonTypes[name] = funcType

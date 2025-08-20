@@ -7,7 +7,7 @@ import (
 
 func TestPhase2_3_2_IndexTypes(t *testing.T) {
 	t.Run("ConstantIndexExpressions", func(t *testing.T) {
-		// Test constant index expression
+		// Test constant index expression.
 		constExpr := &ConstantIndexExpr{Value: 42}
 
 		if constExpr.String() != "42" {
@@ -18,6 +18,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("constant evaluation failed: %v", err)
 		}
+
 		if val != 42 {
 			t.Errorf("expected 42, got %d", val)
 		}
@@ -33,7 +34,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 	})
 
 	t.Run("VariableIndexExpressions", func(t *testing.T) {
-		// Test variable index expression
+		// Test variable index expression.
 		varExpr := &VariableIndexExpr{Name: "i"}
 
 		if varExpr.String() != "i" {
@@ -49,19 +50,21 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Errorf("expected variables [i], got %v", vars)
 		}
 
-		// Test evaluation with environment
+		// Test evaluation with environment.
 		env := map[string]interface{}{
 			"i": int64(10),
 		}
+
 		val, err := varExpr.Evaluate(env)
 		if err != nil {
 			t.Fatalf("variable evaluation failed: %v", err)
 		}
+
 		if val != 10 {
 			t.Errorf("expected 10, got %d", val)
 		}
 
-		// Test evaluation without environment
+		// Test evaluation without environment.
 		_, err = varExpr.Evaluate(nil)
 		if err == nil {
 			t.Error("expected error for undefined variable")
@@ -69,7 +72,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 	})
 
 	t.Run("BinaryIndexExpressions", func(t *testing.T) {
-		// Test addition: 5 + 3
+		// Test addition: 5 + 3.
 		left := &ConstantIndexExpr{Value: 5}
 		right := &ConstantIndexExpr{Value: 3}
 		addExpr := &BinaryIndexExpr{
@@ -86,6 +89,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("addition evaluation failed: %v", err)
 		}
+
 		if val != 8 {
 			t.Errorf("expected 8, got %d", val)
 		}
@@ -94,7 +98,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Error("constant addition should be static")
 		}
 
-		// Test subtraction: 10 - 4
+		// Test subtraction: 10 - 4.
 		subExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 10},
 			Operator: IndexOpSub,
@@ -105,11 +109,12 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("subtraction evaluation failed: %v", err)
 		}
+
 		if val != 6 {
 			t.Errorf("expected 6, got %d", val)
 		}
 
-		// Test multiplication: 3 * 4
+		// Test multiplication: 3 * 4.
 		mulExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 3},
 			Operator: IndexOpMul,
@@ -120,6 +125,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("multiplication evaluation failed: %v", err)
 		}
+
 		if val != 12 {
 			t.Errorf("expected 12, got %d", val)
 		}
@@ -135,11 +141,12 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("division evaluation failed: %v", err)
 		}
+
 		if val != 5 {
 			t.Errorf("expected 5, got %d", val)
 		}
 
-		// Test division by zero
+		// Test division by zero.
 		divZeroExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 10},
 			Operator: IndexOpDiv,
@@ -151,7 +158,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Error("expected error for division by zero")
 		}
 
-		// Test modulo: 17 % 5
+		// Test modulo: 17 % 5.
 		modExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 17},
 			Operator: IndexOpMod,
@@ -162,11 +169,12 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("modulo evaluation failed: %v", err)
 		}
+
 		if val != 2 {
 			t.Errorf("expected 2, got %d", val)
 		}
 
-		// Test min function: min(7, 3)
+		// Test min function: min(7, 3).
 		minExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 7},
 			Operator: IndexOpMin,
@@ -181,11 +189,12 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("min evaluation failed: %v", err)
 		}
+
 		if val != 3 {
 			t.Errorf("expected 3, got %d", val)
 		}
 
-		// Test max function: max(7, 3)
+		// Test max function: max(7, 3).
 		maxExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 7},
 			Operator: IndexOpMax,
@@ -200,13 +209,14 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("max evaluation failed: %v", err)
 		}
+
 		if val != 7 {
 			t.Errorf("expected 7, got %d", val)
 		}
 	})
 
 	t.Run("ExpressionSimplification", func(t *testing.T) {
-		// Test constant folding: 5 + 3 -> 8
+		// Test constant folding: 5 + 3 -> 8.
 		addExpr := &BinaryIndexExpr{
 			Left:     &ConstantIndexExpr{Value: 5},
 			Operator: IndexOpAdd,
@@ -222,7 +232,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Error("5 + 3 should simplify to constant 8")
 		}
 
-		// Test addition identity: x + 0 -> x
+		// Test addition identity: x + 0 -> x.
 		varExpr := &VariableIndexExpr{Name: "x"}
 		identityExpr := &BinaryIndexExpr{
 			Left:     varExpr,
@@ -239,7 +249,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Error("x + 0 should simplify to x")
 		}
 
-		// Test multiplication by zero: x * 0 -> 0
+		// Test multiplication by zero: x * 0 -> 0.
 		zeroExpr := &BinaryIndexExpr{
 			Left:     varExpr,
 			Operator: IndexOpMul,
@@ -255,7 +265,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Error("x * 0 should simplify to 0")
 		}
 
-		// Test multiplication identity: x * 1 -> x
+		// Test multiplication identity: x * 1 -> x.
 		identityMulExpr := &BinaryIndexExpr{
 			Left:     varExpr,
 			Operator: IndexOpMul,
@@ -271,7 +281,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Error("x * 1 should simplify to x")
 		}
 
-		// Test subtraction identity: x - 0 -> x
+		// Test subtraction identity: x - 0 -> x.
 		subIdentityExpr := &BinaryIndexExpr{
 			Left:     varExpr,
 			Operator: IndexOpSub,
@@ -289,7 +299,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 	})
 
 	t.Run("LengthIndexExpressions", func(t *testing.T) {
-		// Test length expression
+		// Test length expression.
 		lengthExpr := &LengthIndexExpr{ArrayName: "arr"}
 
 		if lengthExpr.String() != "len(arr)" {
@@ -305,22 +315,25 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Errorf("expected variables [arr], got %v", vars)
 		}
 
-		// Test evaluation with length in environment
+		// Test evaluation with length in environment.
 		env := map[string]interface{}{
 			"len(arr)": int64(10),
 		}
+
 		val, err := lengthExpr.Evaluate(env)
 		if err != nil {
 			t.Fatalf("length evaluation failed: %v", err)
 		}
+
 		if val != 10 {
 			t.Errorf("expected 10, got %d", val)
 		}
 
-		// Test substitution
+		// Test substitution.
 		substitutions := map[string]interface{}{
 			"len(arr)": int64(20),
 		}
+
 		substituted := lengthExpr.Substitute(substitutions)
 		if constExpr, ok := substituted.(*ConstantIndexExpr); ok {
 			if constExpr.Value != 20 {
@@ -342,49 +355,57 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Errorf("expected '[0..10)', got '%s'", bounds.String())
 		}
 
-		// Test contains check for valid index
+		// Test contains check for valid index.
 		validIndex := &ConstantIndexExpr{Value: 5}
+
 		contains, err := bounds.Contains(validIndex, nil)
 		if err != nil {
 			t.Fatalf("bounds checking failed: %v", err)
 		}
+
 		if !contains {
 			t.Error("index 5 should be within bounds [0..10)")
 		}
 
-		// Test contains check for invalid index (too low)
+		// Test contains check for invalid index (too low).
 		invalidLowIndex := &ConstantIndexExpr{Value: -1}
+
 		contains, err = bounds.Contains(invalidLowIndex, nil)
 		if err != nil {
 			t.Fatalf("bounds checking failed: %v", err)
 		}
+
 		if contains {
 			t.Error("index -1 should not be within bounds [0..10)")
 		}
 
-		// Test contains check for invalid index (too high)
+		// Test contains check for invalid index (too high).
 		invalidHighIndex := &ConstantIndexExpr{Value: 10}
+
 		contains, err = bounds.Contains(invalidHighIndex, nil)
 		if err != nil {
 			t.Fatalf("bounds checking failed: %v", err)
 		}
+
 		if contains {
 			t.Error("index 10 should not be within bounds [0..10) (exclusive upper bound)")
 		}
 
-		// Test edge case: upper bound - 1
+		// Test edge case: upper bound - 1.
 		edgeIndex := &ConstantIndexExpr{Value: 9}
+
 		contains, err = bounds.Contains(edgeIndex, nil)
 		if err != nil {
 			t.Fatalf("bounds checking failed: %v", err)
 		}
+
 		if !contains {
 			t.Error("index 9 should be within bounds [0..10)")
 		}
 	})
 
 	t.Run("IndexTypes", func(t *testing.T) {
-		// Test fixed array type
+		// Test fixed array type.
 		fixedArray := NewFixedArray(TypeInt32, 10)
 
 		if !fixedArray.IsFixedLength {
@@ -400,35 +421,39 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Errorf("expected '%s', got '%s'", expectedString, fixedArray.String())
 		}
 
-		// Test bounds
+		// Test bounds.
 		bounds := fixedArray.GetBounds()
 		if bounds.String() != "[0..10)" {
 			t.Errorf("expected bounds '[0..10)', got '%s'", bounds.String())
 		}
 
-		// Test valid index check
+		// Test valid index check.
 		validIndex := &ConstantIndexExpr{Value: 5}
+
 		valid, err := fixedArray.IsValidIndex(validIndex, nil)
 		if err != nil {
 			t.Fatalf("index validation failed: %v", err)
 		}
+
 		if !valid {
 			t.Error("index 5 should be valid for array of length 10")
 		}
 
-		// Test invalid index check
+		// Test invalid index check.
 		invalidIndex := &ConstantIndexExpr{Value: 15}
+
 		valid, err = fixedArray.IsValidIndex(invalidIndex, nil)
 		if err != nil {
 			t.Fatalf("index validation failed: %v", err)
 		}
+
 		if valid {
 			t.Error("index 15 should not be valid for array of length 10")
 		}
 	})
 
 	t.Run("DynamicSlices", func(t *testing.T) {
-		// Test dynamic slice type
+		// Test dynamic slice type.
 		dynamicSlice := NewDynamicSlice(TypeInt32, "data")
 
 		if dynamicSlice.IsFixedLength {
@@ -444,7 +469,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Errorf("expected '%s', got '%s'", expectedString, dynamicSlice.String())
 		}
 
-		// Test bounds with length variable
+		// Test bounds with length variable.
 		bounds := dynamicSlice.GetBounds()
 		if bounds.String() != "[0..len(data))" {
 			t.Errorf("expected bounds '[0..len(data))', got '%s'", bounds.String())
@@ -452,7 +477,7 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 	})
 
 	t.Run("BoundedArrays", func(t *testing.T) {
-		// Test bounded array with custom bounds
+		// Test bounded array with custom bounds.
 		lengthExpr := &ConstantIndexExpr{Value: 20}
 		lowerBound := &ConstantIndexExpr{Value: 5}
 		upperBound := &ConstantIndexExpr{Value: 15}
@@ -468,32 +493,36 @@ func TestPhase2_3_2_IndexTypes(t *testing.T) {
 			t.Errorf("expected bounds '[5..15)', got '%s'", bounds.String())
 		}
 
-		// Test index within custom bounds
+		// Test index within custom bounds.
 		validIndex := &ConstantIndexExpr{Value: 10}
+
 		valid, err := boundedArray.IsValidIndex(validIndex, nil)
 		if err != nil {
 			t.Fatalf("index validation failed: %v", err)
 		}
+
 		if !valid {
 			t.Error("index 10 should be valid for bounded array [5..15)")
 		}
 
-		// Test index outside custom bounds (but within array length)
+		// Test index outside custom bounds (but within array length).
 		invalidIndex := &ConstantIndexExpr{Value: 3}
+
 		valid, err = boundedArray.IsValidIndex(invalidIndex, nil)
 		if err != nil {
 			t.Fatalf("index validation failed: %v", err)
 		}
+
 		if valid {
 			t.Error("index 3 should not be valid for bounded array [5..15)")
 		}
 	})
 
 	t.Run("OperatorStringRepresentation", func(t *testing.T) {
-		// Test binary operator string representations
+		// Test binary operator string representations.
 		operators := []struct {
-			op       BinaryIndexOperator
 			expected string
+			op       BinaryIndexOperator
 		}{
 			{IndexOpAdd, "+"},
 			{IndexOpSub, "-"},
@@ -529,7 +558,7 @@ func TestIndexChecker(t *testing.T) {
 	t.Run("ArrayVariableManagement", func(t *testing.T) {
 		checker := NewIndexChecker()
 
-		// Add a fixed array variable
+		// Add a fixed array variable.
 		fixedArray := NewFixedArray(TypeInt32, 10)
 		checker.AddArrayVariable("myArray", fixedArray)
 
@@ -539,7 +568,7 @@ func TestIndexChecker(t *testing.T) {
 			t.Error("stored array type should match added type")
 		}
 
-		// Check length environment
+		// Check length environment.
 		lengthKey := "len(myArray)"
 		if lengthExpr, exists := checker.lengthEnv[lengthKey]; !exists {
 			t.Error("length expression should be added to length environment")
@@ -553,11 +582,11 @@ func TestIndexChecker(t *testing.T) {
 	t.Run("BoundsConstraintCollection", func(t *testing.T) {
 		checker := NewIndexChecker()
 
-		// Add an array variable
+		// Add an array variable.
 		fixedArray := NewFixedArray(TypeInt32, 5)
 		checker.AddArrayVariable("testArray", fixedArray)
 
-		// Create array access expression
+		// Create array access expression.
 		arrayVar := &VariableExpr{Name: "testArray"}
 		index := &ConstantIndexExpr{Value: 3}
 		location := SourceLocation{Line: 10, Column: 5}
@@ -567,7 +596,7 @@ func TestIndexChecker(t *testing.T) {
 			t.Fatalf("array access checking failed: %v", err)
 		}
 
-		// Should have collected one constraint
+		// Should have collected one constraint.
 		if len(checker.constraints) != 1 {
 			t.Errorf("expected 1 constraint, got %d", len(checker.constraints))
 		}
@@ -581,11 +610,11 @@ func TestIndexChecker(t *testing.T) {
 	t.Run("ConstraintSolvingValid", func(t *testing.T) {
 		checker := NewIndexChecker()
 
-		// Add an array variable
+		// Add an array variable.
 		fixedArray := NewFixedArray(TypeInt32, 10)
 		checker.AddArrayVariable("validArray", fixedArray)
 
-		// Create a valid array access
+		// Create a valid array access.
 		arrayVar := &VariableExpr{Name: "validArray"}
 		validIndex := &ConstantIndexExpr{Value: 5}
 		location := SourceLocation{Line: 1, Column: 1}
@@ -595,13 +624,13 @@ func TestIndexChecker(t *testing.T) {
 			t.Fatalf("array access checking failed: %v", err)
 		}
 
-		// Solve constraints
+		// Solve constraints.
 		errors, err := checker.SolveIndexConstraints()
 		if err != nil {
 			t.Fatalf("constraint solving failed: %v", err)
 		}
 
-		// Should have no errors for valid index
+		// Should have no errors for valid index.
 		if len(errors) != 0 {
 			t.Errorf("expected no errors for valid index, got %d", len(errors))
 		}
@@ -610,11 +639,11 @@ func TestIndexChecker(t *testing.T) {
 	t.Run("ConstraintSolvingInvalid", func(t *testing.T) {
 		checker := NewIndexChecker()
 
-		// Add an array variable
+		// Add an array variable.
 		fixedArray := NewFixedArray(TypeInt32, 5)
 		checker.AddArrayVariable("invalidArray", fixedArray)
 
-		// Create an invalid array access (index out of bounds)
+		// Create an invalid array access (index out of bounds).
 		arrayVar := &VariableExpr{Name: "invalidArray"}
 		invalidIndex := &ConstantIndexExpr{Value: 10}
 		location := SourceLocation{Line: 2, Column: 3}
@@ -624,13 +653,13 @@ func TestIndexChecker(t *testing.T) {
 			t.Fatalf("array access checking failed: %v", err)
 		}
 
-		// Solve constraints
+		// Solve constraints.
 		errors, err := checker.SolveIndexConstraints()
 		if err != nil {
 			t.Fatalf("constraint solving failed: %v", err)
 		}
 
-		// Should have one error for invalid index
+		// Should have one error for invalid index.
 		if len(errors) != 1 {
 			t.Errorf("expected 1 error for invalid index, got %d", len(errors))
 		}
@@ -646,7 +675,7 @@ func TestIndexChecker(t *testing.T) {
 	t.Run("UnknownArrayHandling", func(t *testing.T) {
 		checker := NewIndexChecker()
 
-		// Try to check access to unknown array
+		// Try to check access to unknown array.
 		unknownArray := &VariableExpr{Name: "unknownArray"}
 		index := &ConstantIndexExpr{Value: 0}
 		location := SourceLocation{Line: 1, Column: 1}
@@ -660,40 +689,47 @@ func TestIndexChecker(t *testing.T) {
 
 func TestIndexExpressionParser(t *testing.T) {
 	t.Run("BasicParsing", func(t *testing.T) {
-		// Test parsing constant
+		// Test parsing constant.
 		parser := NewIndexExpressionParser("42")
+
 		expr, err := parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing '42' failed: %v", err)
 		}
+
 		if constExpr, ok := expr.(*ConstantIndexExpr); !ok || constExpr.Value != 42 {
 			t.Error("'42' should parse as constant 42")
 		}
 
-		// Test parsing variable
+		// Test parsing variable.
 		parser = NewIndexExpressionParser("i")
+
 		expr, err = parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing 'i' failed: %v", err)
 		}
+
 		if varExpr, ok := expr.(*VariableIndexExpr); !ok || varExpr.Name != "i" {
 			t.Error("'i' should parse as variable i")
 		}
 
-		// Test parsing length function
+		// Test parsing length function.
 		parser = NewIndexExpressionParser("len(arr)")
+
 		expr, err = parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing 'len(arr)' failed: %v", err)
 		}
+
 		if lengthExpr, ok := expr.(*LengthIndexExpr); !ok || lengthExpr.ArrayName != "arr" {
 			t.Error("'len(arr)' should parse as length expression for arr")
 		}
 	})
 
 	t.Run("BinaryExpressionParsing", func(t *testing.T) {
-		// Test parsing addition
+		// Test parsing addition.
 		parser := NewIndexExpressionParser("i + 1")
+
 		expr, err := parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing 'i + 1' failed: %v", err)
@@ -703,9 +739,11 @@ func TestIndexExpressionParser(t *testing.T) {
 			if binExpr.Operator != IndexOpAdd {
 				t.Error("should parse '+' operator")
 			}
+
 			if varExpr, ok := binExpr.Left.(*VariableIndexExpr); !ok || varExpr.Name != "i" {
 				t.Error("left operand should be variable 'i'")
 			}
+
 			if constExpr, ok := binExpr.Right.(*ConstantIndexExpr); !ok || constExpr.Value != 1 {
 				t.Error("right operand should be constant 1")
 			}
@@ -713,18 +751,20 @@ func TestIndexExpressionParser(t *testing.T) {
 			t.Error("'i + 1' should parse as binary expression")
 		}
 
-		// Test parsing multiplication with precedence
+		// Test parsing multiplication with precedence.
 		parser = NewIndexExpressionParser("2 * 3 + 4")
+
 		expr, err = parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing '2 * 3 + 4' failed: %v", err)
 		}
 
-		// Should parse as (2 * 3) + 4 due to precedence
+		// Should parse as (2 * 3) + 4 due to precedence.
 		if binExpr, ok := expr.(*BinaryIndexExpr); ok {
 			if binExpr.Operator != IndexOpAdd {
 				t.Error("top level should be addition")
 			}
+
 			if leftBin, ok := binExpr.Left.(*BinaryIndexExpr); ok {
 				if leftBin.Operator != IndexOpMul {
 					t.Error("left operand should be multiplication")
@@ -738,8 +778,9 @@ func TestIndexExpressionParser(t *testing.T) {
 	})
 
 	t.Run("ParenthesesParsing", func(t *testing.T) {
-		// Test parsing with parentheses
+		// Test parsing with parentheses.
 		parser := NewIndexExpressionParser("(i + 1)")
+
 		expr, err := parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing '(i + 1)' failed: %v", err)
@@ -753,18 +794,20 @@ func TestIndexExpressionParser(t *testing.T) {
 			t.Error("'(i + 1)' should parse as binary expression")
 		}
 
-		// Test precedence with parentheses: 2 * (3 + 4)
+		// Test precedence with parentheses: 2 * (3 + 4).
 		parser = NewIndexExpressionParser("2 * (3 + 4)")
+
 		expr, err = parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing '2 * (3 + 4)' failed: %v", err)
 		}
 
-		// Should parse as 2 * (3 + 4)
+		// Should parse as 2 * (3 + 4).
 		if binExpr, ok := expr.(*BinaryIndexExpr); ok {
 			if binExpr.Operator != IndexOpMul {
 				t.Error("top level should be multiplication")
 			}
+
 			if rightBin, ok := binExpr.Right.(*BinaryIndexExpr); ok {
 				if rightBin.Operator != IndexOpAdd {
 					t.Error("right operand should be addition")
@@ -778,8 +821,9 @@ func TestIndexExpressionParser(t *testing.T) {
 	})
 
 	t.Run("ComplexExpressionParsing", func(t *testing.T) {
-		// Test complex expression: len(arr) - 1
+		// Test complex expression: len(arr) - 1.
 		parser := NewIndexExpressionParser("len(data) - 1")
+
 		expr, err := parser.ParseIndexExpression()
 		if err != nil {
 			t.Fatalf("parsing 'len(data) - 1' failed: %v", err)
@@ -789,9 +833,11 @@ func TestIndexExpressionParser(t *testing.T) {
 			if binExpr.Operator != IndexOpSub {
 				t.Error("should parse as subtraction")
 			}
+
 			if lengthExpr, ok := binExpr.Left.(*LengthIndexExpr); !ok || lengthExpr.ArrayName != "data" {
 				t.Error("left operand should be length of 'data'")
 			}
+
 			if constExpr, ok := binExpr.Right.(*ConstantIndexExpr); !ok || constExpr.Value != 1 {
 				t.Error("right operand should be constant 1")
 			}
@@ -803,7 +849,7 @@ func TestIndexExpressionParser(t *testing.T) {
 
 func TestArrayAccessExpressions(t *testing.T) {
 	t.Run("ArrayAccessString", func(t *testing.T) {
-		// Test array access string representation
+		// Test array access string representation.
 		arrayVar := &VariableExpr{Name: "myArray"}
 		index := &ConstantIndexExpr{Value: 5}
 
@@ -821,7 +867,7 @@ func TestArrayAccessExpressions(t *testing.T) {
 	t.Run("SliceExpressionString", func(t *testing.T) {
 		arrayVar := &VariableExpr{Name: "data"}
 
-		// Test full slice: data[1:5]
+		// Test full slice: data[1:5].
 		startIndex := &ConstantIndexExpr{Value: 1}
 		endIndex := &ConstantIndexExpr{Value: 5}
 
@@ -836,7 +882,7 @@ func TestArrayAccessExpressions(t *testing.T) {
 			t.Errorf("expected '%s', got '%s'", expected, fullSlice.String())
 		}
 
-		// Test start-only slice: data[2:]
+		// Test start-only slice: data[2:].
 		startOnlySlice := &SliceExpr{
 			Array: arrayVar,
 			Start: &ConstantIndexExpr{Value: 2},
@@ -848,7 +894,7 @@ func TestArrayAccessExpressions(t *testing.T) {
 			t.Errorf("expected '%s', got '%s'", expected, startOnlySlice.String())
 		}
 
-		// Test end-only slice: data[:3]
+		// Test end-only slice: data[:3].
 		endOnlySlice := &SliceExpr{
 			Array: arrayVar,
 			Start: nil,
@@ -860,7 +906,7 @@ func TestArrayAccessExpressions(t *testing.T) {
 			t.Errorf("expected '%s', got '%s'", expected, endOnlySlice.String())
 		}
 
-		// Test full slice: data[:]
+		// Test full slice: data[:].
 		fullDataSlice := &SliceExpr{
 			Array: arrayVar,
 			Start: nil,
@@ -876,7 +922,7 @@ func TestArrayAccessExpressions(t *testing.T) {
 
 func TestDependentArrayTypes(t *testing.T) {
 	t.Run("DependentArrayTypeCreation", func(t *testing.T) {
-		// Create a dependent array type
+		// Create a dependent array type.
 		lengthBound := NewPositiveType(TypeInt32)
 
 		depArrayType := &DependentArrayType{
@@ -890,7 +936,7 @@ func TestDependentArrayTypes(t *testing.T) {
 			t.Errorf("expected '%s', got '%s'", expectedString, depArrayType.String())
 		}
 
-		// Test creating concrete index type
+		// Test creating concrete index type.
 		indexType := depArrayType.CreateIndexType(10)
 
 		if !indexType.IsFixedLength {
@@ -901,7 +947,7 @@ func TestDependentArrayTypes(t *testing.T) {
 			t.Error("created index type should preserve element type")
 		}
 
-		// Test bounds
+		// Test bounds.
 		bounds := indexType.GetBounds()
 		if bounds.String() != "[0..10)" {
 			t.Errorf("expected bounds '[0..10)', got '%s'", bounds.String())
@@ -911,7 +957,7 @@ func TestDependentArrayTypes(t *testing.T) {
 
 func TestComplexIndexExpressions(t *testing.T) {
 	t.Run("VariableSubstitution", func(t *testing.T) {
-		// Test complex expression with substitution: (i + j) * 2
+		// Test complex expression with substitution: (i + j) * 2.
 		iVar := &VariableIndexExpr{Name: "i"}
 		jVar := &VariableIndexExpr{Name: "j"}
 
@@ -927,22 +973,23 @@ func TestComplexIndexExpressions(t *testing.T) {
 			Right:    &ConstantIndexExpr{Value: 2},
 		}
 
-		// Test variable collection
+		// Test variable collection.
 		vars := mulExpr.Variables()
 		if len(vars) < 2 {
 			t.Errorf("complex expression should have at least 2 variables, got %d", len(vars))
 		}
 
-		// Check that both i and j are present
+		// Check that both i and j are present.
 		varSet := make(map[string]bool)
 		for _, v := range vars {
 			varSet[v] = true
 		}
+
 		if !varSet["i"] || !varSet["j"] {
 			t.Error("complex expression should include both i and j variables")
 		}
 
-		// Test substitution: i = 3, j = 4
+		// Test substitution: i = 3, j = 4.
 		substitutions := map[string]interface{}{
 			"i": int64(3),
 			"j": int64(4),
@@ -950,18 +997,19 @@ func TestComplexIndexExpressions(t *testing.T) {
 
 		substituted := mulExpr.Substitute(substitutions)
 
-		// Should evaluate to (3 + 4) * 2 = 14
+		// Should evaluate to (3 + 4) * 2 = 14.
 		val, err := substituted.Evaluate(nil)
 		if err != nil {
 			t.Fatalf("substituted expression evaluation failed: %v", err)
 		}
+
 		if val != 14 {
 			t.Errorf("expected 14, got %d", val)
 		}
 	})
 
 	t.Run("NestedLengthExpressions", func(t *testing.T) {
-		// Test expression: len(arr1) + len(arr2)
+		// Test expression: len(arr1) + len(arr2).
 		len1 := &LengthIndexExpr{ArrayName: "arr1"}
 		len2 := &LengthIndexExpr{ArrayName: "arr2"}
 
@@ -975,7 +1023,7 @@ func TestComplexIndexExpressions(t *testing.T) {
 			t.Errorf("unexpected string representation: %s", sumLengths.String())
 		}
 
-		// Test evaluation with length environment
+		// Test evaluation with length environment.
 		env := map[string]interface{}{
 			"len(arr1)": int64(5),
 			"len(arr2)": int64(7),
@@ -985,6 +1033,7 @@ func TestComplexIndexExpressions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("nested length expression evaluation failed: %v", err)
 		}
+
 		if val != 12 {
 			t.Errorf("expected 12, got %d", val)
 		}

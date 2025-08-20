@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-// TestPhase2_2_3_BidirectionalTypeChecking tests the Phase 2.2.3 bidirectional type checking system
+// TestPhase2_2_3_BidirectionalTypeChecking tests the Phase 2.2.3 bidirectional type checking system.
 func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	engine := NewInferenceEngine()
 	checker := NewBidirectionalChecker(engine)
 
-	// Set verbose for debugging during development
+	// Set verbose for debugging during development.
 	checker.SetVerbose(false)
 
 	t.Run("TypeSynthesis", func(t *testing.T) {
-		// Test type synthesis for literals
+		// Test type synthesis for literals.
 		literal := &LiteralExpr{Value: int32(42)}
 
 		synthesizedType, err := checker.SynthesizeType(literal)
@@ -29,7 +29,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("TypeChecking", func(t *testing.T) {
-		// Test type checking against expected type
+		// Test type checking against expected type.
 		literal := &LiteralExpr{Value: int32(42)}
 
 		checkedType, err := checker.CheckExpression(literal, TypeInt32)
@@ -43,7 +43,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("LambdaTypeChecking", func(t *testing.T) {
-		// Test lambda type checking
+		// Test lambda type checking.
 		// λx:Int32.x should have type Int32 -> Int32
 		body := &VariableExpr{Name: "x"}
 		lambda := &LambdaExpr{
@@ -51,7 +51,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 			Body:      body,
 		}
 
-		// Add x to environment for body checking
+		// Add x to environment for body checking.
 		engine.currentEnv.Variables["x"] = &TypeScheme{
 			TypeVars: []string{},
 			Type:     TypeInt32,
@@ -71,11 +71,11 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("FunctionApplicationSynthesis", func(t *testing.T) {
-		// Test function application type synthesis
+		// Test function application type synthesis.
 		// Create identity function: (λx:Int32.x) 42
 		arg := &LiteralExpr{Value: int32(42)}
 
-		// Add identity function to environment
+		// Add identity function to environment.
 		identityType := NewFunctionType([]*Type{TypeInt32}, TypeInt32, false, false)
 		engine.currentEnv.Variables["id"] = &TypeScheme{
 			TypeVars: []string{},
@@ -83,7 +83,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 			Level:    0,
 		}
 
-		// Use identity variable instead of lambda for synthesis
+		// Use identity variable instead of lambda for synthesis.
 		idVar := &VariableExpr{Name: "id"}
 		appWithVar := &ApplicationExpr{
 			Function: idVar,
@@ -101,7 +101,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("BinaryOperatorSynthesis", func(t *testing.T) {
-		// Test binary operator type synthesis
+		// Test binary operator type synthesis.
 		left := &LiteralExpr{Value: int32(5)}
 		right := &LiteralExpr{Value: int32(3)}
 		binary := &BinaryExpr{
@@ -121,7 +121,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("ComparisonOperatorSynthesis", func(t *testing.T) {
-		// Test comparison operator type synthesis
+		// Test comparison operator type synthesis.
 		left := &LiteralExpr{Value: int32(5)}
 		right := &LiteralExpr{Value: int32(3)}
 		comparison := &BinaryExpr{
@@ -141,7 +141,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("ConditionalTypeChecking", func(t *testing.T) {
-		// Test conditional expression type checking
+		// Test conditional expression type checking.
 		condition := &LiteralExpr{Value: true}
 		thenBranch := &LiteralExpr{Value: int32(42)}
 		elseBranch := &LiteralExpr{Value: int32(24)}
@@ -163,7 +163,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("TypeMismatchError", func(t *testing.T) {
-		// Test type mismatch error handling
+		// Test type mismatch error handling.
 		literal := &LiteralExpr{Value: "hello"}
 
 		_, err := checker.CheckExpression(literal, TypeInt32)
@@ -171,21 +171,20 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 			t.Error("expected type mismatch error, but got none")
 		}
 
-		// Check that error is recorded
+		// Check that error is recorded.
 		errors := checker.GetErrors()
 		if len(errors) == 0 {
 			t.Error("expected error to be recorded")
 		}
 
-		// Clear errors for next test
+		// Clear errors for next test.
 		checker.ClearErrors()
 	})
 
 	t.Run("SubsumptionChecking", func(t *testing.T) {
-		// Test function subtyping (contravariant parameters, covariant return)
-		// This is a simplified test - in practice you'd have more complex subtyping
-
-		// For now, just test exact equality since we haven't implemented full subtyping
+		// Test function subtyping (contravariant parameters, covariant return).
+		// This is a simplified test - in practice you'd have more complex subtyping.
+		// For now, just test exact equality since we haven't implemented full subtyping.
 		literal := &LiteralExpr{Value: int32(42)}
 
 		checkedType, err := checker.CheckExpression(literal, TypeInt32)
@@ -199,7 +198,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	})
 
 	t.Run("ErrorReporting", func(t *testing.T) {
-		// Test detailed error reporting
+		// Test detailed error reporting.
 		literal := &LiteralExpr{Value: "string"}
 
 		_, err := checker.CheckExpression(literal, TypeInt32)
@@ -212,7 +211,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 			t.Error("expected error to be recorded")
 		}
 
-		// Check error details
+		// Check error details.
 		error := errors[0]
 		if error.ExpectedType == nil || error.ActualType == nil {
 			t.Error("error should have both expected and actual types")
@@ -245,7 +244,7 @@ func TestPhase2_2_3_BidirectionalTypeChecking(t *testing.T) {
 	t.Log("🚀 Ready for Phase 2.3.1 Refinement Types!")
 }
 
-// TestBidirectionalInference tests the integrated bidirectional inference system
+// TestBidirectionalInference tests the integrated bidirectional inference system.
 func TestBidirectionalInference(t *testing.T) {
 	engine := NewInferenceEngine()
 	bidirectional := NewBidirectionalInference(engine)
@@ -253,7 +252,7 @@ func TestBidirectionalInference(t *testing.T) {
 	bidirectional.SetVerbose(false)
 
 	t.Run("InferWithExpectedType", func(t *testing.T) {
-		// Test inference with expected type (checking mode)
+		// Test inference with expected type (checking mode).
 		literal := &LiteralExpr{Value: int32(42)}
 
 		resultType, err := bidirectional.InferWithBidirectional(literal, TypeInt32)
@@ -267,7 +266,7 @@ func TestBidirectionalInference(t *testing.T) {
 	})
 
 	t.Run("InferWithoutExpectedType", func(t *testing.T) {
-		// Test inference without expected type (synthesis mode)
+		// Test inference without expected type (synthesis mode).
 		literal := &LiteralExpr{Value: int32(42)}
 
 		resultType, err := bidirectional.InferWithBidirectional(literal, nil)
@@ -281,7 +280,7 @@ func TestBidirectionalInference(t *testing.T) {
 	})
 
 	t.Run("FallbackToConstraintBased", func(t *testing.T) {
-		// Test fallback to constraint-based inference
+		// Test fallback to constraint-based inference.
 		literal := &LiteralExpr{Value: int32(42)}
 
 		resultType, err := bidirectional.InferWithFallback(literal, TypeInt32)
@@ -295,7 +294,7 @@ func TestBidirectionalInference(t *testing.T) {
 	})
 
 	t.Run("ComplexExpressionInference", func(t *testing.T) {
-		// Test inference on more complex expressions
+		// Test inference on more complex expressions.
 		left := &LiteralExpr{Value: int32(5)}
 		right := &LiteralExpr{Value: int32(3)}
 		binary := &BinaryExpr{
@@ -319,7 +318,7 @@ func TestBidirectionalInference(t *testing.T) {
 	t.Log("✅ Integration with existing type systems")
 }
 
-// TestBidirectionalModes tests the different modes of bidirectional checking
+// TestBidirectionalModes tests the different modes of bidirectional checking.
 func TestBidirectionalModes(t *testing.T) {
 	t.Run("ModeStringRepresentation", func(t *testing.T) {
 		if SynthesisMode.String() != "synthesis" {
@@ -346,7 +345,7 @@ func TestBidirectionalModes(t *testing.T) {
 			t.Error("error string should not be empty")
 		}
 
-		// Check that error contains key information
+		// Check that error contains key information.
 		if !containsSubstring(errorString, "Type mismatch") {
 			t.Error("error string should contain message")
 		}
@@ -360,14 +359,14 @@ func TestBidirectionalModes(t *testing.T) {
 	t.Log("✅ Error formatting and reporting")
 }
 
-// TestTypeAnnotationParsing tests type annotation parsing
+// TestTypeAnnotationParsing tests type annotation parsing.
 func TestTypeAnnotationParsing(t *testing.T) {
 	engine := NewInferenceEngine()
 	checker := NewBidirectionalChecker(engine)
 
 	testCases := []struct {
-		annotation   string
 		expectedType *Type
+		annotation   string
 	}{
 		{"Int32", TypeInt32},
 		{"Int64", TypeInt64},
@@ -390,7 +389,7 @@ func TestTypeAnnotationParsing(t *testing.T) {
 		})
 	}
 
-	// Test invalid annotation
+	// Test invalid annotation.
 	t.Run("InvalidAnnotation", func(t *testing.T) {
 		_, err := checker.parseTypeAnnotation("InvalidType")
 		if err == nil {
@@ -401,18 +400,18 @@ func TestTypeAnnotationParsing(t *testing.T) {
 	t.Log("✅ Type annotation parsing working correctly")
 }
 
-// TestBidirectionalPerformance tests performance of bidirectional type checking
+// TestBidirectionalPerformance tests performance of bidirectional type checking.
 func TestBidirectionalPerformance(t *testing.T) {
 	engine := NewInferenceEngine()
 	bidirectional := NewBidirectionalInference(engine)
 
-	// Test with many expressions
+	// Test with many expressions.
 	expressions := make([]Expr, 1000)
 	for i := 0; i < 1000; i++ {
 		expressions[i] = &LiteralExpr{Value: int32(i)}
 	}
 
-	// Perform type checking on all expressions
+	// Perform type checking on all expressions.
 	for i, expr := range expressions {
 		resultType, err := bidirectional.InferWithBidirectional(expr, TypeInt32)
 		if err != nil {
@@ -427,7 +426,7 @@ func TestBidirectionalPerformance(t *testing.T) {
 	t.Logf("✅ Performance test: processed %d expressions successfully", len(expressions))
 }
 
-// Helper function to check if string contains substring
+// Helper function to check if string contains substring.
 func containsSubstring(s, substr string) bool {
 	return strings.Contains(s, substr)
 }

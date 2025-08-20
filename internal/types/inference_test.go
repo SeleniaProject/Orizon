@@ -1,5 +1,5 @@
-// Comprehensive test suite for Hindley-Milner type inference engine
-// Tests Algorithm W, unification, generalization, and let-polymorphism
+// Comprehensive test suite for Hindley-Milner type inference engine.
+// Tests Algorithm W, unification, generalization, and let-polymorphism.
 
 package types
 
@@ -15,34 +15,40 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 
 	engine := NewInferenceEngine()
 
-	// Test 1: Basic Type Inference
+	// Test 1: Basic Type Inference.
 	t.Run("BasicTypeInference", func(t *testing.T) {
-		// Test literal inference
+		// Test literal inference.
 		literal := NewLiteralExpr(42)
+
 		inferredType, err := engine.InferType(literal)
 		if err != nil {
 			t.Fatalf("Failed to infer literal type: %v", err)
 		}
+
 		if inferredType.Kind != TypeKindInt32 {
 			t.Errorf("Expected Int32, got %s", inferredType.String())
 		}
 
-		// Test string literal
+		// Test string literal.
 		stringLit := NewLiteralExpr("hello")
+
 		stringType, err := engine.InferType(stringLit)
 		if err != nil {
 			t.Fatalf("Failed to infer string type: %v", err)
 		}
+
 		if stringType.Kind != TypeKindString {
 			t.Errorf("Expected String, got %s", stringType.String())
 		}
 
-		// Test boolean literal
+		// Test boolean literal.
 		boolLit := NewLiteralExpr(true)
+
 		boolType, err := engine.InferType(boolLit)
 		if err != nil {
 			t.Fatalf("Failed to infer boolean type: %v", err)
 		}
+
 		if boolType.Kind != TypeKindBool {
 			t.Errorf("Expected Bool, got %s", boolType.String())
 		}
@@ -50,11 +56,11 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		t.Log("✅ Basic type inference for literals working correctly")
 	})
 
-	// Test 2: Variable Inference
+	// Test 2: Variable Inference.
 	t.Run("VariableInference", func(t *testing.T) {
 		engine.Reset()
 
-		// Add a variable to environment
+		// Add a variable to environment.
 		intScheme := &TypeScheme{
 			TypeVars: []string{},
 			Type:     TypeInt32,
@@ -62,18 +68,21 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		}
 		engine.AddVariable("x", intScheme)
 
-		// Test variable lookup
+		// Test variable lookup.
 		varExpr := NewVariableExpr("x")
+
 		inferredType, err := engine.InferType(varExpr)
 		if err != nil {
 			t.Fatalf("Failed to infer variable type: %v", err)
 		}
+
 		if inferredType.Kind != TypeKindInt32 {
 			t.Errorf("Expected Int32, got %s", inferredType.String())
 		}
 
-		// Test undefined variable
+		// Test undefined variable.
 		undefinedVar := NewVariableExpr("undefined")
+
 		_, err = engine.InferType(undefinedVar)
 		if err == nil {
 			t.Error("Should fail for undefined variable")
@@ -82,12 +91,13 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		t.Log("✅ Variable type inference working correctly")
 	})
 
-	// Test 3: Lambda Inference
+	// Test 3: Lambda Inference.
 	t.Run("LambdaInference", func(t *testing.T) {
 		engine.Reset()
 
 		// Test identity function: λx.x
 		identityLambda := NewLambdaExpr("x", NewVariableExpr("x"))
+
 		identityType, err := engine.InferType(identityLambda)
 		if err != nil {
 			t.Fatalf("Failed to infer identity function type: %v", err)
@@ -102,14 +112,15 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 			t.Errorf("Expected 1 parameter, got %d", len(funcData.Parameters))
 		}
 
-		// The identity function should have type: τ₀ -> τ₀
+		// The identity function should have type: τ₀ -> τ₀.
 		paramType := funcData.Parameters[0]
 		returnType := funcData.ReturnType
+
 		if paramType.Kind != TypeKindTypeVar || returnType.Kind != TypeKindTypeVar {
 			t.Errorf("Identity function should have polymorphic type variables")
 		}
 
-		// Apply substitutions to check if they unify
+		// Apply substitutions to check if they unify.
 		engine.substitutions = make(map[string]*Type)
 		if err := engine.Unify(paramType, returnType); err != nil {
 			t.Errorf("Identity function parameter and return types should unify: %v", err)
@@ -118,7 +129,7 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		t.Log("✅ Lambda function inference working correctly")
 	})
 
-	// Test 4: Function Application
+	// Test 4: Function Application.
 	t.Run("FunctionApplication", func(t *testing.T) {
 		engine.Reset()
 
@@ -136,8 +147,9 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 			t.Errorf("Expected Int32, got %s", resultType.String())
 		}
 
-		// Test application with type mismatch
+		// Test application with type mismatch.
 		engine.Reset()
+
 		stringLiteral := NewLiteralExpr("hello")
 
 		// Create a function that expects int: λx:int.x
@@ -152,14 +164,14 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		t.Log("✅ Function application inference working correctly")
 	})
 
-	// Test 5: Let-Polymorphism
+	// Test 5: Let-Polymorphism.
 	t.Run("LetPolymorphism", func(t *testing.T) {
 		engine.Reset()
 
 		// Test: let id = λx.x in (id 42)
 		identityLambda := NewLambdaExpr("x", NewVariableExpr("x"))
 
-		// Use the identity function on an integer
+		// Use the identity function on an integer.
 		idVar := NewVariableExpr("id")
 		intApp := NewApplicationExpr(idVar, NewLiteralExpr(42))
 
@@ -170,7 +182,7 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 			t.Fatalf("Failed to infer let-polymorphism type: %v", err)
 		}
 
-		// Result should be Int32
+		// Result should be Int32.
 		if resultType.Kind != TypeKindInt32 {
 			t.Errorf("Expected Int32, got %s", resultType.String())
 		}
@@ -178,11 +190,11 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		t.Log("✅ Let-polymorphism working correctly")
 	})
 
-	// Test 6: Conditional Expressions
+	// Test 6: Conditional Expressions.
 	t.Run("ConditionalInference", func(t *testing.T) {
 		engine.Reset()
 
-		// Test: if true then 42 else 84
+		// Test: if true then 42 else 84.
 		condition := NewLiteralExpr(true)
 		thenExpr := NewLiteralExpr(42)
 		elseExpr := NewLiteralExpr(84)
@@ -198,8 +210,9 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 			t.Errorf("Expected Int32, got %s", resultType.String())
 		}
 
-		// Test type mismatch in branches
+		// Test type mismatch in branches.
 		engine.Reset()
+
 		stringElse := NewLiteralExpr("hello")
 		mismatchIfElse := NewIfElseExpr(condition, thenExpr, stringElse)
 
@@ -208,8 +221,9 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 			t.Error("Should fail for type mismatch in if-else branches")
 		}
 
-		// Test non-boolean condition
+		// Test non-boolean condition.
 		engine.Reset()
+
 		intCondition := NewLiteralExpr(42)
 		invalidIfElse := NewIfElseExpr(intCondition, thenExpr, elseExpr)
 
@@ -221,11 +235,11 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		t.Log("✅ Conditional expression inference working correctly")
 	})
 
-	// Test 7: Binary Operations
+	// Test 7: Binary Operations.
 	t.Run("BinaryOperations", func(t *testing.T) {
 		engine.Reset()
 
-		// Add arithmetic operator to environment
+		// Add arithmetic operator to environment.
 		addOpScheme := &TypeScheme{
 			TypeVars: []string{},
 			Type: NewFunctionType([]*Type{
@@ -236,7 +250,7 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 		}
 		engine.AddVariable("+", addOpScheme)
 
-		// Test arithmetic: 42 + 84
+		// Test arithmetic: 42 + 84.
 		left := NewLiteralExpr(42)
 		right := NewLiteralExpr(84)
 		addition := NewBinaryOpExpr(left, "+", right)
@@ -250,10 +264,10 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 			t.Errorf("Expected Int32, got %s", resultType.String())
 		}
 
-		// Test comparison: 42 == 42
+		// Test comparison: 42 == 42.
 		engine.Reset()
 
-		// Add equality operator to environment
+		// Add equality operator to environment.
 		eqOpScheme := &TypeScheme{
 			TypeVars: []string{},
 			Type: NewFunctionType([]*Type{
@@ -281,19 +295,19 @@ func TestPhase2_2_1_HindleyMilnerInference(t *testing.T) {
 	t.Log("✅ Phase 2.2.1: Hindley-Milner Type Inference - ALL TESTS PASSED")
 }
 
-// ====== Unification Tests ======
+// ====== Unification Tests ======.
 
 func TestUnificationAlgorithm(t *testing.T) {
 	t.Run("PrimitiveUnification", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test unifying same types
+		// Test unifying same types.
 		err := engine.Unify(TypeInt32, TypeInt32)
 		if err != nil {
 			t.Errorf("Same types should unify: %v", err)
 		}
 
-		// Test unifying different primitive types
+		// Test unifying different primitive types.
 		err = engine.Unify(TypeInt32, TypeString)
 		if err == nil {
 			t.Error("Different primitive types should not unify")
@@ -305,20 +319,21 @@ func TestUnificationAlgorithm(t *testing.T) {
 	t.Run("TypeVariableUnification", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test unifying type variable with concrete type
+		// Test unifying type variable with concrete type.
 		typeVar := engine.FreshTypeVar()
+
 		err := engine.Unify(typeVar, TypeInt32)
 		if err != nil {
 			t.Errorf("Type variable should unify with concrete type: %v", err)
 		}
 
-		// Check substitution was added
+		// Check substitution was added.
 		varData := typeVar.Data.(*TypeVar)
 		if subst, exists := engine.substitutions[varData.Name]; !exists || subst != TypeInt32 {
 			t.Error("Substitution should be added for unified type variable")
 		}
 
-		// Test unifying two type variables
+		// Test unifying two type variables.
 		engine.Reset()
 		typeVar1 := engine.FreshTypeVar()
 		typeVar2 := engine.FreshTypeVar()
@@ -334,11 +349,11 @@ func TestUnificationAlgorithm(t *testing.T) {
 	t.Run("OccursCheck", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Create recursive type: τ = τ -> τ
+		// Create recursive type: τ = τ -> τ.
 		typeVar := engine.FreshTypeVar()
 		funcType := NewFunctionType([]*Type{typeVar}, typeVar, false, false)
 
-		// This should fail occurs check
+		// This should fail occurs check.
 		err := engine.Unify(typeVar, funcType)
 		if err == nil {
 			t.Error("Occurs check should prevent infinite types")
@@ -350,7 +365,7 @@ func TestUnificationAlgorithm(t *testing.T) {
 	t.Run("ComplexTypeUnification", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test unifying function types
+		// Test unifying function types.
 		func1 := NewFunctionType([]*Type{TypeInt32}, TypeString, false, false)
 		func2 := NewFunctionType([]*Type{TypeInt32}, TypeString, false, false)
 
@@ -359,7 +374,7 @@ func TestUnificationAlgorithm(t *testing.T) {
 			t.Errorf("Same function types should unify: %v", err)
 		}
 
-		// Test unifying array types
+		// Test unifying array types.
 		array1 := NewArrayType(TypeInt32, 10)
 		array2 := NewArrayType(TypeInt32, 10)
 
@@ -368,8 +383,9 @@ func TestUnificationAlgorithm(t *testing.T) {
 			t.Errorf("Same array types should unify: %v", err)
 		}
 
-		// Test unifying arrays with different lengths
+		// Test unifying arrays with different lengths.
 		array3 := NewArrayType(TypeInt32, 5)
+
 		err = engine.Unify(array1, array3)
 		if err == nil {
 			t.Error("Arrays with different lengths should not unify")
@@ -379,13 +395,13 @@ func TestUnificationAlgorithm(t *testing.T) {
 	})
 }
 
-// ====== Type Environment Tests ======
+// ====== Type Environment Tests ======.
 
 func TestTypeEnvironment(t *testing.T) {
 	t.Run("EnvironmentOperations", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test adding and looking up variables
+		// Test adding and looking up variables.
 		intScheme := &TypeScheme{
 			TypeVars: []string{},
 			Type:     TypeInt32,
@@ -398,11 +414,12 @@ func TestTypeEnvironment(t *testing.T) {
 		if !exists {
 			t.Error("Variable should exist in environment")
 		}
+
 		if scheme.Type.Kind != TypeKindInt32 {
 			t.Errorf("Expected Int32, got %s", scheme.Type.String())
 		}
 
-		// Test nested environments
+		// Test nested environments.
 		engine.PushEnvironment()
 
 		stringScheme := &TypeScheme{
@@ -412,7 +429,7 @@ func TestTypeEnvironment(t *testing.T) {
 		}
 		engine.AddVariable("y", stringScheme)
 
-		// Should find both variables
+		// Should find both variables.
 		_, exists = engine.LookupVariable("x") // From parent
 		if !exists {
 			t.Error("Should find variable from parent environment")
@@ -423,10 +440,10 @@ func TestTypeEnvironment(t *testing.T) {
 			t.Error("Should find variable from current environment")
 		}
 
-		// Pop environment
+		// Pop environment.
 		engine.PopEnvironment()
 
-		// Should only find x now
+		// Should only find x now.
 		_, exists = engine.LookupVariable("x")
 		if !exists {
 			t.Error("Should still find variable from parent environment")
@@ -441,17 +458,17 @@ func TestTypeEnvironment(t *testing.T) {
 	})
 }
 
-// ====== Generalization and Instantiation Tests ======
+// ====== Generalization and Instantiation Tests ======.
 
 func TestGeneralizationInstantiation(t *testing.T) {
 	t.Run("Generalization", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Create a type with free variables: τ₀ -> τ₀
+		// Create a type with free variables: τ₀ -> τ₀.
 		typeVar := engine.FreshTypeVar()
 		funcType := NewFunctionType([]*Type{typeVar}, typeVar, false, false)
 
-		// Generalize it
+		// Generalize it.
 		scheme := engine.Generalize(funcType)
 
 		if len(scheme.TypeVars) != 1 {
@@ -478,11 +495,11 @@ func TestGeneralizationInstantiation(t *testing.T) {
 			Level: 0,
 		}
 
-		// Instantiate it twice
+		// Instantiate it twice.
 		instance1 := engine.Instantiate(scheme)
 		instance2 := engine.Instantiate(scheme)
 
-		// Instances should have fresh type variables
+		// Instances should have fresh type variables.
 		func1 := instance1.Data.(*FunctionType)
 		func2 := instance2.Data.(*FunctionType)
 
@@ -493,7 +510,7 @@ func TestGeneralizationInstantiation(t *testing.T) {
 			t.Error("Instantiated types should have type variables")
 		}
 
-		// Variables should be different (fresh)
+		// Variables should be different (fresh).
 		var1Data := param1.Data.(*TypeVar)
 		var2Data := param2.Data.(*TypeVar)
 
@@ -505,18 +522,18 @@ func TestGeneralizationInstantiation(t *testing.T) {
 	})
 }
 
-// ====== Advanced Inference Tests ======
+// ====== Advanced Inference Tests ======.
 
 func TestAdvancedInference(t *testing.T) {
 	t.Run("HigherOrderFunctions", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test map function: (a -> b) -> [a] -> [b]
+		// Test map function: (a -> b) -> [a] -> [b].
 		// let map = λf.λxs.map_impl f xs
-		// For simplicity, we'll test function composition
+		// For simplicity, we'll test function composition.
 
 		// Create: λf.λg.λx.f (g x)
-		// This is function composition with type: (b -> c) -> (a -> b) -> a -> c
+		// This is function composition with type: (b -> c) -> (a -> b) -> a -> c.
 		x := NewVariableExpr("x")
 		gx := NewApplicationExpr(NewVariableExpr("g"), x)
 		fgx := NewApplicationExpr(NewVariableExpr("f"), gx)
@@ -540,10 +557,10 @@ func TestAdvancedInference(t *testing.T) {
 	t.Run("RecursiveFunctions", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test recursive factorial (simplified)
+		// Test recursive factorial (simplified).
 		// let rec fact = λn.if (n == 0) then 1 else n * (fact (n - 1))
 
-		// First, add factorial to environment (recursive binding)
+		// First, add factorial to environment (recursive binding).
 		factScheme := &TypeScheme{
 			TypeVars: []string{},
 			Type:     NewFunctionType([]*Type{TypeInt32}, TypeInt32, false, false),
@@ -551,7 +568,7 @@ func TestAdvancedInference(t *testing.T) {
 		}
 		engine.AddVariable("fact", factScheme)
 
-		// Create the body: if (n == 0) then 1 else n * (fact (n - 1))
+		// Create the body: if (n == 0) then 1 else n * (fact (n - 1)).
 		n := NewVariableExpr("n")
 		zero := NewLiteralExpr(0)
 		one := NewLiteralExpr(1)
@@ -559,11 +576,11 @@ func TestAdvancedInference(t *testing.T) {
 		condition := NewBinaryOpExpr(n, "==", zero)
 		thenExpr := one
 
-		// n - 1
+		// n - 1.
 		nMinus1 := NewBinaryOpExpr(n, "-", one)
-		// fact (n - 1)
+		// fact (n - 1).
 		factCall := NewApplicationExpr(NewVariableExpr("fact"), nMinus1)
-		// n * (fact (n - 1))
+		// n * (fact (n - 1)).
 		elseExpr := NewBinaryOpExpr(n, "*", factCall)
 
 		ifElseExpr := NewIfElseExpr(condition, thenExpr, elseExpr)
@@ -578,6 +595,7 @@ func TestAdvancedInference(t *testing.T) {
 		if len(funcData.Parameters) != 1 || funcData.Parameters[0].Kind != TypeKindInt32 {
 			t.Error("Factorial should take one Int32 parameter")
 		}
+
 		if funcData.ReturnType.Kind != TypeKindInt32 {
 			t.Error("Factorial should return Int32")
 		}
@@ -586,14 +604,15 @@ func TestAdvancedInference(t *testing.T) {
 	})
 }
 
-// ====== Performance Tests ======
+// ====== Performance Tests ======.
 
 func TestInferencePerformance(t *testing.T) {
 	t.Run("LargeExpressionInference", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Create a large expression tree
+		// Create a large expression tree.
 		var expr Expr = NewLiteralExpr(1)
+
 		for i := 0; i < 100; i++ {
 			nextLit := NewLiteralExpr(1)
 			expr = NewBinaryOpExpr(expr, "+", nextLit)
@@ -614,7 +633,7 @@ func TestInferencePerformance(t *testing.T) {
 	t.Run("ManyVariableEnvironment", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Add many variables to environment
+		// Add many variables to environment.
 		for i := 0; i < 1000; i++ {
 			varName := fmt.Sprintf("var%d", i)
 			scheme := &TypeScheme{
@@ -625,8 +644,9 @@ func TestInferencePerformance(t *testing.T) {
 			engine.AddVariable(varName, scheme)
 		}
 
-		// Test lookup performance
+		// Test lookup performance.
 		varExpr := NewVariableExpr("var500")
+
 		inferredType, err := engine.InferType(varExpr)
 		if err != nil {
 			t.Fatalf("Failed to infer variable type in large environment: %v", err)
@@ -640,13 +660,13 @@ func TestInferencePerformance(t *testing.T) {
 	})
 }
 
-// ====== Error Handling Tests ======
+// ====== Error Handling Tests ======.
 
 func TestInferenceErrors(t *testing.T) {
 	t.Run("TypeMismatchErrors", func(t *testing.T) {
 		engine := NewInferenceEngine()
 
-		// Test function application with wrong argument type
+		// Test function application with wrong argument type.
 		intFunc := NewTypedLambdaExpr("x", TypeInt32, NewVariableExpr("x"))
 		stringArg := NewLiteralExpr("hello")
 		wrongApp := NewApplicationExpr(intFunc, stringArg)
@@ -664,6 +684,7 @@ func TestInferenceErrors(t *testing.T) {
 		engine := NewInferenceEngine()
 
 		undefinedVar := NewVariableExpr("undefinedVariable")
+
 		_, err := engine.InferType(undefinedVar)
 		if err == nil {
 			t.Error("Should fail for undefined variable")

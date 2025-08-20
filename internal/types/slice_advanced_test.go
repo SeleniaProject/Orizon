@@ -9,7 +9,7 @@ import (
 	"unsafe"
 )
 
-// TestOrizonSlice_SecurityTests provides security-focused testing
+// TestOrizonSlice_SecurityTests provides security-focused testing.
 func TestOrizonSlice_SecurityTests(t *testing.T) {
 	t.Run("buffer_overflow_protection", func(t *testing.T) {
 		data := make([]int32, 10)
@@ -20,7 +20,7 @@ func TestOrizonSlice_SecurityTests(t *testing.T) {
 			typeInfo: &TypeInfo{Size: 4},
 		}
 
-		// Test various overflow attempts
+		// Test various overflow attempts.
 		maliciousIndices := []uintptr{
 			10, 11, 100, 1000, 10000,
 			^uintptr(0), ^uintptr(0) - 1, ^uintptr(0) >> 1,
@@ -39,7 +39,7 @@ func TestOrizonSlice_SecurityTests(t *testing.T) {
 	})
 
 	t.Run("integer_overflow_protection", func(t *testing.T) {
-		// Test cases that could cause integer overflow
+		// Test cases that could cause integer overflow.
 		testCases := []struct {
 			name        string
 			length      uintptr
@@ -73,7 +73,7 @@ func TestOrizonSlice_SecurityTests(t *testing.T) {
 	})
 }
 
-// TestOrizonSlice_EdgeCases provides comprehensive edge case testing
+// TestOrizonSlice_EdgeCases provides comprehensive edge case testing.
 func TestOrizonSlice_EdgeCases(t *testing.T) {
 	t.Run("zero_length_slice", func(t *testing.T) {
 		slice := &OrizonSlice{
@@ -83,18 +83,20 @@ func TestOrizonSlice_EdgeCases(t *testing.T) {
 			typeInfo: &TypeInfo{Size: 4},
 		}
 
-		// Test all methods on zero-length slice
+		// Test all methods on zero-length slice.
 		if slice.Len() != 0 {
 			t.Error("Expected zero length")
 		}
+
 		if slice.Cap() != 0 {
 			t.Error("Expected zero capacity")
 		}
+
 		if !slice.IsEmpty() {
 			t.Error("Expected empty slice")
 		}
 
-		// Access should panic
+		// Access should panic.
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("Expected panic for access to empty slice")
@@ -113,13 +115,13 @@ func TestOrizonSlice_EdgeCases(t *testing.T) {
 			typeInfo: &TypeInfo{Size: 4},
 		}
 
-		// Valid access
+		// Valid access.
 		ptr := slice.Get(0)
 		if *(*int32)(ptr) != 42 {
 			t.Error("Single element access failed")
 		}
 
-		// Invalid access should panic
+		// Invalid access should panic.
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("Expected panic for index 1 in single-element slice")
@@ -141,15 +143,16 @@ func TestOrizonSlice_EdgeCases(t *testing.T) {
 			typeInfo: &TypeInfo{Size: 4},
 		}
 
-		// Test first and last valid indices
+		// Test first and last valid indices.
 		if *(*int32)(slice.Get(0)) != 1 {
 			t.Error("First element access failed")
 		}
+
 		if *(*int32)(slice.Get(size - 1)) != size {
 			t.Error("Last element access failed")
 		}
 
-		// Test just past boundary
+		// Test just past boundary.
 		defer func() {
 			if r := recover(); r == nil {
 				t.Error("Expected panic for access past boundary")
@@ -159,10 +162,11 @@ func TestOrizonSlice_EdgeCases(t *testing.T) {
 	})
 }
 
-// TestOrizonSlice_ConcurrentSafety provides concurrent access safety testing
+// TestOrizonSlice_ConcurrentSafety provides concurrent access safety testing.
 func TestOrizonSlice_ConcurrentSafety(t *testing.T) {
 	t.Run("read_only_concurrent_access", func(t *testing.T) {
 		const size = 10000
+
 		data := make([]int64, size)
 		for i := range data {
 			data[i] = int64(i)
@@ -176,13 +180,16 @@ func TestOrizonSlice_ConcurrentSafety(t *testing.T) {
 		}
 
 		const numGoroutines = 50
+
 		const operationsPerGoroutine = 1000
 
 		var wg sync.WaitGroup
+
 		errors := make(chan error, numGoroutines)
 
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
+
 			go func(id int) {
 				defer wg.Done()
 				defer func() {
@@ -194,9 +201,11 @@ func TestOrizonSlice_ConcurrentSafety(t *testing.T) {
 				for j := 0; j < operationsPerGoroutine; j++ {
 					index := uintptr((id*operationsPerGoroutine + j) % size)
 					ptr := slice.Get(index)
+
 					value := *(*int64)(ptr)
 					if value != int64(index) {
 						errors <- fmt.Errorf("wrong value at index %d: got %d", index, value)
+
 						return
 					}
 				}
@@ -222,15 +231,17 @@ func TestOrizonSlice_ConcurrentSafety(t *testing.T) {
 		}
 
 		const numGoroutines = 20
+
 		var wg sync.WaitGroup
 
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
+
 			go func(id int) {
 				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
-						// Unexpected panic in this test
+						// Unexpected panic in this test.
 						t.Errorf("Goroutine %d panicked: %v", id, r)
 					}
 				}()
@@ -239,11 +250,11 @@ func TestOrizonSlice_ConcurrentSafety(t *testing.T) {
 					index := uintptr((id*100 + j) % size)
 
 					if j%2 == 0 {
-						// Read operation
+						// Read operation.
 						ptr := slice.Get(index)
 						_ = *(*int64)(ptr)
 					} else {
-						// Write operation
+						// Write operation.
 						value := int64(id*10000 + j)
 						slice.Set(index, unsafe.Pointer(&value))
 					}
@@ -255,7 +266,7 @@ func TestOrizonSlice_ConcurrentSafety(t *testing.T) {
 	})
 }
 
-// TestOrizonSlice_MemoryAlignment tests memory alignment scenarios
+// TestOrizonSlice_MemoryAlignment tests memory alignment scenarios.
 func TestOrizonSlice_MemoryAlignment(t *testing.T) {
 	t.Run("various_element_sizes", func(t *testing.T) {
 		testSizes := []uintptr{1, 2, 3, 4, 5, 7, 8, 12, 16, 24, 32, 64, 128}
@@ -272,14 +283,14 @@ func TestOrizonSlice_MemoryAlignment(t *testing.T) {
 					typeInfo: &TypeInfo{Size: size},
 				}
 
-				// Test access to all elements
+				// Test access to all elements.
 				for i := uintptr(0); i < numElements; i++ {
 					ptr := slice.Get(i)
 					if ptr == nil {
 						t.Errorf("Got nil pointer at index %d", i)
 					}
 
-					// Verify pointer arithmetic
+					// Verify pointer arithmetic.
 					expected := unsafe.Add(unsafe.Pointer(&data[0]), i*size)
 					if ptr != expected {
 						t.Errorf("Pointer arithmetic failed at index %d", i)
@@ -290,15 +301,16 @@ func TestOrizonSlice_MemoryAlignment(t *testing.T) {
 	})
 }
 
-// TestOrizonSlice_ResourceManagement tests resource management
+// TestOrizonSlice_ResourceManagement tests resource management.
 func TestOrizonSlice_ResourceManagement(t *testing.T) {
 	t.Run("no_memory_leaks", func(t *testing.T) {
-		// Monitor memory usage
+		// Monitor memory usage.
 		var m1, m2 runtime.MemStats
+
 		runtime.GC()
 		runtime.ReadMemStats(&m1)
 
-		// Create and destroy many slices
+		// Create and destroy many slices.
 		for i := 0; i < 10000; i++ {
 			data := make([]int32, 100)
 			slice := &OrizonSlice{
@@ -308,22 +320,21 @@ func TestOrizonSlice_ResourceManagement(t *testing.T) {
 				typeInfo: &TypeInfo{Size: 4},
 			}
 
-			// Use the slice
+			// Use the slice.
 			for j := uintptr(0); j < 100; j++ {
 				value := int32(i*100 + int(j))
 				slice.Set(j, unsafe.Pointer(&value))
 				ptr := slice.Get(j)
 				_ = *(*int32)(ptr)
 			}
-
-			// Slice should be eligible for GC after this scope
+			// Slice should be eligible for GC after this scope.
 		}
 
 		runtime.GC()
 		runtime.GC() // Double GC to ensure cleanup
 		runtime.ReadMemStats(&m2)
 
-		// Memory usage should not grow significantly
+		// Memory usage should not grow significantly.
 		memGrowth := m2.Alloc - m1.Alloc
 		if memGrowth > 10*1024*1024 { // 10MB threshold
 			t.Logf("Memory growth: %d bytes (may indicate leak)", memGrowth)
@@ -333,10 +344,11 @@ func TestOrizonSlice_ResourceManagement(t *testing.T) {
 	t.Run("goroutine_cleanup", func(t *testing.T) {
 		initialGoroutines := runtime.NumGoroutine()
 
-		// Test that doesn't create persistent goroutines
+		// Test that doesn't create persistent goroutines.
 		var wg sync.WaitGroup
 		for i := 0; i < 100; i++ {
 			wg.Add(1)
+
 			go func() {
 				defer wg.Done()
 
@@ -348,7 +360,7 @@ func TestOrizonSlice_ResourceManagement(t *testing.T) {
 					typeInfo: &TypeInfo{Size: 4},
 				}
 
-				// Perform operations
+				// Perform operations.
 				for j := uintptr(0); j < 1000; j++ {
 					value := int32(j)
 					slice.Set(j, unsafe.Pointer(&value))
@@ -358,7 +370,7 @@ func TestOrizonSlice_ResourceManagement(t *testing.T) {
 
 		wg.Wait()
 
-		// Allow time for goroutine cleanup
+		// Allow time for goroutine cleanup.
 		time.Sleep(100 * time.Millisecond)
 		runtime.GC()
 
@@ -370,7 +382,7 @@ func TestOrizonSlice_ResourceManagement(t *testing.T) {
 	})
 }
 
-// TestOrizonSlice_PerformanceCharacteristics tests performance properties
+// TestOrizonSlice_PerformanceCharacteristics tests performance properties.
 func TestOrizonSlice_PerformanceCharacteristics(t *testing.T) {
 	sizes := []int{100, 1000, 10000, 100000}
 
@@ -384,18 +396,20 @@ func TestOrizonSlice_PerformanceCharacteristics(t *testing.T) {
 				typeInfo: &TypeInfo{Size: 4},
 			}
 
-			// Sequential access performance
+			// Sequential access performance.
 			start := time.Now()
+
 			iterations := 100000
 			for i := 0; i < iterations; i++ {
 				index := uintptr(i % size)
 				ptr := slice.Get(index)
 				_ = *(*int32)(ptr)
 			}
+
 			duration := time.Since(start)
 			nsPerOp := duration.Nanoseconds() / int64(iterations)
 
-			// Performance should be O(1) - not dependent on slice size
+			// Performance should be O(1) - not dependent on slice size.
 			if nsPerOp > 50 { // Very generous threshold
 				t.Logf("Size %d: %d ns/op (may need optimization)", size, nsPerOp)
 			} else {
@@ -405,9 +419,9 @@ func TestOrizonSlice_PerformanceCharacteristics(t *testing.T) {
 	}
 }
 
-// BenchmarkOrizonSlice_ComprehensivePerformance provides detailed benchmarks
+// BenchmarkOrizonSlice_ComprehensivePerformance provides detailed benchmarks.
 func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
-	// Small slice benchmark
+	// Small slice benchmark.
 	b.Run("small_slice_sequential", func(b *testing.B) {
 		data := make([]int32, 100)
 		slice := &OrizonSlice{
@@ -418,6 +432,7 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			index := uintptr(i % 100)
 			ptr := slice.Get(index)
@@ -425,7 +440,7 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 	})
 
-	// Large slice benchmark
+	// Large slice benchmark.
 	b.Run("large_slice_sequential", func(b *testing.B) {
 		data := make([]int32, 1000000)
 		slice := &OrizonSlice{
@@ -436,6 +451,7 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			index := uintptr(i % 1000000)
 			ptr := slice.Get(index)
@@ -443,7 +459,7 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 	})
 
-	// Random access benchmark
+	// Random access benchmark.
 	b.Run("random_access", func(b *testing.B) {
 		data := make([]int32, 10000)
 		slice := &OrizonSlice{
@@ -453,20 +469,21 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 			typeInfo: &TypeInfo{Size: 4},
 		}
 
-		// Pre-generate random indices
+		// Pre-generate random indices.
 		indices := make([]uintptr, b.N)
 		for i := range indices {
 			indices[i] = uintptr(i * 7919 % 10000)
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			ptr := slice.Get(indices[i])
 			_ = *(*int32)(ptr)
 		}
 	})
 
-	// Set operation benchmark
+	// Set operation benchmark.
 	b.Run("set_operations", func(b *testing.B) {
 		data := make([]int32, 10000)
 		slice := &OrizonSlice{
@@ -477,6 +494,7 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			index := uintptr(i % 10000)
 			value := int32(i)
@@ -484,7 +502,7 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 	})
 
-	// Subslice operation benchmark
+	// Subslice operation benchmark.
 	b.Run("subslice_operations", func(b *testing.B) {
 		data := make([]int32, 10000)
 		slice := &OrizonSlice{
@@ -495,12 +513,15 @@ func BenchmarkOrizonSlice_ComprehensivePerformance(b *testing.B) {
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			start := uintptr(i % 5000)
+
 			end := start + uintptr(i%1000) + 1
 			if end > 10000 {
 				end = 10000
 			}
+
 			sub := slice.Sub(start, end)
 			_ = sub.Len() // Use the subslice
 		}

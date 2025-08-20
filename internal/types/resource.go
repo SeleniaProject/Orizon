@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ResourceTypeKind represents different kinds of resources (avoiding conflict with linear.go)
+// ResourceTypeKind represents different kinds of resources (avoiding conflict with linear.go).
 type ResourceTypeKind int
 
 const (
@@ -26,7 +26,7 @@ const (
 	ResourceTypeKindCustom                               // User-defined resource
 )
 
-// String returns a string representation of the resource kind
+// String returns a string representation of the resource kind.
 func (rk ResourceTypeKind) String() string {
 	switch rk {
 	case ResourceTypeKindFile:
@@ -58,7 +58,7 @@ func (rk ResourceTypeKind) String() string {
 	}
 }
 
-// ResourceState represents the current state of a resource
+// ResourceState represents the current state of a resource.
 type ResourceState int
 
 const (
@@ -70,7 +70,7 @@ const (
 	ResourceStateLeaked                             // Resource leaked (not properly released)
 )
 
-// String returns a string representation of the resource state
+// String returns a string representation of the resource state.
 func (rs ResourceState) String() string {
 	switch rs {
 	case ResourceStateUninitialized:
@@ -90,25 +90,25 @@ func (rs ResourceState) String() string {
 	}
 }
 
-// ManagedResourceType represents a resource type with automatic management
+// ManagedResourceType represents a resource type with automatic management.
 type ManagedResourceType struct {
 	BaseType      *Type
-	Kind          ResourceTypeKind
-	AcquireFunc   string        // Function to acquire the resource
-	ReleaseFunc   string        // Function to release the resource
-	Finalizer     string        // Optional finalizer function
-	State         ResourceState // Current state
-	Lifetime      *ResourceLifetime
-	Constraints   []ResourceConstraint
-	Dependencies  []*ManagedResourceType // Resources this depends on
-	UsageCount    int
-	MaxUsageCount int  // Maximum allowed concurrent usage
-	IsShared      bool // Whether resource can be shared
-	UniqueId      string
 	Metadata      map[string]interface{}
+	Lifetime      *ResourceLifetime
+	ReleaseFunc   string
+	Finalizer     string
+	AcquireFunc   string
+	UniqueId      string
+	Constraints   []ResourceConstraint
+	Dependencies  []*ManagedResourceType
+	State         ResourceState
+	UsageCount    int
+	MaxUsageCount int
+	Kind          ResourceTypeKind
+	IsShared      bool
 }
 
-// String returns a string representation of the resource type
+// String returns a string representation of the resource type.
 func (rt *ManagedResourceType) String() string {
 	shared := ""
 	if rt.IsShared {
@@ -125,7 +125,7 @@ func (rt *ManagedResourceType) String() string {
 		rt.State.String())
 }
 
-// CanAcquire checks if the resource can be acquired
+// CanAcquire checks if the resource can be acquired.
 func (rt *ManagedResourceType) CanAcquire() bool {
 	switch rt.State {
 	case ResourceStateUninitialized:
@@ -141,21 +141,21 @@ func (rt *ManagedResourceType) CanAcquire() bool {
 	}
 }
 
-// Acquire marks the resource as acquired
+// Acquire marks the resource as acquired.
 func (rt *ManagedResourceType) Acquire() error {
 	if !rt.CanAcquire() {
 		return fmt.Errorf("cannot acquire resource %s in state %s",
 			rt.Kind.String(), rt.State.String())
 	}
 
-	// Check constraints
+	// Check constraints.
 	for _, constraint := range rt.Constraints {
 		if err := constraint.Check(rt); err != nil {
-			return fmt.Errorf("constraint violation: %v", err)
+			return fmt.Errorf("constraint violation: %w", err)
 		}
 	}
 
-	// Check dependencies
+	// Check dependencies.
 	for _, dep := range rt.Dependencies {
 		if dep.State != ResourceStateAcquired && dep.State != ResourceStateInUse {
 			return fmt.Errorf("dependency %s not available", dep.Kind.String())
@@ -172,7 +172,7 @@ func (rt *ManagedResourceType) Acquire() error {
 	return nil
 }
 
-// Use marks the resource as in use
+// Use marks the resource as in use.
 func (rt *ManagedResourceType) Use() error {
 	if rt.State != ResourceStateAcquired {
 		return fmt.Errorf("resource %s not acquired (state: %s)",
@@ -180,10 +180,11 @@ func (rt *ManagedResourceType) Use() error {
 	}
 
 	rt.State = ResourceStateInUse
+
 	return nil
 }
 
-// Release marks the resource as released
+// Release marks the resource as released.
 func (rt *ManagedResourceType) Release() error {
 	if rt.State != ResourceStateAcquired && rt.State != ResourceStateInUse {
 		return fmt.Errorf("resource %s not in releasable state (state: %s)",
@@ -201,7 +202,7 @@ func (rt *ManagedResourceType) Release() error {
 	return nil
 }
 
-// MarkLeaked marks the resource as leaked
+// MarkLeaked marks the resource as leaked.
 func (rt *ManagedResourceType) MarkLeaked() {
 	rt.State = ResourceStateLeaked
 	if rt.Lifetime != nil {
@@ -209,45 +210,46 @@ func (rt *ManagedResourceType) MarkLeaked() {
 	}
 }
 
-// IsActive checks if the resource is currently active
+// IsActive checks if the resource is currently active.
 func (rt *ManagedResourceType) IsActive() bool {
 	return rt.State == ResourceStateAcquired || rt.State == ResourceStateInUse
 }
 
-// ResourceLifetime tracks the lifetime of a resource
+// ResourceLifetime tracks the lifetime of a resource.
 type ResourceLifetime struct {
 	StartTime       time.Time
 	EndTime         time.Time
+	Location        SourceLocation
+	ReleaseLocation SourceLocation
 	Duration        time.Duration
-	MaxLifetime     time.Duration // Maximum allowed lifetime
+	MaxLifetime     time.Duration
 	IsTimedOut      bool
 	IsLeaked        bool
-	Location        SourceLocation // Where resource was acquired
-	ReleaseLocation SourceLocation // Where resource was released
 }
 
-// IsExpired checks if the resource lifetime has expired
+// IsExpired checks if the resource lifetime has expired.
 func (rl *ResourceLifetime) IsExpired() bool {
 	if rl.MaxLifetime == 0 {
 		return false
 	}
+
 	return time.Since(rl.StartTime) > rl.MaxLifetime
 }
 
-// CheckExpiration checks and marks expiration status
+// CheckExpiration checks and marks expiration status.
 func (rl *ResourceLifetime) CheckExpiration() {
 	rl.IsTimedOut = rl.IsExpired()
 }
 
-// ResourceConstraint represents a constraint on resource usage
+// ResourceConstraint represents a constraint on resource usage.
 type ResourceConstraint struct {
-	Kind        ResourceConstraintKind
-	Description string
 	Check       func(*ManagedResourceType) error
 	Parameters  map[string]interface{}
+	Description string
+	Kind        ResourceConstraintKind
 }
 
-// ResourceConstraintKind represents kinds of resource constraints
+// ResourceConstraintKind represents kinds of resource constraints.
 type ResourceConstraintKind int
 
 const (
@@ -261,7 +263,7 @@ const (
 	ConstraintKindOrdering                                 // Ordering constraint
 )
 
-// String returns a string representation of the constraint kind
+// String returns a string representation of the constraint kind.
 func (rck ResourceConstraintKind) String() string {
 	switch rck {
 	case ConstraintKindExclusive:
@@ -285,76 +287,78 @@ func (rck ResourceConstraintKind) String() string {
 	}
 }
 
-// ResourceManager manages resource allocation and lifecycle
+// ResourceManager manages resource allocation and lifecycle.
 type ResourceManager struct {
 	resources    map[string]*ManagedResourceType
 	allocations  map[string]*ResourceAllocation
 	pools        map[string]*ResourcePool
-	cleanupTasks []CleanupTask
 	leakDetector *ResourceLeakDetector
 	monitor      *ResourceMonitor
+	cleanupTasks []CleanupTask
 	mutex        sync.RWMutex
 }
 
-// ResourceAllocation represents an allocation of a resource
+// ResourceAllocation represents an allocation of a resource.
 type ResourceAllocation struct {
+	Timestamp  time.Time
 	ResourceId string
 	ProcessId  string
 	ThreadId   string
-	Timestamp  time.Time
-	Location   SourceLocation
-	IsActive   bool
-	RefCount   int
 	Finalizers []func()
+	Location   SourceLocation
+	RefCount   int
+	IsActive   bool
 }
 
-// ResourcePool manages a pool of similar resources
+// ResourcePool manages a pool of similar resources.
 type ResourcePool struct {
-	Name      string
-	Kind      ResourceTypeKind
-	MaxSize   int
-	MinSize   int
-	Available []*ManagedResourceType
-	InUse     []*ManagedResourceType
 	Factory   func() (*ManagedResourceType, error)
 	Validator func(*ManagedResourceType) bool
 	ResetFunc func(*ManagedResourceType) error
+	Name      string
+	Available []*ManagedResourceType
+	InUse     []*ManagedResourceType
+	Kind      ResourceTypeKind
+	MaxSize   int
+	MinSize   int
 	mutex     sync.Mutex
 }
 
-// Get retrieves a resource from the pool
+// Get retrieves a resource from the pool.
 func (rp *ResourcePool) Get() (*ManagedResourceType, error) {
 	rp.mutex.Lock()
 	defer rp.mutex.Unlock()
 
-	// Try to get from available resources
+	// Try to get from available resources.
 	if len(rp.Available) > 0 {
 		resource := rp.Available[len(rp.Available)-1]
 		rp.Available = rp.Available[:len(rp.Available)-1]
 		rp.InUse = append(rp.InUse, resource)
 
-		// Validate and reset if needed
+		// Validate and reset if needed.
 		if rp.Validator != nil && !rp.Validator(resource) {
 			return nil, fmt.Errorf("resource validation failed")
 		}
 
 		if rp.ResetFunc != nil {
 			if err := rp.ResetFunc(resource); err != nil {
-				return nil, fmt.Errorf("resource reset failed: %v", err)
+				return nil, fmt.Errorf("resource reset failed: %w", err)
 			}
 		}
 
 		return resource, nil
 	}
 
-	// Create new resource if under limit
+	// Create new resource if under limit.
 	if len(rp.InUse) < rp.MaxSize {
 		if rp.Factory != nil {
 			resource, err := rp.Factory()
 			if err != nil {
-				return nil, fmt.Errorf("resource creation failed: %v", err)
+				return nil, fmt.Errorf("resource creation failed: %w", err)
 			}
+
 			rp.InUse = append(rp.InUse, resource)
+
 			return resource, nil
 		}
 	}
@@ -362,42 +366,44 @@ func (rp *ResourcePool) Get() (*ManagedResourceType, error) {
 	return nil, fmt.Errorf("resource pool exhausted")
 }
 
-// Put returns a resource to the pool
+// Put returns a resource to the pool.
 func (rp *ResourcePool) Put(resource *ManagedResourceType) error {
 	rp.mutex.Lock()
 	defer rp.mutex.Unlock()
 
-	// Remove from in-use list
+	// Remove from in-use list.
 	for i, r := range rp.InUse {
 		if r.UniqueId == resource.UniqueId {
 			rp.InUse = append(rp.InUse[:i], rp.InUse[i+1:]...)
+
 			break
 		}
 	}
 
-	// Add to available if under minimum
+	// Add to available if under minimum.
 	if len(rp.Available) < rp.MinSize {
 		resource.State = ResourceStateAcquired
 		rp.Available = append(rp.Available, resource)
+
 		return nil
 	}
 
-	// Otherwise release the resource
+	// Otherwise release the resource.
 	return resource.Release()
 }
 
-// CleanupTask represents a cleanup task for resources
+// CleanupTask represents a cleanup task for resources.
 type CleanupTask struct {
-	Id         string
-	ResourceId string
-	Priority   int
 	Deadline   time.Time
 	Cleanup    func() error
 	OnFailure  func(error)
+	Id         string
+	ResourceId string
+	Priority   int
 	IsExecuted bool
 }
 
-// Execute executes the cleanup task
+// Execute executes the cleanup task.
 func (ct *CleanupTask) Execute() error {
 	if ct.IsExecuted {
 		return nil
@@ -409,20 +415,21 @@ func (ct *CleanupTask) Execute() error {
 	}
 
 	ct.IsExecuted = true
+
 	return err
 }
 
-// ResourceLeakDetector detects resource leaks
+// ResourceLeakDetector detects resource leaks.
 type ResourceLeakDetector struct {
 	allocations  map[string]*ResourceAllocation
+	stopChan     chan bool
 	scanInterval time.Duration
 	threshold    time.Duration
-	isRunning    bool
-	stopChan     chan bool
 	mutex        sync.RWMutex
+	isRunning    bool
 }
 
-// NewResourceLeakDetector creates a new leak detector
+// NewResourceLeakDetector creates a new leak detector.
 func NewResourceLeakDetector(scanInterval, threshold time.Duration) *ResourceLeakDetector {
 	return &ResourceLeakDetector{
 		allocations:  make(map[string]*ResourceAllocation),
@@ -432,7 +439,7 @@ func NewResourceLeakDetector(scanInterval, threshold time.Duration) *ResourceLea
 	}
 }
 
-// Start starts the leak detection process
+// Start starts the leak detection process.
 func (rld *ResourceLeakDetector) Start() {
 	if rld.isRunning {
 		return
@@ -442,7 +449,7 @@ func (rld *ResourceLeakDetector) Start() {
 	go rld.scanLoop()
 }
 
-// Stop stops the leak detection process
+// Stop stops the leak detection process.
 func (rld *ResourceLeakDetector) Stop() {
 	if !rld.isRunning {
 		return
@@ -452,7 +459,7 @@ func (rld *ResourceLeakDetector) Stop() {
 	rld.isRunning = false
 }
 
-// scanLoop performs periodic leak detection scans
+// scanLoop performs periodic leak detection scans.
 func (rld *ResourceLeakDetector) scanLoop() {
 	ticker := time.NewTicker(rld.scanInterval)
 	defer ticker.Stop()
@@ -467,7 +474,7 @@ func (rld *ResourceLeakDetector) scanLoop() {
 	}
 }
 
-// scanForLeaks scans for potential resource leaks
+// scanForLeaks scans for potential resource leaks.
 func (rld *ResourceLeakDetector) scanForLeaks() {
 	rld.mutex.RLock()
 	defer rld.mutex.RUnlock()
@@ -475,34 +482,34 @@ func (rld *ResourceLeakDetector) scanForLeaks() {
 	now := time.Now()
 	for id, allocation := range rld.allocations {
 		if allocation.IsActive && now.Sub(allocation.Timestamp) > rld.threshold {
-			// Potential leak detected
+			// Potential leak detected.
 			rld.reportLeak(id, allocation)
 		}
 	}
 }
 
-// reportLeak reports a detected resource leak
+// reportLeak reports a detected resource leak.
 func (rld *ResourceLeakDetector) reportLeak(id string, allocation *ResourceAllocation) {
 	fmt.Printf("Resource leak detected: %s allocated at %s:%d:%d, age: %v\n",
 		id, allocation.Location.File, allocation.Location.Line, allocation.Location.Column,
 		time.Since(allocation.Timestamp))
 }
 
-// AddAllocation tracks a new resource allocation
+// AddAllocation tracks a new resource allocation.
 func (rld *ResourceLeakDetector) AddAllocation(id string, allocation *ResourceAllocation) {
 	rld.mutex.Lock()
 	defer rld.mutex.Unlock()
 	rld.allocations[id] = allocation
 }
 
-// RemoveAllocation removes tracking for a resource allocation
+// RemoveAllocation removes tracking for a resource allocation.
 func (rld *ResourceLeakDetector) RemoveAllocation(id string) {
 	rld.mutex.Lock()
 	defer rld.mutex.Unlock()
 	delete(rld.allocations, id)
 }
 
-// ResourceMonitor monitors resource usage and performance
+// ResourceMonitor monitors resource usage and performance.
 type ResourceMonitor struct {
 	metrics    map[string]*ResourceMetrics
 	collectors []MetricCollector
@@ -510,8 +517,9 @@ type ResourceMonitor struct {
 	mutex      sync.RWMutex
 }
 
-// ResourceMetrics represents metrics for a resource
+// ResourceMetrics represents metrics for a resource.
 type ResourceMetrics struct {
+	LastAccess       time.Time
 	ResourceId       string
 	TotalAllocations int64
 	TotalReleases    int64
@@ -519,16 +527,15 @@ type ResourceMetrics struct {
 	PeakUsage        int64
 	AverageLifetime  time.Duration
 	TotalLeaks       int64
-	LastAccess       time.Time
 }
 
-// MetricCollector interface for collecting resource metrics
+// MetricCollector interface for collecting resource metrics.
 type MetricCollector interface {
 	Collect(resourceId string, metrics *ResourceMetrics)
 	Name() string
 }
 
-// NewResourceManager creates a new resource manager
+// NewResourceManager creates a new resource manager.
 func NewResourceManager() *ResourceManager {
 	return &ResourceManager{
 		resources:    make(map[string]*ManagedResourceType),
@@ -543,7 +550,7 @@ func NewResourceManager() *ResourceManager {
 	}
 }
 
-// RegisterResource registers a new resource type
+// RegisterResource registers a new resource type.
 func (rm *ResourceManager) RegisterResource(id string, resourceType *ManagedResourceType) error {
 	rm.mutex.Lock()
 	defer rm.mutex.Unlock()
@@ -554,10 +561,11 @@ func (rm *ResourceManager) RegisterResource(id string, resourceType *ManagedReso
 
 	resourceType.UniqueId = id
 	rm.resources[id] = resourceType
+
 	return nil
 }
 
-// AllocateResource allocates a resource
+// AllocateResource allocates a resource.
 func (rm *ResourceManager) AllocateResource(resourceId, processId string, location SourceLocation) (*ResourceAllocation, error) {
 	rm.mutex.Lock()
 	defer rm.mutex.Unlock()
@@ -568,7 +576,7 @@ func (rm *ResourceManager) AllocateResource(resourceId, processId string, locati
 	}
 
 	if err := resource.Acquire(); err != nil {
-		return nil, fmt.Errorf("failed to acquire resource %s: %v", resourceId, err)
+		return nil, fmt.Errorf("failed to acquire resource %s: %w", resourceId, err)
 	}
 
 	allocation := &ResourceAllocation{
@@ -584,13 +592,13 @@ func (rm *ResourceManager) AllocateResource(resourceId, processId string, locati
 	allocationId := fmt.Sprintf("%s_%s_%d", resourceId, processId, allocation.Timestamp.Unix())
 	rm.allocations[allocationId] = allocation
 
-	// Track allocation for leak detection
+	// Track allocation for leak detection.
 	rm.leakDetector.AddAllocation(allocationId, allocation)
 
 	return allocation, nil
 }
 
-// ReleaseResource releases a resource allocation
+// ReleaseResource releases a resource allocation.
 func (rm *ResourceManager) ReleaseResource(allocationId string) error {
 	rm.mutex.Lock()
 	defer rm.mutex.Unlock()
@@ -609,25 +617,26 @@ func (rm *ResourceManager) ReleaseResource(allocationId string) error {
 		return fmt.Errorf("resource %s not found", allocation.ResourceId)
 	}
 
-	// Execute finalizers
+	// Execute finalizers.
 	for _, finalizer := range allocation.Finalizers {
 		finalizer()
 	}
 
 	if err := resource.Release(); err != nil {
-		return fmt.Errorf("failed to release resource %s: %v", allocation.ResourceId, err)
+		return fmt.Errorf("failed to release resource %s: %w", allocation.ResourceId, err)
 	}
 
 	allocation.IsActive = false
+
 	rm.leakDetector.RemoveAllocation(allocationId)
 
 	return nil
 }
 
-// CreateResourcePool creates a new resource pool
+// CreateResourcePool creates a new resource pool.
 func (rm *ResourceManager) CreateResourcePool(name string, kind ResourceTypeKind, minSize, maxSize int,
-	factory func() (*ManagedResourceType, error)) (*ResourcePool, error) {
-
+	factory func() (*ManagedResourceType, error),
+) (*ResourcePool, error) {
 	rm.mutex.Lock()
 	defer rm.mutex.Unlock()
 
@@ -645,29 +654,31 @@ func (rm *ResourceManager) CreateResourcePool(name string, kind ResourceTypeKind
 		Factory:   factory,
 	}
 
-	// Pre-populate with minimum resources
+	// Pre-populate with minimum resources.
 	for i := 0; i < minSize; i++ {
 		if factory != nil {
 			resource, err := factory()
 			if err != nil {
-				return nil, fmt.Errorf("failed to create initial resource: %v", err)
+				return nil, fmt.Errorf("failed to create initial resource: %w", err)
 			}
+
 			pool.Available = append(pool.Available, resource)
 		}
 	}
 
 	rm.pools[name] = pool
+
 	return pool, nil
 }
 
-// ScheduleCleanup schedules a cleanup task
+// ScheduleCleanup schedules a cleanup task.
 func (rm *ResourceManager) ScheduleCleanup(task CleanupTask) {
 	rm.mutex.Lock()
 	defer rm.mutex.Unlock()
 	rm.cleanupTasks = append(rm.cleanupTasks, task)
 }
 
-// ExecuteCleanup executes all pending cleanup tasks
+// ExecuteCleanup executes all pending cleanup tasks.
 func (rm *ResourceManager) ExecuteCleanup() {
 	rm.mutex.Lock()
 	defer rm.mutex.Unlock()
@@ -680,18 +691,19 @@ func (rm *ResourceManager) ExecuteCleanup() {
 			if err := task.Execute(); err != nil {
 				fmt.Printf("Cleanup task %s failed: %v\n", task.Id, err)
 			}
+
 			executed = append(executed, i)
 		}
 	}
 
-	// Remove executed tasks (in reverse order to maintain indices)
+	// Remove executed tasks (in reverse order to maintain indices).
 	for i := len(executed) - 1; i >= 0; i-- {
 		idx := executed[i]
 		rm.cleanupTasks = append(rm.cleanupTasks[:idx], rm.cleanupTasks[idx+1:]...)
 	}
 }
 
-// ResourceTypeChecker performs resource type checking
+// ResourceTypeChecker performs resource type checking.
 type ResourceTypeChecker struct {
 	manager     *ResourceManager
 	allocations map[string][]string // process -> allocation IDs
@@ -700,16 +712,16 @@ type ResourceTypeChecker struct {
 	mutex       sync.RWMutex
 }
 
-// ResourceTypeError represents an error in resource type checking
+// ResourceTypeError represents an error in resource type checking.
 type ResourceTypeError struct {
-	Kind     ResourceErrorKind
 	Resource string
 	Process  string
-	Location SourceLocation
 	Message  string
+	Location SourceLocation
+	Kind     ResourceErrorKind
 }
 
-// ResourceErrorKind represents kinds of resource type errors
+// ResourceErrorKind represents kinds of resource type errors.
 type ResourceErrorKind int
 
 const (
@@ -723,7 +735,7 @@ const (
 	ErrorKindLifetimeExpired
 )
 
-// String returns a string representation of the error kind
+// String returns a string representation of the error kind.
 func (rek ResourceErrorKind) String() string {
 	switch rek {
 	case ErrorKindResourceNotFound:
@@ -747,22 +759,22 @@ func (rek ResourceErrorKind) String() string {
 	}
 }
 
-// Error implements the error interface
+// Error implements the error interface.
 func (rte ResourceTypeError) Error() string {
 	return fmt.Sprintf("Resource error (%s) at %s:%d:%d: %s",
 		rte.Kind.String(), rte.Location.File, rte.Location.Line, rte.Location.Column, rte.Message)
 }
 
-// ResourceWarning represents a warning in resource usage
+// ResourceWarning represents a warning in resource usage.
 type ResourceWarning struct {
-	Kind     ResourceWarningKind
 	Resource string
 	Process  string
-	Location SourceLocation
 	Message  string
+	Location SourceLocation
+	Kind     ResourceWarningKind
 }
 
-// ResourceWarningKind represents kinds of resource warnings
+// ResourceWarningKind represents kinds of resource warnings.
 type ResourceWarningKind int
 
 const (
@@ -773,7 +785,7 @@ const (
 	WarningKindFrequentAllocation
 )
 
-// String returns a string representation of the warning kind
+// String returns a string representation of the warning kind.
 func (rwk ResourceWarningKind) String() string {
 	switch rwk {
 	case WarningKindPotentialLeak:
@@ -791,7 +803,7 @@ func (rwk ResourceWarningKind) String() string {
 	}
 }
 
-// NewResourceTypeChecker creates a new resource type checker
+// NewResourceTypeChecker creates a new resource type checker.
 func NewResourceTypeChecker(manager *ResourceManager) *ResourceTypeChecker {
 	return &ResourceTypeChecker{
 		manager:     manager,
@@ -801,7 +813,7 @@ func NewResourceTypeChecker(manager *ResourceManager) *ResourceTypeChecker {
 	}
 }
 
-// CheckResourceUsage checks resource usage in a process
+// CheckResourceUsage checks resource usage in a process.
 func (rtc *ResourceTypeChecker) CheckResourceUsage(processId string) []ResourceTypeError {
 	rtc.mutex.Lock()
 	defer rtc.mutex.Unlock()
@@ -819,7 +831,7 @@ func (rtc *ResourceTypeChecker) CheckResourceUsage(processId string) []ResourceT
 			continue
 		}
 
-		// Check for leaks
+		// Check for leaks.
 		if allocation.IsActive && time.Since(allocation.Timestamp) > time.Hour {
 			error := ResourceTypeError{
 				Kind:     ErrorKindResourceLeak,
@@ -836,7 +848,7 @@ func (rtc *ResourceTypeChecker) CheckResourceUsage(processId string) []ResourceT
 	return errors
 }
 
-// ValidateResourceConstraints validates resource constraints
+// ValidateResourceConstraints validates resource constraints.
 func (rtc *ResourceTypeChecker) ValidateResourceConstraints() []ResourceTypeError {
 	rtc.mutex.RLock()
 	defer rtc.mutex.RUnlock()
@@ -859,9 +871,9 @@ func (rtc *ResourceTypeChecker) ValidateResourceConstraints() []ResourceTypeErro
 	return errors
 }
 
-// Resource type constructors
+// Resource type constructors.
 
-// NewFileResource creates a new file resource type
+// NewFileResource creates a new file resource type.
 func NewFileResource(baseType *Type, path string) *ManagedResourceType {
 	return &ManagedResourceType{
 		BaseType:    baseType,
@@ -878,6 +890,7 @@ func NewFileResource(baseType *Type, path string) *ManagedResourceType {
 					if rt.IsShared {
 						return fmt.Errorf("file resources cannot be shared")
 					}
+
 					return nil
 				},
 			},
@@ -889,7 +902,7 @@ func NewFileResource(baseType *Type, path string) *ManagedResourceType {
 	}
 }
 
-// NewSocketResource creates a new socket resource type
+// NewSocketResource creates a new socket resource type.
 func NewSocketResource(baseType *Type, address string, port int) *ManagedResourceType {
 	return &ManagedResourceType{
 		BaseType:      baseType,
@@ -907,7 +920,7 @@ func NewSocketResource(baseType *Type, address string, port int) *ManagedResourc
 	}
 }
 
-// NewMemoryResource creates a new memory resource type
+// NewMemoryResource creates a new memory resource type.
 func NewMemoryResource(baseType *Type, size int) *ManagedResourceType {
 	return &ManagedResourceType{
 		BaseType:    baseType,
@@ -925,6 +938,7 @@ func NewMemoryResource(baseType *Type, size int) *ManagedResourceType {
 					if rt.UsageCount > 1 {
 						return fmt.Errorf("memory resource already in use")
 					}
+
 					return nil
 				},
 			},
@@ -936,7 +950,7 @@ func NewMemoryResource(baseType *Type, size int) *ManagedResourceType {
 	}
 }
 
-// NewMutexResource creates a new mutex resource type
+// NewMutexResource creates a new mutex resource type.
 func NewMutexResource(baseType *Type) *ManagedResourceType {
 	return &ManagedResourceType{
 		BaseType:    baseType,
@@ -953,6 +967,7 @@ func NewMutexResource(baseType *Type) *ManagedResourceType {
 					if rt.UsageCount > 1 {
 						return fmt.Errorf("mutex already locked")
 					}
+
 					return nil
 				},
 			},
@@ -961,7 +976,7 @@ func NewMutexResource(baseType *Type) *ManagedResourceType {
 	}
 }
 
-// NewDatabaseResource creates a new database resource type
+// NewDatabaseResource creates a new database resource type.
 func NewDatabaseResource(baseType *Type, connectionString string) *ManagedResourceType {
 	return &ManagedResourceType{
 		BaseType:      baseType,
@@ -979,19 +994,19 @@ func NewDatabaseResource(baseType *Type, connectionString string) *ManagedResour
 	}
 }
 
-// generateResourceId generates a unique identifier for resources
+// generateResourceId generates a unique identifier for resources.
 func generateResourceId() string {
 	return fmt.Sprintf("resource_%d", time.Now().UnixNano())
 }
 
-// ResourceTypeKind constant for type system integration
+// ResourceTypeKind constant for type system integration.
 const (
 	TypeKindResource TypeKind = 202
 )
 
-// RAII (Resource Acquisition Is Initialization) pattern support
+// RAII (Resource Acquisition Is Initialization) pattern support.
 
-// RAIIWrapper wraps a resource with RAII semantics
+// RAIIWrapper wraps a resource with RAII semantics.
 type RAIIWrapper struct {
 	Resource   *ManagedResourceType
 	Allocation *ResourceAllocation
@@ -999,7 +1014,7 @@ type RAIIWrapper struct {
 	IsOwner    bool
 }
 
-// NewRAIIWrapper creates a new RAII wrapper
+// NewRAIIWrapper creates a new RAII wrapper.
 func NewRAIIWrapper(manager *ResourceManager, resourceId, processId string, location SourceLocation) (*RAIIWrapper, error) {
 	allocation, err := manager.AllocateResource(resourceId, processId, location)
 	if err != nil {
@@ -1016,7 +1031,7 @@ func NewRAIIWrapper(manager *ResourceManager, resourceId, processId string, loca
 	}, nil
 }
 
-// Release releases the wrapped resource
+// Release releases the wrapped resource.
 func (rw *RAIIWrapper) Release() error {
 	if !rw.IsOwner {
 		return fmt.Errorf("not owner of resource")
@@ -1031,10 +1046,11 @@ func (rw *RAIIWrapper) Release() error {
 	}
 
 	rw.IsOwner = false
+
 	return nil
 }
 
-// Move transfers ownership of the resource
+// Move transfers ownership of the resource.
 func (rw *RAIIWrapper) Move() *RAIIWrapper {
 	if !rw.IsOwner {
 		return nil
@@ -1048,12 +1064,13 @@ func (rw *RAIIWrapper) Move() *RAIIWrapper {
 	}
 
 	rw.IsOwner = false
+
 	return newWrapper
 }
 
-// Smart pointer-like functionality
+// Smart pointer-like functionality.
 
-// ResourcePtr represents a smart pointer to a resource
+// ResourcePtr represents a smart pointer to a resource.
 type ResourcePtr struct {
 	Resource *ManagedResourceType
 	RefCount *int
@@ -1061,9 +1078,10 @@ type ResourcePtr struct {
 	mutex    sync.Mutex
 }
 
-// NewResourcePtr creates a new resource pointer
+// NewResourcePtr creates a new resource pointer.
 func NewResourcePtr(manager *ResourceManager, resource *ManagedResourceType) *ResourcePtr {
 	refCount := 1
+
 	return &ResourcePtr{
 		Resource: resource,
 		RefCount: &refCount,
@@ -1071,12 +1089,13 @@ func NewResourcePtr(manager *ResourceManager, resource *ManagedResourceType) *Re
 	}
 }
 
-// Clone creates a new reference to the same resource
+// Clone creates a new reference to the same resource.
 func (rp *ResourcePtr) Clone() *ResourcePtr {
 	rp.mutex.Lock()
 	defer rp.mutex.Unlock()
 
 	*rp.RefCount++
+
 	return &ResourcePtr{
 		Resource: rp.Resource,
 		RefCount: rp.RefCount,
@@ -1084,7 +1103,7 @@ func (rp *ResourcePtr) Clone() *ResourcePtr {
 	}
 }
 
-// Release decreases reference count and releases if zero
+// Release decreases reference count and releases if zero.
 func (rp *ResourcePtr) Release() error {
 	rp.mutex.Lock()
 	defer rp.mutex.Unlock()

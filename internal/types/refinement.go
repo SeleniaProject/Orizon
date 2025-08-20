@@ -6,25 +6,25 @@ import (
 	"fmt"
 )
 
-// RefinementPredicate represents a predicate in a refinement type
+// RefinementPredicate represents a predicate in a refinement type.
 type RefinementPredicate interface {
-	// String returns a string representation of the predicate
+	// String returns a string representation of the predicate.
 	String() string
 
-	// Evaluate evaluates the predicate against a value
+	// Evaluate evaluates the predicate against a value.
 	Evaluate(value interface{}) (bool, error)
 
-	// Variables returns the set of variables used in the predicate
+	// Variables returns the set of variables used in the predicate.
 	Variables() []string
 
-	// Substitute substitutes variables in the predicate
+	// Substitute substitutes variables in the predicate.
 	Substitute(substitutions map[string]interface{}) RefinementPredicate
 
-	// Simplify performs logical simplification of the predicate
+	// Simplify performs logical simplification of the predicate.
 	Simplify() RefinementPredicate
 }
 
-// PredicateKind represents the kind of predicate
+// PredicateKind represents the kind of predicate.
 type PredicateKind int
 
 const (
@@ -38,7 +38,7 @@ const (
 	PredicateKindApplication
 )
 
-// TruePredicate represents the always-true predicate
+// TruePredicate represents the always-true predicate.
 type TruePredicate struct{}
 
 func (p *TruePredicate) String() string {
@@ -61,7 +61,7 @@ func (p *TruePredicate) Simplify() RefinementPredicate {
 	return p
 }
 
-// FalsePredicate represents the always-false predicate
+// FalsePredicate represents the always-false predicate.
 type FalsePredicate struct{}
 
 func (p *FalsePredicate) String() string {
@@ -84,7 +84,7 @@ func (p *FalsePredicate) Simplify() RefinementPredicate {
 	return p
 }
 
-// VariablePredicate represents a variable in a predicate
+// VariablePredicate represents a variable in a predicate.
 type VariablePredicate struct {
 	Name string
 }
@@ -105,6 +105,7 @@ func (p *VariablePredicate) Substitute(substitutions map[string]interface{}) Ref
 	if val, exists := substitutions[p.Name]; exists {
 		return &ConstantPredicate{Value: val}
 	}
+
 	return p
 }
 
@@ -112,7 +113,7 @@ func (p *VariablePredicate) Simplify() RefinementPredicate {
 	return p
 }
 
-// ConstantPredicate represents a constant value in a predicate
+// ConstantPredicate represents a constant value in a predicate.
 type ConstantPredicate struct {
 	Value interface{}
 }
@@ -122,10 +123,11 @@ func (p *ConstantPredicate) String() string {
 }
 
 func (p *ConstantPredicate) Evaluate(value interface{}) (bool, error) {
-	// Constants evaluate to themselves in boolean context
+	// Constants evaluate to themselves in boolean context.
 	if b, ok := p.Value.(bool); ok {
 		return b, nil
 	}
+
 	return false, fmt.Errorf("cannot evaluate non-boolean constant as predicate")
 }
 
@@ -141,7 +143,7 @@ func (p *ConstantPredicate) Simplify() RefinementPredicate {
 	return p
 }
 
-// ComparisonOperator represents comparison operators
+// ComparisonOperator represents comparison operators.
 type ComparisonOperator int
 
 const (
@@ -172,11 +174,11 @@ func (op ComparisonOperator) String() string {
 	}
 }
 
-// ComparisonPredicate represents comparison predicates
+// ComparisonPredicate represents comparison predicates.
 type ComparisonPredicate struct {
 	Left     RefinementPredicate
-	Operator ComparisonOperator
 	Right    RefinementPredicate
+	Operator ComparisonOperator
 }
 
 func (p *ComparisonPredicate) String() string {
@@ -184,7 +186,7 @@ func (p *ComparisonPredicate) String() string {
 }
 
 func (p *ComparisonPredicate) Evaluate(value interface{}) (bool, error) {
-	// Get raw values from operands
+	// Get raw values from operands.
 	var leftVal, rightVal interface{}
 
 	if constPred, ok := p.Left.(*ConstantPredicate); ok {
@@ -200,11 +202,12 @@ func (p *ComparisonPredicate) Evaluate(value interface{}) (bool, error) {
 			return false, fmt.Errorf("variable evaluation requires environment")
 		}
 	} else {
-		// For other predicate types, evaluate as boolean
+		// For other predicate types, evaluate as boolean.
 		boolVal, err := p.Left.Evaluate(value)
 		if err != nil {
 			return false, err
 		}
+
 		leftVal = boolVal
 	}
 
@@ -221,20 +224,21 @@ func (p *ComparisonPredicate) Evaluate(value interface{}) (bool, error) {
 			return false, fmt.Errorf("variable evaluation requires environment")
 		}
 	} else {
-		// For other predicate types, evaluate as boolean
+		// For other predicate types, evaluate as boolean.
 		boolVal, err := p.Right.Evaluate(value)
 		if err != nil {
 			return false, err
 		}
+
 		rightVal = boolVal
 	}
 
-	// Perform comparison based on value types
+	// Perform comparison based on value types.
 	return p.compareValues(leftVal, rightVal)
 }
 
 func (p *ComparisonPredicate) compareValues(left, right interface{}) (bool, error) {
-	// Convert to common numeric type if possible
+	// Convert to common numeric type if possible.
 	leftNum, leftOk := p.toNumber(left)
 	rightNum, rightOk := p.toNumber(right)
 
@@ -242,7 +246,7 @@ func (p *ComparisonPredicate) compareValues(left, right interface{}) (bool, erro
 		return p.compareNumbers(leftNum, rightNum), nil
 	}
 
-	// Fall back to direct comparison for non-numeric types
+	// Fall back to direct comparison for non-numeric types.
 	switch p.Operator {
 	case CompOpEQ:
 		return left == right, nil
@@ -292,6 +296,7 @@ func (p *ComparisonPredicate) Variables() []string {
 	for _, v := range p.Left.Variables() {
 		vars[v] = true
 	}
+
 	for _, v := range p.Right.Variables() {
 		vars[v] = true
 	}
@@ -300,6 +305,7 @@ func (p *ComparisonPredicate) Variables() []string {
 	for v := range vars {
 		result = append(result, v)
 	}
+
 	return result
 }
 
@@ -315,7 +321,7 @@ func (p *ComparisonPredicate) Simplify() RefinementPredicate {
 	left := p.Left.Simplify()
 	right := p.Right.Simplify()
 
-	// If both sides are constants, evaluate directly
+	// If both sides are constants, evaluate directly.
 	if leftConst, leftOk := left.(*ConstantPredicate); leftOk {
 		if rightConst, rightOk := right.(*ConstantPredicate); rightOk {
 			result, err := p.compareValues(leftConst.Value, rightConst.Value)
@@ -336,7 +342,7 @@ func (p *ComparisonPredicate) Simplify() RefinementPredicate {
 	}
 }
 
-// LogicalOperator represents logical operators
+// LogicalOperator represents logical operators.
 type LogicalOperator int
 
 const (
@@ -364,11 +370,11 @@ func (op LogicalOperator) String() string {
 	}
 }
 
-// LogicalPredicate represents logical combinations of predicates
+// LogicalPredicate represents logical combinations of predicates.
 type LogicalPredicate struct {
-	Operator LogicalOperator
-	Left     RefinementPredicate // nil for unary operators like NOT
+	Left     RefinementPredicate
 	Right    RefinementPredicate
+	Operator LogicalOperator
 }
 
 func (p *LogicalPredicate) String() string {
@@ -387,6 +393,7 @@ func (p *LogicalPredicate) Evaluate(value interface{}) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		return !rightVal, nil
 
 	case LogOpAnd:
@@ -394,9 +401,11 @@ func (p *LogicalPredicate) Evaluate(value interface{}) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		if !leftVal {
 			return false, nil // Short-circuit evaluation
 		}
+
 		return p.Right.Evaluate(value)
 
 	case LogOpOr:
@@ -404,9 +413,11 @@ func (p *LogicalPredicate) Evaluate(value interface{}) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		if leftVal {
 			return true, nil // Short-circuit evaluation
 		}
+
 		return p.Right.Evaluate(value)
 
 	case LogOpImplies:
@@ -414,9 +425,11 @@ func (p *LogicalPredicate) Evaluate(value interface{}) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		if !leftVal {
 			return true, nil // False implies anything
 		}
+
 		return p.Right.Evaluate(value)
 
 	case LogOpIff:
@@ -424,10 +437,12 @@ func (p *LogicalPredicate) Evaluate(value interface{}) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		rightVal, err := p.Right.Evaluate(value)
 		if err != nil {
 			return false, err
 		}
+
 		return leftVal == rightVal, nil
 
 	default:
@@ -452,6 +467,7 @@ func (p *LogicalPredicate) Variables() []string {
 	for v := range vars {
 		result = append(result, v)
 	}
+
 	return result
 }
 
@@ -473,50 +489,56 @@ func (p *LogicalPredicate) Simplify() RefinementPredicate {
 	if p.Left != nil {
 		left = p.Left.Simplify()
 	}
+
 	right := p.Right.Simplify()
 
 	switch p.Operator {
 	case LogOpNot:
-		// Double negation elimination
+		// Double negation elimination.
 		if notPred, ok := right.(*LogicalPredicate); ok && notPred.Operator == LogOpNot {
 			return notPred.Right.Simplify()
 		}
-		// Negation of constants
+		// Negation of constants.
 		if _, ok := right.(*TruePredicate); ok {
 			return &FalsePredicate{}
 		}
+
 		if _, ok := right.(*FalsePredicate); ok {
 			return &TruePredicate{}
 		}
 
 	case LogOpAnd:
-		// Identity laws
+		// Identity laws.
 		if _, ok := left.(*TruePredicate); ok {
 			return right
 		}
+
 		if _, ok := right.(*TruePredicate); ok {
 			return left
 		}
-		// Annihilation laws
+		// Annihilation laws.
 		if _, ok := left.(*FalsePredicate); ok {
 			return &FalsePredicate{}
 		}
+
 		if _, ok := right.(*FalsePredicate); ok {
 			return &FalsePredicate{}
 		}
 
 	case LogOpOr:
-		// Identity laws
+		// Identity laws.
 		if _, ok := left.(*FalsePredicate); ok {
 			return right
 		}
+
 		if _, ok := right.(*FalsePredicate); ok {
 			return left
 		}
-		// Annihilation laws
+		// Annihilation laws.
 		if _, ok := left.(*TruePredicate); ok {
 			return &TruePredicate{}
 		}
+
 		if _, ok := right.(*TruePredicate); ok {
 			return &TruePredicate{}
 		}
@@ -529,54 +551,54 @@ func (p *LogicalPredicate) Simplify() RefinementPredicate {
 	}
 }
 
-// RefinementType represents a type with an associated predicate
+// RefinementType represents a type with an associated predicate.
 type RefinementType struct {
+	Predicate RefinementPredicate
 	BaseType  *Type
 	Variable  string
-	Predicate RefinementPredicate
 }
 
-// String returns a string representation of the refinement type
+// String returns a string representation of the refinement type.
 func (rt *RefinementType) String() string {
 	return fmt.Sprintf("{%s:%s | %s}", rt.Variable, rt.BaseType.String(), rt.Predicate.String())
 }
 
-// IsSubtypeOf checks if this refinement type is a subtype of another
+// IsSubtypeOf checks if this refinement type is a subtype of another.
 func (rt *RefinementType) IsSubtypeOf(other *RefinementType) (bool, error) {
-	// Base types must be compatible
+	// Base types must be compatible.
 	if !rt.BaseType.IsAssignableFrom(other.BaseType) {
 		return false, nil
 	}
 
-	// For refinement subtyping: {x:T | P} <: {x:T | Q} iff P => Q
-	// We need to check if our predicate implies the other predicate
+	// For refinement subtyping: {x:T | P} <: {x:T | Q} iff P => Q.
+	// We need to check if our predicate implies the other predicate.
 	implication := &LogicalPredicate{
 		Operator: LogOpImplies,
 		Left:     rt.Predicate,
 		Right:    other.Predicate,
 	}
 
-	// For now, we'll use a simple syntactic check
-	// In a full implementation, this would involve SMT solving
+	// For now, we'll use a simple syntactic check.
+	// In a full implementation, this would involve SMT solving.
 	return rt.checkImplicationSyntactically(implication), nil
 }
 
-// checkImplicationSyntactically performs a simple syntactic check for implications
+// checkImplicationSyntactically performs a simple syntactic check for implications.
 func (rt *RefinementType) checkImplicationSyntactically(implication *LogicalPredicate) bool {
-	// Simplify the implication
+	// Simplify the implication.
 	simplified := implication.Simplify()
 
-	// If it simplifies to true, the implication holds
+	// If it simplifies to true, the implication holds.
 	if _, ok := simplified.(*TruePredicate); ok {
 		return true
 	}
 
-	// For more complex cases, we'd need a proper theorem prover
-	// For now, we'll be conservative and return false
+	// For more complex cases, we'd need a proper theorem prover.
+	// For now, we'll be conservative and return false.
 	return false
 }
 
-// RefinementChecker handles type checking with refinement types
+// RefinementChecker handles type checking with refinement types.
 type RefinementChecker struct {
 	baseChecker   *BidirectionalChecker
 	predicateEnv  map[string]RefinementPredicate
@@ -584,14 +606,14 @@ type RefinementChecker struct {
 	constraints   []RefinementConstraint
 }
 
-// RefinementConstraint represents a constraint to be checked
+// RefinementConstraint represents a constraint to be checked.
 type RefinementConstraint struct {
 	Predicate RefinementPredicate
-	Location  SourceLocation
 	Message   string
+	Location  SourceLocation
 }
 
-// NewRefinementChecker creates a new refinement type checker
+// NewRefinementChecker creates a new refinement type checker.
 func NewRefinementChecker(baseChecker *BidirectionalChecker) *RefinementChecker {
 	return &RefinementChecker{
 		baseChecker:   baseChecker,
@@ -601,15 +623,15 @@ func NewRefinementChecker(baseChecker *BidirectionalChecker) *RefinementChecker 
 	}
 }
 
-// CheckRefinementType checks an expression against a refinement type
+// CheckRefinementType checks an expression against a refinement type.
 func (rc *RefinementChecker) CheckRefinementType(expr Expr, refinementType *RefinementType) (*RefinementType, error) {
-	// First check the base type
+	// First check the base type.
 	baseType, err := rc.baseChecker.CheckExpression(expr, refinementType.BaseType)
 	if err != nil {
 		return nil, err
 	}
 
-	// Generate constraints for the predicate
+	// Generate constraints for the predicate.
 	constraint := RefinementConstraint{
 		Predicate: refinementType.Predicate,
 		Location:  SourceLocation{Line: 0, Column: 0}, // Would be filled in with actual location
@@ -618,7 +640,7 @@ func (rc *RefinementChecker) CheckRefinementType(expr Expr, refinementType *Refi
 
 	rc.constraints = append(rc.constraints, constraint)
 
-	// Return the refined type
+	// Return the refined type.
 	return &RefinementType{
 		BaseType:  baseType,
 		Variable:  refinementType.Variable,
@@ -626,10 +648,10 @@ func (rc *RefinementChecker) CheckRefinementType(expr Expr, refinementType *Refi
 	}, nil
 }
 
-// SynthesizeRefinementType attempts to synthesize a refinement type for an expression
+// SynthesizeRefinementType attempts to synthesize a refinement type for an expression.
 func (rc *RefinementChecker) SynthesizeRefinementType(expr Expr) (*RefinementType, error) {
-	// For now, create a simple refinement type with true predicate
-	// In practice, this would analyze the expression to generate constraints
+	// For now, create a simple refinement type with true predicate.
+	// In practice, this would analyze the expression to generate constraints.
 	baseType := &Type{Kind: TypeKindInt32} // Simplified base type
 
 	return &RefinementType{
@@ -639,11 +661,11 @@ func (rc *RefinementChecker) SynthesizeRefinementType(expr Expr) (*RefinementTyp
 	}, nil
 }
 
-// generatePredicateForExpression generates a predicate for an expression
+// generatePredicateForExpression generates a predicate for an expression.
 func (rc *RefinementChecker) generatePredicateForExpression(expr Expr) RefinementPredicate {
 	switch e := expr.(type) {
 	case *LiteralExpr:
-		// For literals, generate v == literal
+		// For literals, generate v == literal.
 		return &ComparisonPredicate{
 			Left:     &VariablePredicate{Name: "v"},
 			Operator: CompOpEQ,
@@ -651,29 +673,30 @@ func (rc *RefinementChecker) generatePredicateForExpression(expr Expr) Refinemen
 		}
 
 	case *VariableExpr:
-		// For variables, look up any known refinement
+		// For variables, look up any known refinement.
 		if refinement, exists := rc.refinementEnv[e.Name]; exists {
-			// Substitute the variable name
+			// Substitute the variable name.
 			substitutions := map[string]interface{}{
 				refinement.Variable: &VariablePredicate{Name: "v"},
 			}
+
 			return refinement.Predicate.Substitute(substitutions)
 		}
-		// Otherwise, just return true
+		// Otherwise, just return true.
 		return &TruePredicate{}
 
 	default:
-		// For other expressions, return true (no refinement)
+		// For other expressions, return true (no refinement).
 		return &TruePredicate{}
 	}
 }
 
-// SolveConstraints attempts to solve all accumulated constraints
+// SolveConstraints attempts to solve all accumulated constraints.
 func (rc *RefinementChecker) SolveConstraints() ([]RefinementError, error) {
 	var errors []RefinementError
 
 	for _, constraint := range rc.constraints {
-		// For now, we'll just check if the predicate is obviously false
+		// For now, we'll just check if the predicate is obviously false.
 		simplified := constraint.Predicate.Simplify()
 
 		if _, ok := simplified.(*FalsePredicate); ok {
@@ -688,33 +711,35 @@ func (rc *RefinementChecker) SolveConstraints() ([]RefinementError, error) {
 	return errors, nil
 }
 
-// RefinementError represents an error in refinement type checking
+// RefinementError represents an error in refinement type checking.
 type RefinementError struct {
+	Predicate RefinementPredicate
 	Message   string
 	Location  SourceLocation
-	Predicate RefinementPredicate
 }
 
 func (re RefinementError) Error() string {
 	locationStr := fmt.Sprintf("%s:%d:%d", re.Location.File, re.Location.Line, re.Location.Column)
+
 	return fmt.Sprintf("Refinement error at %s: %s (predicate: %s)",
 		locationStr, re.Message, re.Predicate.String())
 }
 
-// PredicateParser handles parsing of refinement predicates
+// PredicateParser handles parsing of refinement predicates.
 type PredicateParser struct {
 	input    string
 	position int
 	current  rune
 }
 
-// NewPredicateParser creates a new predicate parser
+// NewPredicateParser creates a new predicate parser.
 func NewPredicateParser(input string) *PredicateParser {
 	p := &PredicateParser{
 		input:    input,
 		position: 0,
 	}
 	p.advance()
+
 	return p
 }
 
@@ -733,9 +758,10 @@ func (p *PredicateParser) skipWhitespace() {
 	}
 }
 
-// ParsePredicate parses a predicate from a string
+// ParsePredicate parses a predicate from a string.
 func (p *PredicateParser) ParsePredicate() (RefinementPredicate, error) {
 	p.skipWhitespace()
+
 	return p.parseOr()
 }
 
@@ -747,14 +773,16 @@ func (p *PredicateParser) parseOr() (RefinementPredicate, error) {
 
 	for p.current != 0 {
 		p.skipWhitespace()
-		// Check for ||
+		// Check for ||.
 		if p.position-1+2 <= len(p.input) && p.input[p.position-1:p.position-1+2] == "||" {
 			p.advance()
 			p.advance()
+
 			right, err := p.parseAnd()
 			if err != nil {
 				return nil, err
 			}
+
 			left = &LogicalPredicate{
 				Operator: LogOpOr,
 				Left:     left,
@@ -776,14 +804,16 @@ func (p *PredicateParser) parseAnd() (RefinementPredicate, error) {
 
 	for p.current != 0 {
 		p.skipWhitespace()
-		// Check for &&
+		// Check for &&.
 		if p.position-1+2 <= len(p.input) && p.input[p.position-1:p.position-1+2] == "&&" {
 			p.advance()
 			p.advance()
+
 			right, err := p.parseComparison()
 			if err != nil {
 				return nil, err
 			}
+
 			left = &LogicalPredicate{
 				Operator: LogOpAnd,
 				Left:     left,
@@ -806,53 +836,62 @@ func (p *PredicateParser) parseComparison() (RefinementPredicate, error) {
 	p.skipWhitespace()
 
 	var op ComparisonOperator
+
 	var matched bool
 
-	// Check for two-character operators first
+	// Check for two-character operators first.
 	if p.position-1+2 <= len(p.input) {
 		twoChar := p.input[p.position-1 : p.position-1+2]
 		if twoChar == "==" {
 			op = CompOpEQ
 			matched = true
+
 			p.advance()
 			p.advance()
 		} else if twoChar == "!=" {
 			op = CompOpNE
 			matched = true
+
 			p.advance()
 			p.advance()
 		} else if twoChar == "<=" {
 			op = CompOpLE
 			matched = true
+
 			p.advance()
 			p.advance()
 		} else if twoChar == ">=" {
 			op = CompOpGE
 			matched = true
+
 			p.advance()
 			p.advance()
 		}
 	}
 
-	// Check for single-character operators if no two-character match
+	// Check for single-character operators if no two-character match.
 	if !matched {
 		if p.current == '<' {
 			op = CompOpLT
 			matched = true
+
 			p.advance()
 		} else if p.current == '>' {
 			op = CompOpGT
 			matched = true
+
 			p.advance()
 		}
 	}
 
 	if matched {
 		p.skipWhitespace()
+
 		right, err := p.parsePrimary()
 		if err != nil {
 			return nil, err
 		}
+
 		return &ComparisonPredicate{
 			Left:     left,
 			Operator: op,
@@ -868,10 +907,12 @@ func (p *PredicateParser) parsePrimary() (RefinementPredicate, error) {
 
 	if p.current == '!' {
 		p.advance()
+
 		pred, err := p.parsePrimary()
 		if err != nil {
 			return nil, err
 		}
+
 		return &LogicalPredicate{
 			Operator: LogOpNot,
 			Right:    pred,
@@ -880,43 +921,50 @@ func (p *PredicateParser) parsePrimary() (RefinementPredicate, error) {
 
 	if p.current == '(' {
 		p.advance()
+
 		pred, err := p.parseOr()
 		if err != nil {
 			return nil, err
 		}
+
 		p.skipWhitespace()
+
 		if p.current != ')' {
 			return nil, fmt.Errorf("expected ')'")
 		}
+
 		p.advance()
+
 		return pred, nil
 	}
 
-	// Check for "true"
+	// Check for "true".
 	if p.position-1+4 <= len(p.input) && p.input[p.position-1:p.position-1+4] == "true" {
 		p.advance()
 		p.advance()
 		p.advance()
 		p.advance()
+
 		return &TruePredicate{}, nil
 	}
 
-	// Check for "false"
+	// Check for "false".
 	if p.position-1+5 <= len(p.input) && p.input[p.position-1:p.position-1+5] == "false" {
 		p.advance()
 		p.advance()
 		p.advance()
 		p.advance()
 		p.advance()
+
 		return &FalsePredicate{}, nil
 	}
 
-	// Parse identifier or number
+	// Parse identifier or number.
 	if p.current == 0 {
 		return nil, fmt.Errorf("unexpected end of input")
 	}
 
-	// Check if current character is valid start
+	// Check if current character is valid start.
 	if !((p.current >= 'a' && p.current <= 'z') ||
 		(p.current >= 'A' && p.current <= 'Z') ||
 		(p.current >= '0' && p.current <= '9') ||
@@ -932,21 +980,24 @@ func (p *PredicateParser) parsePrimary() (RefinementPredicate, error) {
 		(p.current >= '0' && p.current <= '9') ||
 		p.current == '_' {
 		charCount++
+
 		p.advance()
 	}
+
 	end := start + charCount // Position after consuming valid characters
 
 	token := p.input[start:end]
 
-	// Check if token is empty
+	// Check if token is empty.
 	if len(token) == 0 {
 		return nil, fmt.Errorf("empty token")
 	}
 
-	// Try to parse as number
+	// Try to parse as number.
 	if token[0] >= '0' && token[0] <= '9' {
-		// Simple integer parsing for demonstration
+		// Simple integer parsing for demonstration.
 		val := 0
+
 		for _, ch := range token {
 			if ch >= '0' && ch <= '9' {
 				val = val*10 + int(ch-'0')
@@ -954,36 +1005,39 @@ func (p *PredicateParser) parsePrimary() (RefinementPredicate, error) {
 				return nil, fmt.Errorf("invalid number: %s", token)
 			}
 		}
+
 		return &ConstantPredicate{Value: val}, nil
 	}
 
-	// Otherwise, it's a variable
+	// Otherwise, it's a variable.
 	return &VariablePredicate{Name: token}, nil
 }
 
 func (p *PredicateParser) match(expected string) bool {
-	// Check if we have enough characters remaining
+	// Check if we have enough characters remaining.
 	if p.position-1+len(expected) > len(p.input) {
 		return false
 	}
 
-	// Check if the string matches from current position (position-1 because position is already advanced)
+	// Check if the string matches from current position (position-1 because position is already advanced).
 	actual := p.input[p.position-1 : p.position-1+len(expected)]
 	if actual == expected {
-		// Advance past the matched string (we already consumed the first character)
+		// Advance past the matched string (we already consumed the first character).
 		for i := 0; i < len(expected)-1; i++ {
 			p.advance()
 		}
+
 		p.advance() // Advance past the last character
+
 		return true
 	}
 
 	return false
 }
 
-// Common refinement type constructors
+// Common refinement type constructors.
 
-// NewPositiveType creates a refinement type for positive numbers
+// NewPositiveType creates a refinement type for positive numbers.
 func NewPositiveType(baseType *Type) *RefinementType {
 	return &RefinementType{
 		BaseType: baseType,
@@ -996,7 +1050,7 @@ func NewPositiveType(baseType *Type) *RefinementType {
 	}
 }
 
-// NewNonZeroType creates a refinement type for non-zero numbers
+// NewNonZeroType creates a refinement type for non-zero numbers.
 func NewNonZeroType(baseType *Type) *RefinementType {
 	return &RefinementType{
 		BaseType: baseType,
@@ -1009,7 +1063,7 @@ func NewNonZeroType(baseType *Type) *RefinementType {
 	}
 }
 
-// NewRangeType creates a refinement type for values in a range
+// NewRangeType creates a refinement type for values in a range.
 func NewRangeType(baseType *Type, min, max interface{}) *RefinementType {
 	minPred := &ComparisonPredicate{
 		Left:     &VariablePredicate{Name: "v"},

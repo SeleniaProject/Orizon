@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-// TestEffectKind tests effect kind functionality
+// TestEffectKind tests effect kind functionality.
 func TestEffectKind(t *testing.T) {
-	// Test effect kind string representation
+	// Test effect kind string representation.
 	tests := []struct {
-		kind     EffectKind
 		expected string
+		kind     EffectKind
 	}{
 		{EffectPure, "Pure"},
 		{EffectIO, "IO"},
@@ -31,93 +31,105 @@ func TestEffectKind(t *testing.T) {
 	}
 }
 
-// TestSideEffect tests side effect functionality
+// TestSideEffect tests side effect functionality.
 func TestSideEffect(t *testing.T) {
-	// Test side effect creation
+	// Test side effect creation.
 	effect := NewSideEffect(EffectIO, EffectLevelMedium)
 	if effect.Kind != EffectIO {
 		t.Errorf("NewSideEffect kind = %v, expected %v", effect.Kind, EffectIO)
 	}
+
 	if effect.Level != EffectLevelMedium {
 		t.Errorf("NewSideEffect level = %v, expected %v", effect.Level, EffectLevelMedium)
 	}
 
-	// Test side effect cloning
+	// Test side effect cloning.
 	clone := effect.Clone()
 	if clone.Kind != effect.Kind {
 		t.Errorf("Clone kind = %v, expected %v", clone.Kind, effect.Kind)
 	}
+
 	if clone.Level != effect.Level {
 		t.Errorf("Clone level = %v, expected %v", clone.Level, effect.Level)
 	}
 
-	// Ensure independence
+	// Ensure independence.
 	clone.Description = "test"
+
 	if effect.Description == "test" {
 		t.Error("Clone should be independent of original")
 	}
 }
 
-// TestEffectSet tests effect set functionality
+// TestEffectSet tests effect set functionality.
 func TestEffectSet(t *testing.T) {
 	set := NewEffectSet()
 
-	// Test empty set
+	// Test empty set.
 	if !set.IsEmpty() {
 		t.Error("New EffectSet should be empty")
 	}
+
 	if set.Size() != 0 {
 		t.Errorf("Empty set size = %d, expected 0", set.Size())
 	}
 
-	// Test adding effects
+	// Test adding effects.
 	effect1 := NewSideEffect(EffectIO, EffectLevelLow)
 	effect2 := NewSideEffect(EffectMemoryWrite, EffectLevelMedium)
 
 	set.Add(effect1)
+
 	if set.IsEmpty() {
 		t.Error("Set should not be empty after adding effect")
 	}
+
 	if set.Size() != 1 {
 		t.Errorf("Set size = %d, expected 1", set.Size())
 	}
 
 	set.Add(effect2)
+
 	if set.Size() != 2 {
 		t.Errorf("Set size = %d, expected 2", set.Size())
 	}
 
-	// Test contains
+	// Test contains.
 	if !set.Contains(EffectIO) {
 		t.Error("Set should contain EffectIO")
 	}
+
 	if !set.Contains(EffectMemoryWrite) {
 		t.Error("Set should contain EffectMemoryWrite")
 	}
+
 	if set.Contains(EffectThrow) {
 		t.Error("Set should not contain EffectThrow")
 	}
 
-	// Test get
+	// Test get.
 	retrieved, exists := set.Get(EffectIO)
 	if !exists {
 		t.Error("Should be able to get existing effect")
 	}
+
 	if retrieved.Kind != EffectIO {
 		t.Errorf("Retrieved effect kind = %v, expected %v", retrieved.Kind, EffectIO)
 	}
 
-	// Test remove
+	// Test remove.
 	set.Remove(EffectIO)
+
 	if set.Contains(EffectIO) {
 		t.Error("Set should not contain removed effect")
 	}
+
 	if set.Size() != 1 {
 		t.Errorf("Set size = %d, expected 1 after removal", set.Size())
 	}
 }
 
-// TestEffectSetOperations tests effect set operations
+// TestEffectSetOperations tests effect set operations.
 func TestEffectSetOperations(t *testing.T) {
 	set1 := NewEffectSet()
 	set2 := NewEffectSet()
@@ -132,35 +144,37 @@ func TestEffectSetOperations(t *testing.T) {
 	set2.Add(effect2)
 	set2.Add(effect3)
 
-	// Test union
+	// Test union.
 	union := set1.Union(set2)
 	if union.Size() != 3 {
 		t.Errorf("Union size = %d, expected 3", union.Size())
 	}
+
 	if !union.Contains(EffectIO) || !union.Contains(EffectMemoryWrite) || !union.Contains(EffectThrow) {
 		t.Error("Union should contain all effects from both sets")
 	}
 
-	// Test intersection
+	// Test intersection.
 	intersection := set1.Intersection(set2)
 	if intersection.Size() != 1 {
 		t.Errorf("Intersection size = %d, expected 1", intersection.Size())
 	}
+
 	if !intersection.Contains(EffectMemoryWrite) {
 		t.Error("Intersection should contain common effect")
 	}
 }
 
-// TestEffectSignature tests effect signature functionality
+// TestEffectSignature tests effect signature functionality.
 func TestEffectSignature(t *testing.T) {
 	signature := NewEffectSignature()
 
-	// Test new signature is pure
+	// Test new signature is pure.
 	if !signature.IsPure() {
 		t.Error("New signature should be pure")
 	}
 
-	// Test adding effects
+	// Test adding effects.
 	effect := NewSideEffect(EffectIO, EffectLevelMedium)
 	signature.Effects.Add(effect)
 
@@ -168,21 +182,22 @@ func TestEffectSignature(t *testing.T) {
 		t.Error("Signature with effects should not be pure")
 	}
 
-	// Test signature cloning
+	// Test signature cloning.
 	clone := signature.Clone()
 	if clone.Effects.Size() != signature.Effects.Size() {
 		t.Error("Clone should have same number of effects")
 	}
 
-	// Test independence
+	// Test independence.
 	newEffect := NewSideEffect(EffectThrow, EffectLevelHigh)
 	clone.Effects.Add(newEffect)
+
 	if signature.Effects.Size() == clone.Effects.Size() {
 		t.Error("Clone should be independent of original")
 	}
 }
 
-// TestEffectSignatureMerge tests effect signature merging
+// TestEffectSignatureMerge tests effect signature merging.
 func TestEffectSignatureMerge(t *testing.T) {
 	sig1 := NewEffectSignature()
 	sig2 := NewEffectSignature()
@@ -204,21 +219,21 @@ func TestEffectSignatureMerge(t *testing.T) {
 	}
 }
 
-// TestEffectConstraints tests effect constraint functionality
+// TestEffectConstraints tests effect constraint functionality.
 func TestEffectConstraints(t *testing.T) {
 	signature := NewEffectSignature()
 
-	// Test NoEffectConstraint
+	// Test NoEffectConstraint.
 	noIOConstraint := &NoEffectConstraint{
 		Kinds: []EffectKind{EffectIO},
 	}
 
-	// Should pass for signature without IO
+	// Should pass for signature without IO.
 	if err := noIOConstraint.Check(signature); err != nil {
 		t.Errorf("NoEffectConstraint should pass for signature without IO: %v", err)
 	}
 
-	// Should fail for signature with IO
+	// Should fail for signature with IO.
 	ioEffect := NewSideEffect(EffectIO, EffectLevelMedium)
 	signature.Effects.Add(ioEffect)
 
@@ -226,37 +241,39 @@ func TestEffectConstraints(t *testing.T) {
 		t.Error("NoEffectConstraint should fail for signature with IO")
 	}
 
-	// Test RequiredEffectConstraint
+	// Test RequiredEffectConstraint.
 	requiredIOConstraint := &RequiredEffectConstraint{
 		Kinds: []EffectKind{EffectIO},
 	}
 
-	// Should pass for signature with IO
+	// Should pass for signature with IO.
 	if err := requiredIOConstraint.Check(signature); err != nil {
 		t.Errorf("RequiredEffectConstraint should pass for signature with IO: %v", err)
 	}
 
-	// Should fail for signature without required effect
+	// Should fail for signature without required effect.
 	signature.Effects.Remove(EffectIO)
+
 	if err := requiredIOConstraint.Check(signature); err == nil {
 		t.Error("RequiredEffectConstraint should fail for signature without required effect")
 	}
 }
 
-// TestEffectScope tests effect scope functionality
+// TestEffectScope tests effect scope functionality.
 func TestEffectScope(t *testing.T) {
 	parent := NewEffectScope("parent", nil)
 	child := NewEffectScope("child", parent)
 
-	// Test parent-child relationship
+	// Test parent-child relationship.
 	if child.Parent != parent {
 		t.Error("Child scope should have correct parent")
 	}
+
 	if len(parent.Children) != 1 || parent.Children[0] != child {
 		t.Error("Parent scope should have child in children list")
 	}
 
-	// Test adding effects
+	// Test adding effects.
 	effect := NewSideEffect(EffectIO, EffectLevelMedium)
 	child.AddEffect(effect)
 
@@ -264,7 +281,7 @@ func TestEffectScope(t *testing.T) {
 		t.Error("Scope should contain added effect")
 	}
 
-	// Test masking
+	// Test masking.
 	child.MaskEffect(EffectIO)
 	effective := child.GetEffectiveEffects()
 
@@ -273,7 +290,7 @@ func TestEffectScope(t *testing.T) {
 	}
 }
 
-// TestEffectMask tests effect masking functionality
+// TestEffectMask tests effect masking functionality.
 func TestEffectMask(t *testing.T) {
 	effects := NewEffectSet()
 	effect1 := NewSideEffect(EffectIO, EffectLevelMedium)
@@ -282,18 +299,19 @@ func TestEffectMask(t *testing.T) {
 	effects.Add(effect1)
 	effects.Add(effect2)
 
-	// Test masking IO effects
+	// Test masking IO effects.
 	mask := NewEffectMask([]EffectKind{EffectIO})
 	masked := mask.Apply(effects)
 
 	if masked.Contains(EffectIO) {
 		t.Error("Masked effects should not contain masked effect kind")
 	}
+
 	if !masked.Contains(EffectMemoryWrite) {
 		t.Error("Masked effects should contain non-masked effect kind")
 	}
 
-	// Test inactive mask
+	// Test inactive mask.
 	mask.Active = false
 	maskedInactive := mask.Apply(effects)
 
@@ -302,7 +320,7 @@ func TestEffectMask(t *testing.T) {
 	}
 }
 
-// TestEffectComposer tests effect composition functionality
+// TestEffectComposer tests effect composition functionality.
 func TestEffectComposer(t *testing.T) {
 	composer := NewEffectComposer()
 
@@ -327,12 +345,12 @@ func TestEffectComposer(t *testing.T) {
 	}
 }
 
-// BenchmarkEffectSetOperations benchmarks effect set operations
+// BenchmarkEffectSetOperations benchmarks effect set operations.
 func BenchmarkEffectSetOperations(b *testing.B) {
 	set := NewEffectSet()
 	effects := make([]*SideEffect, 100)
 
-	// Prepare effects
+	// Prepare effects.
 	for i := 0; i < 100; i++ {
 		kind := EffectKind(i%10 + 1)  // Cycle through first 10 effect kinds
 		level := EffectLevel(i%5 + 1) // Cycle through effect levels
@@ -362,17 +380,18 @@ func BenchmarkEffectSetOperations(b *testing.B) {
 		}
 
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			set.Union(other)
 		}
 	})
 }
 
-// BenchmarkEffectInference benchmarks effect inference performance
+// BenchmarkEffectInference benchmarks effect inference performance.
 func BenchmarkEffectInference(b *testing.B) {
 	engine := NewEffectInferenceEngine(nil)
 
-	// Create a simple AST node for testing
+	// Create a simple AST node for testing.
 	node := &Expression{
 		BaseNode: BaseNode{
 			Location: &SourceLocation{

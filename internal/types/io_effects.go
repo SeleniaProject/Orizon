@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-// IOEffectKind represents different categories of I/O effects
+// IOEffectKind represents different categories of I/O effects.
 type IOEffectKind int
 
 const (
-	// Pure I/O - no external side effects
+	// Pure I/O - no external side effects.
 	IOEffectPure IOEffectKind = iota
 
-	// File system I/O
+	// File system I/O.
 	IOEffectFileRead
 	IOEffectFileWrite
 	IOEffectFileCreate
@@ -30,7 +30,7 @@ const (
 	IOEffectFilePermissions
 	IOEffectFileMetadata
 
-	// Network I/O
+	// Network I/O.
 	IOEffectNetworkConnect
 	IOEffectNetworkListen
 	IOEffectNetworkSend
@@ -41,7 +41,7 @@ const (
 	IOEffectWebSocket
 	IOEffectDNSLookup
 
-	// Console I/O
+	// Console I/O.
 	IOEffectConsoleRead
 	IOEffectConsoleWrite
 	IOEffectConsoleError
@@ -49,7 +49,7 @@ const (
 	IOEffectStdoutWrite
 	IOEffectStderrWrite
 
-	// Database I/O
+	// Database I/O.
 	IOEffectDatabaseConnect
 	IOEffectDatabaseQuery
 	IOEffectDatabaseInsert
@@ -59,7 +59,7 @@ const (
 	IOEffectDatabaseCommit
 	IOEffectDatabaseRollback
 
-	// System I/O
+	// System I/O.
 	IOEffectEnvironmentRead
 	IOEffectEnvironmentWrite
 	IOEffectProcessSpawn
@@ -69,12 +69,12 @@ const (
 	IOEffectDeviceRead
 	IOEffectDeviceWrite
 
-	// Memory-mapped I/O
+	// Memory-mapped I/O.
 	IOEffectMemoryMap
 	IOEffectMemoryUnmap
 	IOEffectMemorySync
 
-	// Inter-process I/O
+	// Inter-process I/O.
 	IOEffectPipeRead
 	IOEffectPipeWrite
 	IOEffectSocketRead
@@ -82,12 +82,12 @@ const (
 	IOEffectSharedMemoryRead
 	IOEffectSharedMemoryWrite
 
-	// Time-based I/O
+	// Time-based I/O.
 	IOEffectTimer
 	IOEffectSleep
 	IOEffectTimeout
 
-	// Custom I/O effects
+	// Custom I/O effects.
 	IOEffectCustom
 )
 
@@ -208,7 +208,7 @@ func (iek IOEffectKind) String() string {
 	}
 }
 
-// IOEffectPermission represents the permission level of an I/O effect
+// IOEffectPermission represents the permission level of an I/O effect.
 type IOEffectPermission int
 
 const (
@@ -239,7 +239,7 @@ func (iep IOEffectPermission) String() string {
 	}
 }
 
-// IOEffectBehavior represents the behavior characteristics of an I/O effect
+// IOEffectBehavior represents the behavior characteristics of an I/O effect.
 type IOEffectBehavior int
 
 const (
@@ -276,21 +276,21 @@ func (ieb IOEffectBehavior) String() string {
 	}
 }
 
-// IOEffect represents a single I/O effect with its characteristics
+// IOEffect represents a single I/O effect with its characteristics.
 type IOEffect struct {
-	Kind        IOEffectKind
-	Permission  IOEffectPermission
-	Behaviors   []IOEffectBehavior
+	Timestamp   time.Time
+	Metadata    map[string]interface{}
 	Resource    string
 	Description string
-	Level       EffectLevel
-	Location    SourceLocation
 	Context     string
-	Metadata    map[string]interface{}
-	Timestamp   time.Time
+	Behaviors   []IOEffectBehavior
+	Location    SourceLocation
+	Kind        IOEffectKind
+	Permission  IOEffectPermission
+	Level       EffectLevel
 }
 
-// NewIOEffect creates a new I/O effect
+// NewIOEffect creates a new I/O effect.
 func NewIOEffect(kind IOEffectKind, permission IOEffectPermission) *IOEffect {
 	return &IOEffect{
 		Kind:       kind,
@@ -306,6 +306,7 @@ func (ie *IOEffect) String() string {
 	if ie.Resource != "" {
 		return fmt.Sprintf("%s[%s]@%s", ie.Kind.String(), ie.Permission.String(), ie.Resource)
 	}
+
 	return fmt.Sprintf("%s[%s]", ie.Kind.String(), ie.Permission.String())
 }
 
@@ -324,6 +325,7 @@ func (ie *IOEffect) Clone() *IOEffect {
 	}
 
 	copy(clone.Behaviors, ie.Behaviors)
+
 	for k, v := range ie.Metadata {
 		clone.Metadata[k] = v
 	}
@@ -351,6 +353,7 @@ func (ie *IOEffect) HasBehavior(behavior IOEffectBehavior) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -360,13 +363,13 @@ func (ie *IOEffect) AddBehavior(behavior IOEffectBehavior) {
 	}
 }
 
-// IOEffectSet represents a collection of I/O effects
+// IOEffectSet represents a collection of I/O effects.
 type IOEffectSet struct {
 	effects map[string]*IOEffect
 	mu      sync.RWMutex
 }
 
-// NewIOEffectSet creates a new I/O effect set
+// NewIOEffectSet creates a new I/O effect set.
 func NewIOEffectSet() *IOEffectSet {
 	return &IOEffectSet{
 		effects: make(map[string]*IOEffect),
@@ -395,18 +398,21 @@ func (ies *IOEffectSet) Contains(effect *IOEffect) bool {
 
 	key := effect.String()
 	_, exists := ies.effects[key]
+
 	return exists
 }
 
 func (ies *IOEffectSet) Size() int {
 	ies.mu.RLock()
 	defer ies.mu.RUnlock()
+
 	return len(ies.effects)
 }
 
 func (ies *IOEffectSet) IsEmpty() bool {
 	ies.mu.RLock()
 	defer ies.mu.RUnlock()
+
 	return len(ies.effects) == 0
 }
 
@@ -423,6 +429,7 @@ func (ies *IOEffectSet) IsPure() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -487,7 +494,7 @@ func (ies *IOEffectSet) ToSlice() []*IOEffect {
 		effects = append(effects, effect.Clone())
 	}
 
-	// Sort by effect kind for consistent ordering
+	// Sort by effect kind for consistent ordering.
 	sort.Slice(effects, func(i, j int) bool {
 		return effects[i].Kind < effects[j].Kind
 	})
@@ -509,16 +516,16 @@ func (ies *IOEffectSet) String() string {
 	return "{" + strings.Join(strs, ", ") + "}"
 }
 
-// IOConstraint represents a constraint on I/O effects
+// IOConstraint represents a constraint on I/O effects.
 type IOConstraint interface {
 	Check(effect *IOEffect) bool
 	String() string
 }
 
-// IOPermissionConstraint restricts I/O effects by permission level
+// IOPermissionConstraint restricts I/O effects by permission level.
 type IOPermissionConstraint struct {
-	AllowedPermissions []IOEffectPermission
 	Description        string
+	AllowedPermissions []IOEffectPermission
 }
 
 func NewIOPermissionConstraint(permissions ...IOEffectPermission) *IOPermissionConstraint {
@@ -534,6 +541,7 @@ func (ipc *IOPermissionConstraint) Check(effect *IOEffect) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -542,14 +550,15 @@ func (ipc *IOPermissionConstraint) String() string {
 	for _, p := range ipc.AllowedPermissions {
 		permissions = append(permissions, p.String())
 	}
+
 	return fmt.Sprintf("allow permissions: %s", strings.Join(permissions, ", "))
 }
 
-// IOResourceConstraint restricts I/O effects by resource pattern
+// IOResourceConstraint restricts I/O effects by resource pattern.
 type IOResourceConstraint struct {
+	Description      string
 	AllowedResources []string
 	DeniedResources  []string
-	Description      string
 }
 
 func NewIOResourceConstraint() *IOResourceConstraint {
@@ -569,27 +578,27 @@ func (irc *IOResourceConstraint) DenyResource(resource string) {
 }
 
 func (irc *IOResourceConstraint) Check(effect *IOEffect) bool {
-	// Check denied resources first
+	// Check denied resources first.
 	for _, denied := range irc.DeniedResources {
 		if strings.Contains(effect.Resource, denied) {
 			return false
 		}
 	}
 
-	// If no allowed resources specified, allow by default (unless explicitly denied above)
+	// If no allowed resources specified, allow by default (unless explicitly denied above).
 	if len(irc.AllowedResources) == 0 {
 		return true
 	}
 
-	// Check allowed resources
+	// Check allowed resources.
 	for _, allowed := range irc.AllowedResources {
 		if strings.Contains(effect.Resource, allowed) {
 			return true
 		}
 	}
 
-	// If allowed resources are specified but resource doesn't match any,
-	// still allow if not explicitly denied (for backwards compatibility)
+	// If allowed resources are specified but resource doesn't match any,.
+	// still allow if not explicitly denied (for backwards compatibility).
 	return true
 }
 
@@ -598,13 +607,15 @@ func (irc *IOResourceConstraint) String() string {
 	if len(irc.AllowedResources) > 0 {
 		parts = append(parts, fmt.Sprintf("allow: %v", irc.AllowedResources))
 	}
+
 	if len(irc.DeniedResources) > 0 {
 		parts = append(parts, fmt.Sprintf("deny: %v", irc.DeniedResources))
 	}
+
 	return fmt.Sprintf("resource constraint: %s", strings.Join(parts, ", "))
 }
 
-// IOSignature represents the complete I/O signature of a function
+// IOSignature represents the complete I/O signature of a function.
 type IOSignature struct {
 	FunctionName  string
 	Effects       *IOEffectSet
@@ -616,7 +627,7 @@ type IOSignature struct {
 	Idempotent    bool
 }
 
-// NewIOSignature creates a new I/O signature
+// NewIOSignature creates a new I/O signature.
 func NewIOSignature(name string) *IOSignature {
 	return &IOSignature{
 		FunctionName:  name,
@@ -633,7 +644,7 @@ func NewIOSignature(name string) *IOSignature {
 func (ios *IOSignature) AddEffect(effect *IOEffect) {
 	ios.Effects.Add(effect)
 
-	// Update signature properties
+	// Update signature properties.
 	if !effect.IsPure() {
 		ios.Pure = false
 	}
@@ -668,25 +679,25 @@ func (ios *IOSignature) String() string {
 		ios.FunctionName, ios.Effects.String(), ios.Pure, ios.Deterministic, ios.Idempotent)
 }
 
-// IOMonad represents the I/O monad for sequencing I/O operations
+// IOMonad represents the I/O monad for sequencing I/O operations.
 type IOMonad struct {
 	action func() (interface{}, error)
 	next   *IOMonad
 }
 
-// NewIOMonad creates a new I/O monad
+// NewIOMonad creates a new I/O monad.
 func NewIOMonad(action func() (interface{}, error)) *IOMonad {
 	return &IOMonad{action: action}
 }
 
-// PureIO creates a pure I/O monad that returns a value without side effects
+// PureIO creates a pure I/O monad that returns a value without side effects.
 func PureIO(value interface{}) *IOMonad {
 	return NewIOMonad(func() (interface{}, error) {
 		return value, nil
 	})
 }
 
-// Bind chains I/O operations in a monadic fashion
+// Bind chains I/O operations in a monadic fashion.
 func (iom *IOMonad) Bind(f func(interface{}) *IOMonad) *IOMonad {
 	return NewIOMonad(func() (interface{}, error) {
 		result, err := iom.action()
@@ -695,42 +706,47 @@ func (iom *IOMonad) Bind(f func(interface{}) *IOMonad) *IOMonad {
 		}
 
 		next := f(result)
+
 		return next.action()
 	})
 }
 
-// Map applies a pure function to the result of an I/O operation
+// Map applies a pure function to the result of an I/O operation.
 func (iom *IOMonad) Map(f func(interface{}) interface{}) *IOMonad {
 	return NewIOMonad(func() (interface{}, error) {
 		result, err := iom.action()
 		if err != nil {
 			return nil, err
 		}
+
 		return f(result), nil
 	})
 }
 
-// Run executes the I/O monad and returns the result
+// Run executes the I/O monad and returns the result.
 func (iom *IOMonad) Run() (interface{}, error) {
 	return iom.action()
 }
 
-// Sequence combines multiple I/O monads into a single monad that returns a slice of results
+// Sequence combines multiple I/O monads into a single monad that returns a slice of results.
 func Sequence(monads []*IOMonad) *IOMonad {
 	return NewIOMonad(func() (interface{}, error) {
 		results := make([]interface{}, len(monads))
+
 		for i, monad := range monads {
 			result, err := monad.Run()
 			if err != nil {
 				return nil, err
 			}
+
 			results[i] = result
 		}
+
 		return results, nil
 	})
 }
 
-// Parallel executes multiple I/O monads in parallel and returns their results
+// Parallel executes multiple I/O monads in parallel and returns their results.
 func Parallel(monads []*IOMonad) *IOMonad {
 	return NewIOMonad(func() (interface{}, error) {
 		results := make([]interface{}, len(monads))
@@ -739,15 +755,17 @@ func Parallel(monads []*IOMonad) *IOMonad {
 		var wg sync.WaitGroup
 		for i, monad := range monads {
 			wg.Add(1)
+
 			go func(index int, m *IOMonad) {
 				defer wg.Done()
+
 				results[index], errors[index] = m.Run()
 			}(i, monad)
 		}
 
 		wg.Wait()
 
-		// Check for errors
+		// Check for errors.
 		for _, err := range errors {
 			if err != nil {
 				return nil, err
@@ -758,16 +776,16 @@ func Parallel(monads []*IOMonad) *IOMonad {
 	})
 }
 
-// IOContext provides context for I/O operations
+// IOContext provides context for I/O operations.
 type IOContext struct {
+	Metadata     map[string]interface{}
 	Permissions  []IOEffectPermission
 	AllowedKinds []IOEffectKind
 	Constraints  []IOConstraint
 	Timeout      time.Duration
-	Metadata     map[string]interface{}
 }
 
-// NewIOContext creates a new I/O context
+// NewIOContext creates a new I/O context.
 func NewIOContext() *IOContext {
 	return &IOContext{
 		Permissions:  make([]IOEffectPermission, 0),
@@ -790,35 +808,41 @@ func (ioc *IOContext) AddConstraint(constraint IOConstraint) {
 }
 
 func (ioc *IOContext) CanPerform(effect *IOEffect) bool {
-	// Check permissions
+	// Check permissions.
 	if len(ioc.Permissions) > 0 {
 		hasPermission := false
+
 		for _, permission := range ioc.Permissions {
 			if effect.Permission == permission {
 				hasPermission = true
+
 				break
 			}
 		}
+
 		if !hasPermission {
 			return false
 		}
 	}
 
-	// Check allowed kinds
+	// Check allowed kinds.
 	if len(ioc.AllowedKinds) > 0 {
 		hasKind := false
+
 		for _, kind := range ioc.AllowedKinds {
 			if effect.Kind == kind {
 				hasKind = true
+
 				break
 			}
 		}
+
 		if !hasKind {
 			return false
 		}
 	}
 
-	// Check constraints
+	// Check constraints.
 	for _, constraint := range ioc.Constraints {
 		if !constraint.Check(effect) {
 			return false
@@ -828,7 +852,7 @@ func (ioc *IOContext) CanPerform(effect *IOEffect) bool {
 	return true
 }
 
-// IOInferenceEngine infers I/O effects from AST nodes
+// IOInferenceEngine infers I/O effects from AST nodes.
 type IOInferenceEngine struct {
 	context         *IOContext
 	functionSigs    map[string]*IOSignature
@@ -837,7 +861,7 @@ type IOInferenceEngine struct {
 	mu              sync.RWMutex
 }
 
-// NewIOInferenceEngine creates a new I/O inference engine
+// NewIOInferenceEngine creates a new I/O inference engine.
 func NewIOInferenceEngine(context *IOContext) *IOInferenceEngine {
 	return &IOInferenceEngine{
 		context:         context,
@@ -848,7 +872,7 @@ func NewIOInferenceEngine(context *IOContext) *IOInferenceEngine {
 }
 
 func (iie *IOInferenceEngine) InferEffects(node ASTNode) (*IOEffectSet, error) {
-	// Check cache first
+	// Check cache first.
 	nodeStr := fmt.Sprintf("%T", node)
 	if cached, exists := iie.cache[nodeStr]; exists {
 		return cached, nil
@@ -862,6 +886,7 @@ func (iie *IOInferenceEngine) InferEffects(node ASTNode) (*IOEffectSet, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		effects = effects.Union(funcEffects)
 
 	case *CallExpr:
@@ -869,6 +894,7 @@ func (iie *IOInferenceEngine) InferEffects(node ASTNode) (*IOEffectSet, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		effects = effects.Union(callEffects)
 
 	case *AssignmentExpr:
@@ -876,13 +902,14 @@ func (iie *IOInferenceEngine) InferEffects(node ASTNode) (*IOEffectSet, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		effects = effects.Union(assignEffects)
 
 	default:
-		// For other node types, assume pure
+		// For other node types, assume pure.
 	}
 
-	// Cache the result
+	// Cache the result.
 	iie.cache[nodeStr] = effects
 
 	return effects, nil
@@ -891,13 +918,13 @@ func (iie *IOInferenceEngine) InferEffects(node ASTNode) (*IOEffectSet, error) {
 func (iie *IOInferenceEngine) inferFunctionEffects(funcDecl *FunctionDecl) (*IOEffectSet, error) {
 	effects := NewIOEffectSet()
 
-	// Check if function signature exists
+	// Check if function signature exists.
 	if sig, exists := iie.functionSigs[funcDecl.Name]; exists {
 		return sig.Effects, nil
 	}
 
 	// Analyze function body for I/O operations
-	// This is a simplified implementation - in practice, would traverse the entire function body
+	// This is a simplified implementation - in practice, would traverse the entire function body.
 
 	// For demonstration, add some basic I/O effects based on function name patterns
 	if strings.Contains(funcDecl.Name, "read") || strings.Contains(funcDecl.Name, "Read") {
@@ -921,8 +948,9 @@ func (iie *IOInferenceEngine) inferFunctionEffects(funcDecl *FunctionDecl) (*IOE
 func (iie *IOInferenceEngine) inferCallEffects(callExpr *CallExpr) (*IOEffectSet, error) {
 	effects := NewIOEffectSet()
 
-	// Extract function name from the Function field
+	// Extract function name from the Function field.
 	functionName := ""
+
 	if callExpr.Function != nil {
 		if funcDecl, ok := callExpr.Function.(*FunctionDecl); ok {
 			functionName = funcDecl.Name
@@ -931,12 +959,12 @@ func (iie *IOInferenceEngine) inferCallEffects(callExpr *CallExpr) (*IOEffectSet
 		}
 	}
 
-	// Get function signature if available
+	// Get function signature if available.
 	if sig, exists := iie.functionSigs[functionName]; exists {
 		effects = effects.Union(sig.Effects)
 	}
 
-	// Infer effects based on function name
+	// Infer effects based on function name.
 	switch functionName {
 	case "println", "print", "printf":
 		effect := NewIOEffect(IOEffectStdoutWrite, IOPermissionWrite)
@@ -972,12 +1000,13 @@ func (iie *IOInferenceEngine) inferAssignmentEffects(assignExpr *AssignmentExpr)
 	effects := NewIOEffectSet()
 
 	// Assignments themselves don't typically have I/O effects,
-	// but the RHS expression might
+	// but the RHS expression might.
 	if assignExpr.RHS != nil {
 		rhsEffects, err := iie.InferEffects(assignExpr.RHS)
 		if err != nil {
 			return nil, err
 		}
+
 		effects = effects.Union(rhsEffects)
 	}
 
@@ -994,16 +1023,17 @@ func (iie *IOInferenceEngine) GetFunctionSignature(name string) (*IOSignature, b
 	iie.mu.RLock()
 	defer iie.mu.RUnlock()
 	sig, exists := iie.functionSigs[name]
+
 	return sig, exists
 }
 
-// IOPurityChecker ensures pure function guarantees
+// IOPurityChecker ensures pure function guarantees.
 type IOPurityChecker struct {
-	strictMode bool
 	whitelist  map[string]bool
+	strictMode bool
 }
 
-// NewIOPurityChecker creates a new purity checker
+// NewIOPurityChecker creates a new purity checker.
 func NewIOPurityChecker(strict bool) *IOPurityChecker {
 	return &IOPurityChecker{
 		strictMode: strict,
@@ -1040,5 +1070,6 @@ func (ipc *IOPurityChecker) EnforcePurity(signature *IOSignature) error {
 	if len(violations) > 0 {
 		return fmt.Errorf("purity violations: %s", strings.Join(violations, "; "))
 	}
+
 	return nil
 }

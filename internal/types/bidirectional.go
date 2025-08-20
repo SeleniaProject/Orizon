@@ -3,11 +3,12 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
 
-// BinaryExpr represents binary expressions for bidirectional type checking
+// BinaryExpr represents binary expressions for bidirectional type checking.
 type BinaryExpr struct {
 	Left     Expr
 	Right    Expr
@@ -19,11 +20,11 @@ func (e *BinaryExpr) String() string {
 }
 
 func (e *BinaryExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// This would be implemented by the visitor pattern
+	// This would be implemented by the visitor pattern.
 	return nil, fmt.Errorf("binary expression visitor not implemented")
 }
 
-// IfExpr represents conditional expressions for bidirectional type checking
+// IfExpr represents conditional expressions for bidirectional type checking.
 type IfExpr struct {
 	Condition  Expr
 	ThenBranch Expr
@@ -35,11 +36,11 @@ func (e *IfExpr) String() string {
 }
 
 func (e *IfExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// This would be implemented by the visitor pattern
+	// This would be implemented by the visitor pattern.
 	return nil, fmt.Errorf("if expression visitor not implemented")
 }
 
-// AnnotatedExpr represents expressions with type annotations
+// AnnotatedExpr represents expressions with type annotations.
 type AnnotatedExpr struct {
 	Expression Expr
 	Annotation *Type
@@ -50,22 +51,22 @@ func (e *AnnotatedExpr) String() string {
 }
 
 func (e *AnnotatedExpr) Accept(visitor ExprVisitor) (*Type, error) {
-	// This would be implemented by the visitor pattern
+	// This would be implemented by the visitor pattern.
 	return nil, fmt.Errorf("annotated expression visitor not implemented")
 }
 
-// BidirectionalMode represents the mode of bidirectional type checking
+// BidirectionalMode represents the mode of bidirectional type checking.
 type BidirectionalMode int
 
 const (
-	// SynthesisMode generates types from expressions (⇒)
+	// SynthesisMode generates types from expressions (⇒).
 	SynthesisMode BidirectionalMode = iota
 
-	// CheckMode verifies expressions against expected types (⇐)
+	// CheckMode verifies expressions against expected types (⇐).
 	CheckMode
 )
 
-// String returns a string representation of the bidirectional mode
+// String returns a string representation of the bidirectional mode.
 func (bm BidirectionalMode) String() string {
 	switch bm {
 	case SynthesisMode:
@@ -77,27 +78,27 @@ func (bm BidirectionalMode) String() string {
 	}
 }
 
-// TypeCheckingContext represents the context for bidirectional type checking
+// TypeCheckingContext represents the context for bidirectional type checking.
 type TypeCheckingContext struct {
-	mode         BidirectionalMode
 	expectedType *Type
 	environment  *TypeEnvironment
 	inference    *InferenceEngine
 	errors       []BidirectionalError
 	position     SourceLocation
+	mode         BidirectionalMode
 }
 
-// BidirectionalError represents errors in bidirectional type checking
+// BidirectionalError represents errors in bidirectional type checking.
 type BidirectionalError struct {
-	Message      string
-	Location     SourceLocation
 	ExpectedType *Type
 	ActualType   *Type
+	Message      string
 	Context      string
 	Suggestion   string
+	Location     SourceLocation
 }
 
-// String returns a string representation of the bidirectional error
+// String returns a string representation of the bidirectional error.
 func (be *BidirectionalError) String() string {
 	var sb strings.Builder
 
@@ -120,7 +121,7 @@ func (be *BidirectionalError) String() string {
 	return sb.String()
 }
 
-// BidirectionalChecker implements the bidirectional type checking algorithm
+// BidirectionalChecker implements the bidirectional type checking algorithm.
 type BidirectionalChecker struct {
 	inference   *InferenceEngine
 	environment *TypeEnvironment
@@ -128,7 +129,7 @@ type BidirectionalChecker struct {
 	verbose     bool
 }
 
-// NewBidirectionalChecker creates a new bidirectional type checker
+// NewBidirectionalChecker creates a new bidirectional type checker.
 func NewBidirectionalChecker(inference *InferenceEngine) *BidirectionalChecker {
 	return &BidirectionalChecker{
 		inference:   inference,
@@ -143,28 +144,28 @@ func NewBidirectionalChecker(inference *InferenceEngine) *BidirectionalChecker {
 	}
 }
 
-// SetVerbose enables or disables verbose output
+// SetVerbose enables or disables verbose output.
 func (bc *BidirectionalChecker) SetVerbose(verbose bool) {
 	bc.verbose = verbose
 }
 
-// GetErrors returns all type checking errors
+// GetErrors returns all type checking errors.
 func (bc *BidirectionalChecker) GetErrors() []BidirectionalError {
 	return bc.context.errors
 }
 
-// ClearErrors clears all accumulated errors
+// ClearErrors clears all accumulated errors.
 func (bc *BidirectionalChecker) ClearErrors() {
 	bc.context.errors = make([]BidirectionalError, 0)
 }
 
-// CheckExpression performs bidirectional type checking on an expression
+// CheckExpression performs bidirectional type checking on an expression.
 func (bc *BidirectionalChecker) CheckExpression(expr Expr, expectedType *Type) (*Type, error) {
 	if bc.verbose {
 		fmt.Printf("Checking expression against type: %s\n", expectedType.String())
 	}
 
-	// Set check mode with expected type
+	// Set check mode with expected type.
 	oldMode := bc.context.mode
 	oldExpected := bc.context.expectedType
 
@@ -179,13 +180,13 @@ func (bc *BidirectionalChecker) CheckExpression(expr Expr, expectedType *Type) (
 	return bc.checkExpressionInternal(expr)
 }
 
-// SynthesizeType performs type synthesis on an expression
+// SynthesizeType performs type synthesis on an expression.
 func (bc *BidirectionalChecker) SynthesizeType(expr Expr) (*Type, error) {
 	if bc.verbose {
 		fmt.Printf("Synthesizing type for expression\n")
 	}
 
-	// Set synthesis mode
+	// Set synthesis mode.
 	oldMode := bc.context.mode
 	oldExpected := bc.context.expectedType
 
@@ -200,7 +201,7 @@ func (bc *BidirectionalChecker) SynthesizeType(expr Expr) (*Type, error) {
 	return bc.synthesizeTypeInternal(expr)
 }
 
-// checkExpressionInternal implements the checking judgment (Γ ⊢ e ⇐ A)
+// checkExpressionInternal implements the checking judgment (Γ ⊢ e ⇐ A).
 func (bc *BidirectionalChecker) checkExpressionInternal(expr Expr) (*Type, error) {
 	switch e := expr.(type) {
 	case *LambdaExpr:
@@ -210,13 +211,13 @@ func (bc *BidirectionalChecker) checkExpressionInternal(expr Expr) (*Type, error
 	case *IfExpr:
 		return bc.checkIf(e)
 	default:
-		// For other expressions, synthesize and check subsumption
+		// For other expressions, synthesize and check subsumption.
 		synthesizedType, err := bc.synthesizeTypeInternal(expr)
 		if err != nil {
 			return nil, err
 		}
 
-		// Check if synthesized type is compatible with expected type
+		// Check if synthesized type is compatible with expected type.
 		if bc.context.expectedType != nil {
 			if err := bc.checkSubsumption(synthesizedType, bc.context.expectedType, expr); err != nil {
 				return nil, err
@@ -227,7 +228,7 @@ func (bc *BidirectionalChecker) checkExpressionInternal(expr Expr) (*Type, error
 	}
 }
 
-// synthesizeTypeInternal implements the synthesis judgment (Γ ⊢ e ⇒ A)
+// synthesizeTypeInternal implements the synthesis judgment (Γ ⊢ e ⇒ A).
 func (bc *BidirectionalChecker) synthesizeTypeInternal(expr Expr) (*Type, error) {
 	switch e := expr.(type) {
 	case *LiteralExpr:
@@ -245,7 +246,7 @@ func (bc *BidirectionalChecker) synthesizeTypeInternal(expr Expr) (*Type, error)
 	}
 }
 
-// checkLambda checks lambda expressions against function types
+// checkLambda checks lambda expressions against function types.
 func (bc *BidirectionalChecker) checkLambda(lambda *LambdaExpr) (*Type, error) {
 	if bc.context.expectedType == nil {
 		return nil, fmt.Errorf("cannot check lambda without expected type")
@@ -258,14 +259,14 @@ func (bc *BidirectionalChecker) checkLambda(lambda *LambdaExpr) (*Type, error) {
 
 	funcType := bc.context.expectedType.Data.(*FunctionType)
 
-	// For simplicity, handle single parameter lambdas
+	// For simplicity, handle single parameter lambdas.
 	if len(funcType.Parameters) != 1 {
 		return nil, bc.addError("lambda parameters", nil, nil,
 			fmt.Sprintf("Expected 1 parameter, got function with %d parameters",
 				len(funcType.Parameters)))
 	}
 
-	// Extend environment with parameter type
+	// Extend environment with parameter type.
 	newEnv := &TypeEnvironment{
 		Variables: make(map[string]*TypeScheme),
 		Parent:    bc.context.environment,
@@ -279,7 +280,7 @@ func (bc *BidirectionalChecker) checkLambda(lambda *LambdaExpr) (*Type, error) {
 		Level:    newEnv.Level,
 	}
 
-	// Check body against expected return type
+	// Check body against expected return type.
 	oldEnv := bc.context.environment
 	bc.context.environment = newEnv
 
@@ -300,25 +301,25 @@ func (bc *BidirectionalChecker) checkLambda(lambda *LambdaExpr) (*Type, error) {
 	return bc.context.expectedType, nil
 }
 
-// checkAnnotated checks annotated expressions
+// checkAnnotated checks annotated expressions.
 func (bc *BidirectionalChecker) checkAnnotated(annotated *AnnotatedExpr) (*Type, error) {
-	// Get the type annotation
+	// Get the type annotation.
 	annotationType := annotated.Annotation
 
-	// Check if annotation matches expected type
+	// Check if annotation matches expected type.
 	if bc.context.expectedType != nil {
 		if err := bc.checkSubsumption(annotationType, bc.context.expectedType, annotated); err != nil {
 			return nil, err
 		}
 	}
 
-	// Check expression against annotated type
+	// Check expression against annotated type.
 	return bc.CheckExpression(annotated.Expression, annotationType)
 }
 
-// checkIf checks conditional expressions
+// checkIf checks conditional expressions.
 func (bc *BidirectionalChecker) checkIf(ifExpr *IfExpr) (*Type, error) {
-	// Synthesize condition type and check it's boolean
+	// Synthesize condition type and check it's boolean.
 	condType, err := bc.SynthesizeType(ifExpr.Condition)
 	if err != nil {
 		return nil, err
@@ -329,7 +330,7 @@ func (bc *BidirectionalChecker) checkIf(ifExpr *IfExpr) (*Type, error) {
 			"Condition must be boolean")
 	}
 
-	// Check both branches against expected type
+	// Check both branches against expected type.
 	thenType, err := bc.CheckExpression(ifExpr.ThenBranch, bc.context.expectedType)
 	if err != nil {
 		return nil, err
@@ -340,7 +341,7 @@ func (bc *BidirectionalChecker) checkIf(ifExpr *IfExpr) (*Type, error) {
 		return nil, err
 	}
 
-	// Verify both branches have compatible types
+	// Verify both branches have compatible types.
 	if !thenType.Equals(elseType) {
 		return nil, bc.addError("if branches", thenType, elseType,
 			"Both branches must have the same type")
@@ -349,7 +350,7 @@ func (bc *BidirectionalChecker) checkIf(ifExpr *IfExpr) (*Type, error) {
 	return thenType, nil
 }
 
-// synthesizeLiteral synthesizes types for literal expressions
+// synthesizeLiteral synthesizes types for literal expressions.
 func (bc *BidirectionalChecker) synthesizeLiteral(literal *LiteralExpr) (*Type, error) {
 	switch literal.Value.(type) {
 	case int32:
@@ -369,7 +370,7 @@ func (bc *BidirectionalChecker) synthesizeLiteral(literal *LiteralExpr) (*Type, 
 	}
 }
 
-// synthesizeVariable synthesizes types for variable expressions
+// synthesizeVariable synthesizes types for variable expressions.
 func (bc *BidirectionalChecker) synthesizeVariable(variable *VariableExpr) (*Type, error) {
 	scheme, exists := bc.inference.LookupVariable(variable.Name)
 	if !exists {
@@ -380,9 +381,9 @@ func (bc *BidirectionalChecker) synthesizeVariable(variable *VariableExpr) (*Typ
 	return bc.inference.Instantiate(scheme), nil
 }
 
-// synthesizeApplication synthesizes types for function applications
+// synthesizeApplication synthesizes types for function applications.
 func (bc *BidirectionalChecker) synthesizeApplication(app *ApplicationExpr) (*Type, error) {
-	// Synthesize function type
+	// Synthesize function type.
 	funcType, err := bc.SynthesizeType(app.Function)
 	if err != nil {
 		return nil, err
@@ -399,23 +400,24 @@ func (bc *BidirectionalChecker) synthesizeApplication(app *ApplicationExpr) (*Ty
 			"Cannot apply function with no parameters")
 	}
 
-	// Check argument against parameter type
+	// Check argument against parameter type.
 	expectedParamType := funcData.Parameters[0]
+
 	_, err = bc.CheckExpression(app.Argument, expectedParamType)
 	if err != nil {
 		return nil, err
 	}
 
-	// Return the return type (for single parameter functions)
+	// Return the return type (for single parameter functions).
 	return funcData.ReturnType, nil
 }
 
-// synthesizeAnnotated synthesizes types for annotated expressions
+// synthesizeAnnotated synthesizes types for annotated expressions.
 func (bc *BidirectionalChecker) synthesizeAnnotated(annotated *AnnotatedExpr) (*Type, error) {
-	// Get the type annotation
+	// Get the type annotation.
 	annotationType := annotated.Annotation
 
-	// Check expression against annotated type
+	// Check expression against annotated type.
 	_, err := bc.CheckExpression(annotated.Expression, annotationType)
 	if err != nil {
 		return nil, err
@@ -424,9 +426,9 @@ func (bc *BidirectionalChecker) synthesizeAnnotated(annotated *AnnotatedExpr) (*
 	return annotationType, nil
 }
 
-// synthesizeBinary synthesizes types for binary expressions
+// synthesizeBinary synthesizes types for binary expressions.
 func (bc *BidirectionalChecker) synthesizeBinary(binary *BinaryExpr) (*Type, error) {
-	// Synthesize operand types
+	// Synthesize operand types.
 	leftType, err := bc.SynthesizeType(binary.Left)
 	if err != nil {
 		return nil, err
@@ -437,28 +439,28 @@ func (bc *BidirectionalChecker) synthesizeBinary(binary *BinaryExpr) (*Type, err
 		return nil, err
 	}
 
-	// Determine result type based on operator
+	// Determine result type based on operator.
 	return bc.getBinaryOperatorResultType(binary.Operator, leftType, rightType)
 }
 
-// checkSubsumption checks if one type is a subtype of another
+// checkSubsumption checks if one type is a subtype of another.
 func (bc *BidirectionalChecker) checkSubsumption(actual, expected *Type, expr Expr) error {
 	if actual.Equals(expected) {
 		return nil
 	}
 
-	// For now, use structural subtyping for functions
+	// For now, use structural subtyping for functions.
 	if actual.Kind == TypeKindFunction && expected.Kind == TypeKindFunction {
 		actualFunc := actual.Data.(*FunctionType)
 		expectedFunc := expected.Data.(*FunctionType)
 
-		// Check contravariance in parameters and covariance in return type
+		// Check contravariance in parameters and covariance in return type.
 		if len(actualFunc.Parameters) != len(expectedFunc.Parameters) {
 			return bc.addError("function subtyping", expected, actual,
 				"Parameter count mismatch")
 		}
 
-		// Parameters are contravariant
+		// Parameters are contravariant.
 		for i, actualParam := range actualFunc.Parameters {
 			expectedParam := expectedFunc.Parameters[i]
 			if err := bc.checkSubsumption(expectedParam, actualParam, expr); err != nil {
@@ -466,7 +468,7 @@ func (bc *BidirectionalChecker) checkSubsumption(actual, expected *Type, expr Ex
 			}
 		}
 
-		// Return type is covariant
+		// Return type is covariant.
 		return bc.checkSubsumption(actualFunc.ReturnType, expectedFunc.ReturnType, expr)
 	}
 
@@ -474,31 +476,34 @@ func (bc *BidirectionalChecker) checkSubsumption(actual, expected *Type, expr Ex
 		"Types are not compatible")
 }
 
-// getBinaryOperatorResultType determines the result type of binary operations
+// getBinaryOperatorResultType determines the result type of binary operations.
 func (bc *BidirectionalChecker) getBinaryOperatorResultType(op string, left, right *Type) (*Type, error) {
 	switch op {
 	case "+", "-", "*", "/":
-		// Arithmetic operators
+		// Arithmetic operators.
 		if left.Equals(right) && (left.Equals(TypeInt32) || left.Equals(TypeInt64) ||
 			left.Equals(TypeFloat32) || left.Equals(TypeFloat64)) {
 			return left, nil
 		}
+
 		return nil, bc.addError("arithmetic operation", left, right,
 			"Operands must be of the same numeric type")
 
 	case "==", "!=", "<", ">", "<=", ">=":
-		// Comparison operators
+		// Comparison operators.
 		if left.Equals(right) {
 			return TypeBool, nil
 		}
+
 		return nil, bc.addError("comparison operation", left, right,
 			"Operands must be of the same type")
 
 	case "&&", "||":
-		// Logical operators
+		// Logical operators.
 		if left.Equals(TypeBool) && right.Equals(TypeBool) {
 			return TypeBool, nil
 		}
+
 		return nil, bc.addError("logical operation", TypeBool, nil,
 			"Operands must be boolean")
 
@@ -508,9 +513,9 @@ func (bc *BidirectionalChecker) getBinaryOperatorResultType(op string, left, rig
 	}
 }
 
-// parseTypeAnnotation parses a type annotation string into a Type
+// parseTypeAnnotation parses a type annotation string into a Type.
 func (bc *BidirectionalChecker) parseTypeAnnotation(annotation string) (*Type, error) {
-	// Simple type annotation parsing
+	// Simple type annotation parsing.
 	switch annotation {
 	case "Int32":
 		return TypeInt32, nil
@@ -525,12 +530,12 @@ func (bc *BidirectionalChecker) parseTypeAnnotation(annotation string) (*Type, e
 	case "Bool":
 		return TypeBool, nil
 	default:
-		// For more complex types, you would need a proper parser
+		// For more complex types, you would need a proper parser.
 		return nil, fmt.Errorf("unsupported type annotation: %s", annotation)
 	}
 }
 
-// addError adds a bidirectional error to the context
+// addError adds a bidirectional error to the context.
 func (bc *BidirectionalChecker) addError(context string, expected, actual *Type, message string) error {
 	error := BidirectionalError{
 		Message:      message,
@@ -541,17 +546,18 @@ func (bc *BidirectionalChecker) addError(context string, expected, actual *Type,
 	}
 
 	bc.context.errors = append(bc.context.errors, error)
-	return fmt.Errorf(error.String())
+
+	return errors.New(error.String())
 }
 
-// BidirectionalInference combines bidirectional checking with constraint-based inference
+// BidirectionalInference combines bidirectional checking with constraint-based inference.
 type BidirectionalInference struct {
 	checker           *BidirectionalChecker
 	constraintChecker *ConstraintBasedInference
 	inference         *InferenceEngine
 }
 
-// NewBidirectionalInference creates a new bidirectional inference system
+// NewBidirectionalInference creates a new bidirectional inference system.
 func NewBidirectionalInference(inference *InferenceEngine) *BidirectionalInference {
 	return &BidirectionalInference{
 		checker:           NewBidirectionalChecker(inference),
@@ -560,42 +566,42 @@ func NewBidirectionalInference(inference *InferenceEngine) *BidirectionalInferen
 	}
 }
 
-// InferWithBidirectional performs type inference using bidirectional checking
+// InferWithBidirectional performs type inference using bidirectional checking.
 func (bi *BidirectionalInference) InferWithBidirectional(expr Expr, expectedType *Type) (*Type, error) {
 	if expectedType != nil {
-		// Use checking mode when expected type is provided
+		// Use checking mode when expected type is provided.
 		return bi.checker.CheckExpression(expr, expectedType)
 	} else {
-		// Use synthesis mode when no expected type is provided
+		// Use synthesis mode when no expected type is provided.
 		return bi.checker.SynthesizeType(expr)
 	}
 }
 
-// InferWithFallback tries bidirectional inference first, then falls back to constraint-based
+// InferWithFallback tries bidirectional inference first, then falls back to constraint-based.
 func (bi *BidirectionalInference) InferWithFallback(expr Expr, expectedType *Type) (*Type, error) {
-	// Try bidirectional first
+	// Try bidirectional first.
 	result, err := bi.InferWithBidirectional(expr, expectedType)
 	if err == nil {
 		return result, nil
 	}
 
-	// Fall back to constraint-based inference
+	// Fall back to constraint-based inference.
 	if expectedType != nil {
-		// Use constraint-based with expected type information
+		// Use constraint-based with expected type information.
 		return bi.constraintChecker.InferTypeWithConstraints(expr)
 	} else {
-		// Use regular constraint-based inference
+		// Use regular constraint-based inference.
 		return bi.constraintChecker.InferTypeWithConstraints(expr)
 	}
 }
 
-// SetVerbose enables or disables verbose output
+// SetVerbose enables or disables verbose output.
 func (bi *BidirectionalInference) SetVerbose(verbose bool) {
 	bi.checker.SetVerbose(verbose)
 	bi.constraintChecker.SetVerbose(verbose)
 }
 
-// GetErrors returns all accumulated errors
+// GetErrors returns all accumulated errors.
 func (bi *BidirectionalInference) GetErrors() []BidirectionalError {
 	return bi.checker.GetErrors()
 }

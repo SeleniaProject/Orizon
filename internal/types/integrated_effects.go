@@ -1,5 +1,5 @@
 // Package types provides exception-effect integration for the Orizon compiler.
-// This module integrates exception effects with the existing effect tracking system
+// This module integrates exception effects with the existing effect tracking system.
 // to provide comprehensive type-level side effect and exception control.
 package types
 
@@ -8,17 +8,17 @@ import (
 	"strings"
 )
 
-// IntegratedEffect represents a unified effect that combines side effects and exceptions
+// IntegratedEffect represents a unified effect that combines side effects and exceptions.
 type IntegratedEffect struct {
 	SideEffect    *SideEffect
 	ExceptionSpec *ExceptionSpec
-	Context       string
-	Location      SourceLocation
-	Constraints   []EffectConstraint
 	Metadata      map[string]interface{}
+	Context       string
+	Constraints   []EffectConstraint
+	Location      SourceLocation
 }
 
-// NewIntegratedEffect creates a new integrated effect
+// NewIntegratedEffect creates a new integrated effect.
 func NewIntegratedEffect(sideEffect *SideEffect, exceptionSpec *ExceptionSpec) *IntegratedEffect {
 	return &IntegratedEffect{
 		SideEffect:    sideEffect,
@@ -36,6 +36,7 @@ func (ie *IntegratedEffect) String() string {
 	} else if ie.ExceptionSpec != nil {
 		return ie.ExceptionSpec.String()
 	}
+
 	return "NoEffect"
 }
 
@@ -78,7 +79,7 @@ func mapExceptionSeverityToEffectLevel(severity ExceptionSeverity) EffectLevel {
 	}
 }
 
-// IntegratedEffectSet represents a collection of integrated effects
+// IntegratedEffectSet represents a collection of integrated effects.
 type IntegratedEffectSet struct {
 	effects     map[string]*IntegratedEffect
 	sideEffects *EffectSet
@@ -164,22 +165,23 @@ func (ies *IntegratedEffectSet) Intersection(other *IntegratedEffectSet) *Integr
 func (ies *IntegratedEffectSet) Contains(effect *IntegratedEffect) bool {
 	key := effect.String()
 	_, exists := ies.effects[key]
+
 	return exists
 }
 
-// IntegratedEffectSignature represents a complete effect signature including both side effects and exceptions
+// IntegratedEffectSignature represents a complete effect signature including both side effects and exceptions.
 type IntegratedEffectSignature struct {
+	Effects       *IntegratedEffectSet
+	Requires      *IntegratedEffectSet
+	Ensures       *IntegratedEffectSet
+	SideEffectSig *EffectSignature
+	ExceptionSig  *ExceptionSignature
 	FunctionName  string
 	Parameters    []string
 	Returns       []string
-	Effects       *IntegratedEffectSet
-	Requires      *IntegratedEffectSet // Precondition effects
-	Ensures       *IntegratedEffectSet // Postcondition effects
-	SideEffectSig *EffectSignature
-	ExceptionSig  *ExceptionSignature
+	Guarantees    []string
 	Safety        ExceptionSafety
 	Purity        bool
-	Guarantees    []string
 }
 
 func NewIntegratedEffectSignature(name string) *IntegratedEffectSignature {
@@ -211,6 +213,7 @@ func (ies *IntegratedEffectSignature) AddEffect(effect *IntegratedEffect) {
 
 	if effect.SideEffect != nil {
 		ies.SideEffectSig.Effects.Add(effect.SideEffect)
+
 		if effect.SideEffect.Kind != EffectPure {
 			ies.Purity = false
 		}
@@ -241,13 +244,13 @@ func (ies *IntegratedEffectSignature) GetMaxSeverity() EffectLevel {
 	return maxSeverity
 }
 
-// IntegratedEffectMask represents a mask for both side effects and exceptions
+// IntegratedEffectMask represents a mask for both side effects and exceptions.
 type IntegratedEffectMask struct {
 	SideEffectMask *EffectMask
 	ExceptionMask  *ExceptionMask
 	Name           string
-	Active         bool
 	Conditions     []string
+	Active         bool
 }
 
 func NewIntegratedEffectMask(name string) *IntegratedEffectMask {
@@ -283,19 +286,21 @@ func (iem *IntegratedEffectMask) String() string {
 	if iem.SideEffectMask != nil {
 		sideStr = fmt.Sprintf("%v", iem.SideEffectMask.MaskedKinds)
 	}
+
 	if iem.ExceptionMask != nil {
 		exceptionStr = iem.ExceptionMask.String()
 	}
+
 	return fmt.Sprintf("IntegratedMask[%s]: side=%s, exception=%s",
 		iem.Name, sideStr, exceptionStr)
 }
 
-// ExceptionMask represents a mask for filtering exceptions
+// ExceptionMask represents a mask for filtering exceptions.
 type ExceptionMask struct {
-	Name             string
 	MaskedKinds      map[ExceptionKind]bool
 	MaskedSeverities map[ExceptionSeverity]bool
 	AllowedTypes     map[string]bool
+	Name             string
 	Active           bool
 	Temporary        bool
 }
@@ -328,17 +333,17 @@ func (em *ExceptionMask) ShouldMask(spec *ExceptionSpec) bool {
 		return false
 	}
 
-	// Check if kind is masked
+	// Check if kind is masked.
 	if em.MaskedKinds[spec.Kind] {
 		return true
 	}
 
-	// Check if severity is masked
+	// Check if severity is masked.
 	if em.MaskedSeverities[spec.Severity] {
 		return true
 	}
 
-	// Check if type is explicitly allowed
+	// Check if type is explicitly allowed.
 	if len(em.AllowedTypes) > 0 {
 		return !em.AllowedTypes[spec.TypeName]
 	}
@@ -363,7 +368,7 @@ func (em *ExceptionMask) String() string {
 	return fmt.Sprintf("ExceptionMask[%s:%s]", em.Name, strings.Join(masked, ","))
 }
 
-// IntegratedEffectAnalyzer performs unified analysis of side effects and exceptions
+// IntegratedEffectAnalyzer performs unified analysis of side effects and exceptions.
 type IntegratedEffectAnalyzer struct {
 	EffectInferenceEngine *EffectInferenceEngine
 	ExceptionAnalyzer     *ExceptionAnalyzer
@@ -385,35 +390,35 @@ func NewIntegratedEffectAnalyzer() *IntegratedEffectAnalyzer {
 }
 
 func (iea *IntegratedEffectAnalyzer) AnalyzeFunction(node ASTNode) (*IntegratedEffectSignature, error) {
-	// Analyze side effects
+	// Analyze side effects.
 	sideEffectSig, err := iea.EffectInferenceEngine.InferEffects(node)
 	if err != nil {
 		return nil, fmt.Errorf("side effect analysis failed: %w", err)
 	}
 
-	// Analyze exceptions using basic flow analysis
+	// Analyze exceptions using basic flow analysis.
 	exceptionSig := NewExceptionSignature()
 	exceptionSig.FunctionName = getFunctionName(node)
 
-	// For demonstration, we'll add some basic exception analysis
-	// In a real implementation, this would traverse the AST and analyze exception flows
+	// For demonstration, we'll add some basic exception analysis.
+	// In a real implementation, this would traverse the AST and analyze exception flows.
 	if funcDecl, ok := node.(*FunctionDecl); ok {
 		exceptionSig.FunctionName = funcDecl.Name
 
-		// Analyze function body for potential exceptions
+		// Analyze function body for potential exceptions.
 		exceptionSpec := iea.analyzeExceptionFlows(funcDecl)
 		if exceptionSpec != nil {
 			exceptionSig.Throws.Add(exceptionSpec)
 		}
 	}
 
-	// Create integrated signature
+	// Create integrated signature.
 	functionName := getFunctionName(node)
 	integratedSig := NewIntegratedEffectSignature(functionName)
 	integratedSig.SideEffectSig = sideEffectSig
 	integratedSig.ExceptionSig = exceptionSig
 
-	// Combine effects
+	// Combine effects.
 	for _, sideEffect := range sideEffectSig.Effects.ToSlice() {
 		integrated := NewIntegratedEffect(sideEffect, nil)
 		integratedSig.AddEffect(integrated)
@@ -424,26 +429,25 @@ func (iea *IntegratedEffectAnalyzer) AnalyzeFunction(node ASTNode) (*IntegratedE
 		integratedSig.AddEffect(integrated)
 	}
 
-	// Determine overall purity and safety
+	// Determine overall purity and safety.
 	integratedSig.Purity = sideEffectSig.Pure
 	integratedSig.Safety = exceptionSig.Safety
 
-	// Store signature
+	// Store signature.
 	iea.IntegratedSignatures[functionName] = integratedSig
 
 	return integratedSig, nil
 }
 
 func (iea *IntegratedEffectAnalyzer) analyzeExceptionFlows(funcDecl *FunctionDecl) *ExceptionSpec {
-	// Basic exception flow analysis
-	// In a real implementation, this would analyze the function body for:
-	// - Array access (IndexOutOfBounds)
-	// - Division operations (DivisionByZero)
-	// - File operations (IOError, FileNotFound)
-	// - Network operations (NetworkTimeout)
+	// Basic exception flow analysis.
+	// In a real implementation, this would analyze the function body for:.
+	// - Array access (IndexOutOfBounds).
+	// - Division operations (DivisionByZero).
+	// - File operations (IOError, FileNotFound).
+	// - Network operations (NetworkTimeout).
 	// - etc.
-
-	// For demonstration, return a runtime exception if function is not pure
+	// For demonstration, return a runtime exception if function is not pure.
 	return NewExceptionSpec(ExceptionRuntime, ExceptionSeverityError)
 }
 
@@ -462,6 +466,7 @@ func (iea *IntegratedEffectAnalyzer) ApplyMasks(signature *IntegratedEffectSigna
 		for _, mask := range iea.IntegratedMasks {
 			if mask.Active && mask.MaskEffect(effect) {
 				shouldMask = true
+
 				break
 			}
 		}
@@ -477,21 +482,22 @@ func (iea *IntegratedEffectAnalyzer) ApplyMasks(signature *IntegratedEffectSigna
 func (iea *IntegratedEffectAnalyzer) CheckCompatibility(caller, callee *IntegratedEffectSignature) []string {
 	var issues []string
 
-	// Check purity compatibility
+	// Check purity compatibility.
 	if caller.IsPure() && !callee.IsPure() {
 		issues = append(issues, fmt.Sprintf("pure function %s cannot call impure function %s",
 			caller.FunctionName, callee.FunctionName))
 	}
 
-	// Check exception safety compatibility
+	// Check exception safety compatibility.
 	if caller.IsNoThrow() && !callee.IsNoThrow() {
 		issues = append(issues, fmt.Sprintf("no-throw function %s cannot call throwing function %s",
 			caller.FunctionName, callee.FunctionName))
 	}
 
-	// Check effect level compatibility
+	// Check effect level compatibility.
 	callerSeverity := caller.GetMaxSeverity()
 	calleeSeverity := callee.GetMaxSeverity()
+
 	if callerSeverity < calleeSeverity {
 		issues = append(issues, fmt.Sprintf("function %s (severity %s) cannot call function %s (severity %s)",
 			caller.FunctionName, callerSeverity.String(), callee.FunctionName, calleeSeverity.String()))
@@ -502,6 +508,7 @@ func (iea *IntegratedEffectAnalyzer) CheckCompatibility(caller, callee *Integrat
 
 func (iea *IntegratedEffectAnalyzer) GetSignature(functionName string) (*IntegratedEffectSignature, bool) {
 	sig, exists := iea.IntegratedSignatures[functionName]
+
 	return sig, exists
 }
 
@@ -513,6 +520,7 @@ func (iea *IntegratedEffectAnalyzer) RemoveMask(maskName string) {
 	for i, mask := range iea.IntegratedMasks {
 		if mask.Name == maskName {
 			iea.IntegratedMasks = append(iea.IntegratedMasks[:i], iea.IntegratedMasks[i+1:]...)
+
 			break
 		}
 	}
@@ -523,17 +531,18 @@ func (iea *IntegratedEffectAnalyzer) String() string {
 		len(iea.IntegratedSignatures), len(iea.IntegratedMasks))
 }
 
-// Helper function to extract function name from AST node
+// Helper function to extract function name from AST node.
 func getFunctionName(node ASTNode) string {
 	if funcDecl, ok := node.(*FunctionDecl); ok {
 		return funcDecl.Name
 	}
+
 	return "unknown"
 }
 
-// Validation functions for integrated effects
+// Validation functions for integrated effects.
 
-// ValidateIntegratedEffect checks if an integrated effect is valid
+// ValidateIntegratedEffect checks if an integrated effect is valid.
 func ValidateIntegratedEffect(effect *IntegratedEffect) error {
 	if effect == nil {
 		return fmt.Errorf("integrated effect cannot be nil")
@@ -558,7 +567,7 @@ func ValidateIntegratedEffect(effect *IntegratedEffect) error {
 	return nil
 }
 
-// ValidateSideEffect checks if a side effect is valid
+// ValidateSideEffect checks if a side effect is valid.
 func ValidateSideEffect(effect *SideEffect) error {
 	if effect == nil {
 		return fmt.Errorf("side effect cannot be nil")
@@ -575,7 +584,7 @@ func ValidateSideEffect(effect *SideEffect) error {
 	return nil
 }
 
-// ValidateExceptionSpec checks if an exception specification is valid
+// ValidateExceptionSpec checks if an exception specification is valid.
 func ValidateExceptionSpec(spec *ExceptionSpec) error {
 	if spec == nil {
 		return fmt.Errorf("exception spec cannot be nil")

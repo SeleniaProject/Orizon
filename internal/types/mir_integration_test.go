@@ -6,7 +6,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/mir"
 )
 
-// TestCoreMIRIntegration tests MIR integration for core types
+// TestCoreMIRIntegration tests MIR integration for core types.
 func TestCoreMIRIntegration(t *testing.T) {
 	module := &mir.Module{
 		Name:      "test_module",
@@ -23,7 +23,7 @@ func TestCoreMIRIntegration(t *testing.T) {
 	}
 }
 
-// TestOptionOperations tests Option type MIR operations
+// TestOptionOperations tests Option type MIR operations.
 func TestOptionOperations(t *testing.T) {
 	module := &mir.Module{
 		Name:      "option_test",
@@ -37,17 +37,21 @@ func TestOptionOperations(t *testing.T) {
 		t.Error("No Option functions generated")
 	}
 
-	// Check that we have the expected function
+	// Check that we have the expected function.
 	found := false
+
 	for _, fn := range optionFuncs {
 		if fn.Name == "option_some" {
 			found = true
+
 			if len(fn.Parameters) != 1 {
 				t.Errorf("Expected 1 parameter for option_some, got %d", len(fn.Parameters))
 			}
+
 			if len(fn.Blocks) != 1 {
 				t.Errorf("Expected 1 block for option_some, got %d", len(fn.Blocks))
 			}
+
 			break
 		}
 	}
@@ -57,7 +61,7 @@ func TestOptionOperations(t *testing.T) {
 	}
 }
 
-// TestResultOperations tests Result type MIR operations
+// TestResultOperations tests Result type MIR operations.
 func TestResultOperations(t *testing.T) {
 	module := &mir.Module{
 		Name:      "result_test",
@@ -71,17 +75,21 @@ func TestResultOperations(t *testing.T) {
 		t.Error("No Result functions generated")
 	}
 
-	// Check that we have the expected function
+	// Check that we have the expected function.
 	found := false
+
 	for _, fn := range resultFuncs {
 		if fn.Name == "result_ok" {
 			found = true
+
 			if len(fn.Parameters) != 1 {
 				t.Errorf("Expected 1 parameter for result_ok, got %d", len(fn.Parameters))
 			}
+
 			if len(fn.Blocks) != 1 {
 				t.Errorf("Expected 1 block for result_ok, got %d", len(fn.Blocks))
 			}
+
 			break
 		}
 	}
@@ -91,7 +99,7 @@ func TestResultOperations(t *testing.T) {
 	}
 }
 
-// TestGetAllCoreFunctions tests getting all core type functions
+// TestGetAllCoreFunctions tests getting all core type functions.
 func TestGetAllCoreFunctions(t *testing.T) {
 	module := &mir.Module{
 		Name:      "all_core_test",
@@ -105,7 +113,7 @@ func TestGetAllCoreFunctions(t *testing.T) {
 		t.Errorf("Expected at least 2 core functions, got %d", len(allFuncs))
 	}
 
-	// Verify we have both option and result functions
+	// Verify we have both option and result functions.
 	hasOption := false
 	hasResult := false
 
@@ -113,6 +121,7 @@ func TestGetAllCoreFunctions(t *testing.T) {
 		if fn.Name == "option_some" {
 			hasOption = true
 		}
+
 		if fn.Name == "result_ok" {
 			hasResult = true
 		}
@@ -121,12 +130,13 @@ func TestGetAllCoreFunctions(t *testing.T) {
 	if !hasOption {
 		t.Error("Option function not found in all core functions")
 	}
+
 	if !hasResult {
 		t.Error("Result function not found in all core functions")
 	}
 }
 
-// TestRegisterCoreFunctions tests registering functions with the module
+// TestRegisterCoreFunctions tests registering functions with the module.
 func TestRegisterCoreFunctions(t *testing.T) {
 	module := &mir.Module{
 		Name:      "register_test",
@@ -135,20 +145,20 @@ func TestRegisterCoreFunctions(t *testing.T) {
 
 	integration := NewCoreTypeMIRIntegration(module)
 
-	// Initially no functions
+	// Initially no functions.
 	if len(module.Functions) != 0 {
 		t.Errorf("Expected 0 functions initially, got %d", len(module.Functions))
 	}
 
-	// Register core functions
+	// Register core functions.
 	integration.RegisterCoreFunctions()
 
-	// Should now have functions
+	// Should now have functions.
 	if len(module.Functions) == 0 {
 		t.Error("No functions registered with module")
 	}
 
-	// Check that functions are properly added
+	// Check that functions are properly added.
 	functionNames := make(map[string]bool)
 	for _, fn := range module.Functions {
 		functionNames[fn.Name] = true
@@ -162,7 +172,7 @@ func TestRegisterCoreFunctions(t *testing.T) {
 	}
 }
 
-// TestMIRModuleIntegrity tests that the MIR module remains valid
+// TestMIRModuleIntegrity tests that the MIR module remains valid.
 func TestMIRModuleIntegrity(t *testing.T) {
 	module := &mir.Module{
 		Name:      "integrity_test",
@@ -172,28 +182,31 @@ func TestMIRModuleIntegrity(t *testing.T) {
 	integration := NewCoreTypeMIRIntegration(module)
 	integration.RegisterCoreFunctions()
 
-	// Verify module structure
+	// Verify module structure.
 	if module.Name != "integrity_test" {
 		t.Error("Module name was modified")
 	}
 
-	// Verify all functions have required fields
+	// Verify all functions have required fields.
 	for i, fn := range module.Functions {
 		if fn.Name == "" {
 			t.Errorf("Function %d has empty name", i)
 		}
+
 		if fn.Blocks == nil {
 			t.Errorf("Function %s has nil blocks", fn.Name)
 		}
+
 		if len(fn.Blocks) == 0 {
 			t.Errorf("Function %s has no blocks", fn.Name)
 		}
 
-		// Verify each block
+		// Verify each block.
 		for j, block := range fn.Blocks {
 			if block.Name == "" {
 				t.Errorf("Function %s block %d has empty name", fn.Name, j)
 			}
+
 			if block.Instr == nil {
 				t.Errorf("Function %s block %s has nil instructions", fn.Name, block.Name)
 			}
@@ -201,7 +214,7 @@ func TestMIRModuleIntegrity(t *testing.T) {
 	}
 }
 
-// BenchmarkMIRGeneration benchmarks MIR function generation
+// BenchmarkMIRGeneration benchmarks MIR function generation.
 func BenchmarkMIRGeneration(b *testing.B) {
 	module := &mir.Module{
 		Name:      "bench_test",
@@ -209,15 +222,17 @@ func BenchmarkMIRGeneration(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		integration := NewCoreTypeMIRIntegration(module)
 		_ = integration.GetAllCoreFunctions()
 	}
 }
 
-// BenchmarkFunctionRegistration benchmarks function registration
+// BenchmarkFunctionRegistration benchmarks function registration.
 func BenchmarkFunctionRegistration(b *testing.B) {
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		module := &mir.Module{
 			Name:      "bench_register",

@@ -8,16 +8,17 @@ import (
 
 func TestOrizonSlice_SafetyValidation(t *testing.T) {
 	tests := []struct {
-		name        string
 		setupSlice  func() *OrizonSlice
+		name        string
+		expectedMsg string
 		index       uintptr
 		expectPanic bool
-		expectedMsg string
 	}{
 		{
 			name: "valid access within bounds",
 			setupSlice: func() *OrizonSlice {
 				data := make([]int32, 10)
+
 				return &OrizonSlice{
 					data:     unsafe.Pointer(&data[0]),
 					length:   10,
@@ -31,6 +32,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			name: "index out of bounds",
 			setupSlice: func() *OrizonSlice {
 				data := make([]int32, 10)
+
 				return &OrizonSlice{
 					data:     unsafe.Pointer(&data[0]),
 					length:   10,
@@ -58,6 +60,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			name: "nil typeInfo",
 			setupSlice: func() *OrizonSlice {
 				data := make([]int32, 10)
+
 				return &OrizonSlice{
 					data:     unsafe.Pointer(&data[0]),
 					length:   10,
@@ -72,6 +75,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			name: "zero element size",
 			setupSlice: func() *OrizonSlice {
 				data := make([]int32, 10)
+
 				return &OrizonSlice{
 					data:     unsafe.Pointer(&data[0]),
 					length:   10,
@@ -119,7 +123,7 @@ func TestOrizonSlice_SetSafetyValidation(t *testing.T) {
 		typeInfo: &TypeInfo{Size: 4},
 	}
 
-	// Test nil value pointer
+	// Test nil value pointer.
 	defer func() {
 		if r := recover(); r != nil {
 			panicMsg := r.(string)
@@ -134,7 +138,7 @@ func TestOrizonSlice_SetSafetyValidation(t *testing.T) {
 }
 
 func TestOrizonSlice_ConcurrentAccess(t *testing.T) {
-	// Test for race conditions in concurrent access
+	// Test for race conditions in concurrent access.
 	data := make([]int32, 1000)
 	slice := &OrizonSlice{
 		data:     unsafe.Pointer(&data[0]),
@@ -143,6 +147,7 @@ func TestOrizonSlice_ConcurrentAccess(t *testing.T) {
 	}
 
 	const numGoroutines = 100
+
 	const numOperations = 1000
 
 	done := make(chan bool, numGoroutines)
@@ -158,7 +163,7 @@ func TestOrizonSlice_ConcurrentAccess(t *testing.T) {
 		}(i)
 	}
 
-	// Wait for all goroutines to complete
+	// Wait for all goroutines to complete.
 	for i := 0; i < numGoroutines; i++ {
 		<-done
 	}
@@ -173,6 +178,7 @@ func BenchmarkOrizonSlice_SafeGet(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		index := uintptr(i % 10000)
 		_ = slice.Get(index)

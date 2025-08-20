@@ -1,5 +1,5 @@
-// Comprehensive test suite for function type system
-// Tests closures, higher-order functions, partial application, and async functions
+// Comprehensive test suite for function type system.
+// Tests closures, higher-order functions, partial application, and async functions.
 
 package types
 
@@ -13,12 +13,12 @@ import (
 func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 	t.Log("=== Phase 2.1.3: Function Type System Implementation Test ===")
 
-	// Test 1: Closure Types
+	// Test 1: Closure Types.
 	t.Run("ClosureTypes", func(t *testing.T) {
-		// Create base function type
+		// Create base function type.
 		baseFunc := NewFunctionType([]*Type{TypeInt32}, TypeInt32, false, false)
 
-		// Create captured variables
+		// Create captured variables.
 		capturedVars := []CapturedVariable{
 			{
 				Name:        "multiplier",
@@ -34,7 +34,7 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			},
 		}
 
-		// Create closure type
+		// Create closure type.
 		closureType := NewClosureType(baseFunc.Data.(*FunctionType), capturedVars, CaptureModeImplicit)
 
 		if closureType.Kind != TypeKindFunction {
@@ -45,36 +45,37 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			t.Error("Closure type should be callable")
 		}
 
-		// Test closure environment
+		// Test closure environment.
 		closureData := closureType.Data.(*ClosureType)
 		if len(closureData.CapturedVars) != 2 {
 			t.Errorf("Expected 2 captured variables, got %d", len(closureData.CapturedVars))
 		}
 
-		// Test capture kinds
+		// Test capture kinds.
 		if closureData.CapturedVars[0].CaptureKind != CaptureByValue {
 			t.Error("First captured variable should be by value")
 		}
+
 		if closureData.CapturedVars[1].CaptureKind != CaptureByReference {
 			t.Error("Second captured variable should be by reference")
 		}
 
-		// Test purity
+		// Test purity.
 		if closureType.IsPure() {
 			t.Error("Closure with reference captures should not be pure")
 		}
 	})
 
-	// Test 2: Higher-Order Function Types
+	// Test 2: Higher-Order Function Types.
 	t.Run("HigherOrderTypes", func(t *testing.T) {
-		// Create generic parameters
+		// Create generic parameters.
 		tParam := NewGenericType("T", []*Type{}, VarianceInvariant)
 		uParam := NewGenericType("U", []*Type{}, VarianceInvariant)
 
-		// Create mapper function type: T -> U
+		// Create mapper function type: T -> U.
 		mapperFunc := NewFunctionType([]*Type{tParam}, uParam, false, false)
 
-		// Create higher-order map function: (T -> U) -> [T] -> [U]
+		// Create higher-order map function: (T -> U) -> [T] -> [U].
 		inputArray := NewSliceType(tParam)
 		outputArray := NewSliceType(uParam)
 
@@ -93,19 +94,19 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			t.Errorf("Expected 2 type parameters, got %d", len(hoData.TypeParams))
 		}
 
-		// Test string representation
+		// Test string representation.
 		hoStr := hoType.FunctionString()
 		if hoStr == "" {
 			t.Error("Higher-order function string representation should not be empty")
 		}
 	})
 
-	// Test 3: Partial Application
+	// Test 3: Partial Application.
 	t.Run("PartialApplication", func(t *testing.T) {
-		// Create function type: (int, int, int) -> int
+		// Create function type: (int, int, int) -> int.
 		originalFunc := NewFunctionType([]*Type{TypeInt32, TypeInt32, TypeInt32}, TypeInt32, false, false)
 
-		// Partially apply first argument
+		// Partially apply first argument.
 		partialType, err := originalFunc.ApplyPartially([]*Type{TypeInt32})
 		if err != nil {
 			t.Fatalf("Failed to create partial application: %v", err)
@@ -115,12 +116,12 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			t.Error("Partially applied function should be callable")
 		}
 
-		// Check remaining arity
+		// Check remaining arity.
 		if partialType.GetArity() != 2 {
 			t.Errorf("Expected arity 2 after partial application, got %d", partialType.GetArity())
 		}
 
-		// Apply second argument
+		// Apply second argument.
 		partialType2, err := partialType.ApplyPartially([]*Type{TypeInt32})
 		if err != nil {
 			t.Fatalf("Failed to apply second argument: %v", err)
@@ -130,7 +131,7 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			t.Errorf("Expected arity 1 after second partial application, got %d", partialType2.GetArity())
 		}
 
-		// Fully apply
+		// Fully apply.
 		resultType, err := partialType2.ApplyPartially([]*Type{TypeInt32})
 		if err != nil {
 			t.Fatalf("Failed to fully apply function: %v", err)
@@ -141,27 +142,27 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 		}
 	})
 
-	// Test 4: Function Callability
+	// Test 4: Function Callability.
 	t.Run("FunctionCallability", func(t *testing.T) {
-		// Create function type: (int, string) -> bool
+		// Create function type: (int, string) -> bool.
 		funcType := NewFunctionType([]*Type{TypeInt32, TypeString}, TypeBool, false, false)
 
-		// Test valid call
+		// Test valid call.
 		if !funcType.IsCallableWith([]*Type{TypeInt32, TypeString}) {
 			t.Error("Function should be callable with correct argument types")
 		}
 
-		// Test invalid call - wrong number of arguments
+		// Test invalid call - wrong number of arguments.
 		if funcType.IsCallableWith([]*Type{TypeInt32}) {
 			t.Error("Function should not be callable with too few arguments")
 		}
 
-		// Test invalid call - wrong argument types
+		// Test invalid call - wrong argument types.
 		if funcType.IsCallableWith([]*Type{TypeString, TypeInt32}) {
 			t.Error("Function should not be callable with wrong argument types")
 		}
 
-		// Test variadic function
+		// Test variadic function.
 		variadicFunc := NewFunctionType([]*Type{TypeInt32, TypeString}, TypeBool, true, false)
 
 		if !variadicFunc.IsCallableWith([]*Type{TypeInt32, TypeString}) {
@@ -177,12 +178,12 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 		}
 	})
 
-	// Test 5: Async Function Types
+	// Test 5: Async Function Types.
 	t.Run("AsyncFunctionTypes", func(t *testing.T) {
-		// Create base async function
+		// Create base async function.
 		baseFunc := NewFunctionType([]*Type{TypeString}, TypeInt32, false, true)
 
-		// Create async function type with Promise-like return
+		// Create async function type with Promise-like return.
 		promiseType := NewGenericType("Promise", []*Type{TypeInt32}, VarianceCovariant)
 		errorType := NewGenericType("Error", []*Type{}, VarianceInvariant)
 
@@ -197,7 +198,7 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			t.Error("Async function base return type should be preserved")
 		}
 
-		// Test result type
+		// Test result type.
 		resultType, err := asyncFunc.GetCallResultType([]*Type{TypeString})
 		if err != nil {
 			t.Fatalf("Failed to get async function result type: %v", err)
@@ -207,16 +208,16 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 			t.Error("Async function should return Promise-like type")
 		}
 
-		// Test string representation
+		// Test string representation.
 		asyncStr := asyncFunc.FunctionString()
 		if asyncStr == "" {
 			t.Error("Async function string representation should not be empty")
 		}
 	})
 
-	// Test 6: Generator Types
+	// Test 6: Generator Types.
 	t.Run("GeneratorTypes", func(t *testing.T) {
-		// Create generator: yields int, returns string, accepts bool
+		// Create generator: yields int, returns string, accepts bool.
 		genType := NewGeneratorType(TypeInt32, TypeString, TypeBool)
 
 		if genType.Kind != TypeKindFunction {
@@ -227,27 +228,29 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 		if genData.YieldType.Kind != TypeKindInt32 {
 			t.Error("Generator yield type should be Int32")
 		}
+
 		if genData.ReturnType.Kind != TypeKindString {
 			t.Error("Generator return type should be String")
 		}
+
 		if genData.SendType.Kind != TypeKindBool {
 			t.Error("Generator send type should be Bool")
 		}
 
-		// Test string representation
+		// Test string representation.
 		genStr := genType.FunctionString()
 		if genStr == "" {
 			t.Error("Generator string representation should not be empty")
 		}
 	})
 
-	// Test 7: Function Composition
+	// Test 7: Function Composition.
 	t.Run("FunctionComposition", func(t *testing.T) {
-		// Create functions f: int -> string, g: bool -> int
+		// Create functions f: int -> string, g: bool -> int.
 		f := NewFunctionType([]*Type{TypeInt32}, TypeString, false, false)
 		g := NewFunctionType([]*Type{TypeBool}, TypeInt32, false, false)
 
-		// Compose f(g(x)): bool -> string
+		// Compose f(g(x)): bool -> string.
 		composed, err := ComposeFunction(f, g)
 		if err != nil {
 			t.Fatalf("Failed to compose functions: %v", err)
@@ -261,12 +264,14 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 		if len(composedFunc.Parameters) != 1 || composedFunc.Parameters[0].Kind != TypeKindBool {
 			t.Error("Composed function should take bool parameter")
 		}
+
 		if composedFunc.ReturnType.Kind != TypeKindString {
 			t.Error("Composed function should return string")
 		}
 
-		// Test invalid composition
+		// Test invalid composition.
 		h := NewFunctionType([]*Type{TypeString, TypeInt32}, TypeBool, false, false)
+
 		_, err = ComposeFunction(h, g)
 		if err == nil {
 			t.Error("Should fail to compose functions with incompatible signatures")
@@ -276,11 +281,11 @@ func TestPhase2_1_3_FunctionTypeSystem(t *testing.T) {
 	t.Log("✅ Phase 2.1.3: Function Type System - ALL TESTS PASSED")
 }
 
-// ====== Closure Analysis Tests ======
+// ====== Closure Analysis Tests ======.
 
 func TestClosureAnalysis(t *testing.T) {
 	t.Run("ClosureEnvironment", func(t *testing.T) {
-		// Create closure environment
+		// Create closure environment.
 		env := &ClosureEnvironment{
 			Variables: map[string]*Type{
 				"x": TypeInt32,
@@ -291,11 +296,12 @@ func TestClosureAnalysis(t *testing.T) {
 			Size:   0,
 		}
 
-		// Create base function
+		// Create base function.
 		funcType := NewFunctionType([]*Type{TypeBool}, TypeInt32, false, false)
 
-		// Analyze closure
+		// Analyze closure.
 		freeVars := []string{"x", "y", "z"}
+
 		closureType, err := AnalyzeClosure(funcType.Data.(*FunctionType), env, freeVars)
 		if err != nil {
 			t.Fatalf("Failed to analyze closure: %v", err)
@@ -306,21 +312,21 @@ func TestClosureAnalysis(t *testing.T) {
 			t.Errorf("Expected 3 captured variables, got %d", len(closureData.CapturedVars))
 		}
 
-		// Check capture kinds
+		// Check capture kinds.
 		for _, captured := range closureData.CapturedVars {
 			switch captured.Name {
 			case "x":
-				// Int32 should be captured by value
+				// Int32 should be captured by value.
 				if captured.CaptureKind != CaptureByValue {
 					t.Errorf("Variable 'x' should be captured by value, got %v", captured.CaptureKind)
 				}
 			case "y":
-				// String should be captured by value
+				// String should be captured by value.
 				if captured.CaptureKind != CaptureByValue {
 					t.Errorf("Variable 'y' should be captured by value, got %v", captured.CaptureKind)
 				}
 			case "z":
-				// Slice should be captured by reference
+				// Slice should be captured by reference.
 				if captured.CaptureKind != CaptureByReference {
 					t.Errorf("Variable 'z' should be captured by reference, got %v", captured.CaptureKind)
 				}
@@ -329,7 +335,7 @@ func TestClosureAnalysis(t *testing.T) {
 	})
 
 	t.Run("NestedClosures", func(t *testing.T) {
-		// Test nested closure environments
+		// Test nested closure environments.
 		parentEnv := &ClosureEnvironment{
 			Variables: map[string]*Type{
 				"outer": TypeInt32,
@@ -346,14 +352,15 @@ func TestClosureAnalysis(t *testing.T) {
 			Size:   8,
 		}
 
-		// Create nested closure
+		// Create nested closure.
 		funcType := NewFunctionType([]*Type{}, TypeVoid, false, false)
+
 		closureType, err := AnalyzeClosure(funcType.Data.(*FunctionType), childEnv, []string{"inner", "outer"})
 		if err != nil {
 			t.Fatalf("Failed to analyze nested closure: %v", err)
 		}
 
-		// Should capture both variables
+		// Should capture both variables.
 		closureData := closureType.Data.(*ClosureType)
 		if len(closureData.CapturedVars) != 2 {
 			t.Errorf("Expected 2 captured variables in nested closure, got %d", len(closureData.CapturedVars))
@@ -361,7 +368,7 @@ func TestClosureAnalysis(t *testing.T) {
 	})
 }
 
-// ====== Higher-Order Function Tests ======
+// ====== Higher-Order Function Tests ======.
 
 func TestHigherOrderFunctions(t *testing.T) {
 	registry := NewFunctionTypeRegistry()
@@ -376,7 +383,7 @@ func TestHigherOrderFunctions(t *testing.T) {
 			t.Error("Map function should be callable")
 		}
 
-		// Test map string representation
+		// Test map string representation.
 		mapStr := mapType.FunctionString()
 		if mapStr == "" {
 			t.Error("Map function string representation should not be empty")
@@ -414,7 +421,7 @@ func TestHigherOrderFunctions(t *testing.T) {
 			t.Errorf("Reduce should have 2 type parameters, got %d", len(hoData.TypeParams))
 		}
 
-		// Check parameter names
+		// Check parameter names.
 		expectedParams := []string{"T", "Acc"}
 		for i, param := range hoData.TypeParams {
 			if param.Name != expectedParams[i] {
@@ -424,7 +431,7 @@ func TestHigherOrderFunctions(t *testing.T) {
 	})
 
 	t.Run("CommonFunctionTypes", func(t *testing.T) {
-		// Test unary int function
+		// Test unary int function.
 		unaryInt, exists := registry.GetCommonType("unary_int")
 		if !exists {
 			t.Fatal("Unary int function type should be registered")
@@ -434,7 +441,7 @@ func TestHigherOrderFunctions(t *testing.T) {
 			t.Errorf("Unary function should have arity 1, got %d", unaryInt.GetArity())
 		}
 
-		// Test binary int function
+		// Test binary int function.
 		binaryInt, exists := registry.GetCommonType("binary_int")
 		if !exists {
 			t.Fatal("Binary int function type should be registered")
@@ -444,7 +451,7 @@ func TestHigherOrderFunctions(t *testing.T) {
 			t.Errorf("Binary function should have arity 2, got %d", binaryInt.GetArity())
 		}
 
-		// Test predicate function
+		// Test predicate function.
 		predicate, exists := registry.GetCommonType("predicate")
 		if !exists {
 			t.Fatal("Predicate function type should be registered")
@@ -457,7 +464,7 @@ func TestHigherOrderFunctions(t *testing.T) {
 	})
 }
 
-// ====== Function Type Inference Tests ======
+// ====== Function Type Inference Tests ======.
 
 func TestFunctionTypeInference(t *testing.T) {
 	t.Run("BasicInference", func(t *testing.T) {
@@ -468,7 +475,7 @@ func TestFunctionTypeInference(t *testing.T) {
 			Constraints: []Constraint{},
 		}
 
-		// Infer simple function type
+		// Infer simple function type.
 		params := []*Type{TypeInt32, TypeString}
 		returnType := TypeBool
 
@@ -500,16 +507,16 @@ func TestFunctionTypeInference(t *testing.T) {
 			Constraints: []Constraint{},
 		}
 
-		// Create generic parameters
+		// Create generic parameters.
 		tParam := NewGenericType("T", []*Type{}, VarianceInvariant)
 
-		// Infer generic function type
+		// Infer generic function type.
 		params := []*Type{tParam, tParam}
 		returnType := tParam
 
 		inferred := InferFunctionType(params, returnType, context)
 
-		// Should create higher-order type
+		// Should create higher-order type.
 		if inferred.Data == nil {
 			t.Fatal("Inferred type should have data")
 		}
@@ -518,6 +525,7 @@ func TestFunctionTypeInference(t *testing.T) {
 			if len(hoData.TypeParams) != 1 {
 				t.Errorf("Expected 1 type parameter, got %d", len(hoData.TypeParams))
 			}
+
 			if hoData.TypeParams[0].Name != "T" {
 				t.Errorf("Expected type parameter 'T', got %s", hoData.TypeParams[0].Name)
 			}
@@ -527,13 +535,13 @@ func TestFunctionTypeInference(t *testing.T) {
 	})
 }
 
-// ====== Performance Tests ======
+// ====== Performance Tests ======.
 
 func TestFunctionTypePerformance(t *testing.T) {
 	t.Run("ClosureCreation", func(t *testing.T) {
 		baseFunc := NewFunctionType([]*Type{TypeInt32}, TypeInt32, false, false)
 
-		// Create many captured variables
+		// Create many captured variables.
 		var capturedVars []CapturedVariable
 		for i := 0; i < 100; i++ {
 			capturedVars = append(capturedVars, CapturedVariable{
@@ -544,7 +552,7 @@ func TestFunctionTypePerformance(t *testing.T) {
 			})
 		}
 
-		// Time closure creation
+		// Time closure creation.
 		for i := 0; i < 1000; i++ {
 			closure := NewClosureType(baseFunc.Data.(*FunctionType), capturedVars, CaptureModeImplicit)
 			if closure == nil {
@@ -554,7 +562,7 @@ func TestFunctionTypePerformance(t *testing.T) {
 	})
 
 	t.Run("PartialApplication", func(t *testing.T) {
-		// Create function with many parameters
+		// Create function with many parameters.
 		var params []*Type
 		for i := 0; i < 10; i++ {
 			params = append(params, TypeInt32)
@@ -562,17 +570,18 @@ func TestFunctionTypePerformance(t *testing.T) {
 
 		originalFunc := NewFunctionType(params, TypeInt32, false, false)
 
-		// Time partial applications
+		// Time partial applications.
 		current := originalFunc
 		for i := 0; i < 9; i++ {
 			partial, err := current.ApplyPartially([]*Type{TypeInt32})
 			if err != nil {
 				t.Fatalf("Failed partial application at step %d: %v", i, err)
 			}
+
 			current = partial
 		}
 
-		// Final application should return result type
+		// Final application should return result type.
 		result, err := current.ApplyPartially([]*Type{TypeInt32})
 		if err != nil {
 			t.Fatalf("Failed final application: %v", err)
@@ -584,12 +593,12 @@ func TestFunctionTypePerformance(t *testing.T) {
 	})
 
 	t.Run("FunctionComposition", func(t *testing.T) {
-		// Create chain of functions
+		// Create chain of functions.
 		f1 := NewFunctionType([]*Type{TypeInt32}, TypeString, false, false)
 		f2 := NewFunctionType([]*Type{TypeBool}, TypeInt32, false, false)
 		f3 := NewFunctionType([]*Type{TypeFloat64}, TypeBool, false, false)
 
-		// Compose f1(f2(f3(x)))
+		// Compose f1(f2(f3(x))).
 		composed12, err := ComposeFunction(f1, f2)
 		if err != nil {
 			t.Fatalf("Failed to compose f1 and f2: %v", err)
@@ -600,23 +609,25 @@ func TestFunctionTypePerformance(t *testing.T) {
 			t.Fatalf("Failed to compose with f3: %v", err)
 		}
 
-		// Check final type: float64 -> string
+		// Check final type: float64 -> string.
 		finalFunc := final.Data.(*FunctionType)
 		if finalFunc.Parameters[0].Kind != TypeKindFloat64 {
 			t.Error("Final composed function should take float64")
 		}
+
 		if finalFunc.ReturnType.Kind != TypeKindString {
 			t.Error("Final composed function should return string")
 		}
 	})
 }
 
-// ====== Error Handling Tests ======
+// ====== Error Handling Tests ======.
 
 func TestFunctionTypeErrors(t *testing.T) {
 	t.Run("InvalidPartialApplication", func(t *testing.T) {
-		// Try to partially apply non-function
+		// Try to partially apply non-function.
 		nonFunc := TypeInt32
+
 		_, err := nonFunc.ApplyPartially([]*Type{TypeString})
 		if err == nil {
 			t.Error("Should fail to partially apply non-function type")
@@ -624,7 +635,7 @@ func TestFunctionTypeErrors(t *testing.T) {
 	})
 
 	t.Run("InvalidComposition", func(t *testing.T) {
-		// Try to compose incompatible functions
+		// Try to compose incompatible functions.
 		f1 := NewFunctionType([]*Type{TypeString}, TypeInt32, false, false)
 		f2 := NewFunctionType([]*Type{TypeBool}, TypeFloat64, false, false)
 
@@ -637,7 +648,7 @@ func TestFunctionTypeErrors(t *testing.T) {
 	t.Run("InvalidCallability", func(t *testing.T) {
 		funcType := NewFunctionType([]*Type{TypeInt32, TypeString}, TypeBool, false, false)
 
-		// Test with wrong argument count
+		// Test with wrong argument count.
 		if funcType.IsCallableWith([]*Type{TypeInt32}) {
 			t.Error("Should not be callable with too few arguments")
 		}
@@ -646,30 +657,30 @@ func TestFunctionTypeErrors(t *testing.T) {
 			t.Error("Should not be callable with too many arguments")
 		}
 
-		// Test with wrong argument types
+		// Test with wrong argument types.
 		if funcType.IsCallableWith([]*Type{TypeString, TypeInt32}) {
 			t.Error("Should not be callable with wrong argument types")
 		}
 	})
 }
 
-// ====== Integration Tests ======
+// ====== Integration Tests ======.
 
 func TestFunctionTypeIntegration(t *testing.T) {
 	t.Run("ComplexFunctionPipeline", func(t *testing.T) {
 		registry := NewFunctionTypeRegistry()
 
-		// Create a complex function pipeline using higher-order functions
+		// Create a complex function pipeline using higher-order functions.
 		mapType, _ := registry.GetCommonType("map")
 		filterType, _ := registry.GetCommonType("filter")
 		reduceType, _ := registry.GetCommonType("reduce")
 
-		// All should be callable
+		// All should be callable.
 		if !mapType.IsCallable() || !filterType.IsCallable() || !reduceType.IsCallable() {
 			t.Error("All higher-order functions should be callable")
 		}
 
-		// Test string representations
+		// Test string representations.
 		mapStr := mapType.FunctionString()
 		filterStr := filterType.FunctionString()
 		reduceStr := reduceType.FunctionString()
@@ -684,7 +695,7 @@ func TestFunctionTypeIntegration(t *testing.T) {
 	})
 
 	t.Run("ClosureWithPartialApplication", func(t *testing.T) {
-		// Create closure
+		// Create closure.
 		baseFunc := NewFunctionType([]*Type{TypeInt32, TypeInt32}, TypeInt32, false, false)
 		capturedVars := []CapturedVariable{
 			{Name: "multiplier", Type: TypeInt32, CaptureKind: CaptureByValue, Source: TypeInt32},
@@ -692,7 +703,7 @@ func TestFunctionTypeIntegration(t *testing.T) {
 
 		closureType := NewClosureType(baseFunc.Data.(*FunctionType), capturedVars, CaptureModeImplicit)
 
-		// Partially apply closure
+		// Partially apply closure.
 		partialClosure, err := closureType.ApplyPartially([]*Type{TypeInt32})
 		if err != nil {
 			t.Fatalf("Failed to partially apply closure: %v", err)
@@ -702,7 +713,7 @@ func TestFunctionTypeIntegration(t *testing.T) {
 			t.Errorf("Partially applied closure should have arity 1, got %d", partialClosure.GetArity())
 		}
 
-		// Check that it's still callable
+		// Check that it's still callable.
 		if !partialClosure.IsCallable() {
 			t.Error("Partially applied closure should still be callable")
 		}

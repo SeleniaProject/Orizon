@@ -1,5 +1,5 @@
 // Package types provides exception effect system for type-level exception tracking.
-// This module implements comprehensive exception effect tracking, try-catch typing,
+// This module implements comprehensive exception effect tracking, try-catch typing,.
 // and exception safety guarantees for the Orizon language.
 package types
 
@@ -9,11 +9,11 @@ import (
 	"sync"
 )
 
-// ExceptionEffectKind represents different kinds of exception effects
+// ExceptionEffectKind represents different kinds of exception effects.
 type ExceptionEffectKind int
 
 const (
-	// Exception throwing effects
+	// Exception throwing effects.
 	ExceptionEffectThrows ExceptionEffectKind = iota
 	ExceptionEffectArithmeticError
 	ExceptionEffectNullPointer
@@ -21,12 +21,12 @@ const (
 	ExceptionEffectTypeError
 	ExceptionEffectIOError
 
-	// Exception handling effects
+	// Exception handling effects.
 	ExceptionEffectCatches
 	ExceptionEffectHandles
 )
 
-// String returns the string representation of an ExceptionEffectKind
+// String returns the string representation of an ExceptionEffectKind.
 func (eek ExceptionEffectKind) String() string {
 	switch eek {
 	case ExceptionEffectThrows:
@@ -50,19 +50,19 @@ func (eek ExceptionEffectKind) String() string {
 	}
 }
 
-// ExceptionEffect represents an exception effect in the type system
+// ExceptionEffect represents an exception effect in the type system.
 type ExceptionEffect struct {
-	Kind          ExceptionEffectKind
-	Level         EffectLevel
-	TypeName      string
 	Spec          *ExceptionSpec
 	Context       map[string]interface{}
-	Description   string // Description of the exception effect
-	Deterministic bool   // Whether the effect is deterministic
-	Safe          bool   // Whether the effect is considered safe
+	TypeName      string
+	Description   string
+	Kind          ExceptionEffectKind
+	Level         EffectLevel
+	Deterministic bool
+	Safe          bool
 }
 
-// NewExceptionEffect creates a new ExceptionEffect
+// NewExceptionEffect creates a new ExceptionEffect.
 func NewExceptionEffect(kind ExceptionEffectKind, level EffectLevel) *ExceptionEffect {
 	return &ExceptionEffect{
 		Kind:          kind,
@@ -73,16 +73,16 @@ func NewExceptionEffect(kind ExceptionEffectKind, level EffectLevel) *ExceptionE
 	}
 }
 
-// String returns the string representation of an ExceptionEffect
+// String returns the string representation of an ExceptionEffect.
 func (ee *ExceptionEffect) String() string {
 	return fmt.Sprintf("%s(level=%d)", ee.Kind.String(), ee.Level)
 }
 
-// ExceptionKind represents different categories of exceptions
+// ExceptionKind represents different categories of exceptions.
 type ExceptionKind int
 
 const (
-	// Built-in exception types
+	// Built-in exception types.
 	ExceptionNone ExceptionKind = iota
 	ExceptionRuntime
 	ExceptionNullPointer
@@ -93,28 +93,28 @@ const (
 	ExceptionInvalidOperation
 	ExceptionTypeError
 	ExceptionParseError
-	// I/O exceptions
+	// I/O exceptions.
 	ExceptionIOError
 	ExceptionFileNotFound
 	ExceptionPermissionDenied
 	ExceptionNetworkTimeout
 	ExceptionConnectionFailed
-	// Concurrency exceptions
+	// Concurrency exceptions.
 	ExceptionDeadlock
 	ExceptionRaceCondition
 	ExceptionThreadAbort
 	ExceptionSynchronization
-	// System exceptions
+	// System exceptions.
 	ExceptionSystemError
 	ExceptionResourceExhausted
 	ExceptionSecurityViolation
 	ExceptionConfigurationError
-	// User-defined exceptions
+	// User-defined exceptions.
 	ExceptionUserDefined
 	ExceptionCustom
 )
 
-// String returns the string representation of an ExceptionKind
+// String returns the string representation of an ExceptionKind.
 func (ek ExceptionKind) String() string {
 	switch ek {
 	case ExceptionNone:
@@ -172,7 +172,7 @@ func (ek ExceptionKind) String() string {
 	}
 }
 
-// ExceptionSeverity represents the severity level of an exception
+// ExceptionSeverity represents the severity level of an exception.
 type ExceptionSeverity int
 
 const (
@@ -183,7 +183,7 @@ const (
 	ExceptionSeverityFatal
 )
 
-// String returns the string representation of an ExceptionSeverity
+// String returns the string representation of an ExceptionSeverity.
 func (es ExceptionSeverity) String() string {
 	switch es {
 	case ExceptionSeverityInfo:
@@ -201,7 +201,7 @@ func (es ExceptionSeverity) String() string {
 	}
 }
 
-// ExceptionRecovery represents recovery strategies for exceptions
+// ExceptionRecovery represents recovery strategies for exceptions.
 type ExceptionRecovery int
 
 const (
@@ -215,7 +215,7 @@ const (
 	RecoveryCustom
 )
 
-// String returns the string representation of an ExceptionRecovery
+// String returns the string representation of an ExceptionRecovery.
 func (er ExceptionRecovery) String() string {
 	switch er {
 	case RecoveryNone:
@@ -239,21 +239,21 @@ func (er ExceptionRecovery) String() string {
 	}
 }
 
-// ExceptionSpec represents an exception specification
+// ExceptionSpec represents an exception specification.
 type ExceptionSpec struct {
+	Location   *SourceLocation
+	Metadata   map[string]interface{}
+	Parent     *ExceptionSpec
+	Message    string
+	TypeName   string
+	Conditions []string
+	Children   []*ExceptionSpec
 	Kind       ExceptionKind
 	Severity   ExceptionSeverity
 	Recovery   ExceptionRecovery
-	Message    string
-	TypeName   string
-	Location   *SourceLocation
-	Conditions []string
-	Metadata   map[string]interface{}
-	Parent     *ExceptionSpec
-	Children   []*ExceptionSpec
 }
 
-// NewExceptionSpec creates a new ExceptionSpec
+// NewExceptionSpec creates a new ExceptionSpec.
 func NewExceptionSpec(kind ExceptionKind, severity ExceptionSeverity) *ExceptionSpec {
 	return &ExceptionSpec{
 		Kind:       kind,
@@ -265,55 +265,56 @@ func NewExceptionSpec(kind ExceptionKind, severity ExceptionSeverity) *Exception
 	}
 }
 
-// String returns the string representation of an ExceptionSpec
+// String returns the string representation of an ExceptionSpec.
 func (es *ExceptionSpec) String() string {
 	return fmt.Sprintf("%s[%s]", es.Kind.String(), es.Severity.String())
 }
 
-// IsSubtypeOf checks if this exception is a subtype of another
+// IsSubtypeOf checks if this exception is a subtype of another.
 func (es *ExceptionSpec) IsSubtypeOf(other *ExceptionSpec) bool {
 	if es.Kind == other.Kind {
 		return true
 	}
 
-	// Check parent hierarchy
+	// Check parent hierarchy.
 	current := es.Parent
 	for current != nil {
 		if current.Kind == other.Kind {
 			return true
 		}
+
 		current = current.Parent
 	}
 
 	return false
 }
 
-// AddChild adds a child exception
+// AddChild adds a child exception.
 func (es *ExceptionSpec) AddChild(child *ExceptionSpec) {
 	child.Parent = es
 	es.Children = append(es.Children, child)
 }
 
-// ExceptionSet represents a collection of exception specifications
+// ExceptionSet represents a collection of exception specifications.
 type ExceptionSet struct {
 	exceptions map[ExceptionKind]*ExceptionSpec
 	mu         sync.RWMutex
 }
 
-// NewExceptionSet creates a new empty ExceptionSet
+// NewExceptionSet creates a new empty ExceptionSet.
 func NewExceptionSet() *ExceptionSet {
 	return &ExceptionSet{
 		exceptions: make(map[ExceptionKind]*ExceptionSpec),
 	}
 }
 
-// Add adds an exception to the set
+// Add adds an exception to the set.
 func (es *ExceptionSet) Add(exception *ExceptionSpec) {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 
 	if existing, exists := es.exceptions[exception.Kind]; exists {
-		// Keep the higher severity
+		// Keep the higher severity.
 		if exception.Severity > existing.Severity {
 			es.exceptions[exception.Kind] = exception
 		}
@@ -322,44 +323,48 @@ func (es *ExceptionSet) Add(exception *ExceptionSpec) {
 	}
 }
 
-// Remove removes an exception from the set
+// Remove removes an exception from the set.
 func (es *ExceptionSet) Remove(kind ExceptionKind) {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 	delete(es.exceptions, kind)
 }
 
-// Contains checks if the set contains an exception of the given kind
+// Contains checks if the set contains an exception of the given kind.
 func (es *ExceptionSet) Contains(kind ExceptionKind) bool {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
 	_, exists := es.exceptions[kind]
+
 	return exists
 }
 
-// Get retrieves an exception by kind
+// Get retrieves an exception by kind.
 func (es *ExceptionSet) Get(kind ExceptionKind) (*ExceptionSpec, bool) {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
 	exception, exists := es.exceptions[kind]
+
 	return exception, exists
 }
 
-// Size returns the number of exceptions in the set
+// Size returns the number of exceptions in the set.
 func (es *ExceptionSet) Size() int {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	return len(es.exceptions)
 }
 
-// IsEmpty checks if the exception set is empty
+// IsEmpty checks if the exception set is empty.
 func (es *ExceptionSet) IsEmpty() bool {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	return len(es.exceptions) == 0
 }
 
-// Union creates a new ExceptionSet containing exceptions from both sets
+// Union creates a new ExceptionSet containing exceptions from both sets.
 func (es *ExceptionSet) Union(other *ExceptionSet) *ExceptionSet {
 	result := NewExceptionSet()
 
@@ -378,7 +383,7 @@ func (es *ExceptionSet) Union(other *ExceptionSet) *ExceptionSet {
 	return result
 }
 
-// Intersection creates a new ExceptionSet containing exceptions common to both sets
+// Intersection creates a new ExceptionSet containing exceptions common to both sets.
 func (es *ExceptionSet) Intersection(other *ExceptionSet) *ExceptionSet {
 	result := NewExceptionSet()
 
@@ -396,7 +401,7 @@ func (es *ExceptionSet) Intersection(other *ExceptionSet) *ExceptionSet {
 	return result
 }
 
-// Subtract creates a new ExceptionSet with exceptions from this set not in other
+// Subtract creates a new ExceptionSet with exceptions from this set not in other.
 func (es *ExceptionSet) Subtract(other *ExceptionSet) *ExceptionSet {
 	result := NewExceptionSet()
 
@@ -414,7 +419,7 @@ func (es *ExceptionSet) Subtract(other *ExceptionSet) *ExceptionSet {
 	return result
 }
 
-// ToSlice returns all exceptions as a slice
+// ToSlice returns all exceptions as a slice.
 func (es *ExceptionSet) ToSlice() []*ExceptionSpec {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
@@ -427,14 +432,16 @@ func (es *ExceptionSet) ToSlice() []*ExceptionSpec {
 	return exceptions
 }
 
-// String returns the string representation of the ExceptionSet
+// String returns the string representation of the ExceptionSet.
 func (es *ExceptionSet) String() string {
 	if es.IsEmpty() {
 		return "NoExceptions"
 	}
 
 	exceptions := es.ToSlice()
+
 	var strs []string
+
 	for _, exception := range exceptions {
 		strs = append(strs, exception.String())
 	}
@@ -442,17 +449,17 @@ func (es *ExceptionSet) String() string {
 	return "{" + strings.Join(strs, ", ") + "}"
 }
 
-// TryBlock represents a try block with exception handling
+// TryBlock represents a try block with exception handling.
 type TryBlock struct {
 	Body         ASTNode
-	CatchBlocks  []*CatchBlock
 	FinallyBlock *FinallyBlock
 	Exceptions   *ExceptionSet
-	Resources    []string
 	Location     *SourceLocation
+	CatchBlocks  []*CatchBlock
+	Resources    []string
 }
 
-// NewTryBlock creates a new TryBlock
+// NewTryBlock creates a new TryBlock.
 func NewTryBlock(body ASTNode) *TryBlock {
 	return &TryBlock{
 		Body:        body,
@@ -462,27 +469,27 @@ func NewTryBlock(body ASTNode) *TryBlock {
 	}
 }
 
-// AddCatchBlock adds a catch block
+// AddCatchBlock adds a catch block.
 func (tb *TryBlock) AddCatchBlock(catchBlock *CatchBlock) {
 	tb.CatchBlocks = append(tb.CatchBlocks, catchBlock)
 }
 
-// SetFinallyBlock sets the finally block
+// SetFinallyBlock sets the finally block.
 func (tb *TryBlock) SetFinallyBlock(finallyBlock *FinallyBlock) {
 	tb.FinallyBlock = finallyBlock
 }
 
-// CatchBlock represents a catch block
+// CatchBlock represents a catch block.
 type CatchBlock struct {
-	ExceptionTypes []*ExceptionSpec
-	Parameter      string
 	Body           ASTNode
 	Guard          ASTNode
-	Recovery       ExceptionRecovery
 	Location       *SourceLocation
+	Parameter      string
+	ExceptionTypes []*ExceptionSpec
+	Recovery       ExceptionRecovery
 }
 
-// NewCatchBlock creates a new CatchBlock
+// NewCatchBlock creates a new CatchBlock.
 func NewCatchBlock(exceptionTypes []*ExceptionSpec, parameter string, body ASTNode) *CatchBlock {
 	return &CatchBlock{
 		ExceptionTypes: exceptionTypes,
@@ -492,26 +499,27 @@ func NewCatchBlock(exceptionTypes []*ExceptionSpec, parameter string, body ASTNo
 	}
 }
 
-// CanHandle checks if this catch block can handle the given exception
+// CanHandle checks if this catch block can handle the given exception.
 func (cb *CatchBlock) CanHandle(exception *ExceptionSpec) bool {
 	for _, exceptionType := range cb.ExceptionTypes {
 		if exception.IsSubtypeOf(exceptionType) {
 			return true
 		}
 	}
+
 	return false
 }
 
-// FinallyBlock represents a finally block
+// FinallyBlock represents a finally block.
 type FinallyBlock struct {
 	Body       ASTNode
+	Location   *SourceLocation
 	Cleanup    []string
 	Resources  []string
 	Guaranteed bool
-	Location   *SourceLocation
 }
 
-// NewFinallyBlock creates a new FinallyBlock
+// NewFinallyBlock creates a new FinallyBlock.
 func NewFinallyBlock(body ASTNode) *FinallyBlock {
 	return &FinallyBlock{
 		Body:       body,
@@ -521,16 +529,16 @@ func NewFinallyBlock(body ASTNode) *FinallyBlock {
 	}
 }
 
-// ThrowStatement represents a throw statement
+// ThrowStatement represents a throw statement.
 type ThrowStatement struct {
-	Exception   *ExceptionSpec
 	Expression  ASTNode
-	Conditional bool
 	Condition   ASTNode
+	Exception   *ExceptionSpec
 	Location    *SourceLocation
+	Conditional bool
 }
 
-// NewThrowStatement creates a new ThrowStatement
+// NewThrowStatement creates a new ThrowStatement.
 func NewThrowStatement(exception *ExceptionSpec, expression ASTNode) *ThrowStatement {
 	return &ThrowStatement{
 		Exception:   exception,
@@ -539,18 +547,18 @@ func NewThrowStatement(exception *ExceptionSpec, expression ASTNode) *ThrowState
 	}
 }
 
-// ExceptionSignature represents the exception signature of a function
+// ExceptionSignature represents the exception signature of a function.
 type ExceptionSignature struct {
-	FunctionName string // Name of the function this signature belongs to
 	Throws       *ExceptionSet
 	Catches      *ExceptionSet
 	Propagates   *ExceptionSet
+	FunctionName string
 	Guarantees   []string
-	Safety       ExceptionSafety
 	Contracts    []*ExceptionContract
+	Safety       ExceptionSafety
 }
 
-// NewExceptionSignature creates a new ExceptionSignature
+// NewExceptionSignature creates a new ExceptionSignature.
 func NewExceptionSignature() *ExceptionSignature {
 	return &ExceptionSignature{
 		Throws:     NewExceptionSet(),
@@ -562,7 +570,7 @@ func NewExceptionSignature() *ExceptionSignature {
 	}
 }
 
-// ExceptionSafety represents exception safety levels
+// ExceptionSafety represents exception safety levels.
 type ExceptionSafety int
 
 const (
@@ -573,7 +581,7 @@ const (
 	SafetyNoFail
 )
 
-// String returns the string representation of ExceptionSafety
+// String returns the string representation of ExceptionSafety.
 func (es ExceptionSafety) String() string {
 	switch es {
 	case SafetyNone:
@@ -591,16 +599,16 @@ func (es ExceptionSafety) String() string {
 	}
 }
 
-// ExceptionContract represents exception contracts
+// ExceptionContract represents exception contracts.
 type ExceptionContract struct {
+	ExceptionSpec  *ExceptionSpec
 	Preconditions  []string
 	Postconditions []string
 	Invariants     []string
-	ExceptionSpec  *ExceptionSpec
 	Recovery       ExceptionRecovery
 }
 
-// NewExceptionContract creates a new ExceptionContract
+// NewExceptionContract creates a new ExceptionContract.
 func NewExceptionContract(spec *ExceptionSpec) *ExceptionContract {
 	return &ExceptionContract{
 		Preconditions:  make([]string, 0),
@@ -611,7 +619,7 @@ func NewExceptionContract(spec *ExceptionSpec) *ExceptionContract {
 	}
 }
 
-// ExceptionAnalyzer provides exception analysis capabilities
+// ExceptionAnalyzer provides exception analysis capabilities.
 type ExceptionAnalyzer struct {
 	flowAnalyzer  *ExceptionFlowAnalyzer
 	safetyChecker *ExceptionSafetyChecker
@@ -619,7 +627,7 @@ type ExceptionAnalyzer struct {
 	statistics    *ExceptionStatistics
 }
 
-// NewExceptionAnalyzer creates a new exception analyzer
+// NewExceptionAnalyzer creates a new exception analyzer.
 func NewExceptionAnalyzer() *ExceptionAnalyzer {
 	return &ExceptionAnalyzer{
 		flowAnalyzer:  NewExceptionFlowAnalyzer(),
@@ -629,13 +637,13 @@ func NewExceptionAnalyzer() *ExceptionAnalyzer {
 	}
 }
 
-// AnalyzeExceptions analyzes exception behavior for the given AST node
+// AnalyzeExceptions analyzes exception behavior for the given AST node.
 func (ea *ExceptionAnalyzer) AnalyzeExceptions(node ASTNode) (*ExceptionSignature, error) {
 	ea.statistics.IncrementAnalysis()
 
 	signature := NewExceptionSignature()
 
-	// Perform flow analysis
+	// Perform flow analysis.
 	flowResult, err := ea.flowAnalyzer.AnalyzeFlow(node)
 	if err != nil {
 		return nil, fmt.Errorf("exception flow analysis failed: %w", err)
@@ -644,7 +652,7 @@ func (ea *ExceptionAnalyzer) AnalyzeExceptions(node ASTNode) (*ExceptionSignatur
 	signature.Throws = flowResult.ThrownExceptions
 	signature.Catches = flowResult.CaughtExceptions
 
-	// Perform safety analysis
+	// Perform safety analysis.
 	safetyResult, err := ea.safetyChecker.CheckSafety(node, signature)
 	if err != nil {
 		return nil, fmt.Errorf("exception safety check failed: %w", err)
@@ -653,7 +661,7 @@ func (ea *ExceptionAnalyzer) AnalyzeExceptions(node ASTNode) (*ExceptionSignatur
 	signature.Safety = safetyResult.SafetyLevel
 	signature.Guarantees = safetyResult.Guarantees
 
-	// Perform path analysis
+	// Perform path analysis.
 	pathResult, err := ea.pathAnalyzer.AnalyzePaths(node)
 	if err != nil {
 		return nil, fmt.Errorf("exception path analysis failed: %w", err)
@@ -664,14 +672,14 @@ func (ea *ExceptionAnalyzer) AnalyzeExceptions(node ASTNode) (*ExceptionSignatur
 	return signature, nil
 }
 
-// ExceptionFlowAnalyzer analyzes exception flow
+// ExceptionFlowAnalyzer analyzes exception flow.
 type ExceptionFlowAnalyzer struct {
 	callGraph    *ExceptionCallGraph
 	dominators   map[string][]string
 	reachability map[string]bool
 }
 
-// NewExceptionFlowAnalyzer creates a new exception flow analyzer
+// NewExceptionFlowAnalyzer creates a new exception flow analyzer.
 func NewExceptionFlowAnalyzer() *ExceptionFlowAnalyzer {
 	return &ExceptionFlowAnalyzer{
 		callGraph:    NewExceptionCallGraph(),
@@ -680,15 +688,15 @@ func NewExceptionFlowAnalyzer() *ExceptionFlowAnalyzer {
 	}
 }
 
-// ExceptionFlowResult represents the result of exception flow analysis
+// ExceptionFlowResult represents the result of exception flow analysis.
 type ExceptionFlowResult struct {
 	ThrownExceptions *ExceptionSet
 	CaughtExceptions *ExceptionSet
-	UnhandledPaths   []string
 	FlowGraph        *ExceptionFlowGraph
+	UnhandledPaths   []string
 }
 
-// AnalyzeFlow analyzes exception flow for the given node
+// AnalyzeFlow analyzes exception flow for the given node.
 func (efa *ExceptionFlowAnalyzer) AnalyzeFlow(node ASTNode) (*ExceptionFlowResult, error) {
 	result := &ExceptionFlowResult{
 		ThrownExceptions: NewExceptionSet(),
@@ -697,18 +705,18 @@ func (efa *ExceptionFlowAnalyzer) AnalyzeFlow(node ASTNode) (*ExceptionFlowResul
 		FlowGraph:        NewExceptionFlowGraph(),
 	}
 
-	// Implementation would traverse AST and build flow graph
+	// Implementation would traverse AST and build flow graph.
 	return result, nil
 }
 
-// ExceptionSafetyChecker checks exception safety guarantees
+// ExceptionSafetyChecker checks exception safety guarantees.
 type ExceptionSafetyChecker struct {
 	invariants map[string][]string
 	contracts  []*ExceptionContract
 	violations []string
 }
 
-// NewExceptionSafetyChecker creates a new exception safety checker
+// NewExceptionSafetyChecker creates a new exception safety checker.
 func NewExceptionSafetyChecker() *ExceptionSafetyChecker {
 	return &ExceptionSafetyChecker{
 		invariants: make(map[string][]string),
@@ -717,15 +725,15 @@ func NewExceptionSafetyChecker() *ExceptionSafetyChecker {
 	}
 }
 
-// ExceptionSafetyResult represents the result of safety analysis
+// ExceptionSafetyResult represents the result of safety analysis.
 type ExceptionSafetyResult struct {
-	SafetyLevel     ExceptionSafety
 	Guarantees      []string
 	Violations      []string
 	Recommendations []string
+	SafetyLevel     ExceptionSafety
 }
 
-// CheckSafety checks exception safety for the given node and signature
+// CheckSafety checks exception safety for the given node and signature.
 func (esc *ExceptionSafetyChecker) CheckSafety(node ASTNode, signature *ExceptionSignature) (*ExceptionSafetyResult, error) {
 	result := &ExceptionSafetyResult{
 		SafetyLevel:     SafetyBasic,
@@ -734,7 +742,7 @@ func (esc *ExceptionSafetyChecker) CheckSafety(node ASTNode, signature *Exceptio
 		Recommendations: make([]string, 0),
 	}
 
-	// Determine safety level based on exception handling
+	// Determine safety level based on exception handling.
 	if signature.Throws.IsEmpty() {
 		result.SafetyLevel = SafetyNoThrow
 		result.Guarantees = append(result.Guarantees, "No exceptions thrown")
@@ -746,14 +754,14 @@ func (esc *ExceptionSafetyChecker) CheckSafety(node ASTNode, signature *Exceptio
 	return result, nil
 }
 
-// ExceptionPathAnalyzer analyzes exception propagation paths
+// ExceptionPathAnalyzer analyzes exception propagation paths.
 type ExceptionPathAnalyzer struct {
-	paths      []ExceptionPath
 	coverage   map[string]float64
+	paths      []ExceptionPath
 	complexity int
 }
 
-// NewExceptionPathAnalyzer creates a new exception path analyzer
+// NewExceptionPathAnalyzer creates a new exception path analyzer.
 func NewExceptionPathAnalyzer() *ExceptionPathAnalyzer {
 	return &ExceptionPathAnalyzer{
 		paths:      make([]ExceptionPath, 0),
@@ -762,7 +770,7 @@ func NewExceptionPathAnalyzer() *ExceptionPathAnalyzer {
 	}
 }
 
-// ExceptionPathResult represents the result of path analysis
+// ExceptionPathResult represents the result of path analysis.
 type ExceptionPathResult struct {
 	PropagatedExceptions *ExceptionSet
 	CoverageReport       map[string]float64
@@ -770,7 +778,7 @@ type ExceptionPathResult struct {
 	Recommendations      []string
 }
 
-// AnalyzePaths analyzes exception propagation paths
+// AnalyzePaths analyzes exception propagation paths.
 func (epa *ExceptionPathAnalyzer) AnalyzePaths(node ASTNode) (*ExceptionPathResult, error) {
 	result := &ExceptionPathResult{
 		PropagatedExceptions: NewExceptionSet(),
@@ -779,19 +787,19 @@ func (epa *ExceptionPathAnalyzer) AnalyzePaths(node ASTNode) (*ExceptionPathResu
 		Recommendations:      make([]string, 0),
 	}
 
-	// Implementation would analyze exception propagation paths
+	// Implementation would analyze exception propagation paths.
 	return result, nil
 }
 
-// Supporting types
+// Supporting types.
 
-// ExceptionCallGraph represents call graph with exception information
+// ExceptionCallGraph represents call graph with exception information.
 type ExceptionCallGraph struct {
 	nodes map[string]*ExceptionCallNode
 	edges []ExceptionCallEdge
 }
 
-// NewExceptionCallGraph creates a new exception call graph
+// NewExceptionCallGraph creates a new exception call graph.
 func NewExceptionCallGraph() *ExceptionCallGraph {
 	return &ExceptionCallGraph{
 		nodes: make(map[string]*ExceptionCallNode),
@@ -799,27 +807,27 @@ func NewExceptionCallGraph() *ExceptionCallGraph {
 	}
 }
 
-// ExceptionCallNode represents a node in the exception call graph
+// ExceptionCallNode represents a node in the exception call graph.
 type ExceptionCallNode struct {
-	Name       string
 	Exceptions *ExceptionSet
+	Name       string
 	Safety     ExceptionSafety
 }
 
-// ExceptionCallEdge represents an edge in the exception call graph
+// ExceptionCallEdge represents an edge in the exception call graph.
 type ExceptionCallEdge struct {
+	Exceptions *ExceptionSet
 	From       string
 	To         string
-	Exceptions *ExceptionSet
 }
 
-// ExceptionFlowGraph represents exception flow graph
+// ExceptionFlowGraph represents exception flow graph.
 type ExceptionFlowGraph struct {
 	nodes map[string]*ExceptionFlowNode
 	edges []ExceptionFlowEdge
 }
 
-// NewExceptionFlowGraph creates a new exception flow graph
+// NewExceptionFlowGraph creates a new exception flow graph.
 func NewExceptionFlowGraph() *ExceptionFlowGraph {
 	return &ExceptionFlowGraph{
 		nodes: make(map[string]*ExceptionFlowNode),
@@ -827,32 +835,32 @@ func NewExceptionFlowGraph() *ExceptionFlowGraph {
 	}
 }
 
-// ExceptionFlowNode represents a node in the exception flow graph
+// ExceptionFlowNode represents a node in the exception flow graph.
 type ExceptionFlowNode struct {
+	Exceptions *ExceptionSet
 	ID         string
 	Type       string
-	Exceptions *ExceptionSet
 	Handled    bool
 }
 
-// ExceptionFlowEdge represents an edge in the exception flow graph
+// ExceptionFlowEdge represents an edge in the exception flow graph.
 type ExceptionFlowEdge struct {
+	Exceptions  *ExceptionSet
 	From        string
 	To          string
-	Exceptions  *ExceptionSet
 	Conditional bool
 }
 
-// ExceptionPath represents an exception propagation path
+// ExceptionPath represents an exception propagation path.
 type ExceptionPath struct {
-	Nodes       []string
 	Exceptions  *ExceptionSet
+	Nodes       []string
+	Probability float64
 	Handled     bool
 	Critical    bool
-	Probability float64
 }
 
-// ExceptionStatistics tracks exception analysis statistics
+// ExceptionStatistics tracks exception analysis statistics.
 type ExceptionStatistics struct {
 	TotalAnalyses      int64
 	ExceptionsAnalyzed int64
@@ -861,15 +869,16 @@ type ExceptionStatistics struct {
 	mu                 sync.RWMutex
 }
 
-// NewExceptionStatistics creates new exception statistics
+// NewExceptionStatistics creates new exception statistics.
 func NewExceptionStatistics() *ExceptionStatistics {
 	return &ExceptionStatistics{}
 }
 
-// IncrementAnalysis increments analysis count
+// IncrementAnalysis increments analysis count.
 func (es *ExceptionStatistics) IncrementAnalysis() {
 	es.mu.Lock()
 	defer es.mu.Unlock()
+
 	es.TotalAnalyses++
 }
 
@@ -881,10 +890,11 @@ type ExceptionStatsSnapshot struct {
 	PathsCovered       int64
 }
 
-// GetStats returns a lock-free snapshot of current statistics
+// GetStats returns a lock-free snapshot of current statistics.
 func (es *ExceptionStatistics) GetStats() ExceptionStatsSnapshot {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	return ExceptionStatsSnapshot{
 		TotalAnalyses:      es.TotalAnalyses,
 		ExceptionsAnalyzed: es.ExceptionsAnalyzed,

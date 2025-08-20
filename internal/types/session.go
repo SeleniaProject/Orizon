@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// SessionTypeKind represents different kinds of session types
+// SessionTypeKind represents different kinds of session types.
 type SessionTypeKind int
 
 const (
@@ -24,7 +24,7 @@ const (
 	SessionKindSequential                        // Sequential composition: S1; S2
 )
 
-// String returns a string representation of the session type kind
+// String returns a string representation of the session type kind.
 func (stk SessionTypeKind) String() string {
 	switch stk {
 	case SessionKindEnd:
@@ -52,21 +52,21 @@ func (stk SessionTypeKind) String() string {
 	}
 }
 
-// SessionType represents a session type for protocol specification
+// SessionType represents a session type for protocol specification.
 type SessionType struct {
-	Kind         SessionTypeKind
-	PayloadType  *Type                   // For send/receive operations
-	Label        string                  // For choices, variables, recursion
-	Branches     map[string]*SessionType // For choices and branches
-	Continuation *SessionType            // Next session type
-	Variable     string                  // For recursion binding
-	Body         *SessionType            // For recursion body
-	Left         *SessionType            // For parallel/sequential composition
-	Right        *SessionType            // For parallel/sequential composition
+	PayloadType  *Type
+	Branches     map[string]*SessionType
+	Continuation *SessionType
+	Body         *SessionType
+	Left         *SessionType
+	Right        *SessionType
+	Label        string
+	Variable     string
 	UniqueId     string
+	Kind         SessionTypeKind
 }
 
-// String returns a string representation of the session type
+// String returns a string representation of the session type.
 func (st *SessionType) String() string {
 	switch st.Kind {
 	case SessionKindEnd:
@@ -76,24 +76,28 @@ func (st *SessionType) String() string {
 		if st.Continuation != nil {
 			cont = "." + st.Continuation.String()
 		}
+
 		return fmt.Sprintf("!%s%s", st.PayloadType.String(), cont)
 	case SessionKindReceive:
 		cont := ""
 		if st.Continuation != nil {
 			cont = "." + st.Continuation.String()
 		}
+
 		return fmt.Sprintf("?%s%s", st.PayloadType.String(), cont)
 	case SessionKindChoice:
 		branches := make([]string, 0, len(st.Branches))
 		for label, session := range st.Branches {
 			branches = append(branches, fmt.Sprintf("%s:%s", label, session.String()))
 		}
+
 		return fmt.Sprintf("+{%s}", strings.Join(branches, ", "))
 	case SessionKindBranch:
 		branches := make([]string, 0, len(st.Branches))
 		for label, session := range st.Branches {
 			branches = append(branches, fmt.Sprintf("%s:%s", label, session.String()))
 		}
+
 		return fmt.Sprintf("&{%s}", strings.Join(branches, ", "))
 	case SessionKindRecursion:
 		return fmt.Sprintf("μ%s.%s", st.Variable, st.Body.String())
@@ -110,12 +114,12 @@ func (st *SessionType) String() string {
 	}
 }
 
-// IsDual checks if two session types are dual to each other
+// IsDual checks if two session types are dual to each other.
 func (st *SessionType) IsDual(other *SessionType) bool {
 	return st.computeDual().IsEquivalent(other)
 }
 
-// computeDual computes the dual of a session type
+// computeDual computes the dual of a session type.
 func (st *SessionType) computeDual() *SessionType {
 	switch st.Kind {
 	case SessionKindEnd:
@@ -125,6 +129,7 @@ func (st *SessionType) computeDual() *SessionType {
 		if st.Continuation != nil {
 			dualCont = st.Continuation.computeDual()
 		}
+
 		return &SessionType{
 			Kind:         SessionKindReceive,
 			PayloadType:  st.PayloadType,
@@ -136,6 +141,7 @@ func (st *SessionType) computeDual() *SessionType {
 		if st.Continuation != nil {
 			dualCont = st.Continuation.computeDual()
 		}
+
 		return &SessionType{
 			Kind:         SessionKindSend,
 			PayloadType:  st.PayloadType,
@@ -147,6 +153,7 @@ func (st *SessionType) computeDual() *SessionType {
 		for label, session := range st.Branches {
 			dualBranches[label] = session.computeDual()
 		}
+
 		return &SessionType{
 			Kind:     SessionKindBranch,
 			Branches: dualBranches,
@@ -157,6 +164,7 @@ func (st *SessionType) computeDual() *SessionType {
 		for label, session := range st.Branches {
 			dualBranches[label] = session.computeDual()
 		}
+
 		return &SessionType{
 			Kind:     SessionKindChoice,
 			Branches: dualBranches,
@@ -196,7 +204,7 @@ func (st *SessionType) computeDual() *SessionType {
 	}
 }
 
-// IsEquivalent checks if two session types are equivalent
+// IsEquivalent checks if two session types are equivalent.
 func (st *SessionType) IsEquivalent(other *SessionType) bool {
 	if st.Kind != other.Kind {
 		return false
@@ -209,23 +217,28 @@ func (st *SessionType) IsEquivalent(other *SessionType) bool {
 		if !st.PayloadType.Equals(other.PayloadType) {
 			return false
 		}
+
 		if st.Continuation == nil && other.Continuation == nil {
 			return true
 		}
+
 		if st.Continuation != nil && other.Continuation != nil {
 			return st.Continuation.IsEquivalent(other.Continuation)
 		}
+
 		return false
 	case SessionKindChoice, SessionKindBranch:
 		if len(st.Branches) != len(other.Branches) {
 			return false
 		}
+
 		for label, session := range st.Branches {
 			otherSession, exists := other.Branches[label]
 			if !exists || !session.IsEquivalent(otherSession) {
 				return false
 			}
 		}
+
 		return true
 	case SessionKindRecursion:
 		return st.Variable == other.Variable && st.Body.IsEquivalent(other.Body)
@@ -240,18 +253,18 @@ func (st *SessionType) IsEquivalent(other *SessionType) bool {
 	}
 }
 
-// SessionChannel represents a communication channel with session type
+// SessionChannel represents a communication channel with session type.
 type SessionChannel struct {
-	Name        string
 	SessionType *SessionType
+	Endpoint    *SessionEndpoint
+	Partner     *SessionChannel
+	Name        string
+	Location    SourceLocation
 	Direction   SessionChannelDirection
 	State       ChannelState
-	Endpoint    *SessionEndpoint
-	Partner     *SessionChannel // Dual channel
-	Location    SourceLocation
 }
 
-// SessionChannelDirection represents the direction of communication
+// SessionChannelDirection represents the direction of communication.
 type SessionChannelDirection int
 
 const (
@@ -260,7 +273,7 @@ const (
 	SessionDirectionBidirectional                                // Bidirectional channel
 )
 
-// String returns a string representation of the channel direction
+// String returns a string representation of the channel direction.
 func (cd SessionChannelDirection) String() string {
 	switch cd {
 	case SessionDirectionInput:
@@ -274,7 +287,7 @@ func (cd SessionChannelDirection) String() string {
 	}
 }
 
-// ChannelState represents the current state of a session channel
+// ChannelState represents the current state of a session channel.
 type ChannelState int
 
 const (
@@ -285,7 +298,7 @@ const (
 	StateError                         // Channel in error state
 )
 
-// String returns a string representation of the channel state
+// String returns a string representation of the channel state.
 func (cs ChannelState) String() string {
 	switch cs {
 	case StateUnused:
@@ -303,7 +316,7 @@ func (cs ChannelState) String() string {
 	}
 }
 
-// SessionEndpoint represents an endpoint in a session
+// SessionEndpoint represents an endpoint in a session.
 type SessionEndpoint struct {
 	Id          string
 	Process     string
@@ -312,17 +325,17 @@ type SessionEndpoint struct {
 	IsCompleted bool
 }
 
-// SessionOperation represents an operation in a session
+// SessionOperation represents an operation in a session.
 type SessionOperation struct {
-	Kind      SessionOperationKind
 	Message   *Type
 	Label     string
 	Channel   string
 	Location  SourceLocation
+	Kind      SessionOperationKind
 	Timestamp int64
 }
 
-// SessionOperationKind represents kinds of session operations
+// SessionOperationKind represents kinds of session operations.
 type SessionOperationKind int
 
 const (
@@ -333,7 +346,7 @@ const (
 	OpKindClose  // Close session
 )
 
-// String returns a string representation of the operation kind
+// String returns a string representation of the operation kind.
 func (sok SessionOperationKind) String() string {
 	switch sok {
 	case OpKindSend:
@@ -351,7 +364,7 @@ func (sok SessionOperationKind) String() string {
 	}
 }
 
-// SessionTypeChecker performs session type checking
+// SessionTypeChecker performs session type checking.
 type SessionTypeChecker struct {
 	channels    map[string]*SessionChannel
 	processes   map[string]*SessionProcess
@@ -361,16 +374,16 @@ type SessionTypeChecker struct {
 	mutex       sync.RWMutex
 }
 
-// SessionProcess represents a process participating in sessions
+// SessionProcess represents a process participating in sessions.
 type SessionProcess struct {
-	Name       string
 	Channels   map[string]*SessionChannel
+	Name       string
 	Operations []SessionOperation
-	State      ProcessState
 	Location   SourceLocation
+	State      ProcessState
 }
 
-// ProcessState represents the state of a session process
+// ProcessState represents the state of a session process.
 type ProcessState int
 
 const (
@@ -380,7 +393,7 @@ const (
 	ProcessStateDeadlocked
 )
 
-// String returns a string representation of the process state
+// String returns a string representation of the process state.
 func (ps ProcessState) String() string {
 	switch ps {
 	case ProcessStateActive:
@@ -396,16 +409,16 @@ func (ps ProcessState) String() string {
 	}
 }
 
-// SessionConstraint represents a constraint in session type checking
+// SessionConstraint represents a constraint in session type checking.
 type SessionConstraint struct {
-	Kind     SessionConstraintKind
 	Channel  string
 	Process  string
 	Message  string
 	Location SourceLocation
+	Kind     SessionConstraintKind
 }
 
-// SessionConstraintKind represents kinds of session constraints
+// SessionConstraintKind represents kinds of session constraints.
 type SessionConstraintKind int
 
 const (
@@ -416,7 +429,7 @@ const (
 	ConstraintKindLiveness
 )
 
-// String returns a string representation of the constraint kind
+// String returns a string representation of the constraint kind.
 func (sck SessionConstraintKind) String() string {
 	switch sck {
 	case ConstraintKindProtocolCompliance:
@@ -434,18 +447,18 @@ func (sck SessionConstraintKind) String() string {
 	}
 }
 
-// SessionTypeError represents an error in session type checking
+// SessionTypeError represents an error in session type checking.
 type SessionTypeError struct {
-	Kind     SessionErrorKind
-	Channel  string
-	Process  string
 	Expected *SessionType
 	Actual   *SessionType
-	Location SourceLocation
+	Channel  string
+	Process  string
 	Message  string
+	Location SourceLocation
+	Kind     SessionErrorKind
 }
 
-// SessionErrorKind represents kinds of session type errors
+// SessionErrorKind represents kinds of session type errors.
 type SessionErrorKind int
 
 const (
@@ -457,7 +470,7 @@ const (
 	ErrorKindSessionIncomplete
 )
 
-// String returns a string representation of the error kind
+// String returns a string representation of the error kind.
 func (sek SessionErrorKind) String() string {
 	switch sek {
 	case ErrorKindProtocolViolation:
@@ -477,29 +490,29 @@ func (sek SessionErrorKind) String() string {
 	}
 }
 
-// Error implements the error interface
+// Error implements the error interface.
 func (ste SessionTypeError) Error() string {
 	return fmt.Sprintf("Session type error (%s) at %s:%d:%d: %s",
 		ste.Kind.String(), ste.Location.File, ste.Location.Line, ste.Location.Column, ste.Message)
 }
 
-// DeadlockError represents a deadlock detection error
+// DeadlockError represents a deadlock detection error.
 type DeadlockError struct {
+	Message   string
 	Processes []string
 	Channels  []string
 	Cycle     []string
 	Location  SourceLocation
-	Message   string
 }
 
-// Error implements the error interface
+// Error implements the error interface.
 func (de DeadlockError) Error() string {
 	return fmt.Sprintf("Deadlock detected at %s:%d:%d: %s (processes: %v, channels: %v)",
 		de.Location.File, de.Location.Line, de.Location.Column, de.Message,
 		de.Processes, de.Channels)
 }
 
-// NewSessionTypeChecker creates a new session type checker
+// NewSessionTypeChecker creates a new session type checker.
 func NewSessionTypeChecker() *SessionTypeChecker {
 	return &SessionTypeChecker{
 		channels:    make(map[string]*SessionChannel),
@@ -510,7 +523,7 @@ func NewSessionTypeChecker() *SessionTypeChecker {
 	}
 }
 
-// RegisterChannel registers a session channel
+// RegisterChannel registers a session channel.
 func (stc *SessionTypeChecker) RegisterChannel(name string, sessionType *SessionType, direction SessionChannelDirection, location SourceLocation) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -528,10 +541,11 @@ func (stc *SessionTypeChecker) RegisterChannel(name string, sessionType *Session
 	}
 
 	stc.channels[name] = channel
+
 	return nil
 }
 
-// RegisterProcess registers a session process
+// RegisterProcess registers a session process.
 func (stc *SessionTypeChecker) RegisterProcess(name string, location SourceLocation) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -549,10 +563,11 @@ func (stc *SessionTypeChecker) RegisterProcess(name string, location SourceLocat
 	}
 
 	stc.processes[name] = process
+
 	return nil
 }
 
-// ConnectChannels establishes a dual connection between two channels
+// ConnectChannels establishes a dual connection between two channels.
 func (stc *SessionTypeChecker) ConnectChannels(channel1, channel2 string) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -563,11 +578,12 @@ func (stc *SessionTypeChecker) ConnectChannels(channel1, channel2 string) error 
 	if !exists1 {
 		return fmt.Errorf("channel %s not found", channel1)
 	}
+
 	if !exists2 {
 		return fmt.Errorf("channel %s not found", channel2)
 	}
 
-	// Check duality
+	// Check duality.
 	if !ch1.SessionType.IsDual(ch2.SessionType) {
 		return fmt.Errorf("channels %s and %s are not dual", channel1, channel2)
 	}
@@ -578,7 +594,7 @@ func (stc *SessionTypeChecker) ConnectChannels(channel1, channel2 string) error 
 	return nil
 }
 
-// CheckSendOperation checks a send operation
+// CheckSendOperation checks a send operation.
 func (stc *SessionTypeChecker) CheckSendOperation(process, channel string, messageType *Type, location SourceLocation) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -593,19 +609,19 @@ func (stc *SessionTypeChecker) CheckSendOperation(process, channel string, messa
 		return fmt.Errorf("channel %s not found", channel)
 	}
 
-	// Check if the current session type allows sending
+	// Check if the current session type allows sending.
 	if ch.SessionType.Kind != SessionKindSend {
 		return fmt.Errorf("channel %s does not expect send operation, current type: %s",
 			channel, ch.SessionType.String())
 	}
 
-	// Check message type compatibility
+	// Check message type compatibility.
 	if !ch.SessionType.PayloadType.Equals(messageType) {
 		return fmt.Errorf("message type mismatch: expected %s, got %s",
 			ch.SessionType.PayloadType.String(), messageType.String())
 	}
 
-	// Record the operation
+	// Record the operation.
 	operation := SessionOperation{
 		Kind:     OpKindSend,
 		Message:  messageType,
@@ -615,7 +631,7 @@ func (stc *SessionTypeChecker) CheckSendOperation(process, channel string, messa
 
 	proc.Operations = append(proc.Operations, operation)
 
-	// Advance the session type
+	// Advance the session type.
 	if ch.SessionType.Continuation != nil {
 		ch.SessionType = ch.SessionType.Continuation
 	} else {
@@ -626,7 +642,7 @@ func (stc *SessionTypeChecker) CheckSendOperation(process, channel string, messa
 	return nil
 }
 
-// CheckReceiveOperation checks a receive operation
+// CheckReceiveOperation checks a receive operation.
 func (stc *SessionTypeChecker) CheckReceiveOperation(process, channel string, messageType *Type, location SourceLocation) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -641,19 +657,19 @@ func (stc *SessionTypeChecker) CheckReceiveOperation(process, channel string, me
 		return fmt.Errorf("channel %s not found", channel)
 	}
 
-	// Check if the current session type allows receiving
+	// Check if the current session type allows receiving.
 	if ch.SessionType.Kind != SessionKindReceive {
 		return fmt.Errorf("channel %s does not expect receive operation, current type: %s",
 			channel, ch.SessionType.String())
 	}
 
-	// Check message type compatibility
+	// Check message type compatibility.
 	if !ch.SessionType.PayloadType.Equals(messageType) {
 		return fmt.Errorf("message type mismatch: expected %s, got %s",
 			ch.SessionType.PayloadType.String(), messageType.String())
 	}
 
-	// Record the operation
+	// Record the operation.
 	operation := SessionOperation{
 		Kind:     OpKindReceive,
 		Message:  messageType,
@@ -663,7 +679,7 @@ func (stc *SessionTypeChecker) CheckReceiveOperation(process, channel string, me
 
 	proc.Operations = append(proc.Operations, operation)
 
-	// Advance the session type
+	// Advance the session type.
 	if ch.SessionType.Continuation != nil {
 		ch.SessionType = ch.SessionType.Continuation
 	} else {
@@ -674,7 +690,7 @@ func (stc *SessionTypeChecker) CheckReceiveOperation(process, channel string, me
 	return nil
 }
 
-// CheckChoiceOperation checks a choice (select) operation
+// CheckChoiceOperation checks a choice (select) operation.
 func (stc *SessionTypeChecker) CheckChoiceOperation(process, channel, label string, location SourceLocation) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -689,19 +705,19 @@ func (stc *SessionTypeChecker) CheckChoiceOperation(process, channel, label stri
 		return fmt.Errorf("channel %s not found", channel)
 	}
 
-	// Check if the current session type is a choice
+	// Check if the current session type is a choice.
 	if ch.SessionType.Kind != SessionKindChoice {
 		return fmt.Errorf("channel %s does not expect choice operation, current type: %s",
 			channel, ch.SessionType.String())
 	}
 
-	// Check if the label exists
+	// Check if the label exists.
 	nextSession, labelExists := ch.SessionType.Branches[label]
 	if !labelExists {
 		return fmt.Errorf("label %s not found in choice for channel %s", label, channel)
 	}
 
-	// Record the operation
+	// Record the operation.
 	operation := SessionOperation{
 		Kind:     OpKindSelect,
 		Label:    label,
@@ -711,13 +727,13 @@ func (stc *SessionTypeChecker) CheckChoiceOperation(process, channel, label stri
 
 	proc.Operations = append(proc.Operations, operation)
 
-	// Advance to the selected branch
+	// Advance to the selected branch.
 	ch.SessionType = nextSession
 
 	return nil
 }
 
-// CheckBranchOperation checks a branch operation
+// CheckBranchOperation checks a branch operation.
 func (stc *SessionTypeChecker) CheckBranchOperation(process, channel string, branches map[string]func(), location SourceLocation) error {
 	stc.mutex.Lock()
 	defer stc.mutex.Unlock()
@@ -732,27 +748,27 @@ func (stc *SessionTypeChecker) CheckBranchOperation(process, channel string, bra
 		return fmt.Errorf("channel %s not found", channel)
 	}
 
-	// Check if the current session type is a branch
+	// Check if the current session type is a branch.
 	if ch.SessionType.Kind != SessionKindBranch {
 		return fmt.Errorf("channel %s does not expect branch operation, current type: %s",
 			channel, ch.SessionType.String())
 	}
 
-	// Check if all expected branches are provided
+	// Check if all expected branches are provided.
 	for expectedLabel := range ch.SessionType.Branches {
 		if _, provided := branches[expectedLabel]; !provided {
 			return fmt.Errorf("missing branch handler for label %s in channel %s", expectedLabel, channel)
 		}
 	}
 
-	// Check if no extra branches are provided
+	// Check if no extra branches are provided.
 	for providedLabel := range branches {
 		if _, expected := ch.SessionType.Branches[providedLabel]; !expected {
 			return fmt.Errorf("unexpected branch handler for label %s in channel %s", providedLabel, channel)
 		}
 	}
 
-	// Record the operation
+	// Record the operation.
 	operation := SessionOperation{
 		Kind:     OpKindBranch,
 		Channel:  channel,
@@ -761,23 +777,23 @@ func (stc *SessionTypeChecker) CheckBranchOperation(process, channel string, bra
 
 	proc.Operations = append(proc.Operations, operation)
 
-	// Note: The actual branch selection will happen at runtime
-	// For static analysis, we assume all branches are possible
+	// Note: The actual branch selection will happen at runtime.
+	// For static analysis, we assume all branches are possible.
 
 	return nil
 }
 
-// DetectDeadlocks performs deadlock detection analysis
+// DetectDeadlocks performs deadlock detection analysis.
 func (stc *SessionTypeChecker) DetectDeadlocks() []DeadlockError {
 	stc.mutex.RLock()
 	defer stc.mutex.RUnlock()
 
 	deadlocks := make([]DeadlockError, 0)
 
-	// Build dependency graph
+	// Build dependency graph.
 	dependencies := stc.buildDependencyGraph()
 
-	// Find strongly connected components (cycles)
+	// Find strongly connected components (cycles).
 	cycles := stc.findCycles(dependencies)
 
 	for _, cycle := range cycles {
@@ -795,7 +811,7 @@ func (stc *SessionTypeChecker) DetectDeadlocks() []DeadlockError {
 	return deadlocks
 }
 
-// buildDependencyGraph builds a dependency graph between processes
+// buildDependencyGraph builds a dependency graph between processes.
 func (stc *SessionTypeChecker) buildDependencyGraph() map[string][]string {
 	dependencies := make(map[string][]string)
 
@@ -804,11 +820,12 @@ func (stc *SessionTypeChecker) buildDependencyGraph() map[string][]string {
 
 		for _, channel := range process.Channels {
 			if channel.Partner != nil {
-				// Find the process that owns the partner channel
+				// Find the process that owns the partner channel.
 				for otherProcessName, otherProcess := range stc.processes {
 					for _, otherChannel := range otherProcess.Channels {
 						if otherChannel == channel.Partner {
 							dependencies[processName] = append(dependencies[processName], otherProcessName)
+
 							break
 						}
 					}
@@ -820,7 +837,7 @@ func (stc *SessionTypeChecker) buildDependencyGraph() map[string][]string {
 	return dependencies
 }
 
-// findCycles finds cycles in the dependency graph using Tarjan's algorithm
+// findCycles finds cycles in the dependency graph using Tarjan's algorithm.
 func (stc *SessionTypeChecker) findCycles(dependencies map[string][]string) [][]string {
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
@@ -830,20 +847,24 @@ func (stc *SessionTypeChecker) findCycles(dependencies map[string][]string) [][]
 	dfs = func(node string, path []string) {
 		visited[node] = true
 		recStack[node] = true
+
 		path = append(path, node)
 
 		for _, neighbor := range dependencies[node] {
 			if !visited[neighbor] {
 				dfs(neighbor, path)
 			} else if recStack[neighbor] {
-				// Found a cycle
+				// Found a cycle.
 				cycleStart := -1
+
 				for i, p := range path {
 					if p == neighbor {
 						cycleStart = i
+
 						break
 					}
 				}
+
 				if cycleStart >= 0 {
 					cycle := make([]string, len(path)-cycleStart)
 					copy(cycle, path[cycleStart:])
@@ -864,20 +885,22 @@ func (stc *SessionTypeChecker) findCycles(dependencies map[string][]string) [][]
 	return cycles
 }
 
-// isDeadlockCycle checks if a cycle represents a deadlock
+// isDeadlockCycle checks if a cycle represents a deadlock.
 func (stc *SessionTypeChecker) isDeadlockCycle(cycle []string) bool {
-	// A cycle is a deadlock if all processes in the cycle are waiting
+	// A cycle is a deadlock if all processes in the cycle are waiting.
 	for _, processName := range cycle {
 		process, exists := stc.processes[processName]
 		if !exists {
 			continue
 		}
 
-		// Check if the process is blocked waiting for input
+		// Check if the process is blocked waiting for input.
 		isBlocked := false
+
 		for _, channel := range process.Channels {
 			if channel.SessionType.Kind == SessionKindReceive {
 				isBlocked = true
+
 				break
 			}
 		}
@@ -890,7 +913,7 @@ func (stc *SessionTypeChecker) isDeadlockCycle(cycle []string) bool {
 	return true
 }
 
-// getChannelsInCycle gets all channels involved in a cycle
+// getChannelsInCycle gets all channels involved in a cycle.
 func (stc *SessionTypeChecker) getChannelsInCycle(cycle []string) []string {
 	channelSet := make(map[string]bool)
 
@@ -913,14 +936,14 @@ func (stc *SessionTypeChecker) getChannelsInCycle(cycle []string) []string {
 	return channels
 }
 
-// ValidateProtocol validates that all sessions follow their protocols
+// ValidateProtocol validates that all sessions follow their protocols.
 func (stc *SessionTypeChecker) ValidateProtocol() []SessionTypeError {
 	stc.mutex.RLock()
 	defer stc.mutex.RUnlock()
 
 	errors := make([]SessionTypeError, 0)
 
-	// Check that all channels have completed their sessions
+	// Check that all channels have completed their sessions.
 	for channelName, channel := range stc.channels {
 		if channel.SessionType.Kind != SessionKindEnd && channel.State != StateCompleted {
 			error := SessionTypeError{
@@ -933,7 +956,7 @@ func (stc *SessionTypeChecker) ValidateProtocol() []SessionTypeError {
 		}
 	}
 
-	// Check duality constraints
+	// Check duality constraints.
 	for channelName, channel := range stc.channels {
 		if channel.Partner != nil {
 			if !channel.SessionType.IsDual(channel.Partner.SessionType) {
@@ -953,9 +976,9 @@ func (stc *SessionTypeChecker) ValidateProtocol() []SessionTypeError {
 	return errors
 }
 
-// SessionTypeConstructors provides convenient constructors
+// SessionTypeConstructors provides convenient constructors.
 
-// NewEndSession creates an end session type
+// NewEndSession creates an end session type.
 func NewEndSession() *SessionType {
 	return &SessionType{
 		Kind:     SessionKindEnd,
@@ -963,7 +986,7 @@ func NewEndSession() *SessionType {
 	}
 }
 
-// NewSendSession creates a send session type
+// NewSendSession creates a send session type.
 func NewSendSession(payloadType *Type, continuation *SessionType) *SessionType {
 	return &SessionType{
 		Kind:         SessionKindSend,
@@ -973,7 +996,7 @@ func NewSendSession(payloadType *Type, continuation *SessionType) *SessionType {
 	}
 }
 
-// NewReceiveSession creates a receive session type
+// NewReceiveSession creates a receive session type.
 func NewReceiveSession(payloadType *Type, continuation *SessionType) *SessionType {
 	return &SessionType{
 		Kind:         SessionKindReceive,
@@ -983,7 +1006,7 @@ func NewReceiveSession(payloadType *Type, continuation *SessionType) *SessionTyp
 	}
 }
 
-// NewChoiceSession creates a choice session type
+// NewChoiceSession creates a choice session type.
 func NewChoiceSession(branches map[string]*SessionType) *SessionType {
 	return &SessionType{
 		Kind:     SessionKindChoice,
@@ -992,7 +1015,7 @@ func NewChoiceSession(branches map[string]*SessionType) *SessionType {
 	}
 }
 
-// NewBranchSession creates a branch session type
+// NewBranchSession creates a branch session type.
 func NewBranchSession(branches map[string]*SessionType) *SessionType {
 	return &SessionType{
 		Kind:     SessionKindBranch,
@@ -1001,7 +1024,7 @@ func NewBranchSession(branches map[string]*SessionType) *SessionType {
 	}
 }
 
-// NewRecursiveSession creates a recursive session type
+// NewRecursiveSession creates a recursive session type.
 func NewRecursiveSession(variable string, body *SessionType) *SessionType {
 	return &SessionType{
 		Kind:     SessionKindRecursion,
@@ -1011,7 +1034,7 @@ func NewRecursiveSession(variable string, body *SessionType) *SessionType {
 	}
 }
 
-// NewSessionVariable creates a session variable
+// NewSessionVariable creates a session variable.
 func NewSessionVariable(variable string) *SessionType {
 	return &SessionType{
 		Kind:     SessionKindVariable,
@@ -1020,7 +1043,7 @@ func NewSessionVariable(variable string) *SessionType {
 	}
 }
 
-// NewDualSession creates a dual session type
+// NewDualSession creates a dual session type.
 func NewDualSession(session *SessionType) *SessionType {
 	return &SessionType{
 		Kind:         SessionKindDual,
@@ -1029,7 +1052,7 @@ func NewDualSession(session *SessionType) *SessionType {
 	}
 }
 
-// NewParallelSession creates a parallel session composition
+// NewParallelSession creates a parallel session composition.
 func NewParallelSession(left, right *SessionType) *SessionType {
 	return &SessionType{
 		Kind:     SessionKindParallel,
@@ -1039,7 +1062,7 @@ func NewParallelSession(left, right *SessionType) *SessionType {
 	}
 }
 
-// NewSequentialSession creates a sequential session composition
+// NewSequentialSession creates a sequential session composition.
 func NewSequentialSession(left, right *SessionType) *SessionType {
 	return &SessionType{
 		Kind:     SessionKindSequential,
@@ -1049,9 +1072,9 @@ func NewSequentialSession(left, right *SessionType) *SessionType {
 	}
 }
 
-// Protocol analysis and verification
+// Protocol analysis and verification.
 
-// ProtocolAnalyzer analyzes session protocols for properties
+// ProtocolAnalyzer analyzes session protocols for properties.
 type ProtocolAnalyzer struct {
 	checker   *SessionTypeChecker
 	protocols map[string]*Protocol
@@ -1059,7 +1082,7 @@ type ProtocolAnalyzer struct {
 	liveness  []LivenessProperty
 }
 
-// Protocol represents a communication protocol
+// Protocol represents a communication protocol.
 type Protocol struct {
 	Name         string
 	Participants []string
@@ -1067,14 +1090,14 @@ type Protocol struct {
 	Properties   []ProtocolProperty
 }
 
-// ProtocolProperty represents a property of a protocol
+// ProtocolProperty represents a property of a protocol.
 type ProtocolProperty struct {
-	Kind        PropertyKind
 	Description string
-	Formula     string // Temporal logic formula
+	Formula     string
+	Kind        PropertyKind
 }
 
-// PropertyKind represents kinds of protocol properties
+// PropertyKind represents kinds of protocol properties.
 type PropertyKind int
 
 const (
@@ -1084,21 +1107,21 @@ const (
 	PropertyKindProgress
 )
 
-// SafetyProperty represents a safety property
+// SafetyProperty represents a safety property.
 type SafetyProperty struct {
-	Name        string
-	Description string
 	Invariant   func(*SessionTypeChecker) bool
-}
-
-// LivenessProperty represents a liveness property
-type LivenessProperty struct {
 	Name        string
 	Description string
-	Eventually  func(*SessionTypeChecker) bool
 }
 
-// NewProtocolAnalyzer creates a new protocol analyzer
+// LivenessProperty represents a liveness property.
+type LivenessProperty struct {
+	Eventually  func(*SessionTypeChecker) bool
+	Name        string
+	Description string
+}
+
+// NewProtocolAnalyzer creates a new protocol analyzer.
 func NewProtocolAnalyzer(checker *SessionTypeChecker) *ProtocolAnalyzer {
 	return &ProtocolAnalyzer{
 		checker:   checker,
@@ -1108,7 +1131,7 @@ func NewProtocolAnalyzer(checker *SessionTypeChecker) *ProtocolAnalyzer {
 	}
 }
 
-// AddSafetyProperty adds a safety property to check
+// AddSafetyProperty adds a safety property to check.
 func (pa *ProtocolAnalyzer) AddSafetyProperty(name, description string, invariant func(*SessionTypeChecker) bool) {
 	property := SafetyProperty{
 		Name:        name,
@@ -1118,7 +1141,7 @@ func (pa *ProtocolAnalyzer) AddSafetyProperty(name, description string, invarian
 	pa.safety = append(pa.safety, property)
 }
 
-// AddLivenessProperty adds a liveness property to check
+// AddLivenessProperty adds a liveness property to check.
 func (pa *ProtocolAnalyzer) AddLivenessProperty(name, description string, eventually func(*SessionTypeChecker) bool) {
 	property := LivenessProperty{
 		Name:        name,
@@ -1128,11 +1151,11 @@ func (pa *ProtocolAnalyzer) AddLivenessProperty(name, description string, eventu
 	pa.liveness = append(pa.liveness, property)
 }
 
-// VerifyProtocol verifies a protocol against its properties
+// VerifyProtocol verifies a protocol against its properties.
 func (pa *ProtocolAnalyzer) VerifyProtocol(protocolName string) []ProtocolViolation {
 	violations := make([]ProtocolViolation, 0)
 
-	// Check safety properties
+	// Check safety properties.
 	for _, safety := range pa.safety {
 		if !safety.Invariant(pa.checker) {
 			violation := ProtocolViolation{
@@ -1145,7 +1168,7 @@ func (pa *ProtocolAnalyzer) VerifyProtocol(protocolName string) []ProtocolViolat
 		}
 	}
 
-	// Check liveness properties
+	// Check liveness properties.
 	for _, liveness := range pa.liveness {
 		if !liveness.Eventually(pa.checker) {
 			violation := ProtocolViolation{
@@ -1161,15 +1184,15 @@ func (pa *ProtocolAnalyzer) VerifyProtocol(protocolName string) []ProtocolViolat
 	return violations
 }
 
-// ProtocolViolation represents a violation of protocol properties
+// ProtocolViolation represents a violation of protocol properties.
 type ProtocolViolation struct {
-	Kind        ViolationKind
 	Property    string
 	Description string
 	Message     string
+	Kind        ViolationKind
 }
 
-// ViolationKind represents kinds of protocol violations
+// ViolationKind represents kinds of protocol violations.
 type ViolationKind int
 
 const (
@@ -1179,12 +1202,12 @@ const (
 	ViolationKindProgress
 )
 
-// generateSessionId generates a unique identifier for sessions
+// generateSessionId generates a unique identifier for sessions.
 func generateSessionId() string {
 	return fmt.Sprintf("session_%d", len("temp_id"))
 }
 
-// SessionTypeKind constant for type system integration
+// SessionTypeKind constant for type system integration.
 const (
 	TypeKindSession TypeKind = 201
 )

@@ -1,5 +1,5 @@
 // Package types provides effect type system for static side effect tracking and control.
-// This module implements comprehensive effect tracking, inference, masking, and composition
+// This module implements comprehensive effect tracking, inference, masking, and composition.
 // to enable safe and predictable handling of side effects in the Orizon language.
 package types
 
@@ -11,13 +11,13 @@ import (
 	"time"
 )
 
-// EffectKind represents different categories of side effects
+// EffectKind represents different categories of side effects.
 type EffectKind int
 
 const (
-	// Pure indicates no side effects
+	// Pure indicates no side effects.
 	EffectPure EffectKind = iota
-	// I/O operations
+	// I/O operations.
 	EffectIO
 	EffectFileRead
 	EffectFileWrite
@@ -26,34 +26,34 @@ const (
 	EffectConsoleRead
 	EffectConsoleWrite
 	EffectConsoleOutput // Alias for console output operations
-	// Memory operations
+	// Memory operations.
 	EffectMemoryRead
 	EffectMemoryWrite
 	EffectMemoryAlloc
 	EffectMemoryFree
-	// Exception operations
+	// Exception operations.
 	EffectThrow
 	EffectCatch
-	// Concurrency operations
+	// Concurrency operations.
 	EffectSpawn
 	EffectJoin
 	EffectSync
 	EffectAsync
-	// State operations
+	// State operations.
 	EffectStateRead
 	EffectStateWrite
 	EffectGlobalRead
 	EffectGlobalWrite
-	// System operations
+	// System operations.
 	EffectSystemCall
 	EffectEnvironment
 	EffectRandom
 	EffectTime
-	// Custom effects
+	// Custom effects.
 	EffectCustom
 )
 
-// String returns the string representation of an EffectKind
+// String returns the string representation of an EffectKind.
 func (ek EffectKind) String() string {
 	switch ek {
 	case EffectPure:
@@ -115,7 +115,7 @@ func (ek EffectKind) String() string {
 	}
 }
 
-// EffectLevel represents the severity/impact level of an effect
+// EffectLevel represents the severity/impact level of an effect.
 type EffectLevel int
 
 const (
@@ -126,7 +126,7 @@ const (
 	EffectLevelCritical
 )
 
-// String returns the string representation of an EffectLevel
+// String returns the string representation of an EffectLevel.
 func (el EffectLevel) String() string {
 	switch el {
 	case EffectLevelNone:
@@ -144,18 +144,18 @@ func (el EffectLevel) String() string {
 	}
 }
 
-// SideEffect represents a single side effect with its properties
+// SideEffect represents a single side effect with its properties.
 type SideEffect struct {
-	Kind         EffectKind
-	Level        EffectLevel
-	Description  string
 	Location     *SourceLocation
+	Metadata     map[string]interface{}
+	Description  string
 	Dependencies []string
 	Constraints  []string
-	Metadata     map[string]interface{}
+	Kind         EffectKind
+	Level        EffectLevel
 }
 
-// NewSideEffect creates a new SideEffect with the given kind and level
+// NewSideEffect creates a new SideEffect with the given kind and level.
 func NewSideEffect(kind EffectKind, level EffectLevel) *SideEffect {
 	return &SideEffect{
 		Kind:         kind,
@@ -166,12 +166,12 @@ func NewSideEffect(kind EffectKind, level EffectLevel) *SideEffect {
 	}
 }
 
-// String returns the string representation of a SideEffect
+// String returns the string representation of a SideEffect.
 func (e *SideEffect) String() string {
 	return fmt.Sprintf("%s[%s]", e.Kind.String(), e.Level.String())
 }
 
-// Clone creates a deep copy of the SideEffect
+// Clone creates a deep copy of the SideEffect.
 func (e *SideEffect) Clone() *SideEffect {
 	clone := &SideEffect{
 		Kind:         e.Kind,
@@ -193,26 +193,26 @@ func (e *SideEffect) Clone() *SideEffect {
 	return clone
 }
 
-// EffectSet represents a collection of side effects
+// EffectSet represents a collection of side effects.
 type EffectSet struct {
 	effects map[EffectKind]*SideEffect
 	mu      sync.RWMutex
 }
 
-// NewEffectSet creates a new empty EffectSet
+// NewEffectSet creates a new empty EffectSet.
 func NewEffectSet() *EffectSet {
 	return &EffectSet{
 		effects: make(map[EffectKind]*SideEffect),
 	}
 }
 
-// Add adds a side effect to the set
+// Add adds a side effect to the set.
 func (es *EffectSet) Add(effect *SideEffect) {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 
 	if existing, exists := es.effects[effect.Kind]; exists {
-		// Merge effects, keeping the higher level
+		// Merge effects, keeping the higher level.
 		if effect.Level > existing.Level {
 			es.effects[effect.Kind] = effect.Clone()
 		}
@@ -221,33 +221,36 @@ func (es *EffectSet) Add(effect *SideEffect) {
 	}
 }
 
-// Remove removes an effect from the set
+// Remove removes an effect from the set.
 func (es *EffectSet) Remove(kind EffectKind) {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 	delete(es.effects, kind)
 }
 
-// Contains checks if the set contains an effect of the given kind
+// Contains checks if the set contains an effect of the given kind.
 func (es *EffectSet) Contains(kind EffectKind) bool {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
 	_, exists := es.effects[kind]
+
 	return exists
 }
 
-// Get retrieves an effect by kind
+// Get retrieves an effect by kind.
 func (es *EffectSet) Get(kind EffectKind) (*SideEffect, bool) {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	effect, exists := es.effects[kind]
 	if exists {
 		return effect.Clone(), true
 	}
+
 	return nil, false
 }
 
-// Union creates a new EffectSet containing effects from both sets
+// Union creates a new EffectSet containing effects from both sets.
 func (es *EffectSet) Union(other *EffectSet) *EffectSet {
 	result := NewEffectSet()
 
@@ -266,7 +269,7 @@ func (es *EffectSet) Union(other *EffectSet) *EffectSet {
 	return result
 }
 
-// Intersection creates a new EffectSet containing effects common to both sets
+// Intersection creates a new EffectSet containing effects common to both sets.
 func (es *EffectSet) Intersection(other *EffectSet) *EffectSet {
 	result := NewEffectSet()
 
@@ -284,21 +287,23 @@ func (es *EffectSet) Intersection(other *EffectSet) *EffectSet {
 	return result
 }
 
-// IsEmpty checks if the effect set is empty
+// IsEmpty checks if the effect set is empty.
 func (es *EffectSet) IsEmpty() bool {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	return len(es.effects) == 0
 }
 
-// Size returns the number of effects in the set
+// Size returns the number of effects in the set.
 func (es *EffectSet) Size() int {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	return len(es.effects)
 }
 
-// ToSlice returns all effects as a slice
+// ToSlice returns all effects as a slice.
 func (es *EffectSet) ToSlice() []*SideEffect {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
@@ -308,7 +313,7 @@ func (es *EffectSet) ToSlice() []*SideEffect {
 		effects = append(effects, effect.Clone())
 	}
 
-	// Sort by effect kind for consistent ordering
+	// Sort by effect kind for consistent ordering.
 	sort.Slice(effects, func(i, j int) bool {
 		return effects[i].Kind < effects[j].Kind
 	})
@@ -316,7 +321,7 @@ func (es *EffectSet) ToSlice() []*SideEffect {
 	return effects
 }
 
-// String returns the string representation of the EffectSet
+// String returns the string representation of the EffectSet.
 func (es *EffectSet) String() string {
 	effects := es.ToSlice()
 	if len(effects) == 0 {
@@ -331,7 +336,7 @@ func (es *EffectSet) String() string {
 	return "{" + strings.Join(strs, ", ") + "}"
 }
 
-// EffectSignature represents the complete effect signature of a function or expression
+// EffectSignature represents the complete effect signature of a function or expression.
 type EffectSignature struct {
 	Effects     *EffectSet
 	Requires    *EffectSet
@@ -341,7 +346,7 @@ type EffectSignature struct {
 	Pure        bool
 }
 
-// NewEffectSignature creates a new EffectSignature
+// NewEffectSignature creates a new EffectSignature.
 func NewEffectSignature() *EffectSignature {
 	return &EffectSignature{
 		Effects:     NewEffectSet(),
@@ -353,7 +358,7 @@ func NewEffectSignature() *EffectSignature {
 	}
 }
 
-// Clone creates a deep copy of the EffectSignature
+// Clone creates a deep copy of the EffectSignature.
 func (es *EffectSignature) Clone() *EffectSignature {
 	clone := &EffectSignature{
 		Effects:     es.Effects.Union(NewEffectSet()),
@@ -365,15 +370,16 @@ func (es *EffectSignature) Clone() *EffectSignature {
 	}
 
 	copy(clone.Constraints, es.Constraints)
+
 	return clone
 }
 
-// IsPure checks if the signature represents a pure function
+// IsPure checks if the signature represents a pure function.
 func (es *EffectSignature) IsPure() bool {
 	return es.Pure || es.Effects.IsEmpty()
 }
 
-// String returns the string representation of the EffectSignature
+// String returns the string representation of the EffectSignature.
 func (es *EffectSignature) String() string {
 	if es.IsPure() {
 		return "pure"
@@ -400,61 +406,65 @@ func (es *EffectSignature) String() string {
 	return strings.Join(parts, ", ")
 }
 
-// EffectConstraint represents constraints on effects
+// EffectConstraint represents constraints on effects.
 type EffectConstraint interface {
 	Check(signature *EffectSignature) error
 	String() string
 }
 
-// NoEffectConstraint ensures no effects of specified kinds
+// NoEffectConstraint ensures no effects of specified kinds.
 type NoEffectConstraint struct {
 	Kinds []EffectKind
 }
 
-// Check verifies that no prohibited effects are present
+// Check verifies that no prohibited effects are present.
 func (nec *NoEffectConstraint) Check(signature *EffectSignature) error {
 	for _, kind := range nec.Kinds {
 		if signature.Effects.Contains(kind) {
 			return fmt.Errorf("prohibited effect %s is present", kind.String())
 		}
 	}
+
 	return nil
 }
 
-// String returns the string representation of NoEffectConstraint
+// String returns the string representation of NoEffectConstraint.
 func (nec *NoEffectConstraint) String() string {
 	var kinds []string
 	for _, kind := range nec.Kinds {
 		kinds = append(kinds, kind.String())
 	}
+
 	return fmt.Sprintf("no effects: %s", strings.Join(kinds, ", "))
 }
 
-// RequiredEffectConstraint ensures specific effects are present
+// RequiredEffectConstraint ensures specific effects are present.
 type RequiredEffectConstraint struct {
 	Kinds []EffectKind
 }
 
-// Check verifies that all required effects are present
+// Check verifies that all required effects are present.
 func (rec *RequiredEffectConstraint) Check(signature *EffectSignature) error {
 	for _, kind := range rec.Kinds {
 		if !signature.Effects.Contains(kind) {
 			return fmt.Errorf("required effect %s is missing", kind.String())
 		}
 	}
+
 	return nil
 }
 
-// String returns the string representation of RequiredEffectConstraint
+// String returns the string representation of RequiredEffectConstraint.
 func (rec *RequiredEffectConstraint) String() string {
 	var kinds []string
 	for _, kind := range rec.Kinds {
 		kinds = append(kinds, kind.String())
 	}
+
 	return fmt.Sprintf("requires effects: %s", strings.Join(kinds, ", "))
 }
 
-// EffectInferenceContext holds context for effect inference
+// EffectInferenceContext holds context for effect inference.
 type EffectInferenceContext struct {
 	FunctionSignatures map[string]*EffectSignature
 	VariableEffects    map[string]*EffectSet
@@ -462,7 +472,7 @@ type EffectInferenceContext struct {
 	mu                 sync.RWMutex
 }
 
-// NewEffectInferenceContext creates a new inference context
+// NewEffectInferenceContext creates a new inference context.
 func NewEffectInferenceContext() *EffectInferenceContext {
 	return &EffectInferenceContext{
 		FunctionSignatures: make(map[string]*EffectSignature),
@@ -471,14 +481,14 @@ func NewEffectInferenceContext() *EffectInferenceContext {
 	}
 }
 
-// PushScope adds a new scope to the stack
+// PushScope adds a new scope to the stack.
 func (eic *EffectInferenceContext) PushScope(scope *EffectScope) {
 	eic.mu.Lock()
 	defer eic.mu.Unlock()
 	eic.ScopeStack = append(eic.ScopeStack, scope)
 }
 
-// PopScope removes the top scope from the stack
+// PopScope removes the top scope from the stack.
 func (eic *EffectInferenceContext) PopScope() *EffectScope {
 	eic.mu.Lock()
 	defer eic.mu.Unlock()
@@ -489,10 +499,11 @@ func (eic *EffectInferenceContext) PopScope() *EffectScope {
 
 	scope := eic.ScopeStack[len(eic.ScopeStack)-1]
 	eic.ScopeStack = eic.ScopeStack[:len(eic.ScopeStack)-1]
+
 	return scope
 }
 
-// CurrentScope returns the current top scope
+// CurrentScope returns the current top scope.
 func (eic *EffectInferenceContext) CurrentScope() *EffectScope {
 	eic.mu.RLock()
 	defer eic.mu.RUnlock()
@@ -504,19 +515,19 @@ func (eic *EffectInferenceContext) CurrentScope() *EffectScope {
 	return eic.ScopeStack[len(eic.ScopeStack)-1]
 }
 
-// EffectScope represents a scope for effect tracking
+// EffectScope represents a scope for effect tracking.
 type EffectScope struct {
-	Name      string
+	CreatedAt time.Time
 	Effects   *EffectSet
 	Masks     *EffectSet
 	Parent    *EffectScope
-	Children  []*EffectScope
 	Variables map[string]*EffectSet
 	Functions map[string]*EffectSignature
-	CreatedAt time.Time
+	Name      string
+	Children  []*EffectScope
 }
 
-// NewEffectScope creates a new effect scope
+// NewEffectScope creates a new effect scope.
 func NewEffectScope(name string, parent *EffectScope) *EffectScope {
 	scope := &EffectScope{
 		Name:      name,
@@ -536,17 +547,17 @@ func NewEffectScope(name string, parent *EffectScope) *EffectScope {
 	return scope
 }
 
-// AddEffect adds a side effect to the scope
+// AddEffect adds a side effect to the scope.
 func (es *EffectScope) AddEffect(effect *SideEffect) {
 	es.Effects.Add(effect)
 }
 
-// MaskEffect masks an effect in the scope
+// MaskEffect masks an effect in the scope.
 func (es *EffectScope) MaskEffect(kind EffectKind) {
 	es.Masks.Add(NewSideEffect(kind, EffectLevelNone))
 }
 
-// GetEffectiveEffects returns effects after applying masks
+// GetEffectiveEffects returns effects after applying masks.
 func (es *EffectScope) GetEffectiveEffects() *EffectSet {
 	result := NewEffectSet()
 
@@ -559,17 +570,17 @@ func (es *EffectScope) GetEffectiveEffects() *EffectSet {
 	return result
 }
 
-// EffectMask represents effect masking capabilities
+// EffectMask represents effect masking capabilities.
 type EffectMask struct {
-	Name        string // Name of the effect mask
+	ExpiresAt   *time.Time
+	Name        string
 	MaskedKinds []EffectKind
 	Conditions  []MaskCondition
 	Active      bool
 	Temporary   bool
-	ExpiresAt   *time.Time
 }
 
-// NewEffectMask creates a new effect mask
+// NewEffectMask creates a new effect mask.
 func NewEffectMask(kinds []EffectKind) *EffectMask {
 	return &EffectMask{
 		MaskedKinds: kinds,
@@ -579,18 +590,21 @@ func NewEffectMask(kinds []EffectKind) *EffectMask {
 	}
 }
 
-// Apply applies the mask to an effect set
+// Apply applies the mask to an effect set.
 func (em *EffectMask) Apply(effects *EffectSet) *EffectSet {
 	if !em.Active || (em.ExpiresAt != nil && time.Now().After(*em.ExpiresAt)) {
 		return effects
 	}
 
 	result := NewEffectSet()
+
 	for _, effect := range effects.ToSlice() {
 		masked := false
+
 		for _, kind := range em.MaskedKinds {
 			if effect.Kind == kind {
 				masked = true
+
 				break
 			}
 		}
@@ -603,7 +617,7 @@ func (em *EffectMask) Apply(effects *EffectSet) *EffectSet {
 	return result
 }
 
-// Contains checks if the mask contains a specific effect kind
+// Contains checks if the mask contains a specific effect kind.
 func (em *EffectMask) Contains(kind EffectKind) bool {
 	if !em.Active || (em.ExpiresAt != nil && time.Now().After(*em.ExpiresAt)) {
 		return false
@@ -614,24 +628,25 @@ func (em *EffectMask) Contains(kind EffectKind) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
-// MaskCondition represents conditions for effect masking
+// MaskCondition represents conditions for effect masking.
 type MaskCondition interface {
 	Evaluate(context *EffectInferenceContext) bool
 	String() string
 }
 
-// EffectComposer handles effect composition and inference
+// EffectComposer handles effect composition and inference.
 type EffectComposer struct {
-	rules      []CompositionRule
 	cache      map[string]*EffectSignature
+	rules      []CompositionRule
 	statistics EffectStatistics
 	mu         sync.RWMutex
 }
 
-// NewEffectComposer creates a new effect composer
+// NewEffectComposer creates a new effect composer.
 func NewEffectComposer() *EffectComposer {
 	return &EffectComposer{
 		rules:      make([]CompositionRule, 0),
@@ -640,14 +655,14 @@ func NewEffectComposer() *EffectComposer {
 	}
 }
 
-// AddRule adds a composition rule
+// AddRule adds a composition rule.
 func (ec *EffectComposer) AddRule(rule CompositionRule) {
 	ec.mu.Lock()
 	defer ec.mu.Unlock()
 	ec.rules = append(ec.rules, rule)
 }
 
-// Compose composes effect signatures according to rules
+// Compose composes effect signatures according to rules.
 func (ec *EffectComposer) Compose(signatures []*EffectSignature) *EffectSignature {
 	result := NewEffectSignature()
 
@@ -657,7 +672,7 @@ func (ec *EffectComposer) Compose(signatures []*EffectSignature) *EffectSignatur
 		result.Ensures = result.Ensures.Union(sig.Ensures)
 	}
 
-	// Apply composition rules
+	// Apply composition rules.
 	ec.mu.RLock()
 	for _, rule := range ec.rules {
 		result = rule.Apply(result)
@@ -667,14 +682,14 @@ func (ec *EffectComposer) Compose(signatures []*EffectSignature) *EffectSignatur
 	return result
 }
 
-// CompositionRule represents a rule for effect composition
+// CompositionRule represents a rule for effect composition.
 type CompositionRule interface {
 	Apply(signature *EffectSignature) *EffectSignature
 	Priority() int
 	String() string
 }
 
-// EffectStatistics tracks effect system statistics
+// EffectStatistics tracks effect system statistics.
 type EffectStatistics struct {
 	InferenceCalls       int64
 	CompositionCalls     int64
@@ -685,31 +700,35 @@ type EffectStatistics struct {
 	mu                   sync.RWMutex
 }
 
-// IncrementInference increments inference call count
+// IncrementInference increments inference call count.
 func (es *EffectStatistics) IncrementInference() {
 	es.mu.Lock()
 	defer es.mu.Unlock()
+
 	es.InferenceCalls++
 }
 
-// IncrementComposition increments composition call count
+// IncrementComposition increments composition call count.
 func (es *EffectStatistics) IncrementComposition() {
 	es.mu.Lock()
 	defer es.mu.Unlock()
+
 	es.CompositionCalls++
 }
 
-// IncrementCacheHit increments cache hit count
+// IncrementCacheHit increments cache hit count.
 func (es *EffectStatistics) IncrementCacheHit() {
 	es.mu.Lock()
 	defer es.mu.Unlock()
+
 	es.CacheHits++
 }
 
-// IncrementCacheMiss increments cache miss count
+// IncrementCacheMiss increments cache miss count.
 func (es *EffectStatistics) IncrementCacheMiss() {
 	es.mu.Lock()
 	defer es.mu.Unlock()
+
 	es.CacheMisses++
 }
 
@@ -723,10 +742,11 @@ type EffectStatsSnapshot struct {
 	EffectMaskings       int64
 }
 
-// GetStats returns a lock-free snapshot of current statistics
+// GetStats returns a lock-free snapshot of current statistics.
 func (es *EffectStatistics) GetStats() EffectStatsSnapshot {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
+
 	return EffectStatsSnapshot{
 		InferenceCalls:       es.InferenceCalls,
 		CompositionCalls:     es.CompositionCalls,
@@ -737,9 +757,10 @@ func (es *EffectStatistics) GetStats() EffectStatsSnapshot {
 	}
 }
 
-// String returns the string representation of statistics
+// String returns the string representation of statistics.
 func (es *EffectStatistics) String() string {
 	stats := es.GetStats()
+
 	return fmt.Sprintf("EffectStats{Inference: %d, Composition: %d, CacheHits: %d, CacheMisses: %d, Violations: %d, Maskings: %d}",
 		stats.InferenceCalls, stats.CompositionCalls, stats.CacheHits, stats.CacheMisses, stats.ConstraintViolations, stats.EffectMaskings)
 }

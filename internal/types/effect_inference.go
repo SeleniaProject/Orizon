@@ -1,5 +1,5 @@
 // Package types provides effect inference engine for static side effect analysis.
-// This module implements sophisticated effect inference algorithms including
+// This module implements sophisticated effect inference algorithms including.
 // flow-sensitive analysis, interprocedural inference, and effect polymorphism.
 package types
 
@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// EffectInferenceEngine provides comprehensive effect inference capabilities
+// EffectInferenceEngine provides comprehensive effect inference capabilities.
 type EffectInferenceEngine struct {
 	context    *EffectInferenceContext
 	analyzer   *EffectAnalyzer
@@ -21,7 +21,7 @@ type EffectInferenceEngine struct {
 	mu         sync.RWMutex
 }
 
-// NewEffectInferenceEngine creates a new effect inference engine
+// NewEffectInferenceEngine creates a new effect inference engine.
 func NewEffectInferenceEngine(config *EffectInferenceConfig) *EffectInferenceEngine {
 	if config == nil {
 		config = DefaultEffectInferenceConfig()
@@ -39,37 +39,39 @@ func NewEffectInferenceEngine(config *EffectInferenceConfig) *EffectInferenceEng
 	}
 }
 
-// InferEffects performs effect inference for the given AST node
+// InferEffects performs effect inference for the given AST node.
 func (eie *EffectInferenceEngine) InferEffects(node ASTNode) (*EffectSignature, error) {
 	eie.mu.Lock()
 	defer eie.mu.Unlock()
 
 	eie.statistics.IncrementInference()
 
-	// Check cache first
+	// Check cache first.
 	if cacheKey := eie.getCacheKey(node); cacheKey != "" {
 		if cached, found := eie.cache.Get(cacheKey); found {
 			eie.statistics.IncrementCacheHit()
+
 			return cached.Clone(), nil
 		}
+
 		eie.statistics.IncrementCacheMiss()
 	}
 
-	// Perform inference
+	// Perform inference.
 	signature, err := eie.inferEffectsInternal(node)
 	if err != nil {
 		return nil, fmt.Errorf("effect inference failed: %w", err)
 	}
 
-	// Validate signature
+	// Validate signature.
 	if err := eie.validator.Validate(signature); err != nil {
 		return nil, fmt.Errorf("effect validation failed: %w", err)
 	}
 
-	// Optimize signature
+	// Optimize signature.
 	optimized := eie.optimizer.Optimize(signature)
 
-	// Cache result
+	// Cache result.
 	if cacheKey := eie.getCacheKey(node); cacheKey != "" {
 		eie.cache.Put(cacheKey, optimized)
 	}
@@ -77,7 +79,7 @@ func (eie *EffectInferenceEngine) InferEffects(node ASTNode) (*EffectSignature, 
 	return optimized, nil
 }
 
-// inferEffectsInternal performs the actual inference logic
+// inferEffectsInternal performs the actual inference logic.
 func (eie *EffectInferenceEngine) inferEffectsInternal(node ASTNode) (*EffectSignature, error) {
 	switch n := node.(type) {
 	case *FunctionDecl:
@@ -103,94 +105,98 @@ func (eie *EffectInferenceEngine) inferEffectsInternal(node ASTNode) (*EffectSig
 	}
 }
 
-// inferFunctionEffects infers effects for function declarations
+// inferFunctionEffects infers effects for function declarations.
 func (eie *EffectInferenceEngine) inferFunctionEffects(fn *FunctionDecl) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Create new scope for function
+	// Create new scope for function.
 	scope := NewEffectScope(fn.Name, eie.context.CurrentScope())
 	eie.context.PushScope(scope)
 	defer eie.context.PopScope()
 
-	// Analyze function body
+	// Analyze function body.
 	if fn.Body != nil {
 		bodySignature, err := eie.InferEffects(fn.Body)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(bodySignature)
 	}
 
-	// Apply function-specific effects
+	// Apply function-specific effects.
 	signature = eie.applyFunctionEffects(fn, signature)
 
 	return signature, nil
 }
 
-// inferCallEffects infers effects for function calls
+// inferCallEffects infers effects for function calls.
 func (eie *EffectInferenceEngine) inferCallEffects(call *CallExpr) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Get callee signature
+	// Get callee signature.
 	calleeSignature, err := eie.getCalleeSignature(call.Function)
 	if err != nil {
 		return nil, err
 	}
 
-	// Merge callee effects
+	// Merge callee effects.
 	signature = signature.Merge(calleeSignature)
 
-	// Analyze arguments
+	// Analyze arguments.
 	for _, arg := range call.Arguments {
 		argSignature, err := eie.InferEffects(arg)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(argSignature)
 	}
 
-	// Apply call-specific effects
+	// Apply call-specific effects.
 	signature = eie.applyCallEffects(call, signature)
 
 	return signature, nil
 }
 
-// inferAssignmentEffects infers effects for assignments
+// inferAssignmentEffects infers effects for assignments.
 func (eie *EffectInferenceEngine) inferAssignmentEffects(assign *AssignmentExpr) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Analyze right-hand side
+	// Analyze right-hand side.
 	rhsSignature, err := eie.InferEffects(assign.RHS)
 	if err != nil {
 		return nil, err
 	}
+
 	signature = signature.Merge(rhsSignature)
 
-	// Add write effect for left-hand side
+	// Add write effect for left-hand side.
 	writeEffect := eie.createWriteEffect(assign.LHS)
 	signature.Effects.Add(writeEffect)
 
 	return signature, nil
 }
 
-// inferConditionalEffects infers effects for conditional statements
+// inferConditionalEffects infers effects for conditional statements.
 func (eie *EffectInferenceEngine) inferConditionalEffects(ifStmt *IfStmt) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Analyze condition
+	// Analyze condition.
 	condSignature, err := eie.InferEffects(ifStmt.Condition)
 	if err != nil {
 		return nil, err
 	}
+
 	signature = signature.Merge(condSignature)
 
-	// Analyze then branch
+	// Analyze then branch.
 	thenSignature, err := eie.InferEffects(ifStmt.Then)
 	if err != nil {
 		return nil, err
 	}
 
-	// Analyze else branch if present
+	// Analyze else branch if present.
 	var elseSignature *EffectSignature
 	if ifStmt.Else != nil {
 		elseSignature, err = eie.InferEffects(ifStmt.Else)
@@ -201,125 +207,130 @@ func (eie *EffectInferenceEngine) inferConditionalEffects(ifStmt *IfStmt) (*Effe
 		elseSignature = NewEffectSignature()
 	}
 
-	// Merge conditional effects
+	// Merge conditional effects.
 	conditionalEffects := eie.mergeConditionalEffects(thenSignature, elseSignature)
 	signature = signature.Merge(conditionalEffects)
 
 	return signature, nil
 }
 
-// inferLoopEffects infers effects for loop statements
+// inferLoopEffects infers effects for loop statements.
 func (eie *EffectInferenceEngine) inferLoopEffects(forStmt *ForStmt) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Analyze initialization
+	// Analyze initialization.
 	if forStmt.Init != nil {
 		initSignature, err := eie.InferEffects(forStmt.Init)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(initSignature)
 	}
 
-	// Analyze condition
+	// Analyze condition.
 	if forStmt.Condition != nil {
 		condSignature, err := eie.InferEffects(forStmt.Condition)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(condSignature)
 	}
 
-	// Analyze update
+	// Analyze update.
 	if forStmt.Update != nil {
 		updateSignature, err := eie.InferEffects(forStmt.Update)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(updateSignature)
 	}
 
-	// Analyze body (may execute multiple times)
+	// Analyze body (may execute multiple times).
 	bodySignature, err := eie.InferEffects(forStmt.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply loop effect amplification
+	// Apply loop effect amplification.
 	loopEffects := eie.amplifyLoopEffects(bodySignature)
 	signature = signature.Merge(loopEffects)
 
 	return signature, nil
 }
 
-// inferBlockEffects infers effects for block statements
+// inferBlockEffects infers effects for block statements.
 func (eie *EffectInferenceEngine) inferBlockEffects(block *BlockStmt) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Create new scope for block
+	// Create new scope for block.
 	scope := NewEffectScope("block", eie.context.CurrentScope())
 	eie.context.PushScope(scope)
 	defer eie.context.PopScope()
 
-	// Analyze statements sequentially
+	// Analyze statements sequentially.
 	for _, stmt := range block.Statements {
 		stmtSignature, err := eie.InferEffects(stmt)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(stmtSignature)
 	}
 
 	return signature, nil
 }
 
-// getCacheKey generates a cache key for the given AST node
+// getCacheKey generates a cache key for the given AST node.
 func (eie *EffectInferenceEngine) getCacheKey(node ASTNode) string {
-	// Simple implementation - in practice would use more sophisticated key generation
+	// Simple implementation - in practice would use more sophisticated key generation.
 	return fmt.Sprintf("%T_%p", node, node)
 }
 
-// getCalleeSignature retrieves the effect signature for a function being called
+// getCalleeSignature retrieves the effect signature for a function being called.
 func (eie *EffectInferenceEngine) getCalleeSignature(fn ASTNode) (*EffectSignature, error) {
-	// Implementation would look up function signatures from context or symbols
-	// For now, return a basic signature
+	// Implementation would look up function signatures from context or symbols.
+	// For now, return a basic signature.
 	return NewEffectSignature(), nil
 }
 
-// applyFunctionEffects applies function-specific effect rules
+// applyFunctionEffects applies function-specific effect rules.
 func (eie *EffectInferenceEngine) applyFunctionEffects(fn *FunctionDecl, signature *EffectSignature) *EffectSignature {
 	// Apply function annotations, modifiers, etc.
 	return signature
 }
 
-// applyCallEffects applies call-specific effect rules
+// applyCallEffects applies call-specific effect rules.
 func (eie *EffectInferenceEngine) applyCallEffects(call *CallExpr, signature *EffectSignature) *EffectSignature {
-	// Apply call-site specific rules
+	// Apply call-site specific rules.
 	return signature
 }
 
-// createWriteEffect creates a write effect for the given expression
+// createWriteEffect creates a write effect for the given expression.
 func (eie *EffectInferenceEngine) createWriteEffect(expr ASTNode) *SideEffect {
-	// Determine the appropriate write effect based on the expression
+	// Determine the appropriate write effect based on the expression.
 	return NewSideEffect(EffectMemoryWrite, EffectLevelLow)
 }
 
-// mergeConditionalEffects merges effects from conditional branches
+// mergeConditionalEffects merges effects from conditional branches.
 func (eie *EffectInferenceEngine) mergeConditionalEffects(thenSig, elseSig *EffectSignature) *EffectSignature {
-	// Take union of both branches as either could execute
+	// Take union of both branches as either could execute.
 	result := NewEffectSignature()
 	result.Effects = thenSig.Effects.Union(elseSig.Effects)
 	result.Requires = thenSig.Requires.Intersection(elseSig.Requires)
 	result.Ensures = thenSig.Ensures.Intersection(elseSig.Ensures)
+
 	return result
 }
 
-// amplifyLoopEffects amplifies effects that may occur multiple times in loops
+// amplifyLoopEffects amplifies effects that may occur multiple times in loops.
 func (eie *EffectInferenceEngine) amplifyLoopEffects(bodySignature *EffectSignature) *EffectSignature {
-	// Loops may amplify certain effects
+	// Loops may amplify certain effects.
 	result := bodySignature.Clone()
 
-	// Increase effect levels for certain kinds
+	// Increase effect levels for certain kinds.
 	for _, effect := range result.Effects.ToSlice() {
 		if effect.Kind == EffectMemoryAlloc || effect.Kind == EffectIO {
 			if effect.Level < EffectLevelHigh {
@@ -333,7 +344,7 @@ func (eie *EffectInferenceEngine) amplifyLoopEffects(bodySignature *EffectSignat
 	return result
 }
 
-// inferReturnEffects infers effects for return statements
+// inferReturnEffects infers effects for return statements.
 func (eie *EffectInferenceEngine) inferReturnEffects(ret *ReturnStmt) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
@@ -342,17 +353,18 @@ func (eie *EffectInferenceEngine) inferReturnEffects(ret *ReturnStmt) (*EffectSi
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(valueSignature)
 	}
 
 	return signature, nil
 }
 
-// inferThrowEffects infers effects for throw statements
+// inferThrowEffects infers effects for throw statements.
 func (eie *EffectInferenceEngine) inferThrowEffects(throw *ThrowStmt) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Add throw effect
+	// Add throw effect.
 	throwEffect := NewSideEffect(EffectThrow, EffectLevelMedium)
 	signature.Effects.Add(throwEffect)
 
@@ -361,55 +373,59 @@ func (eie *EffectInferenceEngine) inferThrowEffects(throw *ThrowStmt) (*EffectSi
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(valueSignature)
 	}
 
 	return signature, nil
 }
 
-// inferTryEffects infers effects for try-catch statements
+// inferTryEffects infers effects for try-catch statements.
 func (eie *EffectInferenceEngine) inferTryEffects(try *TryStmt) (*EffectSignature, error) {
 	signature := NewEffectSignature()
 
-	// Analyze try block
+	// Analyze try block.
 	trySignature, err := eie.InferEffects(try.Body)
 	if err != nil {
 		return nil, err
 	}
+
 	signature = signature.Merge(trySignature)
 
-	// Analyze catch blocks
+	// Analyze catch blocks.
 	for _, catch := range try.Catches {
 		catchSignature, err := eie.InferEffects(catch.Body)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(catchSignature)
 
-		// Add catch effect
+		// Add catch effect.
 		catchEffect := NewSideEffect(EffectCatch, EffectLevelMedium)
 		signature.Effects.Add(catchEffect)
 	}
 
-	// Analyze finally block
+	// Analyze finally block.
 	if try.Finally != nil {
 		finallySignature, err := eie.InferEffects(try.Finally)
 		if err != nil {
 			return nil, err
 		}
+
 		signature = signature.Merge(finallySignature)
 	}
 
 	return signature, nil
 }
 
-// inferDefaultEffects provides default effect inference for unknown node types
+// inferDefaultEffects provides default effect inference for unknown node types.
 func (eie *EffectInferenceEngine) inferDefaultEffects(node ASTNode) (*EffectSignature, error) {
-	// Most expressions are pure by default
+	// Most expressions are pure by default.
 	return NewEffectSignature(), nil
 }
 
-// Merge merges two effect signatures
+// Merge merges two effect signatures.
 func (es *EffectSignature) Merge(other *EffectSignature) *EffectSignature {
 	result := es.Clone()
 	result.Effects = result.Effects.Union(other.Effects)
@@ -418,10 +434,11 @@ func (es *EffectSignature) Merge(other *EffectSignature) *EffectSignature {
 	result.Masks = result.Masks.Union(other.Masks)
 	result.Constraints = append(result.Constraints, other.Constraints...)
 	result.Pure = result.Pure && other.Pure
+
 	return result
 }
 
-// EffectAnalyzer provides detailed effect analysis capabilities
+// EffectAnalyzer provides detailed effect analysis capabilities.
 type EffectAnalyzer struct {
 	flowAnalyzer  *FlowSensitiveAnalyzer
 	aliasAnalyzer *AliasAnalyzer
@@ -429,7 +446,7 @@ type EffectAnalyzer struct {
 	config        *AnalyzerConfig
 }
 
-// NewEffectAnalyzer creates a new effect analyzer
+// NewEffectAnalyzer creates a new effect analyzer.
 func NewEffectAnalyzer() *EffectAnalyzer {
 	return &EffectAnalyzer{
 		flowAnalyzer:  NewFlowSensitiveAnalyzer(),
@@ -439,24 +456,24 @@ func NewEffectAnalyzer() *EffectAnalyzer {
 	}
 }
 
-// FlowSensitiveAnalyzer performs flow-sensitive effect analysis
+// FlowSensitiveAnalyzer performs flow-sensitive effect analysis.
 type FlowSensitiveAnalyzer struct {
 	cfg      *ControlFlowGraph
 	dataflow *DataFlowAnalysis
 }
 
-// NewFlowSensitiveAnalyzer creates a new flow-sensitive analyzer
+// NewFlowSensitiveAnalyzer creates a new flow-sensitive analyzer.
 func NewFlowSensitiveAnalyzer() *FlowSensitiveAnalyzer {
 	return &FlowSensitiveAnalyzer{}
 }
 
-// AliasAnalyzer performs alias analysis for effect inference
+// AliasAnalyzer performs alias analysis for effect inference.
 type AliasAnalyzer struct {
 	pointsTo map[string][]string
 	aliases  map[string][]string
 }
 
-// NewAliasAnalyzer creates a new alias analyzer
+// NewAliasAnalyzer creates a new alias analyzer.
 func NewAliasAnalyzer() *AliasAnalyzer {
 	return &AliasAnalyzer{
 		pointsTo: make(map[string][]string),
@@ -464,14 +481,14 @@ func NewAliasAnalyzer() *AliasAnalyzer {
 	}
 }
 
-// ReachingDefinitions tracks reaching definitions for effect analysis
+// ReachingDefinitions tracks reaching definitions for effect analysis.
 type ReachingDefinitions struct {
 	definitions map[string][]*Definition
 	reachingIn  map[string][]*Definition
 	reachingOut map[string][]*Definition
 }
 
-// NewReachingDefinitions creates a new reaching definitions analyzer
+// NewReachingDefinitions creates a new reaching definitions analyzer.
 func NewReachingDefinitions() *ReachingDefinitions {
 	return &ReachingDefinitions{
 		definitions: make(map[string][]*Definition),
@@ -480,27 +497,27 @@ func NewReachingDefinitions() *ReachingDefinitions {
 	}
 }
 
-// Definition represents a variable definition
+// Definition represents a variable definition.
 type Definition struct {
-	Variable string
 	Value    ASTNode
 	Location *SourceLocation
 	Effects  *EffectSet
+	Variable string
 }
 
-// DataFlowAnalysis provides data flow analysis capabilities
+// DataFlowAnalysis provides data flow analysis capabilities.
 type DataFlowAnalysis struct {
 	facts map[string]interface{}
 }
 
-// AnalyzerConfig holds configuration for effect analyzer
+// AnalyzerConfig holds configuration for effect analyzer.
 type AnalyzerConfig struct {
 	PrecisionLevel  int
 	AnalysisTimeout int
 	MaxIterations   int
 }
 
-// DefaultAnalyzerConfig returns default analyzer configuration
+// DefaultAnalyzerConfig returns default analyzer configuration.
 func DefaultAnalyzerConfig() *AnalyzerConfig {
 	return &AnalyzerConfig{
 		PrecisionLevel:  2,
@@ -509,7 +526,7 @@ func DefaultAnalyzerConfig() *AnalyzerConfig {
 	}
 }
 
-// EffectInferenceConfig holds configuration for effect inference
+// EffectInferenceConfig holds configuration for effect inference.
 type EffectInferenceConfig struct {
 	EnableCaching         bool
 	EnableOptimization    bool
@@ -520,7 +537,7 @@ type EffectInferenceConfig struct {
 	OptimizationLevel     int
 }
 
-// DefaultEffectInferenceConfig returns default effect inference configuration
+// DefaultEffectInferenceConfig returns default effect inference configuration.
 func DefaultEffectInferenceConfig() *EffectInferenceConfig {
 	return &EffectInferenceConfig{
 		EnableCaching:         true,
@@ -533,12 +550,12 @@ func DefaultEffectInferenceConfig() *EffectInferenceConfig {
 	}
 }
 
-// NewEffectInferenceConfig creates a new effect inference configuration with custom settings
+// NewEffectInferenceConfig creates a new effect inference configuration with custom settings.
 func NewEffectInferenceConfig() *EffectInferenceConfig {
 	return DefaultEffectInferenceConfig()
 }
 
-// InferenceCache provides caching for effect inference results
+// InferenceCache provides caching for effect inference results.
 type InferenceCache struct {
 	cache   map[string]*EffectSignature
 	maxSize int
@@ -547,7 +564,7 @@ type InferenceCache struct {
 	mu      sync.RWMutex
 }
 
-// NewInferenceCache creates a new inference cache
+// NewInferenceCache creates a new inference cache.
 func NewInferenceCache() *InferenceCache {
 	return &InferenceCache{
 		cache:   make(map[string]*EffectSignature),
@@ -555,7 +572,7 @@ func NewInferenceCache() *InferenceCache {
 	}
 }
 
-// Get retrieves a cached signature
+// Get retrieves a cached signature.
 func (ic *InferenceCache) Get(key string) (*EffectSignature, bool) {
 	ic.mu.RLock()
 	defer ic.mu.RUnlock()
@@ -563,22 +580,25 @@ func (ic *InferenceCache) Get(key string) (*EffectSignature, bool) {
 	signature, exists := ic.cache[key]
 	if exists {
 		ic.hits++
+
 		return signature.Clone(), true
 	}
 
 	ic.misses++
+
 	return nil, false
 }
 
-// Put stores a signature in the cache
+// Put stores a signature in the cache.
 func (ic *InferenceCache) Put(key string, signature *EffectSignature) {
 	ic.mu.Lock()
 	defer ic.mu.Unlock()
 
 	if len(ic.cache) >= ic.maxSize {
-		// Simple eviction: remove oldest entry
+		// Simple eviction: remove oldest entry.
 		for k := range ic.cache {
 			delete(ic.cache, k)
+
 			break
 		}
 	}
@@ -586,7 +606,7 @@ func (ic *InferenceCache) Put(key string, signature *EffectSignature) {
 	ic.cache[key] = signature.Clone()
 }
 
-// InferenceStatistics tracks inference statistics
+// InferenceStatistics tracks inference statistics.
 type InferenceStatistics struct {
 	TotalInferences int64
 	CacheHits       int64
@@ -595,35 +615,39 @@ type InferenceStatistics struct {
 	mu              sync.RWMutex
 }
 
-// NewInferenceStatistics creates new inference statistics
+// NewInferenceStatistics creates new inference statistics.
 func NewInferenceStatistics() *InferenceStatistics {
 	return &InferenceStatistics{}
 }
 
-// IncrementInference increments total inference count
+// IncrementInference increments total inference count.
 func (is *InferenceStatistics) IncrementInference() {
 	is.mu.Lock()
 	defer is.mu.Unlock()
+
 	is.TotalInferences++
 }
 
-// IncrementCacheHit increments cache hit count
+// IncrementCacheHit increments cache hit count.
 func (is *InferenceStatistics) IncrementCacheHit() {
 	is.mu.Lock()
 	defer is.mu.Unlock()
+
 	is.CacheHits++
 }
 
-// IncrementCacheMiss increments cache miss count
+// IncrementCacheMiss increments cache miss count.
 func (is *InferenceStatistics) IncrementCacheMiss() {
 	is.mu.Lock()
 	defer is.mu.Unlock()
+
 	is.CacheMisses++
 }
 
-// IncrementError increments error count
+// IncrementError increments error count.
 func (is *InferenceStatistics) IncrementError() {
 	is.mu.Lock()
 	defer is.mu.Unlock()
+
 	is.ErrorCount++
 }

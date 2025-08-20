@@ -1,4 +1,4 @@
-// Tests for compound type system implementation
+// Tests for compound type system implementation.
 // This file tests Phase 2.1.2: Compound type system
 
 package types
@@ -11,91 +11,109 @@ import (
 
 func TestPhase2_1_2Completion(t *testing.T) {
 	t.Run("Phase 2.1.2 Compound Type System - Full Implementation", func(t *testing.T) {
-		// Test variant type creation
+		// Test variant type creation.
 		variants := []VariantOption{
 			{Name: "None", Type: nil},
 			{Name: "Some", Type: TypeInt32},
 		}
+
 		variantType := NewVariantType("Option", variants)
 		if variantType == nil {
 			t.Fatal("Failed to create variant type")
 		}
+
 		if variantType.Kind != TypeKindEnum {
 			t.Errorf("Expected TypeKindEnum, got %v", variantType.Kind)
 		}
+
 		t.Log("✅ Variant type creation implemented")
 
-		// Test record type creation
+		// Test record type creation.
 		fields := []RecordField{
 			{Name: "x", Type: TypeInt32, Optional: false, Visibility: VisibilityPublic},
 			{Name: "y", Type: TypeInt32, Optional: false, Visibility: VisibilityPublic},
 		}
+
 		recordType := NewRecordType("Point", fields)
 		if recordType == nil {
 			t.Fatal("Failed to create record type")
 		}
+
 		if recordType.Kind != TypeKindStruct {
 			t.Errorf("Expected TypeKindStruct, got %v", recordType.Kind)
 		}
+
 		t.Log("✅ Record type creation implemented")
 
-		// Test newtype creation
+		// Test newtype creation.
 		newtypeType := NewNewtypeType("UserId", TypeInt64)
 		if newtypeType == nil {
 			t.Fatal("Failed to create newtype")
 		}
+
 		if newtypeType.Size != TypeInt64.Size {
 			t.Errorf("Newtype should have same size as base type")
 		}
+
 		t.Log("✅ Newtype creation implemented")
 
-		// Test interface type creation
+		// Test interface type creation.
 		methods := []MethodSignature{
 			{Name: "ToString", Parameters: []*Type{}, ReturnType: TypeString, IsStatic: false, IsAsync: false},
 		}
+
 		interfaceType := NewInterfaceType("Stringable", methods, []*Type{})
 		if interfaceType == nil {
 			t.Fatal("Failed to create interface type")
 		}
+
 		t.Log("✅ Interface type creation implemented")
 
-		// Test trait type creation
+		// Test trait type creation.
 		params := []GenericParameter{
 			{Name: "T", Constraints: []*Type{}, Default: nil, Variance: VarianceInvariant},
 		}
+
 		traitType := NewTraitType("Display", params, methods)
 		if traitType == nil {
 			t.Fatal("Failed to create trait type")
 		}
+
 		if traitType.Kind != TypeKindTrait {
 			t.Errorf("Expected TypeKindTrait, got %v", traitType.Kind)
 		}
+
 		t.Log("✅ Trait type creation implemented")
 
-		// Test type layout calculation
+		// Test type layout calculation.
 		layout := CalculateLayout(fields)
 		if layout.Size <= 0 {
 			t.Error("Layout should have positive size")
 		}
+
 		if len(layout.Fields) != len(fields) {
 			t.Errorf("Layout should have %d fields, got %d", len(fields), len(layout.Fields))
 		}
+
 		t.Log("✅ Type layout calculation implemented")
 
-		// Test type unification
+		// Test type unification.
 		unified, err := Unify(TypeInt32, TypeInt32)
 		if err != nil {
 			t.Errorf("Unification of same types should succeed: %v", err)
 		}
+
 		if unified != TypeInt32 {
 			t.Error("Unification of same types should return the type")
 		}
+
 		t.Log("✅ Type unification implemented")
 
-		// Test subtyping
+		// Test subtyping.
 		if !TypeInt32.IsSubtypeOf(TypeAny) {
 			t.Error("All types should be subtypes of Any")
 		}
+
 		t.Log("✅ Subtyping relations implemented")
 
 		t.Log("")
@@ -120,7 +138,7 @@ func TestPhase2_1_2Completion(t *testing.T) {
 	})
 }
 
-// ====== Variant Type Tests ======
+// ====== Variant Type Tests ======.
 
 func TestVariantTypes(t *testing.T) {
 	t.Run("Option Type", func(t *testing.T) {
@@ -138,17 +156,18 @@ func TestVariantTypes(t *testing.T) {
 		if variantData.Name != "Option" {
 			t.Errorf("Expected name 'Option', got '%s'", variantData.Name)
 		}
+
 		if len(variantData.Variants) != 2 {
 			t.Errorf("Expected 2 variants, got %d", len(variantData.Variants))
 		}
 
-		// Check None variant
+		// Check None variant.
 		noneVariant := variantData.Variants[0]
 		if noneVariant.Name != "None" || noneVariant.Type != nil {
 			t.Error("None variant should have no associated type")
 		}
 
-		// Check Some variant
+		// Check Some variant.
 		someVariant := variantData.Variants[1]
 		if someVariant.Name != "Some" || !someVariant.Type.Equals(TypeInt32) {
 			t.Error("Some variant should have int32 associated type")
@@ -168,7 +187,7 @@ func TestVariantTypes(t *testing.T) {
 			t.Fatal("Failed to create Result type")
 		}
 
-		// Result type should have size for largest variant + discriminant
+		// Result type should have size for largest variant + discriminant.
 		expectedMinSize := TypeString.Size + 8 // discriminant
 		if resultType.Size < expectedMinSize {
 			t.Errorf("Result type size too small: %d < %d", resultType.Size, expectedMinSize)
@@ -178,7 +197,7 @@ func TestVariantTypes(t *testing.T) {
 	})
 }
 
-// ====== Record Type Tests ======
+// ====== Record Type Tests ======.
 
 func TestRecordTypes(t *testing.T) {
 	t.Run("Point Record", func(t *testing.T) {
@@ -197,11 +216,12 @@ func TestRecordTypes(t *testing.T) {
 		if recordData.Name != "Point3D" {
 			t.Errorf("Expected name 'Point3D', got '%s'", recordData.Name)
 		}
+
 		if len(recordData.Fields) != 3 {
 			t.Errorf("Expected 3 fields, got %d", len(recordData.Fields))
 		}
 
-		// Check optional field
+		// Check optional field.
 		zField := recordData.Fields[2]
 		if !zField.Optional {
 			t.Error("z field should be optional")
@@ -226,9 +246,11 @@ func TestRecordTypes(t *testing.T) {
 		if recordData.Fields[0].Visibility != VisibilityPublic {
 			t.Error("First field should be public")
 		}
+
 		if recordData.Fields[1].Visibility != VisibilityPrivate {
 			t.Error("Second field should be private")
 		}
+
 		if recordData.Fields[2].Visibility != VisibilityInternal {
 			t.Error("Third field should be internal")
 		}
@@ -237,7 +259,7 @@ func TestRecordTypes(t *testing.T) {
 	})
 }
 
-// ====== Interface Type Tests ======
+// ====== Interface Type Tests ======.
 
 func TestInterfaceTypes(t *testing.T) {
 	t.Run("Simple Interface", func(t *testing.T) {
@@ -255,6 +277,7 @@ func TestInterfaceTypes(t *testing.T) {
 		if interfaceData.Name != "ReaderWriter" {
 			t.Errorf("Expected name 'ReaderWriter', got '%s'", interfaceData.Name)
 		}
+
 		if len(interfaceData.Methods) != 2 {
 			t.Errorf("Expected 2 methods, got %d", len(interfaceData.Methods))
 		}
@@ -263,13 +286,13 @@ func TestInterfaceTypes(t *testing.T) {
 	})
 
 	t.Run("Interface Inheritance", func(t *testing.T) {
-		// Base interface
+		// Base interface.
 		readableMethods := []MethodSignature{
 			{Name: "Read", Parameters: []*Type{NewSliceType(TypeUint8)}, ReturnType: TypeInt32},
 		}
 		readableType := NewInterfaceType("Readable", readableMethods, []*Type{})
 
-		// Extended interface
+		// Extended interface.
 		methods := []MethodSignature{
 			{Name: "Write", Parameters: []*Type{NewSliceType(TypeUint8)}, ReturnType: TypeInt32},
 		}
@@ -283,6 +306,7 @@ func TestInterfaceTypes(t *testing.T) {
 		if len(writerData.Extends) != 1 {
 			t.Errorf("Expected 1 extended interface, got %d", len(writerData.Extends))
 		}
+
 		if writerData.Extends[0] != readableType {
 			t.Error("Writer should extend Readable")
 		}
@@ -291,7 +315,7 @@ func TestInterfaceTypes(t *testing.T) {
 	})
 }
 
-// ====== Trait Type Tests ======
+// ====== Trait Type Tests ======.
 
 func TestTraitTypes(t *testing.T) {
 	t.Run("Generic Trait", func(t *testing.T) {
@@ -311,9 +335,11 @@ func TestTraitTypes(t *testing.T) {
 		if traitData.Name != "Into" {
 			t.Errorf("Expected name 'Into', got '%s'", traitData.Name)
 		}
+
 		if len(traitData.TypeParams) != 1 {
 			t.Errorf("Expected 1 type parameter, got %d", len(traitData.TypeParams))
 		}
+
 		if traitData.TypeParams[0].Name != "T" {
 			t.Errorf("Expected type parameter 'T', got '%s'", traitData.TypeParams[0].Name)
 		}
@@ -330,7 +356,7 @@ func TestTraitTypes(t *testing.T) {
 		iteratorTrait := NewTraitType("Iterator", params, methods)
 		traitData := iteratorTrait.Data.(*TraitType)
 
-		// Add associated type
+		// Add associated type.
 		traitData.AssocTypes = []AssociatedType{
 			{Name: "Output", Constraints: []*Type{}, Default: nil},
 		}
@@ -338,6 +364,7 @@ func TestTraitTypes(t *testing.T) {
 		if len(traitData.AssocTypes) != 1 {
 			t.Errorf("Expected 1 associated type, got %d", len(traitData.AssocTypes))
 		}
+
 		if traitData.AssocTypes[0].Name != "Output" {
 			t.Errorf("Expected associated type 'Output', got '%s'", traitData.AssocTypes[0].Name)
 		}
@@ -346,7 +373,7 @@ func TestTraitTypes(t *testing.T) {
 	})
 }
 
-// ====== Layout Calculation Tests ======
+// ====== Layout Calculation Tests ======.
 
 func TestLayoutCalculation(t *testing.T) {
 	t.Run("Simple Struct Layout", func(t *testing.T) {
@@ -358,18 +385,20 @@ func TestLayoutCalculation(t *testing.T) {
 
 		layout := CalculateLayout(fields)
 
-		// Check field offsets
+		// Check field offsets.
 		if layout.Fields[0].Offset != 0 {
 			t.Errorf("Field 'a' should be at offset 0, got %d", layout.Fields[0].Offset)
 		}
+
 		if layout.Fields[1].Offset != 4 { // Aligned to 4-byte boundary
 			t.Errorf("Field 'b' should be at offset 4, got %d", layout.Fields[1].Offset)
 		}
+
 		if layout.Fields[2].Offset != 8 {
 			t.Errorf("Field 'c' should be at offset 8, got %d", layout.Fields[2].Offset)
 		}
 
-		// Total size should be aligned to largest field (4 bytes)
+		// Total size should be aligned to largest field (4 bytes).
 		expectedSize := 12 // 0+1+3(pad)+4+2+2(pad) = 12
 		if layout.Size != expectedSize {
 			t.Errorf("Expected total size %d, got %d", expectedSize, layout.Size)
@@ -379,14 +408,14 @@ func TestLayoutCalculation(t *testing.T) {
 	})
 
 	t.Run("Nested Struct Layout", func(t *testing.T) {
-		// Inner struct
+		// Inner struct.
 		innerFields := []RecordField{
 			{Name: "x", Type: TypeFloat32},
 			{Name: "y", Type: TypeFloat32},
 		}
 		innerType := NewRecordType("Point2D", innerFields)
 
-		// Outer struct
+		// Outer struct.
 		outerFields := []RecordField{
 			{Name: "id", Type: TypeInt32},
 			{Name: "position", Type: innerType},
@@ -403,24 +432,26 @@ func TestLayoutCalculation(t *testing.T) {
 	})
 }
 
-// ====== Type Unification Tests ======
+// ====== Type Unification Tests ======.
 
 func TestTypeUnification(t *testing.T) {
 	t.Run("Primitive Type Unification", func(t *testing.T) {
-		// Same types
+		// Same types.
 		unified, err := Unify(TypeInt32, TypeInt32)
 		if err != nil {
 			t.Errorf("Unification of same types should succeed: %v", err)
 		}
+
 		if !unified.Equals(TypeInt32) {
 			t.Error("Unification of same types should return the type")
 		}
 
-		// Numeric promotion
+		// Numeric promotion.
 		unified, err = Unify(TypeInt32, TypeFloat64)
 		if err != nil {
 			t.Errorf("Numeric unification should succeed: %v", err)
 		}
+
 		if !unified.Equals(TypeFloat64) {
 			t.Error("Should promote to higher-precision type")
 		}
@@ -433,16 +464,17 @@ func TestTypeUnification(t *testing.T) {
 		array2 := NewArrayType(TypeInt32, 10)
 		array3 := NewArrayType(TypeInt32, 20)
 
-		// Same arrays
+		// Same arrays.
 		unified, err := Unify(array1, array2)
 		if err != nil {
 			t.Errorf("Unification of same arrays should succeed: %v", err)
 		}
+
 		if !unified.Equals(array1) {
 			t.Error("Unification should return equivalent array")
 		}
 
-		// Different lengths
+		// Different lengths.
 		_, err = Unify(array1, array3)
 		if err == nil {
 			t.Error("Unification of arrays with different lengths should fail")
@@ -456,16 +488,17 @@ func TestTypeUnification(t *testing.T) {
 		func2 := NewFunctionType([]*Type{TypeInt32}, TypeString, false, false)
 		func3 := NewFunctionType([]*Type{TypeFloat32}, TypeString, false, false)
 
-		// Same functions
+		// Same functions.
 		unified, err := Unify(func1, func2)
 		if err != nil {
 			t.Errorf("Unification of same functions should succeed: %v", err)
 		}
+
 		if !unified.Equals(func1) {
 			t.Error("Unification should return equivalent function")
 		}
 
-		// Different parameter types (should succeed with promotion)
+		// Different parameter types (should succeed with promotion).
 		unified, err = Unify(func1, func3)
 		if err != nil {
 			t.Errorf("Function unification with numeric promotion should succeed: %v", err)
@@ -478,20 +511,22 @@ func TestTypeUnification(t *testing.T) {
 		registry := NewTypeRegistry()
 		typeVar := registry.NewTypeVar("T", []*Type{})
 
-		// Unify type variable with concrete type
+		// Unify type variable with concrete type.
 		unified, err := Unify(typeVar, TypeInt32)
 		if err != nil {
 			t.Errorf("Type variable unification should succeed: %v", err)
 		}
+
 		if !unified.Equals(TypeInt32) {
 			t.Error("Type variable should unify to concrete type")
 		}
 
-		// Check that type variable is bound
+		// Check that type variable is bound.
 		tv := typeVar.Data.(*TypeVar)
 		if tv.Bound == nil {
 			t.Error("Type variable should be bound after unification")
 		}
+
 		if !tv.Bound.Equals(TypeInt32) {
 			t.Error("Type variable should be bound to correct type")
 		}
@@ -500,24 +535,25 @@ func TestTypeUnification(t *testing.T) {
 	})
 }
 
-// ====== Subtyping Tests ======
+// ====== Subtyping Tests ======.
 
 func TestSubtyping(t *testing.T) {
 	t.Run("Basic Subtyping", func(t *testing.T) {
-		// All types are subtypes of Any
+		// All types are subtypes of Any.
 		if !TypeInt32.IsSubtypeOf(TypeAny) {
 			t.Error("int32 should be subtype of Any")
 		}
+
 		if !TypeString.IsSubtypeOf(TypeAny) {
 			t.Error("string should be subtype of Any")
 		}
 
-		// Never is subtype of all types
+		// Never is subtype of all types.
 		if !TypeNever.IsSubtypeOf(TypeInt32) {
 			t.Error("Never should be subtype of int32")
 		}
 
-		// Self-subtyping
+		// Self-subtyping.
 		if !TypeInt32.IsSubtypeOf(TypeInt32) {
 			t.Error("Types should be subtypes of themselves")
 		}
@@ -526,14 +562,14 @@ func TestSubtyping(t *testing.T) {
 	})
 
 	t.Run("Structural Subtyping", func(t *testing.T) {
-		// Base struct
+		// Base struct.
 		baseFields := []StructField{
 			{Name: "x", Type: TypeInt32},
 			{Name: "y", Type: TypeInt32},
 		}
 		baseStruct := NewStructType("Point", baseFields)
 
-		// Extended struct (adds field)
+		// Extended struct (adds field).
 		extendedFields := []StructField{
 			{Name: "x", Type: TypeInt32},
 			{Name: "y", Type: TypeInt32},
@@ -541,12 +577,12 @@ func TestSubtyping(t *testing.T) {
 		}
 		extendedStruct := NewStructType("Point3D", extendedFields)
 
-		// Extended should be subtype of base (structural subtyping)
+		// Extended should be subtype of base (structural subtyping).
 		if !extendedStruct.IsSubtypeOf(baseStruct) {
 			t.Error("Extended struct should be subtype of base struct")
 		}
 
-		// Base should not be subtype of extended
+		// Base should not be subtype of extended.
 		if baseStruct.IsSubtypeOf(extendedStruct) {
 			t.Error("Base struct should not be subtype of extended struct")
 		}
@@ -555,11 +591,11 @@ func TestSubtyping(t *testing.T) {
 	})
 
 	t.Run("Function Subtyping", func(t *testing.T) {
-		// Base function: (int32) -> Any
+		// Base function: (int32) -> Any.
 		baseFunc := NewFunctionType([]*Type{TypeInt32}, TypeAny, false, false)
 
-		// Subtype function: (Any) -> int32 (contravariant params, covariant return)
-		// This is wrong - let's fix it to be: (int32) -> int32 which should be subtype of (int32) -> Any
+		// Subtype function: (Any) -> int32 (contravariant params, covariant return).
+		// This is wrong - let's fix it to be: (int32) -> int32 which should be subtype of (int32) -> Any.
 		subtypeFunc := NewFunctionType([]*Type{TypeInt32}, TypeInt32, false, false)
 
 		t.Logf("baseFunc: %s", baseFunc.String())
@@ -575,17 +611,17 @@ func TestSubtyping(t *testing.T) {
 	})
 }
 
-// ====== Type Substitution Tests ======
+// ====== Type Substitution Tests ======.
 
 func TestTypeSubstitution(t *testing.T) {
 	t.Run("Type Variable Substitution", func(t *testing.T) {
 		registry := NewTypeRegistry()
 		typeVar := registry.NewTypeVar("T", []*Type{})
 
-		// Create a function type with type variable: (T) -> T
+		// Create a function type with type variable: (T) -> T.
 		funcType := NewFunctionType([]*Type{typeVar}, typeVar, false, false)
 
-		// Substitute T with int32
+		// Substitute T with int32.
 		tv := typeVar.Data.(*TypeVar)
 		substitutions := map[int]*Type{
 			tv.ID: TypeInt32,
@@ -600,6 +636,7 @@ func TestTypeSubstitution(t *testing.T) {
 		if !substFunc.Parameters[0].Equals(TypeInt32) {
 			t.Error("Parameter should be substituted to int32")
 		}
+
 		if !substFunc.ReturnType.Equals(TypeInt32) {
 			t.Error("Return type should be substituted to int32")
 		}
@@ -611,10 +648,10 @@ func TestTypeSubstitution(t *testing.T) {
 		registry := NewTypeRegistry()
 		typeVar := registry.NewTypeVar("T", []*Type{})
 
-		// Create array type: [10]T
+		// Create array type: [10]T.
 		arrayType := NewArrayType(typeVar, 10)
 
-		// Substitute T with string
+		// Substitute T with string.
 		tv := typeVar.Data.(*TypeVar)
 		substitutions := map[int]*Type{
 			tv.ID: TypeString,
@@ -626,6 +663,7 @@ func TestTypeSubstitution(t *testing.T) {
 		if !substArray.ElementType.Equals(TypeString) {
 			t.Error("Array element type should be substituted to string")
 		}
+
 		if substArray.Length != 10 {
 			t.Error("Array length should be preserved")
 		}
@@ -634,13 +672,13 @@ func TestTypeSubstitution(t *testing.T) {
 	})
 }
 
-// ====== Type Normalization Tests ======
+// ====== Type Normalization Tests ======.
 
 func TestTypeNormalization(t *testing.T) {
 	t.Run("Type Variable Chain Resolution", func(t *testing.T) {
 		registry := NewTypeRegistry()
 
-		// Create a chain: T1 -> T2 -> int32
+		// Create a chain: T1 -> T2 -> int32.
 		typeVar1 := registry.NewTypeVar("T1", []*Type{})
 		typeVar2 := registry.NewTypeVar("T2", []*Type{})
 
@@ -662,10 +700,10 @@ func TestTypeNormalization(t *testing.T) {
 		registry := NewTypeRegistry()
 		typeVar := registry.NewTypeVar("T", []*Type{})
 
-		// Create function type: (T) -> string
+		// Create function type: (T) -> string.
 		funcType := NewFunctionType([]*Type{typeVar}, TypeString, false, false)
 
-		// Bind T to int32
+		// Bind T to int32.
 		tv := typeVar.Data.(*TypeVar)
 		tv.Bound = TypeInt32
 
@@ -675,6 +713,7 @@ func TestTypeNormalization(t *testing.T) {
 		if !normFunc.Parameters[0].Equals(TypeInt32) {
 			t.Error("Function parameter should be normalized to int32")
 		}
+
 		if !normFunc.ReturnType.Equals(TypeString) {
 			t.Error("Return type should remain string")
 		}
@@ -683,36 +722,40 @@ func TestTypeNormalization(t *testing.T) {
 	})
 }
 
-// ====== Performance Tests ======
+// ====== Performance Tests ======.
 
 func TestCompoundTypePerformance(t *testing.T) {
 	t.Run("Complex Type Creation Performance", func(t *testing.T) {
 		const numTypes = 100
 
-		// Create many variant types
+		// Create many variant types.
 		for i := 0; i < numTypes; i++ {
 			variants := []VariantOption{
 				{Name: "A", Type: TypeInt32},
 				{Name: "B", Type: TypeString},
 				{Name: "C", Type: nil},
 			}
+
 			variantType := NewVariantType("TestVariant", variants)
 			if variantType == nil {
 				t.Errorf("Failed to create variant type %d", i)
+
 				break
 			}
 		}
 
-		// Create many record types
+		// Create many record types.
 		for i := 0; i < numTypes; i++ {
 			fields := []RecordField{
 				{Name: "field1", Type: TypeInt32},
 				{Name: "field2", Type: TypeString},
 				{Name: "field3", Type: TypeFloat64},
 			}
+
 			recordType := NewRecordType("TestRecord", fields)
 			if recordType == nil {
 				t.Errorf("Failed to create record type %d", i)
+
 				break
 			}
 		}
@@ -723,7 +766,7 @@ func TestCompoundTypePerformance(t *testing.T) {
 	t.Run("Type Unification Performance", func(t *testing.T) {
 		const numUnifications = 1000
 
-		// Create complex types
+		// Create complex types.
 		arrayType1 := NewArrayType(TypeInt32, 10)
 		arrayType2 := NewArrayType(TypeInt32, 10)
 
@@ -731,6 +774,7 @@ func TestCompoundTypePerformance(t *testing.T) {
 			_, err := Unify(arrayType1, arrayType2)
 			if err != nil {
 				t.Errorf("Unification %d failed: %v", i, err)
+
 				break
 			}
 		}
