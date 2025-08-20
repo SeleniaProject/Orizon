@@ -255,12 +255,18 @@ func (slice *OrizonSlice) Get(index uintptr) unsafe.Pointer {
 	if slice.data == nil {
 		panic("Null slice data pointer")
 	}
-	// Check for integer overflow in offset calculation.
-	if elementSize > 0 && index > ^uintptr(0)/elementSize {
+	// Check for integer overflow in offset calculation (multiplication).
+	if elementSize > 0 && index >= ^uintptr(0)/elementSize {
 		panic("Offset calculation would overflow")
 	}
+	offset := index * elementSize
+	// Check for integer overflow in pointer addition: base + offset exceeds uintptr max.
+	base := uintptr(slice.data)
+	if offset > ^uintptr(0)-base {
+		panic("Pointer addition would overflow")
+	}
 	// Use unsafe.Add for race detector compatibility
-	return unsafe.Add(slice.data, index*elementSize)
+	return unsafe.Add(slice.data, offset)
 }
 
 func (slice *OrizonSlice) Set(index uintptr, value unsafe.Pointer) {
@@ -284,12 +290,18 @@ func (slice *OrizonSlice) Set(index uintptr, value unsafe.Pointer) {
 	if value == nil {
 		panic("Null value pointer")
 	}
-	// Check for integer overflow in offset calculation.
-	if elementSize > 0 && index > ^uintptr(0)/elementSize {
+	// Check for integer overflow in offset calculation (multiplication).
+	if elementSize > 0 && index >= ^uintptr(0)/elementSize {
 		panic("Offset calculation would overflow")
 	}
+	offset := index * elementSize
+	// Check for integer overflow in pointer addition: base + offset exceeds uintptr max.
+	base := uintptr(slice.data)
+	if offset > ^uintptr(0)-base {
+		panic("Pointer addition would overflow")
+	}
 	// Use unsafe.Add for race detector compatibility
-	dest := unsafe.Add(slice.data, index*elementSize)
+	dest := unsafe.Add(slice.data, offset)
 	// Copy value bytes to destination.
 	copyBytes(dest, value, elementSize)
 }
