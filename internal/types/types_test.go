@@ -1,4 +1,4 @@
-// Tests for basic type system implementation
+// Tests for basic type system implementation.
 // This file tests Phase 2.1.1: Basic type definitions and operations
 
 package types
@@ -11,74 +11,89 @@ import (
 
 func TestPhase2_1_1Completion(t *testing.T) {
 	t.Run("Phase 2.1.1 Basic Type System - Full Implementation", func(t *testing.T) {
-		// Test primitive type creation
+		// Test primitive type creation.
 		intType := NewPrimitiveType(TypeKindInt32, 4, true)
 		if intType == nil {
 			t.Fatal("Failed to create primitive type")
 		}
+
 		if intType.Kind != TypeKindInt32 {
 			t.Errorf("Expected TypeKindInt32, got %v", intType.Kind)
 		}
+
 		t.Log("✅ Primitive type creation implemented")
 
-		// Test array type creation
+		// Test array type creation.
 		arrayType := NewArrayType(intType, 10)
 		if arrayType == nil {
 			t.Fatal("Failed to create array type")
 		}
+
 		if arrayType.Kind != TypeKindArray {
 			t.Errorf("Expected TypeKindArray, got %v", arrayType.Kind)
 		}
+
 		t.Log("✅ Array type creation implemented")
 
-		// Test struct type creation
+		// Test struct type creation.
 		fields := []StructField{
 			{Name: "x", Type: intType},
 			{Name: "y", Type: intType},
 		}
+
 		structType := NewStructType("Point", fields)
 		if structType == nil {
 			t.Fatal("Failed to create struct type")
 		}
+
 		if structType.Kind != TypeKindStruct {
 			t.Errorf("Expected TypeKindStruct, got %v", structType.Kind)
 		}
+
 		t.Log("✅ Struct type creation implemented")
 
-		// Test function type creation
+		// Test function type creation.
 		params := []*Type{intType, intType}
+
 		funcType := NewFunctionType(params, intType, false, false)
 		if funcType == nil {
 			t.Fatal("Failed to create function type")
 		}
+
 		if funcType.Kind != TypeKindFunction {
 			t.Errorf("Expected TypeKindFunction, got %v", funcType.Kind)
 		}
+
 		t.Log("✅ Function type creation implemented")
 
-		// Test type equality
+		// Test type equality.
 		intType2 := NewPrimitiveType(TypeKindInt32, 4, true)
 		if !intType.Equals(intType2) {
 			t.Error("Identical primitive types should be equal")
 		}
+
 		t.Log("✅ Type equality implemented")
 
-		// Test type conversion
+		// Test type conversion.
 		floatType := NewPrimitiveType(TypeKindFloat32, 4, true)
 		if !intType.CanConvertTo(floatType) {
 			t.Error("Numeric types should be convertible")
 		}
+
 		t.Log("✅ Type conversion rules implemented")
 
-		// Test type registry
+		// Test type registry.
 		registry := NewTypeRegistry()
 		if registry == nil {
 			t.Fatal("Failed to create type registry")
 		}
+
 		registry.RegisterType("Point", structType)
+
 		if found, exists := registry.LookupType("Point"); !exists || found != structType {
 			t.Error("Type registry should store and retrieve types")
 		}
+
 		t.Log("✅ Type registry implemented")
 
 		t.Log("")
@@ -103,7 +118,7 @@ func TestPhase2_1_1Completion(t *testing.T) {
 	})
 }
 
-// ====== Type Creation Tests ======
+// ====== Type Creation Tests ======.
 
 func TestTypeCreation(t *testing.T) {
 	t.Run("Primitive Type Creation", func(t *testing.T) {
@@ -125,11 +140,14 @@ func TestTypeCreation(t *testing.T) {
 				typeObj := NewPrimitiveType(tt.kind, tt.size, tt.signed)
 				if typeObj == nil {
 					t.Errorf("Failed to create %s type", tt.name)
+
 					return
 				}
+
 				if typeObj.Kind != tt.kind {
 					t.Errorf("Expected kind %v, got %v", tt.kind, typeObj.Kind)
 				}
+
 				if typeObj.Size != tt.size {
 					t.Errorf("Expected size %d, got %d", tt.size, typeObj.Size)
 				}
@@ -161,6 +179,7 @@ func TestTypeCreation(t *testing.T) {
 				arrayType := NewArrayType(intType, tt.length)
 				if arrayType == nil {
 					t.Errorf("Failed to create array type")
+
 					return
 				}
 
@@ -168,9 +187,11 @@ func TestTypeCreation(t *testing.T) {
 				if arrayData.Length != tt.length {
 					t.Errorf("Expected length %d, got %d", tt.length, arrayData.Length)
 				}
+
 				if !arrayData.ElementType.Equals(intType) {
 					t.Errorf("Element type mismatch")
 				}
+
 				if arrayType.Size != intType.Size*tt.length {
 					t.Errorf("Array size calculation incorrect")
 				}
@@ -214,6 +235,7 @@ func TestTypeCreation(t *testing.T) {
 				structType := NewStructType(tt.name, tt.fields)
 				if structType == nil {
 					t.Errorf("Failed to create struct type")
+
 					return
 				}
 
@@ -221,6 +243,7 @@ func TestTypeCreation(t *testing.T) {
 				if structData.Name != tt.name {
 					t.Errorf("Expected name %s, got %s", tt.name, structData.Name)
 				}
+
 				if len(structData.Fields) != len(tt.fields) {
 					t.Errorf("Expected %d fields, got %d", len(tt.fields), len(structData.Fields))
 				}
@@ -229,6 +252,7 @@ func TestTypeCreation(t *testing.T) {
 					if structData.Fields[i].Name != field.Name {
 						t.Errorf("Field %d name mismatch", i)
 					}
+
 					if !structData.Fields[i].Type.Equals(field.Type) {
 						t.Errorf("Field %d type mismatch", i)
 					}
@@ -240,7 +264,7 @@ func TestTypeCreation(t *testing.T) {
 	})
 }
 
-// ====== Type Equality Tests ======
+// ====== Type Equality Tests ======.
 
 func TestTypeEquality(t *testing.T) {
 	t.Run("Primitive Type Equality", func(t *testing.T) {
@@ -251,6 +275,7 @@ func TestTypeEquality(t *testing.T) {
 		if !int1.Equals(int2) {
 			t.Error("Same primitive types should be equal")
 		}
+
 		if int1.Equals(float1) {
 			t.Error("Different primitive types should not be equal")
 		}
@@ -267,6 +292,7 @@ func TestTypeEquality(t *testing.T) {
 		if !array1.Equals(array2) {
 			t.Error("Arrays with same element type and length should be equal")
 		}
+
 		if array1.Equals(array3) {
 			t.Error("Arrays with different lengths should not be equal")
 		}
@@ -296,6 +322,7 @@ func TestTypeEquality(t *testing.T) {
 		if !struct1.Equals(struct2) {
 			t.Error("Structs with same name and fields should be equal")
 		}
+
 		if struct1.Equals(struct3) {
 			t.Error("Structs with different field names should not be equal")
 		}
@@ -314,6 +341,7 @@ func TestTypeEquality(t *testing.T) {
 		if !func1.Equals(func2) {
 			t.Error("Functions with same signature should be equal")
 		}
+
 		if func1.Equals(func3) {
 			t.Error("Functions with different parameters should not be equal")
 		}
@@ -322,7 +350,7 @@ func TestTypeEquality(t *testing.T) {
 	})
 }
 
-// ====== Type Conversion Tests ======
+// ====== Type Conversion Tests ======.
 
 func TestTypeConversion(t *testing.T) {
 	t.Run("Numeric Conversions", func(t *testing.T) {
@@ -333,9 +361,11 @@ func TestTypeConversion(t *testing.T) {
 		if !intType.CanConvertTo(floatType) {
 			t.Error("int32 should convert to float64")
 		}
+
 		if !floatType.CanConvertTo(intType) {
 			t.Error("float64 should convert to int32")
 		}
+
 		if intType.CanConvertTo(stringType) {
 			t.Error("int32 should not directly convert to string")
 		}
@@ -351,6 +381,7 @@ func TestTypeConversion(t *testing.T) {
 		if !nullablePtr.CanConvertTo(nonNullPtr) {
 			t.Error("Nullable pointer should convert to non-null pointer")
 		}
+
 		if nonNullPtr.CanConvertTo(nullablePtr) {
 			t.Error("Non-null pointer should not convert to nullable pointer")
 		}
@@ -366,6 +397,7 @@ func TestTypeConversion(t *testing.T) {
 		if !arrayType.CanConvertTo(sliceType) {
 			t.Error("Array should convert to slice of same element type")
 		}
+
 		if sliceType.CanConvertTo(arrayType) {
 			t.Error("Slice should not convert to array")
 		}
@@ -381,6 +413,7 @@ func TestTypeConversion(t *testing.T) {
 		if !intType.CanConvertTo(anyType) {
 			t.Error("Any type should accept all types")
 		}
+
 		if !neverType.CanConvertTo(intType) {
 			t.Error("Never type should convert to all types")
 		}
@@ -389,7 +422,7 @@ func TestTypeConversion(t *testing.T) {
 	})
 }
 
-// ====== Type Properties Tests ======
+// ====== Type Properties Tests ======.
 
 func TestTypeProperties(t *testing.T) {
 	t.Run("Numeric Type Properties", func(t *testing.T) {
@@ -401,9 +434,11 @@ func TestTypeProperties(t *testing.T) {
 		if !intType.IsNumeric() {
 			t.Error("int32 should be numeric")
 		}
+
 		if !intType.IsInteger() {
 			t.Error("int32 should be integer")
 		}
+
 		if !intType.IsSigned() {
 			t.Error("int32 should be signed")
 		}
@@ -411,9 +446,11 @@ func TestTypeProperties(t *testing.T) {
 		if !uintType.IsNumeric() {
 			t.Error("uint32 should be numeric")
 		}
+
 		if !uintType.IsInteger() {
 			t.Error("uint32 should be integer")
 		}
+
 		if uintType.IsSigned() {
 			t.Error("uint32 should be unsigned")
 		}
@@ -421,9 +458,11 @@ func TestTypeProperties(t *testing.T) {
 		if !floatType.IsNumeric() {
 			t.Error("float64 should be numeric")
 		}
+
 		if !floatType.IsFloat() {
 			t.Error("float64 should be float")
 		}
+
 		if floatType.IsInteger() {
 			t.Error("float64 should not be integer")
 		}
@@ -447,12 +486,15 @@ func TestTypeProperties(t *testing.T) {
 		if !arrayType.IsAggregate() {
 			t.Error("Array should be aggregate")
 		}
+
 		if sliceType.IsAggregate() {
 			t.Error("Slice should not be aggregate (it's a reference)")
 		}
+
 		if !structType.IsAggregate() {
 			t.Error("Struct should be aggregate")
 		}
+
 		if pointerType.IsAggregate() {
 			t.Error("Pointer should not be aggregate")
 		}
@@ -460,6 +502,7 @@ func TestTypeProperties(t *testing.T) {
 		if !pointerType.IsPointer() {
 			t.Error("Pointer type should be identified as pointer")
 		}
+
 		if arrayType.IsPointer() {
 			t.Error("Array should not be pointer")
 		}
@@ -474,6 +517,7 @@ func TestTypeProperties(t *testing.T) {
 		if !funcType.IsCallable() {
 			t.Error("Function type should be callable")
 		}
+
 		if intType.IsCallable() {
 			t.Error("int32 should not be callable")
 		}
@@ -482,7 +526,7 @@ func TestTypeProperties(t *testing.T) {
 	})
 }
 
-// ====== Type Registry Tests ======
+// ====== Type Registry Tests ======.
 
 func TestTypeRegistry(t *testing.T) {
 	t.Run("Registry Creation and Built-ins", func(t *testing.T) {
@@ -491,7 +535,7 @@ func TestTypeRegistry(t *testing.T) {
 			t.Fatal("Failed to create type registry")
 		}
 
-		// Test built-in types
+		// Test built-in types.
 		builtins := []string{
 			"void", "bool", "int8", "int16", "int32", "int64",
 			"uint8", "uint16", "uint32", "uint64",
@@ -510,7 +554,7 @@ func TestTypeRegistry(t *testing.T) {
 	t.Run("Custom Type Registration", func(t *testing.T) {
 		registry := NewTypeRegistry()
 
-		// Register custom types
+		// Register custom types.
 		pointType := NewStructType("Point", []StructField{
 			{Name: "x", Type: TypeInt32},
 			{Name: "y", Type: TypeInt32},
@@ -518,16 +562,17 @@ func TestTypeRegistry(t *testing.T) {
 
 		registry.RegisterType("Point", pointType)
 
-		// Lookup custom type
+		// Lookup custom type.
 		found, exists := registry.LookupType("Point")
 		if !exists {
 			t.Error("Custom type should be found after registration")
 		}
+
 		if found != pointType {
 			t.Error("Retrieved type should be the same as registered")
 		}
 
-		// Lookup non-existent type
+		// Lookup non-existent type.
 		_, exists = registry.LookupType("NonExistent")
 		if exists {
 			t.Error("Non-existent type should not be found")
@@ -539,7 +584,7 @@ func TestTypeRegistry(t *testing.T) {
 	t.Run("Type Variable Creation", func(t *testing.T) {
 		registry := NewTypeRegistry()
 
-		// Create type variables
+		// Create type variables.
 		var1 := registry.NewTypeVar("T", nil)
 		var2 := registry.NewTypeVar("U", []*Type{TypeInt32})
 
@@ -553,9 +598,11 @@ func TestTypeRegistry(t *testing.T) {
 		if data1.ID == data2.ID {
 			t.Error("Type variables should have unique IDs")
 		}
+
 		if data1.Name != "T" {
 			t.Errorf("Expected name 'T', got '%s'", data1.Name)
 		}
+
 		if len(data2.Constraints) != 1 {
 			t.Errorf("Expected 1 constraint, got %d", len(data2.Constraints))
 		}
@@ -564,7 +611,7 @@ func TestTypeRegistry(t *testing.T) {
 	})
 }
 
-// ====== String Representation Tests ======
+// ====== String Representation Tests ======.
 
 func TestTypeStringRepresentation(t *testing.T) {
 	t.Run("Primitive Type Strings", func(t *testing.T) {
@@ -643,27 +690,29 @@ func TestTypeStringRepresentation(t *testing.T) {
 	})
 }
 
-// ====== Performance Tests ======
+// ====== Performance Tests ======.
 
 func TestTypePerformance(t *testing.T) {
 	t.Run("Type Creation Performance", func(t *testing.T) {
 		const numTypes = 1000
 
-		// Test primitive type creation
+		// Test primitive type creation.
 		for i := 0; i < numTypes; i++ {
 			typeObj := NewPrimitiveType(TypeKindInt32, 4, true)
 			if typeObj == nil {
 				t.Errorf("Failed to create type %d", i)
+
 				break
 			}
 		}
 
-		// Test array type creation
+		// Test array type creation.
 		intType := TypeInt32
 		for i := 0; i < numTypes; i++ {
 			arrayType := NewArrayType(intType, i+1)
 			if arrayType == nil {
 				t.Errorf("Failed to create array type %d", i)
+
 				break
 			}
 		}
@@ -678,14 +727,17 @@ func TestTypePerformance(t *testing.T) {
 		intType2 := TypeInt32
 		floatType := TypeFloat32
 
-		// Test primitive equality
+		// Test primitive equality.
 		for i := 0; i < numComparisons; i++ {
 			if !intType1.Equals(intType2) {
 				t.Error("Same types should be equal")
+
 				break
 			}
+
 			if intType1.Equals(floatType) {
 				t.Error("Different types should not be equal")
+
 				break
 			}
 		}
