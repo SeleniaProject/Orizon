@@ -1,0 +1,519 @@
+name: Orizon CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Daily security scans and comprehensive tests at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  GO_VERSION: '1.24.x'
+  CGO_ENABLED: 0
+  GOPROXY: https://proxy.golang.org,direct
+  GOSUMDB: sum.golang.org
+  
+jobs:
+  # Pre-flight checks and setup
+  preflight:
+    name: Pre-flight Security & Quality Checks
+    runs-on: ubuntu-latest
+    outputs:
+      go-version: ${{ steps.setup.outputs.go-version }}
+      cache-key: ${{ steps.cache.outputs.cache-hit }}
+    steps:
+      - name: Checkout code with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+          
+      - name: Set up Go environment
+        id: setup
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+          
+      - name: Cache Go modules and build cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/*.go') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
+            ${{ runner.os }}-go-
+            
+      - name: Download dependencies with verification
+        run: |
+          go mod download
+          go mod verify
+          
+      - name: Validate Go module integrity
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+          
+      - name: Basic compilation check
+        run: |
+          go build -v ./...
+
+  # Security scanning and vulnerability assessment
+  security:
+    name: Security & Vulnerability Scanning
+    runs-on: ubuntu-latest
+    needs: preflight
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install security tools (Go-native only)
+        run: |
+          # Install Go-based security tools (no C/C++ dependencies)
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/sonatype-nexus-community/nancy@latest
+          
+      - name: Run Gosec security scanner
+        run: |
+          gosec -fmt sarif -out gosec-results.sarif -severity medium ./...
+          gosec -fmt json -out artifacts/security-report.json ./...
+        continue-on-error: true
+        
+      - name: Run Go vulnerability check
+        run: |
+          govulncheck -json ./... > artifacts/vuln-report.json
+        continue-on-error: true
+        
+      - name: Scan dependencies with Nancy
+        run: |
+          go list -json -deps ./... | nancy sleuth --output-format json > artifacts/nancy-report.json
+        continue-on-error: true
+        
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            artifacts/security-report.json
+            artifacts/vuln-report.json
+            artifacts/nancy-report.json
+            gosec-results.sarif
+          retention-days: 30
+
+  # Code quality and static analysis
+  quality:
+    name: Code Quality & Static Analysis
+    runs-on: ubuntu-latest
+    needs: preflight
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install quality tools (Go-native only)
+        run: |
+          # Install Go-based quality tools (avoiding C/C++ dependencies)
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install github.com/kisielk/errcheck@latest
+          go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
+          
+      - name: Run comprehensive linting
+        run: |
+          golangci-lint run --out-format json --issues-exit-code 0 > artifacts/lint-report.json
+          golangci-lint run --out-format github-actions
+          
+      - name: Check code formatting
+        run: |
+          UNFORMATTED=$(gofmt -s -l . | grep -v vendor/ | grep -v .pb.go || true)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "::error::The following files are not properly formatted:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+          
+      - name: Check import organization
+        run: |
+          UNFORMATTED=$(goimports -l . | grep -v vendor/ | grep -v .pb.go || true)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "::error::The following files have incorrect imports:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+          
+      - name: Run additional static analysis
+        run: |
+          staticcheck -f json ./... > artifacts/staticcheck-report.json 2>&1 || true
+          errcheck -json ./... > artifacts/errcheck-report.json 2>&1 || true
+          go vet -json ./... > artifacts/govet-report.json 2>&1 || true
+          
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            artifacts/lint-report.json
+            artifacts/staticcheck-report.json
+            artifacts/errcheck-report.json
+            artifacts/govet-report.json
+          retention-days: 30
+
+  # Build and test matrix
+  build-test:
+    name: Build & Test (${{ matrix.os }}, Go ${{ matrix.go-version }})
+    runs-on: ${{ matrix.os }}
+    needs: [preflight, security, quality]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go-version: ['1.24.x']
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+            
+      - name: Build all tools with CGO disabled
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          make build-all
+          
+      - name: Run unit tests with coverage
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p artifacts
+          go test -v -race -coverprofile=artifacts/coverage-${{ matrix.os }}.out -covermode=atomic ./...
+          go tool cover -func=artifacts/coverage-${{ matrix.os }}.out > artifacts/coverage-summary-${{ matrix.os }}.txt
+          go tool cover -html=artifacts/coverage-${{ matrix.os }}.out -o artifacts/coverage-${{ matrix.os }}.html
+          
+      - name: Run integration tests
+        env:
+          CGO_ENABLED: 0
+        run: |
+          # Platform-specific smoke tests without C/C++ dependencies
+          case "${{ matrix.os }}" in
+            ubuntu-latest)
+              bash ./scripts/linux/smoke.sh
+              ;;
+            windows-latest)
+              powershell -ExecutionPolicy Bypass -File .\scripts\win\smoke.ps1
+              ;;
+            macos-latest)
+              bash ./scripts/linux/smoke.sh
+              ;;
+          esac
+          
+      - name: Run benchmark tests
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go test -bench=. -benchmem -run=^$ ./... > artifacts/benchmark-${{ matrix.os }}.txt
+          
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.os }}
+          path: |
+            build/
+            artifacts/coverage-${{ matrix.os }}.*
+            artifacts/benchmark-${{ matrix.os }}.txt
+          retention-days: 7
+
+  # Advanced testing and fuzzing
+  advanced-testing:
+    name: Advanced Testing & Fuzzing
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Build fuzzing tools
+        env:
+          CGO_ENABLED: 0
+        run: |
+          make build-all
+          
+      - name: Run parser fuzzing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          timeout 300s ./build/orizon-fuzz --target parser --duration 5m --p 4 --max-execs 50000 \
+            --stats --json-stats artifacts/fuzz-parser-stats.json \
+            --corpus corpus/parser_corpus.txt --covout artifacts/parser.cov \
+            --out artifacts/parser-crashes.txt --min-on-crash || true
+            
+      - name: Run lexer fuzzing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          timeout 300s ./build/orizon-fuzz --target lexer --duration 5m --p 4 --max-execs 50000 \
+            --stats --json-stats artifacts/fuzz-lexer-stats.json \
+            --corpus corpus/lexer_corpus.txt \
+            --out artifacts/lexer-crashes.txt || true
+            
+      - name: Run AST bridge fuzzing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          timeout 300s ./build/orizon-fuzz --target astbridge --duration 5m --p 4 --max-execs 50000 \
+            --stats --json-stats artifacts/fuzz-astbridge-stats.json \
+            --corpus corpus/astbridge_corpus.txt \
+            --out artifacts/astbridge-crashes.txt || true
+            
+      - name: Property-based testing
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go test -v -fuzz=. -fuzztime=5m ./internal/lexer/... || true
+          go test -v -fuzz=. -fuzztime=5m ./internal/parser/... || true
+          
+      - name: Upload fuzzing results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzzing-results
+          path: |
+            artifacts/fuzz-*-stats.json
+            artifacts/*-crashes.txt
+            artifacts/*.cov
+          retention-days: 30
+
+  # Configuration validation and Docker builds
+  config-validation:
+    name: Configuration Validation & Container Build
+    runs-on: ubuntu-latest
+    needs: preflight
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Validate Makefile syntax
+        run: |
+          make --dry-run help
+          
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhymond/github-actions-yaml-validator:v1.0.0
+        with:
+          path: '.github/workflows/'
+          
+      - name: Check Dockerfile syntax (if exists)
+        run: |
+          if [ -f Dockerfile ]; then
+            docker run --rm -i hadolint/hadolint < Dockerfile
+          fi
+          if [ -f docker/Dockerfile.dev ]; then
+            docker run --rm -i hadolint/hadolint < docker/Dockerfile.dev
+          fi
+          
+      - name: Validate JSON/YAML configuration files
+        run: |
+          # Check for any JSON files
+          find . -name "*.json" -not -path "./vendor/*" -not -path "./.git/*" | \
+            xargs -I {} sh -c 'echo "Validating {}" && cat {} | python3 -m json.tool > /dev/null'
+          
+          # Check for any YAML files
+          find . -name "*.yml" -o -name "*.yaml" -not -path "./vendor/*" -not -path "./.git/*" | \
+            xargs -I {} sh -c 'echo "Validating {}" && python3 -c "import yaml; yaml.safe_load(open(\"{}\"))"'
+
+  # Cross-platform compatibility and release preparation
+  cross-platform-build:
+    name: Cross-Platform Build & Release Preparation
+    runs-on: ubuntu-latest
+    needs: [build-test, advanced-testing]
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          # Exclude unsupported combinations
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          
+          mkdir -p dist/${{ matrix.goos }}-${{ matrix.goarch }}
+          
+          # Build all main tools
+          go build -ldflags="-s -w -X main.version=$(git describe --tags --always)" \
+            -o "dist/${{ matrix.goos }}-${{ matrix.goarch }}/orizon${EXT}" ./cmd/orizon
+          go build -ldflags="-s -w" \
+            -o "dist/${{ matrix.goos }}-${{ matrix.goarch }}/orizon-compiler${EXT}" ./cmd/orizon-compiler
+          go build -ldflags="-s -w" \
+            -o "dist/${{ matrix.goos }}-${{ matrix.goarch }}/orizon-fmt${EXT}" ./cmd/orizon-fmt
+          go build -ldflags="-s -w" \
+            -o "dist/${{ matrix.goos }}-${{ matrix.goarch }}/orizon-lsp${EXT}" ./cmd/orizon-lsp
+          go build -ldflags="-s -w" \
+            -o "dist/${{ matrix.goos }}-${{ matrix.goarch }}/orizon-test${EXT}" ./cmd/orizon-test
+          
+      - name: Create release archive
+        run: |
+          cd dist/${{ matrix.goos }}-${{ matrix.goarch }}
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip -r ../orizon-${{ matrix.goos }}-${{ matrix.goarch }}.zip .
+          else
+            tar -czf ../orizon-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz .
+          fi
+          cd ../..
+          
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: releases-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/orizon-${{ matrix.goos }}-${{ matrix.goarch }}.*
+          retention-days: 30
+
+  # Comprehensive reporting and summary
+  reporting:
+    name: Generate Comprehensive Reports
+    runs-on: ubuntu-latest
+    needs: [security, quality, build-test, advanced-testing, config-validation]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts/
+          
+      - name: Generate CI/CD summary report
+        run: |
+          mkdir -p final-reports
+          
+          # Create comprehensive summary
+          {
+            echo "# Orizon CI/CD Pipeline Summary Report"
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "**Commit:** ${GITHUB_SHA::8}"
+            echo "**Branch:** ${GITHUB_REF_NAME}"
+            echo ""
+            
+            echo "## Security Analysis"
+            if [ -f all-artifacts/security-reports/security-report.json ]; then
+              echo "✅ Security scan completed"
+            else
+              echo "❌ Security scan failed or missing"
+            fi
+            
+            echo "## Code Quality"
+            if [ -f all-artifacts/quality-reports/lint-report.json ]; then
+              echo "✅ Code quality analysis completed"
+            else
+              echo "❌ Code quality analysis failed or missing"
+            fi
+            
+            echo "## Build Results"
+            for os in ubuntu-latest windows-latest macos-latest; do
+              if [ -d "all-artifacts/build-artifacts-${os}" ]; then
+                echo "✅ ${os} build successful"
+              else
+                echo "❌ ${os} build failed"
+              fi
+            done
+            
+            echo "## Test Coverage"
+            find all-artifacts -name "coverage-*.txt" | while read -r file; do
+              if [ -f "$file" ]; then
+                echo "### $(basename "$file" .txt | sed 's/coverage-summary-//')"
+                tail -1 "$file" || echo "Coverage data unavailable"
+              fi
+            done
+            
+            echo "## Fuzzing Results"
+            find all-artifacts -name "fuzz-*-stats.json" | while read -r file; do
+              if [ -f "$file" ]; then
+                echo "### $(basename "$file" .json)"
+                if command -v jq >/dev/null 2>&1; then
+                  jq -r '. | "Executions: \(.executions // "N/A"), Coverage: \(.coverage // "N/A")"' "$file" 2>/dev/null || echo "JSON parsing failed"
+                else
+                  echo "Stats available in artifact"
+                fi
+              fi
+            done
+          } > final-reports/ci-summary.md
+          
+      - name: Upload comprehensive reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-reports
+          path: final-reports/
+          retention-days: 90
+          
+      - name: Post summary to job summary
+        if: always()
+        run: |
+          if [ -f final-reports/ci-summary.md ]; then
+            cat final-reports/ci-summary.md >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,90 @@
+name: Nightly Tests
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 毎日2時UTC
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24.x'
+  CGO_ENABLED: 0
+
+jobs:
+  comprehensive-test:
+    name: Comprehensive Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go-version: ['1.23.x', '1.24.x']
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Build all components
+      run: make build-all
+      
+    - name: Run all tests
+      run: go test -v ./...
+      
+    - name: Run benchmarks
+      run: go test -bench=. -run=^$ ./...
+      
+    - name: Test with race detector
+      if: runner.os == 'Linux'
+      run: go test -race ./...
+      
+    - name: Test coverage
+      if: runner.os == 'Linux' && matrix.go-version == '1.24.x'
+      run: |
+        go test -coverprofile=coverage.out ./...
+        go tool cover -html=coverage.out -o coverage.html
+        
+    - name: Upload coverage
+      if: runner.os == 'Linux' && matrix.go-version == '1.24.x'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.html
+
+  fuzz-test:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Run fuzz tests
+      run: |
+        # 短時間のファズテスト実行
+        find . -name '*_test.go' -exec grep -l 'func Fuzz' {} \; | while read file; do
+          dir=$(dirname "$file")
+          echo "Running fuzz tests in $dir"
+          cd "$dir"
+          go test -fuzz=. -fuzztime=30s
+          cd -
+        done
+      timeout-minutes: 10
