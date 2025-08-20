@@ -13,7 +13,10 @@ env:
 jobs:
   test:
     name: Test
-  runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         
     steps:
     - name: Checkout code
@@ -45,43 +48,17 @@ jobs:
     - name: Build
       run: make build-all
       
-    - name: List and run stable test packages
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "Resolving package list..."
-        PKGS=$(go list ./... \
-          | grep -v 'internal/astbridge' \
-          | grep -v 'internal/tools/lsp' \
-          | grep -v 'internal/types' \
-          | grep -v 'test/e2e' || true)
-        echo "Packages under test:";
-        echo "$PKGS" | tr ' ' '\n'
-        echo "Running tests (short)..."
-        for p in $PKGS; do
-          echo "==> $p";
-          go test -short "$p";
-        done
+    - name: Test (short)
+      run: go test -timeout=10m -short ./...
       
     - name: Test with race detector (Linux only)
       if: runner.os == 'Linux'
-      shell: bash
-      run: |
-        set -euo pipefail
-        PKGS=$(go list ./... \
-          | grep -v 'internal/astbridge' \
-          | grep -v 'internal/tools/lsp' \
-          | grep -v 'internal/types' \
-          | grep -v 'test/e2e' || true)
-        for p in $PKGS; do
-          echo "[race] ==> $p";
-          go test -race -short "$p";
-        done
+      run: go test -timeout=10m -race -short ./...
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
+    
     
     steps:
     - name: Checkout code
@@ -108,7 +85,7 @@ jobs:
   security:
     name: Security
     runs-on: ubuntu-latest
-    continue-on-error: true
+    
     
     steps:
     - name: Checkout code
