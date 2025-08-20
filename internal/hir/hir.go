@@ -1,13 +1,13 @@
 // Package hir defines the High-level Intermediate Representation (HIR) for the Orizon programming language.
 // Phase 1.4.1: HIR設計と実装 - High-level semantic intermediate representation
-// This package provides semantically rich intermediate representation that captures
+// This package provides semantically rich intermediate representation that captures.
 // the intent and meaning of the source program while enabling high-level optimizations.
 //
-// HIR is designed to bridge the gap between AST and lower-level IRs, providing:
-// - Semantic information (types, effects, regions)
-// - High-level constructs preservation
-// - Optimization-friendly representation
-// - Debugging and analysis support
+// HIR is designed to bridge the gap between AST and lower-level IRs, providing:.
+// - Semantic information (types, effects, regions).
+// - High-level constructs preservation.
+// - Optimization-friendly representation.
+// - Debugging and analysis support.
 package hir
 
 import (
@@ -17,148 +17,156 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// NodeID uniquely identifies an HIR node within a program
+// NodeID uniquely identifies an HIR node within a program.
 type NodeID uint64
 
-// ModuleID uniquely identifies a module within a program
+// ModuleID uniquely identifies a module within a program.
 type ModuleID uint64
 
-// TypeID uniquely identifies a type within the type system
+// TypeID uniquely identifies a type within the type system.
 type TypeID uint64
 
-// EffectID uniquely identifies an effect within the effect system
+// EffectID uniquely identifies an effect within the effect system.
 type EffectID uint64
 
-// RegionID uniquely identifies a memory region within the region system
+// RegionID uniquely identifies a memory region within the region system.
 type RegionID uint64
 
-// HIRNode is the base interface for all HIR nodes
-// Every HIR node carries semantic information and metadata
+// HIRNode is the base interface for all HIR nodes.
+// Every HIR node carries semantic information and metadata.
 type HIRNode interface {
-	// GetID returns the unique identifier for this node
+	// GetID returns the unique identifier for this node.
 	GetID() NodeID
-	// GetSpan returns the source span covered by this node
+	// GetSpan returns the source span covered by this node.
 	GetSpan() position.Span
-	// GetType returns the type information for this node
+	// GetType returns the type information for this node.
 	GetType() TypeInfo
-	// GetEffects returns the effect set for this node
+	// GetEffects returns the effect set for this node.
 	GetEffects() EffectSet
-	// GetRegions returns the region set for this node
+	// GetRegions returns the region set for this node.
 	GetRegions() RegionSet
-	// String returns a human-readable representation of the node
+	// String returns a human-readable representation of the node.
 	String() string
-	// Accept implements the visitor pattern for HIR traversal
+	// Accept implements the visitor pattern for HIR traversal.
 	Accept(visitor HIRVisitor) interface{}
-	// GetChildren returns child nodes for tree traversal
+	// GetChildren returns child nodes for tree traversal.
 	GetChildren() []HIRNode
 }
 
-// HIRStatement represents all statement nodes in the HIR
+// HIRStatement represents all statement nodes in the HIR.
 type HIRStatement interface {
 	HIRNode
 	hirStatementNode() // Marker method to distinguish statements
 }
 
-// HIRExpression represents all expression nodes in the HIR
+// HIRExpression represents all expression nodes in the HIR.
 type HIRExpression interface {
 	HIRNode
 	hirExpressionNode() // Marker method to distinguish expressions
 }
 
-// HIRDeclaration represents all declaration nodes in the HIR
+// HIRDeclaration represents all declaration nodes in the HIR.
 type HIRDeclaration interface {
 	HIRNode
 	hirDeclarationNode() // Marker method to distinguish declarations
 }
 
-// HIRType represents all type nodes in the HIR
+// HIRType represents all type nodes in the HIR.
 type HIRType interface {
 	HIRNode
 	hirTypeNode() // Marker method to distinguish types
 }
 
-// TypeInfo contains complete type information for HIR nodes
+// TypeInfo contains complete type information for HIR nodes.
 type TypeInfo struct {
-	ID          TypeID
-	Kind        TypeKind
+	VariableID  *int
+	StructInfo  *StructLayout
+	Effects     EffectSet
 	Name        string
-	Size        int64            // Size in bytes, -1 if unknown
-	Alignment   int64            // Alignment requirements
-	Properties  TypeProperties   // Type properties (immutable, linear, etc.)
-	Parameters  []TypeInfo       // Generic type parameters
-	Fields      []FieldInfo      // For struct/record types
-	Methods     []MethodInfo     // Associated methods
-	Constraints []TypeConstraint // Type constraints
-	VariableID  *int             // For type variables in inference (nil for concrete types)
-	StructInfo  *StructLayout    // Extended struct layout information for complex types
-	Effects     EffectSet        // Declared effects for function types (zero-value if unspecified)
+	Constraints []TypeConstraint
+	Parameters  []TypeInfo
+	Fields      []FieldInfo
+	Methods     []MethodInfo
+	ID          TypeID
+	Alignment   int64
+	Size        int64
+	Kind        TypeKind
+	Properties  TypeProperties
 }
 
-// 型等価性判定
+// 型等価性判定.
 func (t TypeInfo) Equals(other TypeInfo) bool {
 	if t.Kind != other.Kind || t.Name != other.Name {
 		return false
 	}
+
 	if len(t.Parameters) != len(other.Parameters) {
 		return false
 	}
+
 	for i := range t.Parameters {
 		if !t.Parameters[i].Equals(other.Parameters[i]) {
 			return false
 		}
 	}
+
 	if len(t.Fields) != len(other.Fields) {
 		return false
 	}
+
 	for i := range t.Fields {
 		if t.Fields[i].Name != other.Fields[i].Name ||
 			!t.Fields[i].Type.Equals(other.Fields[i].Type) {
 			return false
 		}
 	}
+
 	return true
 }
 
-// 型変換規則（暗黙変換可能か）
+// 型変換規則（暗黙変換可能か）.
 func (t TypeInfo) CanConvertTo(target TypeInfo) bool {
 	if t.Equals(target) {
 		return true
 	}
-	// int <-> float 暗黙変換可能
+	// int <-> float 暗黙変換可能.
 	if (t.Kind == TypeKindInteger && target.Kind == TypeKindFloat) ||
 		(t.Kind == TypeKindFloat && target.Kind == TypeKindInteger) {
 		return true
 	}
-	// void型は何にも変換不可
+	// void型は何にも変換不可.
 	if t.Kind == TypeKindVoid || target.Kind == TypeKindVoid {
 		return false
 	}
-	// 配列型は要素型が変換可能ならOK
+	// 配列型は要素型が変換可能ならOK.
 	if t.Kind == TypeKindArray && target.Kind == TypeKindArray {
 		if len(t.Parameters) > 0 && len(target.Parameters) > 0 {
 			return t.Parameters[0].CanConvertTo(target.Parameters[0])
 		}
 	}
-	// 構造体型は同名・同フィールド型ならOK
+	// 構造体型は同名・同フィールド型ならOK.
 	if t.Kind == TypeKindStruct && target.Kind == TypeKindStruct {
 		return t.Equals(target)
 	}
-	// 関数型はパラメータ・戻り値型が変換可能ならOK
+	// 関数型はパラメータ・戻り値型が変換可能ならOK.
 	if t.Kind == TypeKindFunction && target.Kind == TypeKindFunction {
 		if len(t.Parameters) != len(target.Parameters) {
 			return false
 		}
+
 		for i := range t.Parameters {
 			if !t.Parameters[i].CanConvertTo(target.Parameters[i]) {
 				return false
 			}
 		}
+
 		return true
 	}
+
 	return false
 }
 
-// TypeKind represents the fundamental kind of a type
+// TypeKind represents the fundamental kind of a type.
 type TypeKind int
 
 const (
@@ -180,7 +188,7 @@ const (
 	TypeKindVariable // For type variables in inference
 	TypeKindTuple    // For tuple types
 	TypeKindSkolem   // For skolem constants
-	// Advanced type system kinds
+	// Advanced type system kinds.
 	TypeKindHigherRank  // For rank-N polymorphic types
 	TypeKindDependent   // For dependent types
 	TypeKindEffect      // For effect types
@@ -190,7 +198,7 @@ const (
 	TypeKindApplication // For type applications
 )
 
-// TypeProperties represents compile-time properties of types
+// TypeProperties represents compile-time properties of types.
 type TypeProperties struct {
 	Immutable   bool // Type is immutable
 	Linear      bool // Type has linear/affine usage
@@ -203,35 +211,35 @@ type TypeProperties struct {
 	Transparent bool // Type is transparent for optimization
 }
 
-// FieldInfo represents a field in a struct/record type
+// FieldInfo represents a field in a struct/record type.
 type FieldInfo struct {
-	Name    string
 	Type    TypeInfo
+	Name    string
+	Span    position.Span
 	Offset  int64
 	Private bool
-	Span    position.Span
 }
 
-// MethodInfo represents a method associated with a type
+// MethodInfo represents a method associated with a type.
 type MethodInfo struct {
-	Name      string
 	Signature TypeInfo
 	Receiver  TypeInfo
-	Static    bool
-	Private   bool
+	Name      string
 	Effects   EffectSet
 	Span      position.Span
+	Static    bool
+	Private   bool
 }
 
-// TypeConstraint represents a constraint on a type parameter
+// TypeConstraint represents a constraint on a type parameter.
 type TypeConstraint struct {
-	Kind      HirConstraintKind // Changed from ConstraintKind to HirConstraintKind
 	Target    TypeInfo
-	Predicate string // Constraint predicate expression
+	Predicate string
 	Span      position.Span
+	Kind      HirConstraintKind
 }
 
-// HirConstraintKind represents the kind of type constraint
+// HirConstraintKind represents the kind of type constraint.
 type HirConstraintKind int
 
 const (
@@ -241,22 +249,22 @@ const (
 	HirConstraintKindPredicate
 )
 
-// EffectSet represents the set of effects that an HIR node may produce
+// EffectSet represents the set of effects that an HIR node may produce.
 type EffectSet struct {
 	Effects map[EffectID]Effect
 	Pure    bool // True if no effects
 }
 
-// Effect represents a computational effect
+// Effect represents a computational effect.
 type Effect struct {
+	Description string
 	ID          EffectID
 	Kind        EffectKind
-	Description string
-	Modality    EffectModality // Must/May/Cannot
-	Scope       EffectScope    // Local/Global/Module
+	Modality    EffectModality
+	Scope       EffectScope
 }
 
-// EffectKind represents the kind of effect
+// EffectKind represents the kind of effect.
 type EffectKind int
 
 const (
@@ -273,7 +281,7 @@ const (
 	EffectKindNonDeterminism
 )
 
-// EffectModality represents whether an effect must, may, or cannot occur
+// EffectModality represents whether an effect must, may, or cannot occur.
 type EffectModality int
 
 const (
@@ -282,7 +290,7 @@ const (
 	EffectModalityCannot
 )
 
-// EffectScope represents the scope of an effect
+// EffectScope represents the scope of an effect.
 type EffectScope int
 
 const (
@@ -291,21 +299,21 @@ const (
 	EffectScopeModule
 )
 
-// RegionSet represents the set of memory regions that an HIR node may access
+// RegionSet represents the set of memory regions that an HIR node may access.
 type RegionSet struct {
 	Regions map[RegionID]Region
 }
 
-// Region represents a memory region
+// Region represents a memory region.
 type Region struct {
+	Lifetime    Lifetime
 	ID          RegionID
 	Kind        RegionKind
-	Lifetime    Lifetime
+	Size        int64
 	Permissions RegionPermissions
-	Size        int64 // Size in bytes, -1 if unknown
 }
 
-// RegionKind represents the kind of memory region
+// RegionKind represents the kind of memory region.
 type RegionKind int
 
 const (
@@ -316,14 +324,14 @@ const (
 	RegionKindReturn
 )
 
-// Lifetime represents the lifetime of a memory region
+// Lifetime represents the lifetime of a memory region.
 type Lifetime struct {
+	Named string
 	Start position.Span
 	End   position.Span
-	Named string // Named lifetime (e.g., 'a, 'static)
 }
 
-// RegionPermissions represents permissions for a memory region
+// RegionPermissions represents permissions for a memory region.
 type RegionPermissions struct {
 	Read    bool
 	Write   bool
@@ -331,48 +339,48 @@ type RegionPermissions struct {
 	Share   bool
 }
 
-// IRMetadata contains metadata for HIR nodes
+// IRMetadata contains metadata for HIR nodes.
 type IRMetadata struct {
-	SourceFile   string
-	OptLevel     int
-	DebugInfo    DebugInfo
 	Annotations  map[string]interface{}
+	SourceFile   string
 	Dependencies []NodeID
 	Dependents   []NodeID
+	DebugInfo    DebugInfo
+	OptLevel     int
 }
 
-// DebugInfo contains debugging information
+// DebugInfo contains debugging information.
 type DebugInfo struct {
 	OriginalSource string
-	Inlined        bool
 	InlineDepth    int
+	Inlined        bool
 	OptimizedAway  bool
 }
 
-// HIRProgram represents a complete HIR program
+// HIRProgram represents a complete HIR program.
 type HIRProgram struct {
-	ID         NodeID
 	Modules    map[ModuleID]*HIRModule
 	TypeInfo   *GlobalTypeInfo
 	EffectInfo *GlobalEffectInfo
 	RegionInfo *GlobalRegionInfo
 	Metadata   IRMetadata
 	Span       position.Span
+	ID         NodeID
 }
 
-// HIRModule represents a module in the HIR
+// HIRModule represents a module in the HIR.
 type HIRModule struct {
-	ID           NodeID
-	ModuleID     ModuleID
 	Name         string
+	Metadata     IRMetadata
 	Declarations []HIRDeclaration
 	Exports      []string
 	Imports      []ImportInfo
-	Metadata     IRMetadata
 	Span         position.Span
+	ID           NodeID
+	ModuleID     ModuleID
 }
 
-// ImportInfo represents an import declaration
+// ImportInfo represents an import declaration.
 type ImportInfo struct {
 	ModuleName string
 	Alias      string
@@ -380,7 +388,7 @@ type ImportInfo struct {
 	Span       position.Span
 }
 
-// GlobalTypeInfo maintains global type information
+// GlobalTypeInfo maintains global type information.
 type GlobalTypeInfo struct {
 	Types      map[TypeID]TypeInfo
 	Primitives map[string]TypeID
@@ -388,31 +396,31 @@ type GlobalTypeInfo struct {
 	NextTypeID TypeID
 }
 
-// GlobalEffectInfo maintains global effect information
+// GlobalEffectInfo maintains global effect information.
 type GlobalEffectInfo struct {
 	Effects      map[EffectID]Effect
 	NextEffectID EffectID
 }
 
-// GlobalRegionInfo maintains global region information
+// GlobalRegionInfo maintains global region information.
 type GlobalRegionInfo struct {
 	Regions      map[RegionID]Region
 	NextRegionID RegionID
 }
 
-// HIRVisitor defines the visitor pattern interface for HIR traversal
+// HIRVisitor defines the visitor pattern interface for HIR traversal.
 type HIRVisitor interface {
-	// Program and module visits
+	// Program and module visits.
 	VisitProgram(node *HIRProgram) interface{}
 	VisitModule(node *HIRModule) interface{}
 
-	// Declaration visits
+	// Declaration visits.
 	VisitFunctionDeclaration(node *HIRFunctionDeclaration) interface{}
 	VisitVariableDeclaration(node *HIRVariableDeclaration) interface{}
 	VisitTypeDeclaration(node *HIRTypeDeclaration) interface{}
 	VisitConstDeclaration(node *HIRConstDeclaration) interface{}
 
-	// Statement visits
+	// Statement visits.
 	VisitBlockStatement(node *HIRBlockStatement) interface{}
 	VisitExpressionStatement(node *HIRExpressionStatement) interface{}
 	VisitReturnStatement(node *HIRReturnStatement) interface{}
@@ -422,11 +430,11 @@ type HIRVisitor interface {
 	VisitBreakStatement(node *HIRBreakStatement) interface{}
 	VisitContinueStatement(node *HIRContinueStatement) interface{}
 	VisitAssignStatement(node *HIRAssignStatement) interface{}
-	// Exception handling
+	// Exception handling.
 	VisitThrowStatement(node *HIRThrowStatement) interface{}
 	VisitTryCatchStatement(node *HIRTryCatchStatement) interface{}
 
-	// Expression visits
+	// Expression visits.
 	VisitIdentifier(node *HIRIdentifier) interface{}
 	VisitLiteral(node *HIRLiteral) interface{}
 	VisitBinaryExpression(node *HIRBinaryExpression) interface{}
@@ -438,7 +446,7 @@ type HIRVisitor interface {
 	VisitArrayExpression(node *HIRArrayExpression) interface{}
 	VisitStructExpression(node *HIRStructExpression) interface{}
 
-	// Type visits
+	// Type visits.
 	VisitBasicType(node *HIRBasicType) interface{}
 	VisitArrayType(node *HIRArrayType) interface{}
 	VisitPointerType(node *HIRPointerType) interface{}
@@ -448,9 +456,9 @@ type HIRVisitor interface {
 	VisitGenericType(node *HIRGenericType) interface{}
 }
 
-// Helper functions for HIR construction
+// Helper functions for HIR construction.
 
-// NewHIRProgram creates a new HIR program
+// NewHIRProgram creates a new HIR program.
 func NewHIRProgram() *HIRProgram {
 	return &HIRProgram{
 		ID:         generateNodeID(),
@@ -462,7 +470,7 @@ func NewHIRProgram() *HIRProgram {
 	}
 }
 
-// NewGlobalTypeInfo creates a new global type information structure
+// NewGlobalTypeInfo creates a new global type information structure.
 func NewGlobalTypeInfo() *GlobalTypeInfo {
 	info := &GlobalTypeInfo{
 		Types:      make(map[TypeID]TypeInfo),
@@ -471,12 +479,13 @@ func NewGlobalTypeInfo() *GlobalTypeInfo {
 		NextTypeID: 1,
 	}
 
-	// Initialize primitive types
+	// Initialize primitive types.
 	info.initializePrimitiveTypes()
+
 	return info
 }
 
-// NewGlobalEffectInfo creates a new global effect information structure
+// NewGlobalEffectInfo creates a new global effect information structure.
 func NewGlobalEffectInfo() *GlobalEffectInfo {
 	return &GlobalEffectInfo{
 		Effects:      make(map[EffectID]Effect),
@@ -484,7 +493,7 @@ func NewGlobalEffectInfo() *GlobalEffectInfo {
 	}
 }
 
-// NewGlobalRegionInfo creates a new global region information structure
+// NewGlobalRegionInfo creates a new global region information structure.
 func NewGlobalRegionInfo() *GlobalRegionInfo {
 	return &GlobalRegionInfo{
 		Regions:      make(map[RegionID]Region),
@@ -492,7 +501,7 @@ func NewGlobalRegionInfo() *GlobalRegionInfo {
 	}
 }
 
-// initializePrimitiveTypes sets up built-in primitive types
+// initializePrimitiveTypes sets up built-in primitive types.
 func (gti *GlobalTypeInfo) initializePrimitiveTypes() {
 	primitives := []struct {
 		name string
@@ -539,18 +548,19 @@ func (gti *GlobalTypeInfo) initializePrimitiveTypes() {
 	}
 }
 
-// Node ID generation (simple counter for now)
+// Node ID generation (simple counter for now).
 var nextNodeID NodeID = 1
 
 func generateNodeID() NodeID {
 	id := nextNodeID
 	nextNodeID++
+
 	return id
 }
 
-// Utility functions for effect sets
+// Utility functions for effect sets.
 
-// NewEffectSet creates a new empty effect set
+// NewEffectSet creates a new empty effect set.
 func NewEffectSet() EffectSet {
 	return EffectSet{
 		Effects: make(map[EffectID]Effect),
@@ -558,19 +568,20 @@ func NewEffectSet() EffectSet {
 	}
 }
 
-// AddEffect adds an effect to the effect set
+// AddEffect adds an effect to the effect set.
 func (es *EffectSet) AddEffect(effect Effect) {
 	es.Effects[effect.ID] = effect
 	es.Pure = false
 }
 
-// HasEffect checks if the effect set contains a specific effect
+// HasEffect checks if the effect set contains a specific effect.
 func (es *EffectSet) HasEffect(effectID EffectID) bool {
 	_, exists := es.Effects[effectID]
+
 	return exists
 }
 
-// Union returns the union of two effect sets
+// Union returns the union of two effect sets.
 func (es *EffectSet) Union(other EffectSet) EffectSet {
 	result := NewEffectSet()
 
@@ -583,30 +594,32 @@ func (es *EffectSet) Union(other EffectSet) EffectSet {
 	}
 
 	result.Pure = es.Pure && other.Pure
+
 	return result
 }
 
-// Utility functions for region sets
+// Utility functions for region sets.
 
-// NewRegionSet creates a new empty region set
+// NewRegionSet creates a new empty region set.
 func NewRegionSet() RegionSet {
 	return RegionSet{
 		Regions: make(map[RegionID]Region),
 	}
 }
 
-// AddRegion adds a region to the region set
+// AddRegion adds a region to the region set.
 func (rs *RegionSet) AddRegion(region Region) {
 	rs.Regions[region.ID] = region
 }
 
-// HasRegion checks if the region set contains a specific region
+// HasRegion checks if the region set contains a specific region.
 func (rs *RegionSet) HasRegion(regionID RegionID) bool {
 	_, exists := rs.Regions[regionID]
+
 	return exists
 }
 
-// Union returns the union of two region sets
+// Union returns the union of two region sets.
 func (rs *RegionSet) Union(other RegionSet) RegionSet {
 	result := NewRegionSet()
 
@@ -621,7 +634,7 @@ func (rs *RegionSet) Union(other RegionSet) RegionSet {
 	return result
 }
 
-// String implementations for debugging
+// String implementations for debugging.
 
 func (tk TypeKind) String() string {
 	switch tk {
@@ -714,17 +727,18 @@ func (r Region) String() string {
 	return fmt.Sprintf("Region{%s: %d bytes}", r.Kind.String(), r.Size)
 }
 
-// Implementation of HIRProgram methods
+// Implementation of HIRProgram methods.
 
 func (p *HIRProgram) GetID() NodeID          { return p.ID }
 func (p *HIRProgram) GetSpan() position.Span { return p.Span }
 func (p *HIRProgram) GetType() TypeInfo {
-	// Program doesn't have a type, return void
+	// Program doesn't have a type, return void.
 	if p.TypeInfo != nil {
 		if voidID, exists := p.TypeInfo.Primitives["void"]; exists {
 			return p.TypeInfo.Types[voidID]
 		}
 	}
+
 	return TypeInfo{Kind: TypeKindVoid, Name: "void"}
 }
 func (p *HIRProgram) GetEffects() EffectSet                 { return NewEffectSet() }
@@ -735,20 +749,25 @@ func (p *HIRProgram) GetChildren() []HIRNode {
 	for _, module := range p.Modules {
 		children = append(children, module)
 	}
+
 	return children
 }
 
 func (p *HIRProgram) String() string {
 	var sb strings.Builder
+
 	sb.WriteString("HIRProgram {\n")
+
 	for _, module := range p.Modules {
 		sb.WriteString(fmt.Sprintf("  %s\n", module.String()))
 	}
+
 	sb.WriteString("}")
+
 	return sb.String()
 }
 
-// Implementation of HIRModule methods
+// Implementation of HIRModule methods.
 
 func (m *HIRModule) GetID() NodeID          { return m.ID }
 func (m *HIRModule) GetSpan() position.Span { return m.Span }
@@ -763,6 +782,7 @@ func (m *HIRModule) GetChildren() []HIRNode {
 	for i, decl := range m.Declarations {
 		children[i] = decl
 	}
+
 	return children
 }
 

@@ -6,19 +6,19 @@ import (
 	"testing"
 )
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.1: Refinement Types Implementation Tests
-// =============================================================================
+// =============================================================================.
 
 func TestRefinementTypeSystem(t *testing.T) {
 	t.Run("RefinementTypeCreation", func(t *testing.T) {
-		// Create a refinement type for positive integers
+		// Create a refinement type for positive integers.
 		baseType := TypeInfo{
 			Kind: TypeKindInteger,
 			Name: "Int",
 		}
 
-		// Create refinement type {x: Int | x > 0}
+		// Create refinement type {x: Int | x > 0}.
 		refinementType := &RefinementType{
 			ID:       TypeID(1),
 			BaseType: baseType,
@@ -75,9 +75,8 @@ func TestRefinementTypeSystem(t *testing.T) {
 	})
 
 	t.Run("PredicateDefinitionLanguage", func(t *testing.T) {
-		// Test simple predicate definition
-
-		// Create HIR representation of predicate
+		// Test simple predicate definition.
+		// Create HIR representation of predicate.
 		hirPredicate := &HIRBinaryExpression{
 			Left: &HIRIdentifier{
 				Name: "x",
@@ -101,10 +100,10 @@ func TestRefinementTypeSystem(t *testing.T) {
 	})
 
 	t.Run("SMTSolverIntegration", func(t *testing.T) {
-		// Test SMT solver preparation (mock implementation)
+		// Test SMT solver preparation (mock implementation).
 		smtFormula := "(assert (> x 0))"
 
-		// Verify SMT formula generation
+		// Verify SMT formula generation.
 		if smtFormula == "" {
 			t.Error("SMT formula should not be empty")
 		}
@@ -113,7 +112,7 @@ func TestRefinementTypeSystem(t *testing.T) {
 			t.Error("SMT formula seems too short")
 		}
 
-		// Test satisfiability check (mock)
+		// Test satisfiability check (mock).
 		satisfiable := true // Would be result from actual SMT solver
 		if !satisfiable {
 			t.Log("SMT formula is satisfiable (as expected)")
@@ -121,7 +120,7 @@ func TestRefinementTypeSystem(t *testing.T) {
 	})
 
 	t.Run("ProofObligationGeneration", func(t *testing.T) {
-		// Generate proof obligation for refinement type checking
+		// Generate proof obligation for refinement type checking.
 		obligation := ProofObligation{
 			Goals: []ProofGoal{
 				{
@@ -154,7 +153,7 @@ func TestRefinementTypeSystem(t *testing.T) {
 			t.Errorf("Expected proof status Pending, got %v", obligation.Status)
 		}
 
-		// Simulate proof completion
+		// Simulate proof completion.
 		obligation.Status = ProofComplete
 		if obligation.Status != ProofComplete {
 			t.Error("Failed to update proof status")
@@ -164,7 +163,7 @@ func TestRefinementTypeSystem(t *testing.T) {
 
 func TestRefinementTypeChecking(t *testing.T) {
 	t.Run("PositiveIntegerRefinement", func(t *testing.T) {
-		// Test refinement type checking for positive integers
+		// Test refinement type checking for positive integers.
 		baseType := TypeInfo{
 			Kind: TypeKindInteger,
 			Name: "Int",
@@ -207,13 +206,13 @@ func TestRefinementTypeChecking(t *testing.T) {
 			Context: RefinementContext{},
 		}
 
-		// Test valid value (positive integer)
+		// Test valid value (positive integer).
 		validValue := 42
 		if !checkRefinementValue(validValue, refinementType) {
 			t.Error("Valid positive integer should satisfy refinement")
 		}
 
-		// Test invalid value (negative integer)
+		// Test invalid value (negative integer).
 		invalidValue := -5
 		if checkRefinementValue(invalidValue, refinementType) {
 			t.Error("Negative integer should not satisfy positive refinement")
@@ -221,7 +220,7 @@ func TestRefinementTypeChecking(t *testing.T) {
 	})
 
 	t.Run("StringLengthRefinement", func(t *testing.T) {
-		// Test refinement for strings with minimum length
+		// Test refinement for strings with minimum length.
 		baseType := TypeInfo{
 			Kind: TypeKindString,
 			Name: "String",
@@ -268,13 +267,13 @@ func TestRefinementTypeChecking(t *testing.T) {
 			Context: RefinementContext{},
 		}
 
-		// Test valid string
+		// Test valid string.
 		validString := "hello world"
 		if !checkRefinementValue(validString, refinementType) {
 			t.Error("Valid long string should satisfy refinement")
 		}
 
-		// Test short string
+		// Test short string.
 		shortString := "hi"
 		if checkRefinementValue(shortString, refinementType) {
 			t.Error("Short string should not satisfy length refinement")
@@ -284,9 +283,8 @@ func TestRefinementTypeChecking(t *testing.T) {
 
 func TestSMTSolverPreparation(t *testing.T) {
 	t.Run("BasicSMTGeneration", func(t *testing.T) {
-		// Test generation of SMT formulas for refinement types
-
-		// Integer refinement: x > 0
+		// Test generation of SMT formulas for refinement types.
+		// Integer refinement: x > 0.
 		integerSMT := generateSMTFormula("x", "Int", "> 0")
 		expectedSMT := "(declare-fun x () Int)\n(assert (> x 0))"
 
@@ -296,14 +294,14 @@ func TestSMTSolverPreparation(t *testing.T) {
 	})
 
 	t.Run("ComplexPredicates", func(t *testing.T) {
-		// Test complex predicates with multiple constraints
+		// Test complex predicates with multiple constraints.
 		complexSMT := generateSMTFormula("x", "Int", "x > 0 && x < 100")
 
 		if len(complexSMT) == 0 {
 			t.Error("Complex SMT formula should not be empty")
 		}
 
-		// Verify formula contains expected elements
+		// Verify formula contains expected elements.
 		if !containsString(complexSMT, "declare-fun") {
 			t.Log("SMT formula should contain variable declaration")
 		}
@@ -316,8 +314,7 @@ func TestSMTSolverPreparation(t *testing.T) {
 
 func TestRefinementTypeIntegration(t *testing.T) {
 	t.Run("FunctionPreconditions", func(t *testing.T) {
-		// Test refinement types in function preconditions
-
+		// Test refinement types in function preconditions.
 		precondition := &RefinementType{
 			ID: TypeID(3),
 			BaseType: TypeInfo{
@@ -357,7 +354,7 @@ func TestRefinementTypeIntegration(t *testing.T) {
 	})
 
 	t.Run("PostconditionChecking", func(t *testing.T) {
-		// Test refinement types in function postconditions
+		// Test refinement types in function postconditions.
 		postcondition := &RefinementType{
 			ID: TypeID(4),
 			BaseType: TypeInfo{
@@ -396,36 +393,36 @@ func TestRefinementTypeIntegration(t *testing.T) {
 func TestPhase231Completion(t *testing.T) {
 	t.Log("=== Phase 2.3.1: Refinement Types Implementation - COMPLETE ===")
 
-	// Test all major components
+	// Test all major components.
 	t.Run("RefinementTypes", func(t *testing.T) {
-		// Basic refinement type functionality
+		// Basic refinement type functionality.
 		if !testRefinementTypeBasics() {
 			t.Error("Refinement type basics failed")
 		}
 	})
 
 	t.Run("PredicateLanguage", func(t *testing.T) {
-		// Predicate definition language
+		// Predicate definition language.
 		if !testPredicateLanguage() {
 			t.Error("Predicate language failed")
 		}
 	})
 
 	t.Run("SMTIntegration", func(t *testing.T) {
-		// SMT solver integration preparation
+		// SMT solver integration preparation.
 		if !testSMTIntegration() {
 			t.Error("SMT integration failed")
 		}
 	})
 
 	t.Run("ProofObligations", func(t *testing.T) {
-		// Proof obligation system
+		// Proof obligation system.
 		if !testProofObligations() {
 			t.Error("Proof obligations failed")
 		}
 	})
 
-	// Report completion
+	// Report completion.
 	t.Log("✅ Refinement type system implemented")
 	t.Log("✅ Predicate definition language implemented")
 	t.Log("✅ SMT solver integration prepared")
@@ -436,12 +433,12 @@ func TestPhase231Completion(t *testing.T) {
 	t.Log("🎯 Phase 2.3.1 SUCCESSFULLY COMPLETED!")
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
+// =============================================================================.
+// Helper Functions.
+// =============================================================================.
 
 func checkRefinementValue(value interface{}, refinementType *RefinementType) bool {
-	// Complete refinement checking implementation
+	// Complete refinement checking implementation.
 	if refinementType == nil || len(refinementType.Refinements) == 0 {
 		return true
 	}
@@ -451,6 +448,7 @@ func checkRefinementValue(value interface{}, refinementType *RefinementType) boo
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -464,6 +462,7 @@ func evaluatePredicate(predicate HIRNode, variable string, value interface{}) bo
 		if boolVal, ok := pred.Value.(bool); ok {
 			return boolVal
 		}
+
 		return true
 	default:
 		return true
@@ -500,6 +499,7 @@ func evaluateUnaryPredicate(expr *HIRUnaryExpression, variable string, value int
 				return len(str) >= 0 // Basic validation
 			}
 		}
+
 		return true
 	default:
 		return true
@@ -512,6 +512,7 @@ func evaluateExpression(expr HIRNode, variable string, value interface{}) interf
 		if e.Name == variable {
 			return value
 		}
+
 		return nil
 	case *HIRLiteral:
 		return e.Value
@@ -523,6 +524,7 @@ func evaluateExpression(expr HIRNode, variable string, value interface{}) interf
 				}
 			}
 		}
+
 		return nil
 	default:
 		return nil
@@ -534,7 +536,7 @@ func compareValues(left, right interface{}, operator string) bool {
 		return false
 	}
 
-	// Handle integer comparisons - more flexible type conversion
+	// Handle integer comparisons - more flexible type conversion.
 	leftInt, leftIsInt := convertToInt(left)
 	rightInt, rightIsInt := convertToInt(right)
 
@@ -555,7 +557,7 @@ func compareValues(left, right interface{}, operator string) bool {
 		}
 	}
 
-	// Handle string comparisons
+	// Handle string comparisons.
 	if leftStr, ok := left.(string); ok {
 		if rightStr, ok := right.(string); ok {
 			switch operator {
@@ -586,22 +588,26 @@ func convertToInt(value interface{}) (int, bool) {
 }
 
 func generateSMTFormula(variable, varType, predicate string) string {
-	// Complete SMT formula generation
+	// Complete SMT formula generation.
 	declaration := fmt.Sprintf("(declare-fun %s () %s)", variable, varType)
 
-	// Parse and format the predicate properly
+	// Parse and format the predicate properly.
 	var assertion string
+
 	if strings.Contains(predicate, "&&") {
-		// Handle complex predicates
+		// Handle complex predicates.
 		parts := strings.Split(predicate, "&&")
+
 		var conditions []string
+
 		for _, part := range parts {
 			part = strings.TrimSpace(part)
 			conditions = append(conditions, formatSMTCondition(part, variable))
 		}
+
 		assertion = fmt.Sprintf("(assert (and %s))", strings.Join(conditions, " "))
 	} else {
-		// Simple predicate
+		// Simple predicate.
 		assertion = fmt.Sprintf("(assert %s)", formatSMTCondition(predicate, variable))
 	}
 
@@ -611,38 +617,49 @@ func generateSMTFormula(variable, varType, predicate string) string {
 func formatSMTCondition(predicate, variable string) string {
 	predicate = strings.TrimSpace(predicate)
 
-	// Handle simple operator predicates like "> 0", "< 100"
+	// Handle simple operator predicates like "> 0", "< 100".
 	if strings.HasPrefix(predicate, ">") {
 		operand := strings.TrimSpace(predicate[1:])
+
 		return fmt.Sprintf("(> %s %s)", variable, operand)
 	}
+
 	if strings.HasPrefix(predicate, ">=") {
 		operand := strings.TrimSpace(predicate[2:])
+
 		return fmt.Sprintf("(>= %s %s)", variable, operand)
 	}
+
 	if strings.HasPrefix(predicate, "<") {
 		operand := strings.TrimSpace(predicate[1:])
+
 		return fmt.Sprintf("(< %s %s)", variable, operand)
 	}
+
 	if strings.HasPrefix(predicate, "<=") {
 		operand := strings.TrimSpace(predicate[2:])
+
 		return fmt.Sprintf("(<= %s %s)", variable, operand)
 	}
+
 	if strings.HasPrefix(predicate, "==") {
 		operand := strings.TrimSpace(predicate[2:])
+
 		return fmt.Sprintf("(= %s %s)", variable, operand)
 	}
+
 	if strings.HasPrefix(predicate, "!=") {
 		operand := strings.TrimSpace(predicate[2:])
+
 		return fmt.Sprintf("(not (= %s %s))", variable, operand)
 	}
 
-	// If already in proper SMT format or contains variable, return as-is
+	// If already in proper SMT format or contains variable, return as-is.
 	if strings.Contains(predicate, variable) || strings.HasPrefix(predicate, "(") {
 		return predicate
 	}
 
-	// Default case
+	// Default case.
 	return fmt.Sprintf("(%s %s)", predicate, variable)
 }
 
@@ -651,7 +668,7 @@ func containsString(s, substr string) bool {
 }
 
 func testRefinementTypeBasics() bool {
-	// Test basic refinement type creation and usage
+	// Test basic refinement type creation and usage.
 	baseType := TypeInfo{Kind: TypeKindInteger, Name: "Int"}
 	refinement := &RefinementType{
 		ID:       TypeID(1),
@@ -678,28 +695,31 @@ func testRefinementTypeBasics() bool {
 		},
 		Context: RefinementContext{},
 	}
+
 	return refinement != nil
 }
 
 func testPredicateLanguage() bool {
-	// Test predicate definition language
+	// Test predicate definition language.
 	predicate := &HIRBinaryExpression{
 		Left:     &HIRIdentifier{Name: "x"},
 		Operator: ">",
 		Right:    &HIRLiteral{Value: 0},
 		Type:     TypeInfo{Kind: TypeKindBoolean, Name: "Bool"},
 	}
+
 	return predicate != nil
 }
 
 func testSMTIntegration() bool {
-	// Test SMT solver integration preparation
+	// Test SMT solver integration preparation.
 	smtFormula := "(assert (> x 0))"
+
 	return len(smtFormula) > 0
 }
 
 func testProofObligations() bool {
-	// Test proof obligation system
+	// Test proof obligation system.
 	obligation := ProofObligation{
 		Goals: []ProofGoal{
 			{
@@ -712,5 +732,6 @@ func testProofObligations() bool {
 		Tactics:    []ProofTactic{},
 		Status:     ProofPending,
 	}
+
 	return len(obligation.Goals) == 1
 }

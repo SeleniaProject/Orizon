@@ -1,5 +1,5 @@
-// HIR verification and validation tools for the Orizon programming language
-// This file provides tools for validating HIR integrity, type consistency, and semantic correctness
+// HIR verification and validation tools for the Orizon programming language.
+// This file provides tools for validating HIR integrity, type consistency, and semantic correctness.
 
 package hir
 
@@ -10,14 +10,14 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// HIRVerifier validates HIR structure and semantics
+// HIRVerifier validates HIR structure and semantics.
 type HIRVerifier struct {
+	visited  map[NodeID]bool
 	errors   []VerificationError
 	warnings []VerificationWarning
-	visited  map[NodeID]bool
 }
 
-// VerificationError represents an error found during HIR verification
+// VerificationError represents an error found during HIR verification.
 type VerificationError struct {
 	Message string
 	Span    position.Span
@@ -25,7 +25,7 @@ type VerificationError struct {
 	NodeID  NodeID
 }
 
-// VerificationWarning represents a warning found during HIR verification
+// VerificationWarning represents a warning found during HIR verification.
 type VerificationWarning struct {
 	Message string
 	Span    position.Span
@@ -33,7 +33,7 @@ type VerificationWarning struct {
 	NodeID  NodeID
 }
 
-// VerificationErrorKind represents the kind of verification error
+// VerificationErrorKind represents the kind of verification error.
 type VerificationErrorKind int
 
 const (
@@ -47,7 +47,7 @@ const (
 	ErrorKindMissingRequired
 )
 
-// WarningKind represents the kind of verification warning
+// WarningKind represents the kind of verification warning.
 type WarningKind int
 
 const (
@@ -58,7 +58,7 @@ const (
 	WarningKindDeprecated
 )
 
-// NewHIRVerifier creates a new HIR verifier
+// NewHIRVerifier creates a new HIR verifier.
 func NewHIRVerifier() *HIRVerifier {
 	return &HIRVerifier{
 		errors:   make([]VerificationError, 0),
@@ -67,34 +67,34 @@ func NewHIRVerifier() *HIRVerifier {
 	}
 }
 
-// VerifyProgram performs comprehensive verification of an HIR program
+// VerifyProgram performs comprehensive verification of an HIR program.
 func (v *HIRVerifier) VerifyProgram(program *HIRProgram) ([]VerificationError, []VerificationWarning) {
 	v.errors = make([]VerificationError, 0)
 	v.warnings = make([]VerificationWarning, 0)
 	v.visited = make(map[NodeID]bool)
 
-	// Basic structure validation
+	// Basic structure validation.
 	v.verifyProgramStructure(program)
 
-	// Type system validation
+	// Type system validation.
 	v.verifyTypeSystem(program)
 
-	// Effect system validation
+	// Effect system validation.
 	v.verifyEffectSystem(program)
 
-	// Region system validation
+	// Region system validation.
 	v.verifyRegionSystem(program)
 
-	// Semantic validation
+	// Semantic validation.
 	v.verifySemantics(program)
 
-	// Performance and style checks
+	// Performance and style checks.
 	v.performStyleChecks(program)
 
 	return v.errors, v.warnings
 }
 
-// verifyProgramStructure validates basic HIR program structure
+// verifyProgramStructure validates basic HIR program structure.
 func (v *HIRVerifier) verifyProgramStructure(program *HIRProgram) {
 	if program == nil {
 		v.addError(VerificationError{
@@ -102,10 +102,11 @@ func (v *HIRVerifier) verifyProgramStructure(program *HIRProgram) {
 			Kind:    ErrorKindInvalidNodeStructure,
 			NodeID:  0,
 		})
+
 		return
 	}
 
-	// Check program ID
+	// Check program ID.
 	if program.ID == 0 {
 		v.addError(VerificationError{
 			Message: "program must have valid ID",
@@ -115,7 +116,7 @@ func (v *HIRVerifier) verifyProgramStructure(program *HIRProgram) {
 		})
 	}
 
-	// Check modules
+	// Check modules.
 	if len(program.Modules) == 0 {
 		v.addWarning(VerificationWarning{
 			Message: "program has no modules",
@@ -125,7 +126,7 @@ func (v *HIRVerifier) verifyProgramStructure(program *HIRProgram) {
 		})
 	}
 
-	// Verify each module
+	// Verify each module.
 	for moduleID, module := range program.Modules {
 		if module == nil {
 			v.addError(VerificationError{
@@ -133,13 +134,14 @@ func (v *HIRVerifier) verifyProgramStructure(program *HIRProgram) {
 				Kind:    ErrorKindInvalidNodeStructure,
 				NodeID:  NodeID(moduleID),
 			})
+
 			continue
 		}
 
 		v.verifyModule(module)
 	}
 
-	// Check global type info
+	// Check global type info.
 	if program.TypeInfo == nil {
 		v.addError(VerificationError{
 			Message: "program must have type information",
@@ -152,7 +154,7 @@ func (v *HIRVerifier) verifyProgramStructure(program *HIRProgram) {
 	}
 }
 
-// verifyModule validates HIR module structure
+// verifyModule validates HIR module structure.
 func (v *HIRVerifier) verifyModule(module *HIRModule) {
 	if v.visited[module.ID] {
 		v.addError(VerificationError{
@@ -161,11 +163,13 @@ func (v *HIRVerifier) verifyModule(module *HIRModule) {
 			Kind:    ErrorKindCircularReference,
 			NodeID:  module.ID,
 		})
+
 		return
 	}
+
 	v.visited[module.ID] = true
 
-	// Check module name
+	// Check module name.
 	if module.Name == "" {
 		v.addError(VerificationError{
 			Message: "module must have a name",
@@ -175,7 +179,7 @@ func (v *HIRVerifier) verifyModule(module *HIRModule) {
 		})
 	}
 
-	// Verify declarations
+	// Verify declarations.
 	for i, decl := range module.Declarations {
 		if decl == nil {
 			v.addError(VerificationError{
@@ -184,6 +188,7 @@ func (v *HIRVerifier) verifyModule(module *HIRModule) {
 				Kind:    ErrorKindInvalidNodeStructure,
 				NodeID:  module.ID,
 			})
+
 			continue
 		}
 
@@ -191,11 +196,12 @@ func (v *HIRVerifier) verifyModule(module *HIRModule) {
 	}
 }
 
-// verifyDeclaration validates HIR declaration
+// verifyDeclaration validates HIR declaration.
 func (v *HIRVerifier) verifyDeclaration(decl HIRDeclaration) {
 	if v.visited[decl.GetID()] {
 		return
 	}
+
 	v.visited[decl.GetID()] = true
 
 	switch d := decl.(type) {
@@ -217,9 +223,9 @@ func (v *HIRVerifier) verifyDeclaration(decl HIRDeclaration) {
 	}
 }
 
-// verifyFunctionDeclaration validates HIR function declaration
+// verifyFunctionDeclaration validates HIR function declaration.
 func (v *HIRVerifier) verifyFunctionDeclaration(funcDecl *HIRFunctionDeclaration) {
-	// Check function name
+	// Check function name.
 	if funcDecl.Name == "" {
 		v.addError(VerificationError{
 			Message: "function must have a name",
@@ -229,7 +235,7 @@ func (v *HIRVerifier) verifyFunctionDeclaration(funcDecl *HIRFunctionDeclaration
 		})
 	}
 
-	// Check parameters
+	// Check parameters.
 	for i, param := range funcDecl.Parameters {
 		if param == nil {
 			v.addError(VerificationError{
@@ -238,13 +244,14 @@ func (v *HIRVerifier) verifyFunctionDeclaration(funcDecl *HIRFunctionDeclaration
 				Kind:    ErrorKindInvalidNodeStructure,
 				NodeID:  funcDecl.ID,
 			})
+
 			continue
 		}
 
 		v.verifyParameter(param)
 	}
 
-	// Check return type
+	// Check return type.
 	if funcDecl.ReturnType == nil {
 		v.addError(VerificationError{
 			Message: fmt.Sprintf("function %s must have return type", funcDecl.Name),
@@ -256,19 +263,19 @@ func (v *HIRVerifier) verifyFunctionDeclaration(funcDecl *HIRFunctionDeclaration
 		v.verifyType(funcDecl.ReturnType)
 	}
 
-	// Check body
+	// Check body.
 	if funcDecl.Body != nil {
 		v.verifyStatement(funcDecl.Body)
 	}
 
-	// Verify effects are consistent
+	// Verify effects are consistent.
 	v.verifyEffectConsistency(funcDecl, funcDecl.Effects)
 
-	// Verify regions are consistent
+	// Verify regions are consistent.
 	v.verifyRegionConsistency(funcDecl, funcDecl.Regions)
 }
 
-// verifyParameter validates HIR parameter
+// verifyParameter validates HIR parameter.
 func (v *HIRVerifier) verifyParameter(param *HIRParameter) {
 	if param.Name == "" {
 		v.addError(VerificationError{
@@ -291,7 +298,7 @@ func (v *HIRVerifier) verifyParameter(param *HIRParameter) {
 	}
 }
 
-// verifyVariableDeclaration validates HIR variable declaration
+// verifyVariableDeclaration validates HIR variable declaration.
 func (v *HIRVerifier) verifyVariableDeclaration(varDecl *HIRVariableDeclaration) {
 	if varDecl.Name == "" {
 		v.addError(VerificationError{
@@ -316,7 +323,7 @@ func (v *HIRVerifier) verifyVariableDeclaration(varDecl *HIRVariableDeclaration)
 	if varDecl.Initializer != nil {
 		v.verifyExpression(varDecl.Initializer)
 
-		// Check type compatibility
+		// Check type compatibility.
 		initType := varDecl.Initializer.GetType()
 		declType := varDecl.Type.GetType()
 
@@ -332,7 +339,7 @@ func (v *HIRVerifier) verifyVariableDeclaration(varDecl *HIRVariableDeclaration)
 	}
 }
 
-// verifyTypeDeclaration validates HIR type declaration
+// verifyTypeDeclaration validates HIR type declaration.
 func (v *HIRVerifier) verifyTypeDeclaration(typeDecl *HIRTypeDeclaration) {
 	if typeDecl.Name == "" {
 		v.addError(VerificationError{
@@ -355,7 +362,7 @@ func (v *HIRVerifier) verifyTypeDeclaration(typeDecl *HIRTypeDeclaration) {
 	}
 }
 
-// verifyConstDeclaration validates HIR const declaration
+// verifyConstDeclaration validates HIR const declaration.
 func (v *HIRVerifier) verifyConstDeclaration(constDecl *HIRConstDeclaration) {
 	if constDecl.Name == "" {
 		v.addError(VerificationError{
@@ -387,7 +394,7 @@ func (v *HIRVerifier) verifyConstDeclaration(constDecl *HIRConstDeclaration) {
 	} else {
 		v.verifyExpression(constDecl.Value)
 
-		// Check type compatibility
+		// Check type compatibility.
 		valueType := constDecl.Value.GetType()
 		declType := constDecl.Type.GetType()
 
@@ -403,7 +410,7 @@ func (v *HIRVerifier) verifyConstDeclaration(constDecl *HIRConstDeclaration) {
 	}
 }
 
-// verifyStatement validates HIR statement
+// verifyStatement validates HIR statement.
 func (v *HIRVerifier) verifyStatement(stmt HIRStatement) {
 	if stmt == nil {
 		return
@@ -412,6 +419,7 @@ func (v *HIRVerifier) verifyStatement(stmt HIRStatement) {
 	if v.visited[stmt.GetID()] {
 		return
 	}
+
 	v.visited[stmt.GetID()] = true
 
 	switch s := stmt.(type) {
@@ -435,7 +443,7 @@ func (v *HIRVerifier) verifyStatement(stmt HIRStatement) {
 	}
 }
 
-// verifyBlockStatement validates HIR block statement
+// verifyBlockStatement validates HIR block statement.
 func (v *HIRVerifier) verifyBlockStatement(block *HIRBlockStatement) {
 	for i, stmt := range block.Statements {
 		if stmt == nil {
@@ -445,18 +453,19 @@ func (v *HIRVerifier) verifyBlockStatement(block *HIRBlockStatement) {
 				Kind:    ErrorKindInvalidNodeStructure,
 				NodeID:  block.ID,
 			})
+
 			continue
 		}
 
 		v.verifyStatement(stmt)
 	}
 
-	// Verify effect and region consistency
+	// Verify effect and region consistency.
 	v.verifyEffectConsistency(block, block.Effects)
 	v.verifyRegionConsistency(block, block.Regions)
 }
 
-// verifyExpressionStatement validates HIR expression statement
+// verifyExpressionStatement validates HIR expression statement.
 func (v *HIRVerifier) verifyExpressionStatement(exprStmt *HIRExpressionStatement) {
 	if exprStmt.Expression == nil {
 		v.addError(VerificationError{
@@ -470,14 +479,14 @@ func (v *HIRVerifier) verifyExpressionStatement(exprStmt *HIRExpressionStatement
 	}
 }
 
-// verifyReturnStatement validates HIR return statement
+// verifyReturnStatement validates HIR return statement.
 func (v *HIRVerifier) verifyReturnStatement(retStmt *HIRReturnStatement) {
 	if retStmt.Expression != nil {
 		v.verifyExpression(retStmt.Expression)
 	}
 }
 
-// verifyIfStatement validates HIR if statement
+// verifyIfStatement validates HIR if statement.
 func (v *HIRVerifier) verifyIfStatement(ifStmt *HIRIfStatement) {
 	if ifStmt.Condition == nil {
 		v.addError(VerificationError{
@@ -489,7 +498,7 @@ func (v *HIRVerifier) verifyIfStatement(ifStmt *HIRIfStatement) {
 	} else {
 		v.verifyExpression(ifStmt.Condition)
 
-		// Check condition type
+		// Check condition type.
 		condType := ifStmt.Condition.GetType()
 		if condType.Kind != TypeKindBoolean {
 			v.addError(VerificationError{
@@ -517,7 +526,7 @@ func (v *HIRVerifier) verifyIfStatement(ifStmt *HIRIfStatement) {
 	}
 }
 
-// verifyWhileStatement validates HIR while statement
+// verifyWhileStatement validates HIR while statement.
 func (v *HIRVerifier) verifyWhileStatement(whileStmt *HIRWhileStatement) {
 	if whileStmt.Condition == nil {
 		v.addError(VerificationError{
@@ -529,7 +538,7 @@ func (v *HIRVerifier) verifyWhileStatement(whileStmt *HIRWhileStatement) {
 	} else {
 		v.verifyExpression(whileStmt.Condition)
 
-		// Check condition type
+		// Check condition type.
 		condType := whileStmt.Condition.GetType()
 		if condType.Kind != TypeKindBoolean {
 			v.addError(VerificationError{
@@ -553,7 +562,7 @@ func (v *HIRVerifier) verifyWhileStatement(whileStmt *HIRWhileStatement) {
 	}
 }
 
-// verifyExpression validates HIR expression
+// verifyExpression validates HIR expression.
 func (v *HIRVerifier) verifyExpression(expr HIRExpression) {
 	if expr == nil {
 		return
@@ -562,6 +571,7 @@ func (v *HIRVerifier) verifyExpression(expr HIRExpression) {
 	if v.visited[expr.GetID()] {
 		return
 	}
+
 	v.visited[expr.GetID()] = true
 
 	switch e := expr.(type) {
@@ -585,7 +595,7 @@ func (v *HIRVerifier) verifyExpression(expr HIRExpression) {
 	}
 }
 
-// verifyIdentifier validates HIR identifier
+// verifyIdentifier validates HIR identifier.
 func (v *HIRVerifier) verifyIdentifier(id *HIRIdentifier) {
 	if id.Name == "" {
 		v.addError(VerificationError{
@@ -596,7 +606,7 @@ func (v *HIRVerifier) verifyIdentifier(id *HIRIdentifier) {
 		})
 	}
 
-	// Check if resolved declaration exists (for name resolution validation)
+	// Check if resolved declaration exists (for name resolution validation).
 	if id.ResolvedDecl == nil {
 		v.addWarning(VerificationWarning{
 			Message: fmt.Sprintf("identifier %s has no resolved declaration", id.Name),
@@ -607,9 +617,9 @@ func (v *HIRVerifier) verifyIdentifier(id *HIRIdentifier) {
 	}
 }
 
-// verifyLiteral validates HIR literal
+// verifyLiteral validates HIR literal.
 func (v *HIRVerifier) verifyLiteral(lit *HIRLiteral) {
-	// Basic validation - literals are generally valid by construction
+	// Basic validation - literals are generally valid by construction.
 	if lit.Value == nil {
 		v.addWarning(VerificationWarning{
 			Message: "literal has nil value",
@@ -620,7 +630,7 @@ func (v *HIRVerifier) verifyLiteral(lit *HIRLiteral) {
 	}
 }
 
-// verifyBinaryExpression validates HIR binary expression
+// verifyBinaryExpression validates HIR binary expression.
 func (v *HIRVerifier) verifyBinaryExpression(binExpr *HIRBinaryExpression) {
 	if binExpr.Left == nil {
 		v.addError(VerificationError{
@@ -653,7 +663,7 @@ func (v *HIRVerifier) verifyBinaryExpression(binExpr *HIRBinaryExpression) {
 		})
 	}
 
-	// Verify operand types are compatible
+	// Verify operand types are compatible.
 	if binExpr.Left != nil && binExpr.Right != nil {
 		leftType := binExpr.Left.GetType()
 		rightType := binExpr.Right.GetType()
@@ -672,7 +682,7 @@ func (v *HIRVerifier) verifyBinaryExpression(binExpr *HIRBinaryExpression) {
 	}
 }
 
-// verifyUnaryExpression validates HIR unary expression
+// verifyUnaryExpression validates HIR unary expression.
 func (v *HIRVerifier) verifyUnaryExpression(unaryExpr *HIRUnaryExpression) {
 	if unaryExpr.Operand == nil {
 		v.addError(VerificationError{
@@ -695,7 +705,7 @@ func (v *HIRVerifier) verifyUnaryExpression(unaryExpr *HIRUnaryExpression) {
 	}
 }
 
-// verifyCallExpression validates HIR call expression
+// verifyCallExpression validates HIR call expression.
 func (v *HIRVerifier) verifyCallExpression(callExpr *HIRCallExpression) {
 	if callExpr.Function == nil {
 		v.addError(VerificationError{
@@ -722,7 +732,7 @@ func (v *HIRVerifier) verifyCallExpression(callExpr *HIRCallExpression) {
 	}
 }
 
-// verifyType validates HIR type
+// verifyType validates HIR type.
 func (v *HIRVerifier) verifyType(hirType HIRType) {
 	if hirType == nil {
 		return
@@ -749,7 +759,7 @@ func (v *HIRVerifier) verifyType(hirType HIRType) {
 	}
 }
 
-// verifyBasicType validates HIR basic type
+// verifyBasicType validates HIR basic type.
 func (v *HIRVerifier) verifyBasicType(basicType *HIRBasicType) {
 	if basicType.Name == "" {
 		v.addError(VerificationError{
@@ -761,7 +771,7 @@ func (v *HIRVerifier) verifyBasicType(basicType *HIRBasicType) {
 	}
 }
 
-// verifyArrayType validates HIR array type
+// verifyArrayType validates HIR array type.
 func (v *HIRVerifier) verifyArrayType(arrayType *HIRArrayType) {
 	if arrayType.ElementType == nil {
 		v.addError(VerificationError{
@@ -779,7 +789,7 @@ func (v *HIRVerifier) verifyArrayType(arrayType *HIRArrayType) {
 	}
 }
 
-// verifyPointerType validates HIR pointer type
+// verifyPointerType validates HIR pointer type.
 func (v *HIRVerifier) verifyPointerType(ptrType *HIRPointerType) {
 	if ptrType.TargetType == nil {
 		v.addError(VerificationError{
@@ -793,7 +803,7 @@ func (v *HIRVerifier) verifyPointerType(ptrType *HIRPointerType) {
 	}
 }
 
-// verifyFunctionType validates HIR function type
+// verifyFunctionType validates HIR function type.
 func (v *HIRVerifier) verifyFunctionType(funcType *HIRFunctionType) {
 	for i, param := range funcType.Parameters {
 		if param == nil {
@@ -820,7 +830,7 @@ func (v *HIRVerifier) verifyFunctionType(funcType *HIRFunctionType) {
 	}
 }
 
-// verifyStructType validates HIR struct type
+// verifyStructType validates HIR struct type.
 func (v *HIRVerifier) verifyStructType(structType *HIRStructType) {
 	if structType.Name == "" {
 		v.addError(VerificationError{
@@ -854,7 +864,7 @@ func (v *HIRVerifier) verifyStructType(structType *HIRStructType) {
 	}
 }
 
-// verifyTypeSystem validates the global type system
+// verifyTypeSystem validates the global type system.
 func (v *HIRVerifier) verifyTypeSystem(program *HIRProgram) {
 	if program.TypeInfo == nil {
 		return
@@ -863,9 +873,9 @@ func (v *HIRVerifier) verifyTypeSystem(program *HIRProgram) {
 	v.verifyGlobalTypeInfo(program.TypeInfo)
 }
 
-// verifyGlobalTypeInfo validates global type information
+// verifyGlobalTypeInfo validates global type information.
 func (v *HIRVerifier) verifyGlobalTypeInfo(typeInfo *GlobalTypeInfo) {
-	// Check primitive types are defined
+	// Check primitive types are defined.
 	requiredPrimitives := []string{"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "string"}
 
 	for _, prim := range requiredPrimitives {
@@ -878,7 +888,7 @@ func (v *HIRVerifier) verifyGlobalTypeInfo(typeInfo *GlobalTypeInfo) {
 		}
 	}
 
-	// Verify type consistency
+	// Verify type consistency.
 	for id, typ := range typeInfo.Types {
 		if typ.ID != id {
 			v.addError(VerificationError{
@@ -890,40 +900,40 @@ func (v *HIRVerifier) verifyGlobalTypeInfo(typeInfo *GlobalTypeInfo) {
 	}
 }
 
-// verifyEffectSystem validates the effect system
+// verifyEffectSystem validates the effect system.
 func (v *HIRVerifier) verifyEffectSystem(program *HIRProgram) {
-	// Effect system validation logic
+	// Effect system validation logic.
 	// This would check effect consistency, purity, etc.
 }
 
-// verifyRegionSystem validates the region system
+// verifyRegionSystem validates the region system.
 func (v *HIRVerifier) verifyRegionSystem(program *HIRProgram) {
-	// Region system validation logic
+	// Region system validation logic.
 	// This would check region lifetime consistency, permissions, etc.
 }
 
-// verifySemantics validates semantic consistency
+// verifySemantics validates semantic consistency.
 func (v *HIRVerifier) verifySemantics(program *HIRProgram) {
-	// Semantic validation logic
+	// Semantic validation logic.
 	// This would check for logical consistency, reachability, etc.
 }
 
-// verifyEffectConsistency validates effect consistency for a node
+// verifyEffectConsistency validates effect consistency for a node.
 func (v *HIRVerifier) verifyEffectConsistency(node HIRNode, effects EffectSet) {
-	// Effect consistency validation logic
+	// Effect consistency validation logic.
 }
 
-// verifyRegionConsistency validates region consistency for a node
+// verifyRegionConsistency validates region consistency for a node.
 func (v *HIRVerifier) verifyRegionConsistency(node HIRNode, regions RegionSet) {
-	// Region consistency validation logic
+	// Region consistency validation logic.
 }
 
-// performStyleChecks performs style and performance checks
+// performStyleChecks performs style and performance checks.
 func (v *HIRVerifier) performStyleChecks(program *HIRProgram) {
-	// Style and performance checking logic
+	// Style and performance checking logic.
 }
 
-// Helper methods for error and warning management
+// Helper methods for error and warning management.
 
 func (v *HIRVerifier) addError(err VerificationError) {
 	v.errors = append(v.errors, err)
@@ -933,67 +943,73 @@ func (v *HIRVerifier) addWarning(warning VerificationWarning) {
 	v.warnings = append(v.warnings, warning)
 }
 
-// GetErrorCount returns the number of verification errors
+// GetErrorCount returns the number of verification errors.
 func (v *HIRVerifier) GetErrorCount() int {
 	return len(v.errors)
 }
 
-// GetWarningCount returns the number of verification warnings
+// GetWarningCount returns the number of verification warnings.
 func (v *HIRVerifier) GetWarningCount() int {
 	return len(v.warnings)
 }
 
-// HasErrors returns true if there are verification errors
+// HasErrors returns true if there are verification errors.
 func (v *HIRVerifier) HasErrors() bool {
 	return len(v.errors) > 0
 }
 
-// FormatErrors returns a formatted string of all errors
+// FormatErrors returns a formatted string of all errors.
 func (v *HIRVerifier) FormatErrors() string {
 	if len(v.errors) == 0 {
 		return "No errors found."
 	}
 
 	var sb strings.Builder
+
 	sb.WriteString(fmt.Sprintf("Found %d verification errors:\n", len(v.errors)))
 
 	for i, err := range v.errors {
 		sb.WriteString(fmt.Sprintf("%d. %s", i+1, err.Error()))
+
 		if err.Span.IsValid() {
 			sb.WriteString(fmt.Sprintf(" at %s", err.Span.String()))
 		}
+
 		sb.WriteString("\n")
 	}
 
 	return sb.String()
 }
 
-// FormatWarnings returns a formatted string of all warnings
+// FormatWarnings returns a formatted string of all warnings.
 func (v *HIRVerifier) FormatWarnings() string {
 	if len(v.warnings) == 0 {
 		return "No warnings found."
 	}
 
 	var sb strings.Builder
+
 	sb.WriteString(fmt.Sprintf("Found %d verification warnings:\n", len(v.warnings)))
 
 	for i, warning := range v.warnings {
 		sb.WriteString(fmt.Sprintf("%d. %s", i+1, warning.Error()))
+
 		if warning.Span.IsValid() {
 			sb.WriteString(fmt.Sprintf(" at %s", warning.Span.String()))
 		}
+
 		sb.WriteString("\n")
 	}
 
 	return sb.String()
 }
 
-// Error returns the error message for VerificationError
+// Error returns the error message for VerificationError.
 func (e VerificationError) Error() string {
 	return e.Message
 }
 
-// Error returns the error message for VerificationWarning
+// Error returns the error message for VerificationWarning.
 func (w VerificationWarning) Error() string {
 	return w.Message
 }

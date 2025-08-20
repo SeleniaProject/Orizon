@@ -1,10 +1,10 @@
 package intrinsics
 
-// ExternKind represents the type of external function
+// ExternKind represents the type of external function.
 type ExternKind int
 
 const (
-	// C Runtime Library
+	// C Runtime Library.
 	ExternMalloc ExternKind = iota
 	ExternFree
 	ExternRealloc
@@ -16,7 +16,7 @@ const (
 	ExternPrintf
 	ExternSprintf
 
-	// File I/O
+	// File I/O.
 	ExternFopen
 	ExternFclose
 	ExternFread
@@ -24,7 +24,7 @@ const (
 	ExternFseek
 	ExternFtell
 
-	// System Calls (Windows)
+	// System Calls (Windows).
 	ExternVirtualAlloc
 	ExternVirtualFree
 	ExternGetCurrentProcess
@@ -33,7 +33,7 @@ const (
 	ExternWaitForSingleObject
 	ExternCloseHandle
 
-	// System Calls (Unix/Linux)
+	// System Calls (Unix/Linux).
 	ExternMmap
 	ExternMunmap
 	ExternOpen
@@ -44,30 +44,30 @@ const (
 	ExternPthread_join
 )
 
-// ExternInfo describes an external function declaration
+// ExternInfo describes an external function declaration.
 type ExternInfo struct {
 	Name      string
-	Kind      ExternKind
+	Library   string
 	Signature ExternSignature
-	Library   string // DLL/SO name
+	Kind      ExternKind
 	Platform  PlatformSupport
 	Calling   CallingConvention
 }
 
-// ExternSignature describes external function signature
+// ExternSignature describes external function signature.
 type ExternSignature struct {
 	Parameters []ExternParameter
 	ReturnType IntrinsicType
 	IsVarArgs  bool
 }
 
-// ExternParameter describes an external function parameter
+// ExternParameter describes an external function parameter.
 type ExternParameter struct {
 	Name string
 	Type IntrinsicType
 }
 
-// CallingConvention specifies the calling convention
+// CallingConvention specifies the calling convention.
 type CallingConvention int
 
 const (
@@ -78,17 +78,17 @@ const (
 	CallingSystem                              // System default
 )
 
-// ExternRegistry manages external function declarations
+// ExternRegistry manages external function declarations.
 type ExternRegistry struct {
 	externs    map[string]*ExternInfo
 	byLibrary  map[string][]*ExternInfo
 	byPlatform map[PlatformSupport][]*ExternInfo
 }
 
-// GlobalExternRegistry contains all external function declarations
+// GlobalExternRegistry contains all external function declarations.
 var GlobalExternRegistry *ExternRegistry
 
-// NewExternRegistry creates a new external function registry
+// NewExternRegistry creates a new external function registry.
 func NewExternRegistry() *ExternRegistry {
 	return &ExternRegistry{
 		externs:    make(map[string]*ExternInfo),
@@ -97,44 +97,45 @@ func NewExternRegistry() *ExternRegistry {
 	}
 }
 
-// Register registers an external function
+// Register registers an external function.
 func (er *ExternRegistry) Register(info *ExternInfo) {
 	er.externs[info.Name] = info
 	er.byLibrary[info.Library] = append(er.byLibrary[info.Library], info)
 	er.byPlatform[info.Platform] = append(er.byPlatform[info.Platform], info)
 }
 
-// Lookup finds an external function by name
+// Lookup finds an external function by name.
 func (er *ExternRegistry) Lookup(name string) (*ExternInfo, bool) {
 	info, exists := er.externs[name]
+
 	return info, exists
 }
 
-// GetByLibrary returns all externals in a library
+// GetByLibrary returns all externals in a library.
 func (er *ExternRegistry) GetByLibrary(library string) []*ExternInfo {
 	return er.byLibrary[library]
 }
 
-// GetByPlatform returns all externals for a platform
+// GetByPlatform returns all externals for a platform.
 func (er *ExternRegistry) GetByPlatform(platform PlatformSupport) []*ExternInfo {
 	return er.byPlatform[platform]
 }
 
-// InitializeExterns initializes the global external function registry
+// InitializeExterns initializes the global external function registry.
 func InitializeExterns() {
 	GlobalExternRegistry = NewExternRegistry()
 
-	// Register C runtime functions
+	// Register C runtime functions.
 	registerCRuntimeExterns()
 
-	// Register platform-specific functions
+	// Register platform-specific functions.
 	registerWindowsExterns()
 	registerUnixExterns()
 }
 
-// C Runtime Library Functions
+// C Runtime Library Functions.
 func registerCRuntimeExterns() {
-	// malloc(size: usize) -> *void
+	// malloc(size: usize) -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "malloc",
 		Kind: ExternMalloc,
@@ -149,7 +150,7 @@ func registerCRuntimeExterns() {
 		Calling:  CallingC,
 	})
 
-	// free(ptr: *void) -> void
+	// free(ptr: *void) -> void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "free",
 		Kind: ExternFree,
@@ -164,7 +165,7 @@ func registerCRuntimeExterns() {
 		Calling:  CallingC,
 	})
 
-	// realloc(ptr: *void, new_size: usize) -> *void
+	// realloc(ptr: *void, new_size: usize) -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "realloc",
 		Kind: ExternRealloc,
@@ -180,7 +181,7 @@ func registerCRuntimeExterns() {
 		Calling:  CallingC,
 	})
 
-	// memcpy(dest: *void, src: *void, count: usize) -> *void
+	// memcpy(dest: *void, src: *void, count: usize) -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "memcpy",
 		Kind: ExternMemcpy,
@@ -197,7 +198,7 @@ func registerCRuntimeExterns() {
 		Calling:  CallingC,
 	})
 
-	// memset(ptr: *void, value: i32, count: usize) -> *void
+	// memset(ptr: *void, value: i32, count: usize) -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "memset",
 		Kind: ExternMemset,
@@ -231,9 +232,9 @@ func registerCRuntimeExterns() {
 	})
 }
 
-// Windows-specific external functions
+// Windows-specific external functions.
 func registerWindowsExterns() {
-	// VirtualAlloc(lpAddress: *void, dwSize: usize, flAllocationType: u32, flProtect: u32) -> *void
+	// VirtualAlloc(lpAddress: *void, dwSize: usize, flAllocationType: u32, flProtect: u32) -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "VirtualAlloc",
 		Kind: ExternVirtualAlloc,
@@ -251,7 +252,7 @@ func registerWindowsExterns() {
 		Calling:  CallingStdcall,
 	})
 
-	// VirtualFree(lpAddress: *void, dwSize: usize, dwFreeType: u32) -> bool
+	// VirtualFree(lpAddress: *void, dwSize: usize, dwFreeType: u32) -> bool.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "VirtualFree",
 		Kind: ExternVirtualFree,
@@ -268,7 +269,7 @@ func registerWindowsExterns() {
 		Calling:  CallingStdcall,
 	})
 
-	// GetCurrentProcess() -> *void
+	// GetCurrentProcess() -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "GetCurrentProcess",
 		Kind: ExternGetCurrentProcess,
@@ -282,9 +283,9 @@ func registerWindowsExterns() {
 	})
 }
 
-// Unix/Linux-specific external functions
+// Unix/Linux-specific external functions.
 func registerUnixExterns() {
-	// mmap(addr: *void, length: usize, prot: i32, flags: i32, fd: i32, offset: i64) -> *void
+	// mmap(addr: *void, length: usize, prot: i32, flags: i32, fd: i32, offset: i64) -> *void.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "mmap",
 		Kind: ExternMmap,
@@ -304,7 +305,7 @@ func registerUnixExterns() {
 		Calling:  CallingC,
 	})
 
-	// munmap(addr: *void, length: usize) -> i32
+	// munmap(addr: *void, length: usize) -> i32.
 	GlobalExternRegistry.Register(&ExternInfo{
 		Name: "munmap",
 		Kind: ExternMunmap,
@@ -321,24 +322,27 @@ func registerUnixExterns() {
 	})
 }
 
-// IsExtern checks if a function name is an external function
+// IsExtern checks if a function name is an external function.
 func IsExtern(name string) bool {
 	if GlobalExternRegistry == nil {
 		return false
 	}
+
 	_, exists := GlobalExternRegistry.Lookup(name)
+
 	return exists
 }
 
-// GetExtern returns external function info for a function name
+// GetExtern returns external function info for a function name.
 func GetExtern(name string) (*ExternInfo, bool) {
 	if GlobalExternRegistry == nil {
 		return nil, false
 	}
+
 	return GlobalExternRegistry.Lookup(name)
 }
 
-// String returns the string representation of a calling convention
+// String returns the string representation of a calling convention.
 func (cc CallingConvention) String() string {
 	switch cc {
 	case CallingC:

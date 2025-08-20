@@ -4,11 +4,11 @@ import (
 	"fmt"
 )
 
-// =============================================================================
-// Advanced Type Checker Infrastructure
-// =============================================================================
+// =============================================================================.
+// Advanced Type Checker Infrastructure.
+// =============================================================================.
 
-// AdvancedTypeChecker provides comprehensive type checking for advanced type systems
+// AdvancedTypeChecker provides comprehensive type checking for advanced type systems.
 type AdvancedTypeChecker struct {
 	RankNChecker      *RankNTypeChecker
 	DependentChecker  *DependentTypeChecker
@@ -23,7 +23,7 @@ type AdvancedTypeChecker struct {
 	Context           *AdvancedTypeContext
 }
 
-// TypeCheckResult represents the result of advanced type checking
+// TypeCheckResult represents the result of advanced type checking.
 type TypeCheckResult struct {
 	Type             TypeInfo
 	Constraints      []TypeConstraint
@@ -37,25 +37,25 @@ type TypeCheckResult struct {
 	Success          bool
 }
 
-// TypeError represents a type checking error
+// TypeError represents a type checking error.
 type TypeError struct {
 	Message     string
+	Context     string
+	Suggestions []string
 	Location    SourceLocation
 	Severity    ErrorSeverity
 	Code        ErrorCode
-	Context     string
-	Suggestions []string
 }
 
-// TypeWarning represents a type checking warning
+// TypeWarning represents a type checking warning.
 type TypeWarning struct {
 	Message  string
+	Context  string
 	Location SourceLocation
 	Code     AdvancedWarningCode
-	Context  string
 }
 
-// ErrorSeverity represents the severity of type errors
+// ErrorSeverity represents the severity of type errors.
 type ErrorSeverity int
 
 const (
@@ -65,7 +65,7 @@ const (
 	SeverityHint
 )
 
-// ErrorCode represents specific type error codes
+// ErrorCode represents specific type error codes.
 type ErrorCode int
 
 const (
@@ -81,7 +81,7 @@ const (
 	ErrorAdvancedUnificationFailure
 )
 
-// AdvancedWarningCode represents specific advanced type warning codes
+// AdvancedWarningCode represents specific advanced type warning codes.
 type AdvancedWarningCode int
 
 const (
@@ -93,7 +93,7 @@ const (
 	AdvancedWarningCapabilityOverpermissive
 )
 
-// SourceLocation represents a location in source code
+// SourceLocation represents a location in source code.
 type SourceLocation struct {
 	File   string
 	Line   int
@@ -101,7 +101,7 @@ type SourceLocation struct {
 	Offset int
 }
 
-// NewAdvancedTypeChecker creates a fully-featured advanced type checker
+// NewAdvancedTypeChecker creates a fully-featured advanced type checker.
 func NewAdvancedTypeChecker() *AdvancedTypeChecker {
 	env := NewAdvancedTypeEnvironment()
 	ctx := NewAdvancedTypeContext()
@@ -121,7 +121,7 @@ func NewAdvancedTypeChecker() *AdvancedTypeChecker {
 	}
 }
 
-// CheckAdvancedType performs comprehensive type checking for advanced type systems
+// CheckAdvancedType performs comprehensive type checking for advanced type systems.
 func (atc *AdvancedTypeChecker) CheckAdvancedType(expr HIRExpression, expectedType TypeInfo) (*TypeCheckResult, error) {
 	result := &TypeCheckResult{
 		Type:             expectedType,
@@ -136,7 +136,7 @@ func (atc *AdvancedTypeChecker) CheckAdvancedType(expr HIRExpression, expectedTy
 		Success:          true,
 	}
 
-	// Phase 1: Determine expression type through inference
+	// Phase 1: Determine expression type through inference.
 	inferredType, err := atc.InferenceEngine.InferType(expr, atc.Environment)
 	if err != nil {
 		result.Errors = append(result.Errors, TypeError{
@@ -145,20 +145,21 @@ func (atc *AdvancedTypeChecker) CheckAdvancedType(expr HIRExpression, expectedTy
 			Code:     ErrorAdvancedUnificationFailure,
 		})
 		result.Success = false
+
 		return result, err
 	}
 
-	// Phase 2: Check if inferred type is advanced
+	// Phase 2: Check if inferred type is advanced.
 	if advType, isAdvanced := IsAdvancedType(inferredType); isAdvanced {
 		return atc.checkAdvancedTypeExpression(expr, advType, expectedType, result)
 	}
 
-	// Phase 3: Check if expected type is advanced
+	// Phase 3: Check if expected type is advanced.
 	if advExpected, isAdvancedExpected := IsAdvancedType(expectedType); isAdvancedExpected {
 		return atc.checkRegularWithAdvanced(expr, inferredType, advExpected, result)
 	}
 
-	// Phase 4: Both types are regular - use standard unification
+	// Phase 4: Both types are regular - use standard unification.
 	unifyResult, err := atc.UnificationEngine.Unify(inferredType, expectedType)
 	if err != nil || !unifyResult.Success {
 		result.Errors = append(result.Errors, TypeError{
@@ -172,7 +173,7 @@ func (atc *AdvancedTypeChecker) CheckAdvancedType(expr HIRExpression, expectedTy
 	return result, nil
 }
 
-// checkAdvancedTypeExpression handles expressions with advanced types
+// checkAdvancedTypeExpression handles expressions with advanced types.
 func (atc *AdvancedTypeChecker) checkAdvancedTypeExpression(expr HIRExpression, advType AdvancedTypeInfo, expectedType TypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
 	switch advType.GetAdvancedKind() {
 	case AdvancedTypeRankN:
@@ -192,17 +193,18 @@ func (atc *AdvancedTypeChecker) checkAdvancedTypeExpression(expr HIRExpression, 
 			Code:     ErrorTypeKindMismatch,
 		})
 		result.Success = false
+
 		return result, fmt.Errorf("unsupported advanced type kind: %v", advType.GetAdvancedKind())
 	}
 }
 
-// checkRankNExpression handles Rank-N polymorphic type checking
+// checkRankNExpression handles Rank-N polymorphic type checking.
 func (atc *AdvancedTypeChecker) checkRankNExpression(expr HIRExpression, rankNType *RankNType, expectedType TypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
-	// Enter new scope for type quantifiers
+	// Enter new scope for type quantifiers.
 	atc.Context.EnterScope()
 	defer atc.Context.ExitScope()
 
-	// Bind quantified type variables
+	// Bind quantified type variables.
 	for _, quantifier := range rankNType.Quantifiers {
 		skolem := atc.Context.SkolemGenerator.GenerateSkolem()
 		skolemType := TypeInfo{
@@ -212,15 +214,16 @@ func (atc *AdvancedTypeChecker) checkRankNExpression(expr HIRExpression, rankNTy
 		atc.Environment.BindTypeVariable(quantifier.Variable, skolemType)
 	}
 
-	// Check the body type with quantifiers bound
+	// Check the body type with quantifiers bound.
 	bodyResult, err := atc.CheckAdvancedType(expr, rankNType.Body)
 	if err != nil {
 		result.Errors = append(result.Errors, bodyResult.Errors...)
 		result.Success = false
+
 		return result, err
 	}
 
-	// Validate rank constraints
+	// Validate rank constraints.
 	for _, constraint := range rankNType.Constraints {
 		if !atc.RankNChecker.ValidateRankConstraint(constraint, rankNType) {
 			result.Errors = append(result.Errors, TypeError{
@@ -232,16 +235,16 @@ func (atc *AdvancedTypeChecker) checkRankNExpression(expr HIRExpression, rankNTy
 		}
 	}
 
-	// Merge results
+	// Merge results.
 	result.Constraints = append(result.Constraints, bodyResult.Constraints...)
 	result.ProofObligations = append(result.ProofObligations, bodyResult.ProofObligations...)
 
 	return result, nil
 }
 
-// checkDependentExpression handles dependent type checking
+// checkDependentExpression handles dependent type checking.
 func (atc *AdvancedTypeChecker) checkDependentExpression(expr HIRExpression, depType *DependentType, expectedType TypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
-	// Validate value dependencies
+	// Validate value dependencies.
 	dependencyResult := atc.DependentChecker.CheckValueDependency(depType.Dependency, expr)
 	if !dependencyResult.Valid {
 		result.Errors = append(result.Errors, TypeError{
@@ -252,7 +255,7 @@ func (atc *AdvancedTypeChecker) checkDependentExpression(expr HIRExpression, dep
 		result.Success = false
 	}
 
-	// Check constructor validity
+	// Check constructor validity.
 	constructorResult := atc.DependentChecker.ValidateConstructor(depType.Constructor, depType.Universe)
 	if !constructorResult.Valid {
 		result.Errors = append(result.Errors, TypeError{
@@ -263,7 +266,7 @@ func (atc *AdvancedTypeChecker) checkDependentExpression(expr HIRExpression, dep
 		result.Success = false
 	}
 
-	// Validate universe level
+	// Validate universe level.
 	if !atc.DependentChecker.ValidateUniverseLevel(depType.Universe, expr) {
 		result.Errors = append(result.Errors, TypeError{
 			Message:  fmt.Sprintf("Universe level validation failed for level %d", depType.Universe),
@@ -273,7 +276,7 @@ func (atc *AdvancedTypeChecker) checkDependentExpression(expr HIRExpression, dep
 		result.Success = false
 	}
 
-	// Check index constraints
+	// Check index constraints.
 	for i, index := range depType.Indices {
 		if !atc.DependentChecker.ValidateIndex(index, i, depType) {
 			result.Errors = append(result.Errors, TypeError{
@@ -288,13 +291,13 @@ func (atc *AdvancedTypeChecker) checkDependentExpression(expr HIRExpression, dep
 	return result, nil
 }
 
-// checkEffectExpression handles effect type checking
+// checkEffectExpression handles effect type checking.
 func (atc *AdvancedTypeChecker) checkEffectExpression(expr HIRExpression, effectType *AdvancedEffectType, expectedType TypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
-	// Collect effects from expression
+	// Collect effects from expression.
 	effectSet := atc.EffectChecker.CollectEffects(expr)
 	result.EffectSet = effectSet
 
-	// Check effect compatibility
+	// Check effect compatibility.
 	for _, effect := range effectType.Effects {
 		if !atc.EffectChecker.IsEffectAllowed(effect, effectSet) {
 			result.Errors = append(result.Errors, TypeError{
@@ -305,7 +308,7 @@ func (atc *AdvancedTypeChecker) checkEffectExpression(expr HIRExpression, effect
 			result.Success = false
 		}
 
-		// Validate effect operations
+		// Validate effect operations.
 		for _, operation := range effect.Operations {
 			if !atc.EffectChecker.ValidateOperation(operation, effect) {
 				result.Errors = append(result.Errors, TypeError{
@@ -318,7 +321,7 @@ func (atc *AdvancedTypeChecker) checkEffectExpression(expr HIRExpression, effect
 		}
 	}
 
-	// Check purity requirements
+	// Check purity requirements.
 	if effectType.Purity == PurityPure && len(effectSet) > 0 {
 		result.Errors = append(result.Errors, TypeError{
 			Message:  "Pure function cannot have effects",
@@ -328,7 +331,7 @@ func (atc *AdvancedTypeChecker) checkEffectExpression(expr HIRExpression, effect
 		result.Success = false
 	}
 
-	// Validate region access
+	// Validate region access.
 	if !atc.EffectChecker.ValidateRegionAccess(effectType.Region, expr) {
 		result.Errors = append(result.Errors, TypeError{
 			Message:  fmt.Sprintf("Invalid region access for %s", effectType.Region.Name),
@@ -338,7 +341,7 @@ func (atc *AdvancedTypeChecker) checkEffectExpression(expr HIRExpression, effect
 		result.Success = false
 	}
 
-	// Check effect handlers
+	// Check effect handlers.
 	for _, handler := range effectType.Handlers {
 		if !atc.EffectChecker.ValidateHandler(handler, effectType) {
 			result.Errors = append(result.Errors, TypeError{
@@ -353,12 +356,12 @@ func (atc *AdvancedTypeChecker) checkEffectExpression(expr HIRExpression, effect
 	return result, nil
 }
 
-// checkLinearExpression handles linear type checking
+// checkLinearExpression handles linear type checking.
 func (atc *AdvancedTypeChecker) checkLinearExpression(expr HIRExpression, linearType *LinearType, expectedType TypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
-	// Track resource usage
+	// Track resource usage.
 	usageResult := atc.LinearChecker.TrackResourceUsage(expr, linearType)
 
-	// Check multiplicity constraints
+	// Check multiplicity constraints.
 	if usageResult.ActualUsage < linearType.Multiplicity.Min {
 		result.Errors = append(result.Errors, TypeError{
 			Message:  fmt.Sprintf("Resource used %d times, minimum required: %d", usageResult.ActualUsage, linearType.Multiplicity.Min),
@@ -377,7 +380,7 @@ func (atc *AdvancedTypeChecker) checkLinearExpression(expr HIRExpression, linear
 		result.Success = false
 	}
 
-	// Validate linear constraints
+	// Validate linear constraints.
 	for _, constraint := range linearType.Constraints {
 		if !atc.LinearChecker.ValidateLinearConstraint(constraint, linearType, expr) {
 			result.Errors = append(result.Errors, TypeError{
@@ -389,7 +392,7 @@ func (atc *AdvancedTypeChecker) checkLinearExpression(expr HIRExpression, linear
 		}
 	}
 
-	// Check access permissions
+	// Check access permissions.
 	requiredAccess := atc.LinearChecker.DetermineRequiredAccess(expr)
 	if !atc.LinearChecker.HasSufficientAccess(linearType.Region.Access, requiredAccess) {
 		result.Errors = append(result.Errors, TypeError{
@@ -400,7 +403,7 @@ func (atc *AdvancedTypeChecker) checkLinearExpression(expr HIRExpression, linear
 		result.Success = false
 	}
 
-	// Validate lifetime constraints
+	// Validate lifetime constraints.
 	if !atc.LinearChecker.ValidateLifetime(linearType.Region.Lifetime, expr) {
 		result.Errors = append(result.Errors, TypeError{
 			Message:  "Lifetime constraint violation for linear resource",
@@ -413,17 +416,18 @@ func (atc *AdvancedTypeChecker) checkLinearExpression(expr HIRExpression, linear
 	return result, nil
 }
 
-// checkRefinementExpression handles refinement type checking
+// checkRefinementExpression handles refinement type checking.
 func (atc *AdvancedTypeChecker) checkRefinementExpression(expr HIRExpression, refinementType *RefinementType, expectedType TypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
-	// First check base type
+	// First check base type.
 	baseResult, err := atc.CheckAdvancedType(expr, refinementType.BaseType)
 	if err != nil {
 		result.Errors = append(result.Errors, baseResult.Errors...)
 		result.Success = false
+
 		return result, err
 	}
 
-	// Validate refinements
+	// Validate refinements.
 	for i, refinement := range refinementType.Refinements {
 		if !atc.RefinementChecker.ValidateRefinement(refinement, expr, refinementType.Context) {
 			result.Errors = append(result.Errors, TypeError{
@@ -435,7 +439,7 @@ func (atc *AdvancedTypeChecker) checkRefinementExpression(expr HIRExpression, re
 		}
 	}
 
-	// Handle proof obligations
+	// Handle proof obligations.
 	if refinementType.Proof.Status == ProofPending {
 		proofResult := atc.ProofEngine.DischargeObligation(refinementType.Proof, refinementType.Context)
 		if !proofResult.Success {
@@ -457,7 +461,7 @@ func (atc *AdvancedTypeChecker) checkRefinementExpression(expr HIRExpression, re
 		}
 	}
 
-	// Validate refinement context
+	// Validate refinement context.
 	if !atc.RefinementChecker.ValidateContext(refinementType.Context, expr) {
 		result.Errors = append(result.Errors, TypeError{
 			Message:  "Refinement context validation failed",
@@ -470,9 +474,9 @@ func (atc *AdvancedTypeChecker) checkRefinementExpression(expr HIRExpression, re
 	return result, nil
 }
 
-// checkRegularWithAdvanced handles cases where regular type meets advanced expected type
+// checkRegularWithAdvanced handles cases where regular type meets advanced expected type.
 func (atc *AdvancedTypeChecker) checkRegularWithAdvanced(expr HIRExpression, regularType TypeInfo, advExpected AdvancedTypeInfo, result *TypeCheckResult) (*TypeCheckResult, error) {
-	// Most regular types cannot be coerced to advanced types
+	// Most regular types cannot be coerced to advanced types.
 	result.Errors = append(result.Errors, TypeError{
 		Message:  fmt.Sprintf("Cannot coerce regular type %v to advanced type %v", regularType, advExpected.GetAdvancedKind()),
 		Severity: SeverityError,
@@ -483,7 +487,7 @@ func (atc *AdvancedTypeChecker) checkRegularWithAdvanced(expr HIRExpression, reg
 	return result, nil
 }
 
-// ValidateTypeWellFormedness checks if an advanced type is well-formed
+// ValidateTypeWellFormedness checks if an advanced type is well-formed.
 func (atc *AdvancedTypeChecker) ValidateTypeWellFormedness(advType AdvancedTypeInfo) (*TypeValidationResult, error) {
 	result := &TypeValidationResult{
 		Valid:    true,
@@ -514,9 +518,9 @@ func (atc *AdvancedTypeChecker) ValidateTypeWellFormedness(advType AdvancedTypeI
 	return result, nil
 }
 
-// TypeValidationResult represents the result of type validation
+// TypeValidationResult represents the result of type validation.
 type TypeValidationResult struct {
-	Valid    bool
 	Errors   []TypeError
 	Warnings []TypeWarning
+	Valid    bool
 }

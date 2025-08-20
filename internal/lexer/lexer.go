@@ -9,27 +9,28 @@ import (
 	"unicode/utf8"
 )
 
-// TokenType represents the type of a token
+// TokenType represents the type of a token.
 type TokenType int
 
-// String returns a string representation of the token type
+// String returns a string representation of the token type.
 func (tt TokenType) String() string {
 	if name, ok := tokenNames[tt]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("UNKNOWN(%d)", int(tt))
 }
 
-// Token types - Orizon言語のトークン定義
+// Token types - Orizon言語のトークン定義.
 const (
-	// 特殊トークン
+	// 特殊トークン.
 	TokenEOF TokenType = iota
 	TokenError
 	TokenNewline
 	TokenWhitespace
 	TokenComment
 
-	// リテラル
+	// リテラル.
 	TokenIdentifier
 	TokenInteger
 	TokenFloat
@@ -38,7 +39,7 @@ const (
 	TokenLifetime
 	TokenBool
 
-	// キーワード
+	// キーワード.
 	TokenFunc
 	TokenLet
 	TokenVar
@@ -71,7 +72,7 @@ const (
 	TokenWhere
 	TokenUnsafe
 
-	// 構文仕様の追加キーワード
+	// 構文仕様の追加キーワード.
 	TokenCase
 	TokenDefault
 	TokenFalse
@@ -83,11 +84,11 @@ const (
 	TokenFn      // func の別名として追加
 	TokenNewtype // newtype 宣言用
 
-	// 効果システム関連
+	// 効果システム関連.
 	TokenEffect // effect keyword for declarations
 	TokenEffects
 
-	// テンプレート文字列関連
+	// テンプレート文字列関連.
 	TokenTemplateString
 	TokenTemplateStart      // ${
 	TokenTemplateEnd        // }
@@ -95,7 +96,7 @@ const (
 	TokenInterpolationStart // ${
 	TokenInterpolationEnd   // }
 
-	// マクロ関連
+	// マクロ関連.
 	TokenMacro
 	TokenMacroInvoke  // !
 	TokenBackquote    // `
@@ -103,7 +104,7 @@ const (
 	TokenMacroRepeat  // Repetition markers (* + ?)
 	TokenMacroGroup   // Grouping markers
 
-	// 演算子
+	// 演算子.
 	TokenPlus
 	TokenMinus
 	TokenMul
@@ -137,12 +138,12 @@ const (
 	TokenShlAssign
 	TokenShrAssign
 
-	// 構文仕様の追加演算子
+	// 構文仕様の追加演算子.
 	TokenSpaceship // <=>
 	TokenRange     // ..
 	TokenEllipsis  // ...
 
-	// 記号
+	// 記号.
 	TokenLParen
 	TokenRParen
 	TokenLBrace
@@ -169,37 +170,35 @@ const (
 	TokenExclamation
 )
 
-// Position represents a position in the source code
+// Position represents a position in the source code.
 type Position struct {
 	Line   int // 1-based line number
 	Column int // 1-based column number
 	Offset int // 0-based byte offset in source
 }
 
-// Span represents a range in the source code
+// Span represents a range in the source code.
 type Span struct {
 	Start Position
 	End   Position
 }
 
-// Token represents a lexical token with position information
+// Token represents a lexical token with position information.
 type Token struct {
-	Type    TokenType
 	Literal string
-	Span    Span // Source code span for this token
-
-	// Legacy compatibility fields (deprecated - use Span instead)
-	Line   int
-	Column int
+	Span    Span
+	Type    TokenType
+	Line    int
+	Column  int
 }
 
-// String returns a string representation of the token
+// String returns a string representation of the token.
 func (t Token) String() string {
 	return fmt.Sprintf("{Type: %s, Literal: %q, Line: %d, Column: %d}",
 		tokenNames[t.Type], t.Literal, t.Line, t.Column)
 }
 
-// tokenNames provides string representations for token types
+// tokenNames provides string representations for token types.
 var tokenNames = map[TokenType]string{
 	TokenEOF:        "EOF",
 	TokenError:      "ERROR",
@@ -247,7 +246,7 @@ var tokenNames = map[TokenType]string{
 	TokenWhere:    "WHERE",
 	TokenUnsafe:   "UNSAFE",
 
-	// マクロ関連
+	// マクロ関連.
 	TokenMacro:        "MACRO",
 	TokenMacroInvoke:  "MACRO_INVOKE",
 	TokenBackquote:    "BACKQUOTE",
@@ -313,7 +312,7 @@ var tokenNames = map[TokenType]string{
 	TokenPercent:     "PERCENT",
 	TokenExclamation: "EXCLAMATION",
 
-	// 追加トークン
+	// 追加トークン.
 	TokenCase:        "CASE",
 	TokenDefault:     "DEFAULT",
 	TokenFalse:       "FALSE",
@@ -325,11 +324,11 @@ var tokenNames = map[TokenType]string{
 	TokenFn:          "FN",
 	TokenNewtype:     "NEWTYPE",
 
-	// 効果システム関連
+	// 効果システム関連.
 	TokenEffect:  "EFFECT",
 	TokenEffects: "EFFECTS",
 
-	// テンプレート文字列関連
+	// テンプレート文字列関連.
 	TokenTemplateString:     "TEMPLATE_STRING",
 	TokenTemplateStart:      "TEMPLATE_START",
 	TokenTemplateEnd:        "TEMPLATE_END",
@@ -337,13 +336,13 @@ var tokenNames = map[TokenType]string{
 	TokenInterpolationStart: "INTERPOLATION_START",
 	TokenInterpolationEnd:   "INTERPOLATION_END",
 
-	// 構文仕様の追加演算子
+	// 構文仕様の追加演算子.
 	TokenSpaceship: "SPACESHIP",
 	TokenRange:     "RANGE",
 	TokenEllipsis:  "ELLIPSIS",
 }
 
-// keywords maps string keywords to their token types
+// keywords maps string keywords to their token types.
 var keywords = map[string]TokenType{
 	"func":     TokenFunc,
 	"fn":       TokenFn, // func の別名
@@ -391,7 +390,7 @@ var keywords = map[string]TokenType{
 	"effects":  TokenEffects,
 }
 
-// CacheEntry represents a cached token with its validity information
+// CacheEntry represents a cached token with its validity information.
 type CacheEntry struct {
 	Token    Token
 	IsValid  bool
@@ -399,44 +398,38 @@ type CacheEntry struct {
 	EndPos   int // End position in original input
 }
 
-// ChangeRegion represents a region that has been modified
+// ChangeRegion represents a region that has been modified.
 type ChangeRegion struct {
 	Start  int // Start offset of change
 	End    int // End offset of change (in original text)
 	Length int // Length of new text
 }
 
-// Lexer represents the lexical analyzer with incremental parsing support
+// Lexer represents the lexical analyzer with incremental parsing support.
 type Lexer struct {
-	input        string
-	position     int  // current position in input (points to current char)
-	readPosition int  // current reading position in input (after current char)
-	ch           byte // current char under examination
-	line         int  // current line number
-	column       int  // current column number
-	offset       int  // current byte offset in input
-
-	// Incremental parsing state
-	filename     string        // source filename for error reporting
-	tokenCache   []CacheEntry  // cached tokens from previous parse
-	changeRegion *ChangeRegion // region that has been modified
-	cacheValid   bool          // whether cache is currently valid
-
-	// Error recovery system (Phase 1.1.3)
-	errorRecovery *ErrorRecovery // error recovery system
-	errors        []any          // accumulated lexical errors (LexicalError)
-
-	// Temporary state for error handling
-	stringTerminated   bool // whether last string was properly terminated
-	hasIdentifierError bool // whether identifier had invalid characters
+	errorRecovery      *ErrorRecovery
+	changeRegion       *ChangeRegion
+	input              string
+	filename           string
+	errors             []any
+	tokenCache         []CacheEntry
+	offset             int
+	column             int
+	line               int
+	readPosition       int
+	position           int
+	ch                 byte
+	cacheValid         bool
+	stringTerminated   bool
+	hasIdentifierError bool
 }
 
-// New creates a new lexer instance for complete parsing
+// New creates a new lexer instance for complete parsing.
 func New(input string) *Lexer {
 	return NewWithFilename(input, "")
 }
 
-// NewWithFilename creates a new lexer instance with filename for error reporting
+// NewWithFilename creates a new lexer instance with filename for error reporting.
 func NewWithFilename(input, filename string) *Lexer {
 	l := &Lexer{
 		input:      input,
@@ -447,14 +440,15 @@ func NewWithFilename(input, filename string) *Lexer {
 		cacheValid: false,
 	}
 
-	// Initialize error recovery system
+	// Initialize error recovery system.
 	l.errorRecovery = NewErrorRecovery()
 
 	l.readChar()
+
 	return l
 }
 
-// NewIncremental creates a lexer for incremental parsing
+// NewIncremental creates a lexer for incremental parsing.
 func NewIncremental(input, filename string, previousCache []CacheEntry, change *ChangeRegion) *Lexer {
 	l := &Lexer{
 		input:        input,
@@ -467,16 +461,18 @@ func NewIncremental(input, filename string, previousCache []CacheEntry, change *
 		cacheValid:   change != nil,
 	}
 	l.readChar()
+
 	return l
 }
 
-// readChar reads the next character and advances position
+// readChar reads the next character and advances position.
 func (l *Lexer) readChar() {
 	if l.readPosition >= len(l.input) {
 		l.ch = 0 // ASCII NUL character represents "EOF"
 	} else {
 		l.ch = l.input[l.readPosition]
 	}
+
 	l.position = l.readPosition
 	l.readPosition++
 	l.offset = l.position // Update byte offset
@@ -489,27 +485,28 @@ func (l *Lexer) readChar() {
 	}
 }
 
-// peekChar returns the next character without advancing position
+// peekChar returns the next character without advancing position.
 func (l *Lexer) peekChar() byte {
 	if l.readPosition >= len(l.input) {
 		return 0
 	}
+
 	return l.input[l.readPosition]
 }
 
-// skipWhitespace skips whitespace characters (except newlines)
+// skipWhitespace skips whitespace characters (except newlines).
 func (l *Lexer) skipWhitespace() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\r' {
 		l.readChar()
 	}
 }
 
-// readIdentifier reads identifier or Unicode identifier - 修正版
+// readIdentifier reads identifier or Unicode identifier - 修正版.
 func (l *Lexer) readIdentifier() string {
 	position := l.position
 	l.hasIdentifierError = false // Reset error flag
 
-	// 最初の文字を処理
+	// 最初の文字を処理.
 	if isLetter(l.ch) || l.ch == '_' {
 		l.readChar()
 	} else if l.ch >= 0x80 { // Unicode文字の開始
@@ -524,7 +521,7 @@ func (l *Lexer) readIdentifier() string {
 		}
 	}
 
-	// 残りの文字を読み続ける
+	// 残りの文字を読み続ける.
 	for {
 		if isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
@@ -533,6 +530,7 @@ func (l *Lexer) readIdentifier() string {
 			if size == 0 {
 				break
 			}
+
 			if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSymbol(r) {
 				for i := 0; i < size; i++ {
 					l.readChar()
@@ -541,16 +539,19 @@ func (l *Lexer) readIdentifier() string {
 				break
 			}
 		} else {
-			// Check for invalid characters that might be typos in identifiers
+			// Check for invalid characters that might be typos in identifiers.
 			if l.ch == '-' || l.ch == '@' || l.ch == '#' || l.ch == '$' || l.ch == '%' || l.ch == '^' || l.ch == '&' || l.ch == '*' {
 				if l.errorRecovery != nil {
 					err := l.CreateInvalidCharacterError(rune(l.ch))
 					l.addError(err)
 				}
+
 				l.hasIdentifierError = true
 				l.readChar() // Skip the invalid character
+
 				continue
 			}
+
 			break
 		}
 	}
@@ -561,54 +562,65 @@ func (l *Lexer) readIdentifier() string {
 func (l *Lexer) readNumber() string {
 	position := l.position
 
-	// Check for special prefixes (0x, 0b, 0o)
+	// Check for special prefixes (0x, 0b, 0o).
 	if l.ch == '0' && l.position+1 < len(l.input) {
 		next := l.input[l.position+1]
 		switch next {
 		case 'x', 'X': // Hexadecimal
 			l.readChar() // consume '0'
 			l.readChar() // consume 'x'
+
 			if !isHexDigit(l.ch) {
 				return l.input[position:l.position] // Error: no hex digits after 0x
 			}
+
 			for isHexDigit(l.ch) || l.ch == '_' {
 				l.readChar()
 			}
+
 			return l.input[position:l.position]
 		case 'b', 'B': // Binary
 			l.readChar() // consume '0'
 			l.readChar() // consume 'b'
+
 			if !isBinaryDigit(l.ch) {
 				return l.input[position:l.position] // Error: no binary digits after 0b
 			}
+
 			for isBinaryDigit(l.ch) || l.ch == '_' {
 				l.readChar()
 			}
+
 			return l.input[position:l.position]
 		case 'o', 'O': // Octal
 			l.readChar() // consume '0'
 			l.readChar() // consume 'o'
+
 			if !isOctalDigit(l.ch) {
 				return l.input[position:l.position] // Error: no octal digits after 0o
 			}
+
 			for isOctalDigit(l.ch) || l.ch == '_' {
 				l.readChar()
 			}
+
 			return l.input[position:l.position]
 		}
 	}
 
 	hasDecimal := false
 
-	// Read decimal digits
+	// Read decimal digits.
 	for isDigit(l.ch) || l.ch == '_' {
 		l.readChar()
 	}
 
-	// Handle decimal point
+	// Handle decimal point.
 	if l.ch == '.' && isDigit(l.peekChar()) {
 		hasDecimal = true
+
 		l.readChar() // consume '.'
+
 		for isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
 		}
@@ -617,12 +629,15 @@ func (l *Lexer) readNumber() string {
 	// Handle exponent (e/E)
 	if l.ch == 'e' || l.ch == 'E' {
 		l.readChar() // consume 'e'/'E'
+
 		if l.ch == '+' || l.ch == '-' {
 			l.readChar() // consume sign
 		}
+
 		if !isDigit(l.ch) {
 			return l.input[position:l.position] // Error: no digits after exponent
 		}
+
 		for isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
 		}
@@ -630,10 +645,11 @@ func (l *Lexer) readNumber() string {
 
 	literal := l.input[position:l.position]
 
-	// Check for malformed number (letters after digits)
+	// Check for malformed number (letters after digits).
 	if isLetter(l.ch) || l.ch == '_' {
-		// Malformed number - read the invalid part too
+		// Malformed number - read the invalid part too.
 		invalidStart := l.position
+
 		for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
 			l.readChar()
 		}
@@ -648,28 +664,31 @@ func (l *Lexer) readNumber() string {
 		return l.input[position:l.position] // Return the full invalid literal
 	}
 
-	// Check for multiple decimal points
+	// Check for multiple decimal points.
 	if hasDecimal {
 		remaining := l.input[l.position:]
 		for i, r := range remaining {
 			if r == '.' {
-				// Found another decimal point - this is malformed
+				// Found another decimal point - this is malformed.
 				if l.errorRecovery != nil {
-					// Read the full malformed literal including the second decimal point
+					// Read the full malformed literal including the second decimal point.
 					extraPos := l.position + i + 1
 					for extraPos < len(l.input) && isDigit(l.input[extraPos]) {
 						extraPos++
 					}
+
 					malformedLiteral := l.input[position:extraPos]
 					err := l.CreateMalformedNumberError(malformedLiteral)
 					l.addError(err)
 				}
-				// Advance position to consume the malformed part
+				// Advance position to consume the malformed part.
 				for l.ch == '.' || isDigit(l.ch) {
 					l.readChar()
 				}
+
 				return l.input[position:l.position]
 			}
+
 			if !isDigit(byte(r)) {
 				break
 			}
@@ -685,20 +704,24 @@ func (l *Lexer) readString() string {
 
 	for {
 		l.readChar()
+
 		if l.ch == '"' {
 			terminated = true
+
 			break
 		}
+
 		if l.ch == 0 {
-			// Unterminated string
+			// Unterminated string.
 			break
 		}
+
 		if l.ch == '\\' {
 			l.readChar() // エスケープ文字をスキップ
 		}
 	}
 
-	// Store termination status for NextToken to use
+	// Store termination status for NextToken to use.
 	l.stringTerminated = terminated
 
 	return l.input[position:l.position]
@@ -706,75 +729,85 @@ func (l *Lexer) readString() string {
 
 func (l *Lexer) readChar2() string {
 	position := l.position + 1 // 開始の引用符をスキップ
+
 	for {
 		l.readChar()
+
 		if l.ch == '\'' || l.ch == 0 {
 			break
 		}
+
 		if l.ch == '\\' {
 			l.readChar() // エスケープ文字をスキップ
 		}
 	}
+
 	return l.input[position:l.position]
 }
 
 func (l *Lexer) readComment() string {
 	position := l.position
+
 	if l.ch == '/' && l.peekChar() == '/' {
-		// シングルラインコメント
+		// シングルラインコメント.
 		for l.ch != '\n' && l.ch != 0 {
 			l.readChar()
 		}
 	} else if l.ch == '/' && l.peekChar() == '*' {
-		// マルチラインコメント
+		// マルチラインコメント.
 		l.readChar() // '/'をスキップ
 		l.readChar() // '*'をスキップ
+
 		for {
 			if l.ch == '*' && l.peekChar() == '/' {
 				l.readChar() // '*'をスキップ
 				l.readChar() // '/'をスキップ
+
 				break
 			}
+
 			if l.ch == 0 {
 				break
 			}
+
 			l.readChar()
 		}
 	}
+
 	return l.input[position:l.position]
 }
 
-// isLetter checks if character is ASCII letter
+// isLetter checks if character is ASCII letter.
 func isLetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
 }
 
-// isDigit checks if character is ASCII digit
+// isDigit checks if character is ASCII digit.
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
 
-// isAlphaNumeric checks if character is alphanumeric
+// isAlphaNumeric checks if character is alphanumeric.
 func isAlphaNumeric(ch byte) bool {
 	return isLetter(ch) || isDigit(ch)
 }
 
-// isHexDigit checks if character is hexadecimal digit
+// isHexDigit checks if character is hexadecimal digit.
 func isHexDigit(ch byte) bool {
 	return isDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
 
-// isBinaryDigit checks if character is binary digit
+// isBinaryDigit checks if character is binary digit.
 func isBinaryDigit(ch byte) bool {
 	return ch == '0' || ch == '1'
 }
 
-// isOctalDigit checks if character is octal digit
+// isOctalDigit checks if character is octal digit.
 func isOctalDigit(ch byte) bool {
 	return '0' <= ch && ch <= '7'
 }
 
-// readRawString reads a raw string literal (r"...")
+// readRawString reads a raw string literal (r"...").
 func (l *Lexer) readRawString() string {
 	position := l.position + 1 // Skip opening quote
 	l.readChar()               // consume opening quote
@@ -786,14 +819,15 @@ func (l *Lexer) readRawString() string {
 	if l.ch == '"' {
 		literal := l.input[position:l.position]
 		l.readChar() // consume closing quote
+
 		return literal
 	}
 
-	// Unterminated raw string
+	// Unterminated raw string.
 	return l.input[position:l.position]
 }
 
-// readTemplateString reads a template string literal (`...`)
+// readTemplateString reads a template string literal (`...`).
 func (l *Lexer) readTemplateString() string {
 	position := l.position + 1 // Skip opening backtick
 	l.readChar()               // consume opening backtick
@@ -802,30 +836,32 @@ func (l *Lexer) readTemplateString() string {
 
 	for l.ch != '`' && l.ch != 0 {
 		if l.ch == '$' && l.peekChar() == '{' {
-			// Found interpolation start ${
-			// Add text before interpolation
+			// Found interpolation start ${.
+			// Add text before interpolation.
 			if l.position > position {
 				result.WriteString(l.input[position:l.position])
 			}
 
-			// Mark interpolation start
+			// Mark interpolation start.
 			result.WriteString("${")
 			l.readChar() // consume $
 			l.readChar() // consume {
 
-			// Read until }
+			// Read until }.
 			braceCount := 1
 			interpolationStart := l.position
+
 			for braceCount > 0 && l.ch != 0 {
 				if l.ch == '{' {
 					braceCount++
 				} else if l.ch == '}' {
 					braceCount--
 				}
+
 				l.readChar()
 			}
 
-			// Add interpolation expression
+			// Add interpolation expression.
 			if braceCount == 0 {
 				result.WriteString(l.input[interpolationStart : l.position-1])
 				result.WriteString("}")
@@ -837,27 +873,28 @@ func (l *Lexer) readTemplateString() string {
 		}
 	}
 
-	// Add remaining text
+	// Add remaining text.
 	if l.position > position {
 		result.WriteString(l.input[position:l.position])
 	}
 
 	if l.ch == '`' {
 		l.readChar() // consume closing backtick
+
 		return result.String()
 	}
 
-	// Unterminated template string
+	// Unterminated template string.
 	return result.String()
 }
 
-// NextToken scans the input and returns the next token with full position information
+// NextToken scans the input and returns the next token with full position information.
 func (l *Lexer) NextToken() Token {
 	var tok Token
 
 	l.skipWhitespace()
 
-	// Store current position for token start
+	// Store current position for token start.
 	startPos := l.getCurrentPosition()
 
 	switch l.ch {
@@ -913,6 +950,7 @@ func (l *Lexer) NextToken() Token {
 		} else if l.peekChar() == '/' || l.peekChar() == '*' {
 			commentText := l.readComment()
 			tok = l.newTokenFromPosition(TokenComment, commentText, startPos)
+
 			return tok
 		} else {
 			tok = l.newTokenFromChar(TokenDiv, l.ch)
@@ -931,22 +969,22 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			tok = l.newToken(TokenNe, string(ch)+string(l.ch))
 		} else {
-			// Context-based disambiguation between logical NOT and macro invocation
+			// Context-based disambiguation between logical NOT and macro invocation.
 			nextChar := l.peekChar()
 
-			// Check if we're in a macro context by looking at surrounding tokens
-			// If followed immediately by another operator or identifier at end of line, it's macro
+			// Check if we're in a macro context by looking at surrounding tokens.
+			// If followed immediately by another operator or identifier at end of line, it's macro.
 			// If followed by space and then identifier/expression, it's NOT
 			if nextChar == ' ' || nextChar == '\t' || nextChar == '\n' || nextChar == '\r' {
 				tok = l.newTokenFromChar(TokenNot, l.ch)
 			} else if isLetter(nextChar) || isDigit(nextChar) {
-				// Directly followed by identifier or number - this is NOT
+				// Directly followed by identifier or number - this is NOT.
 				tok = l.newTokenFromChar(TokenNot, l.ch)
 			} else if nextChar == '!' || nextChar == '~' || nextChar == '-' || nextChar == '+' {
-				// Followed by another operator - this is NOT (for chains like !!a)
+				// Followed by another operator - this is NOT (for chains like !!a).
 				tok = l.newTokenFromChar(TokenNot, l.ch)
 			} else {
-				// At end of line or followed by punctuation - likely macro
+				// At end of line or followed by punctuation - likely macro.
 				tok = l.newTokenFromChar(TokenMacroInvoke, l.ch)
 			}
 		}
@@ -954,7 +992,7 @@ func (l *Lexer) NextToken() Token {
 		if l.peekChar() == '=' {
 			ch := l.ch
 			l.readChar()
-			// Check for spaceship operator <=>
+			// Check for spaceship operator <=>.
 			if l.peekChar() == '>' {
 				l.readChar()
 				tok = l.newToken(TokenSpaceship, string(ch)+string(l.ch)+string(l.peekChar()))
@@ -965,6 +1003,7 @@ func (l *Lexer) NextToken() Token {
 		} else if l.peekChar() == '<' {
 			ch := l.ch
 			l.readChar()
+
 			if l.peekChar() == '=' {
 				l.readChar()
 				tok = l.newToken(TokenShlAssign, "<<"+string(l.ch))
@@ -982,6 +1021,7 @@ func (l *Lexer) NextToken() Token {
 		} else if l.peekChar() == '>' {
 			ch := l.ch
 			l.readChar()
+
 			if l.peekChar() == '=' {
 				l.readChar()
 				tok = Token{Type: TokenShrAssign, Literal: ">>" + string(l.ch)}
@@ -1077,9 +1117,9 @@ func (l *Lexer) NextToken() Token {
 		tok = l.newTokenFromChar(TokenBackslash, l.ch)
 	case '"':
 		stringLiteral := l.readString()
-		// Check if string was properly terminated
+		// Check if string was properly terminated.
 		if !l.stringTerminated {
-			// Unterminated string - return error token (error will be created by RecoverableNextToken)
+			// Unterminated string - return error token (error will be created by RecoverableNextToken).
 			tok = l.newTokenFromPosition(TokenError, "unterminated string literal", startPos)
 		} else {
 			tok = l.newTokenFromPosition(TokenString, stringLiteral, startPos)
@@ -1088,35 +1128,39 @@ func (l *Lexer) NextToken() Token {
 		// Disambiguate between lifetime (e.g., 'a) and char literal (e.g., 'x')
 		next := l.peekChar()
 		if isLetter(next) || next == '_' {
-			// Look ahead to see if this is an immediate closing quote => char literal
-			// Otherwise, treat as lifetime token
+			// Look ahead to see if this is an immediate closing quote => char literal.
+			// Otherwise, treat as lifetime token.
 			i := l.position + 2 // start after '\'' and first ident char
 			for i < len(l.input) {
 				ch := l.input[i]
 				if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' {
 					i++
+
 					continue
 				}
+
 				break
 			}
+
 			if i < len(l.input) && l.input[i] == '\'' {
-				// It's a char literal like 'a'
+				// It's a char literal like 'a'.
 				charLiteral := l.readChar2()
 				tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
 			} else {
-				// It's a lifetime like 'a (no closing quote immediately after ident)
+				// It's a lifetime like 'a (no closing quote immediately after ident).
 				l.readChar() // move to first ident char
 				identLiteral := l.readIdentifier()
 				tok = l.newTokenFromPosition(TokenLifetime, identLiteral, startPos)
+
 				return tok
 			}
 		} else {
-			// Not a lifetime start, parse as char literal (handles escapes)
+			// Not a lifetime start, parse as char literal (handles escapes).
 			charLiteral := l.readChar2()
 			tok = l.newTokenFromPosition(TokenChar, charLiteral, startPos)
 		}
 	case '`':
-		// Template string
+		// Template string.
 		templateLiteral := l.readTemplateString()
 		tok = l.newTokenFromPosition(TokenTemplateString, templateLiteral, startPos)
 	case '\n':
@@ -1125,44 +1169,52 @@ func (l *Lexer) NextToken() Token {
 		tok = l.newToken(TokenEOF, "")
 	default:
 		if isLetter(l.ch) || l.ch == '_' {
-			// Check for raw string prefix
+			// Check for raw string prefix.
 			if l.ch == 'r' && l.peekChar() == '"' {
 				l.readChar() // consume 'r'
 				rawStringLiteral := l.readRawString()
 				tok = l.newTokenFromPosition(TokenString, rawStringLiteral, startPos)
+
 				return tok
 			}
 
 			identLiteral := l.readIdentifier()
+
 			if l.hasIdentifierError {
-				// Return error token for identifier with invalid characters
+				// Return error token for identifier with invalid characters.
 				tok = l.newTokenFromPosition(TokenError, "invalid character in identifier", startPos)
 			} else {
 				tok = l.newTokenFromPosition(lookupIdent(identLiteral), identLiteral, startPos)
 			}
+
 			return tok
 		} else if isDigit(l.ch) {
 			numberLiteral := l.readNumber()
-			// Check if there were errors during number parsing
+			// Check if there were errors during number parsing.
 			if l.errorRecovery != nil && len(l.errors) > 0 {
-				// Check if the last error was a malformed number
+				// Check if the last error was a malformed number.
 				if lastError, ok := l.errors[len(l.errors)-1].(*LexicalError); ok && lastError.Type == CategoryMalformedNumber {
 					tok = l.newTokenFromPosition(TokenError, numberLiteral, startPos)
+
 					return tok
 				}
 			}
+
 			tok = l.newTokenFromPosition(TokenInteger, numberLiteral, startPos)
+
 			return tok
 		} else if l.ch >= 0x80 { // Unicode文字
 			r, size := utf8.DecodeRuneInString(l.input[l.position:])
 			if size > 0 && (unicode.IsLetter(r) || unicode.IsSymbol(r)) {
 				identLiteral := l.readIdentifier()
+
 				if l.hasIdentifierError {
-					// Return error token for identifier with invalid characters
+					// Return error token for identifier with invalid characters.
 					tok = l.newTokenFromPosition(TokenError, "invalid character in identifier", startPos)
 				} else {
 					tok = l.newTokenFromPosition(lookupIdent(identLiteral), identLiteral, startPos)
 				}
+
 				return tok
 			} else {
 				tok = l.newTokenFromChar(TokenError, l.ch)
@@ -1173,10 +1225,11 @@ func (l *Lexer) NextToken() Token {
 	}
 
 	l.readChar()
+
 	return tok
 }
 
-// newToken creates a new token with current position information
+// newToken creates a new token with current position information.
 func (l *Lexer) newToken(tokenType TokenType, literal string) Token {
 	startPos := Position{Line: l.line, Column: l.column, Offset: l.offset}
 	endPos := Position{
@@ -1192,18 +1245,18 @@ func (l *Lexer) newToken(tokenType TokenType, literal string) Token {
 			Start: startPos,
 			End:   endPos,
 		},
-		// Legacy compatibility
+		// Legacy compatibility.
 		Line:   l.line,
 		Column: l.column,
 	}
 }
 
-// newTokenFromChar creates a new token from a single character
+// newTokenFromChar creates a new token from a single character.
 func (l *Lexer) newTokenFromChar(tokenType TokenType, ch byte) Token {
 	return l.newToken(tokenType, string(ch))
 }
 
-// newTokenFromPosition creates a token with explicit span information
+// newTokenFromPosition creates a token with explicit span information.
 func (l *Lexer) newTokenFromPosition(tokenType TokenType, literal string, startPos Position) Token {
 	endPos := Position{
 		Line:   l.line,
@@ -1218,50 +1271,51 @@ func (l *Lexer) newTokenFromPosition(tokenType TokenType, literal string, startP
 			Start: startPos,
 			End:   endPos,
 		},
-		// Legacy compatibility
+		// Legacy compatibility.
 		Line:   startPos.Line,
 		Column: startPos.Column,
 	}
 }
 
-// getCurrentPosition returns current position in source
+// getCurrentPosition returns current position in source.
 func (l *Lexer) getCurrentPosition() Position {
 	return Position{Line: l.line, Column: l.column, Offset: l.offset}
 }
 
-// Legacy function for backward compatibility - deprecated
+// Legacy function for backward compatibility - deprecated.
 func newToken(tokenType TokenType, ch byte) Token {
 	return Token{
 		Type:    tokenType,
 		Literal: string(ch),
-		// Note: Span information not available in legacy function
+		// Note: Span information not available in legacy function.
 		Line:   0,
 		Column: 0,
 	}
 }
 
-// lookupIdent checks if identifier is keyword
+// lookupIdent checks if identifier is keyword.
 func lookupIdent(ident string) TokenType {
 	if tok, ok := keywords[ident]; ok {
 		return tok
 	}
+
 	return TokenIdentifier
 }
 
-// Incremental parsing functions
+// Incremental parsing functions.
 
-// CanUseCache determines if a cached token can be reused for current position
+// CanUseCache determines if a cached token can be reused for current position.
 func (l *Lexer) CanUseCache(cacheEntry *CacheEntry) bool {
 	if !l.cacheValid || l.changeRegion == nil {
 		return false
 	}
 
-	// Check if this token is before the change region
+	// Check if this token is before the change region.
 	if cacheEntry.EndPos < l.changeRegion.Start {
 		return true
 	}
 
-	// Check if this token is after the change region (with offset adjustment)
+	// Check if this token is after the change region (with offset adjustment).
 	if cacheEntry.StartPos > l.changeRegion.End {
 		return true
 	}
@@ -1275,26 +1329,25 @@ func (l *Lexer) AdjustCachedToken(token Token) Token {
 
 	offsetDiff := l.changeRegion.Length - (l.changeRegion.End - l.changeRegion.Start)
 
-	// Only adjust tokens that come after the change region
+	// Only adjust tokens that come after the change region.
 	if token.Span.Start.Offset > l.changeRegion.End {
 		token.Span.Start.Offset += offsetDiff
 		token.Span.End.Offset += offsetDiff
-
-		// Note: Line and column adjustments would require more complex calculation
-		// For now, we only adjust byte offsets for simplicity
+		// Note: Line and column adjustments would require more complex calculation.
+		// For now, we only adjust byte offsets for simplicity.
 	}
 
 	return token
 }
 
-// InvalidateCache marks the token cache as invalid
+// InvalidateCache marks the token cache as invalid.
 func (l *Lexer) InvalidateCache() {
 	l.cacheValid = false
 	l.tokenCache = nil
 	l.changeRegion = nil
 }
 
-// UpdateCache updates the token cache with new tokens
+// UpdateCache updates the token cache with new tokens.
 func (l *Lexer) UpdateCache(tokens []Token) {
 	l.tokenCache = make([]CacheEntry, len(tokens))
 	for i, token := range tokens {
@@ -1305,15 +1358,16 @@ func (l *Lexer) UpdateCache(tokens []Token) {
 			EndPos:   token.Span.End.Offset,
 		}
 	}
+
 	l.cacheValid = true
 }
 
-// GetCachedTokens returns all cached tokens
+// GetCachedTokens returns all cached tokens.
 func (l *Lexer) GetCachedTokens() []CacheEntry {
 	return l.tokenCache
 }
 
-// SetChangeRegion sets the region that has been modified for incremental parsing
+// SetChangeRegion sets the region that has been modified for incremental parsing.
 func (l *Lexer) SetChangeRegion(start, end, newLength int) {
 	l.changeRegion = &ChangeRegion{
 		Start:  start,

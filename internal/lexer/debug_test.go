@@ -1,4 +1,4 @@
-// Simple test for error recovery functionality
+// Simple test for error recovery functionality.
 package lexer
 
 import (
@@ -19,11 +19,13 @@ func TestErrorRecovery_MultipleErrors(t *testing.T) {
 
 		errors := lexer.GetErrors()
 		fmt.Printf("  Current errors: %d\n", len(errors))
+
 		for i, err := range errors {
 			fmt.Printf("  Error %d: %s\n", i, lexer.FormatError(err))
 		}
 
 		tokenCount++
+
 		if token.Type == TokenEOF {
 			break
 		}

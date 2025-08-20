@@ -2,11 +2,11 @@ package hir
 
 import "fmt"
 
-// =============================================================================
-// Advanced Type System Support Structures
-// =============================================================================
+// =============================================================================.
+// Advanced Type System Support Structures.
+// =============================================================================.
 
-// Additional type checkers for advanced type system components
+// Additional type checkers for advanced type system components.
 type RankNTypeChecker struct {
 	Environment *AdvancedTypeEnvironment
 	Context     *AdvancedTypeContext
@@ -60,7 +60,7 @@ type LemmaDatabase struct {
 	Lemmas map[string]ProofLemma
 }
 
-// Constructor functions
+// Constructor functions.
 func NewRankNTypeChecker(env *AdvancedTypeEnvironment, ctx *AdvancedTypeContext) *RankNTypeChecker {
 	return &RankNTypeChecker{Environment: env, Context: ctx}
 }
@@ -100,20 +100,20 @@ func NewProofEngine() *ProofEngine {
 	}
 }
 
-// =============================================================================
-// Type Checker Method Implementations
-// =============================================================================
+// =============================================================================.
+// Type Checker Method Implementations.
+// =============================================================================.
 
-// RankN Type Checker Methods
+// RankN Type Checker Methods.
 func (rntc *RankNTypeChecker) ValidateRankConstraint(constraint RankConstraint, rankNType *RankNType) bool {
-	// Validate that rank constraint is consistent with type structure
+	// Validate that rank constraint is consistent with type structure.
 	return constraint.MinRank <= rankNType.Rank && constraint.MaxRank >= rankNType.Rank
 }
 
 func (rntc *RankNTypeChecker) ValidateWellFormedness(rankNType *RankNType) (*TypeValidationResult, error) {
 	result := &TypeValidationResult{Valid: true, Errors: []TypeError{}, Warnings: []TypeWarning{}}
 
-	// Check rank is non-negative
+	// Check rank is non-negative.
 	if rankNType.Rank < 0 {
 		result.Valid = false
 		result.Errors = append(result.Errors, TypeError{
@@ -123,7 +123,7 @@ func (rntc *RankNTypeChecker) ValidateWellFormedness(rankNType *RankNType) (*Typ
 		})
 	}
 
-	// Check quantifiers are well-formed
+	// Check quantifiers are well-formed.
 	for i, quantifier := range rankNType.Quantifiers {
 		if quantifier.Variable.Name == "" {
 			result.Valid = false
@@ -138,20 +138,20 @@ func (rntc *RankNTypeChecker) ValidateWellFormedness(rankNType *RankNType) (*Typ
 	return result, nil
 }
 
-// Dependent Type Checker Methods
+// Dependent Type Checker Methods.
 type DependencyValidationResult struct {
-	Valid bool
 	Error string
+	Valid bool
 }
 
 func (dtc *DependentTypeChecker) CheckValueDependency(dependency ValueDependency, expr HIRExpression) DependencyValidationResult {
-	// Check if the dependency is satisfied by the expression
+	// Check if the dependency is satisfied by the expression.
 	switch dependency.Kind {
 	case DependencyParameter:
-		// Validate parameter dependency
+		// Validate parameter dependency.
 		return DependencyValidationResult{Valid: true}
 	case DependencyIndex:
-		// Validate index dependency
+		// Validate index dependency.
 		return DependencyValidationResult{Valid: true}
 	default:
 		return DependencyValidationResult{Valid: false, Error: "Unknown dependency kind"}
@@ -159,12 +159,12 @@ func (dtc *DependentTypeChecker) CheckValueDependency(dependency ValueDependency
 }
 
 type ConstructorValidationResult struct {
-	Valid bool
 	Error string
+	Valid bool
 }
 
 func (dtc *DependentTypeChecker) ValidateConstructor(constructor DependentConstructor, universe UniverseLevel) ConstructorValidationResult {
-	// Validate constructor parameters and universe consistency
+	// Validate constructor parameters and universe consistency.
 	if constructor.Name == "" {
 		return ConstructorValidationResult{Valid: false, Error: "Constructor name cannot be empty"}
 	}
@@ -179,19 +179,19 @@ func (dtc *DependentTypeChecker) ValidateConstructor(constructor DependentConstr
 }
 
 func (dtc *DependentTypeChecker) ValidateUniverseLevel(universe UniverseLevel, expr HIRExpression) bool {
-	// Universe levels must be consistent
+	// Universe levels must be consistent.
 	return universe >= 0
 }
 
 func (dtc *DependentTypeChecker) ValidateIndex(index DependentIndex, position int, depType *DependentType) bool {
-	// Validate index constraints
+	// Validate index constraints.
 	return true // Simplified validation
 }
 
 func (dtc *DependentTypeChecker) ValidateWellFormedness(depType *DependentType) (*TypeValidationResult, error) {
 	result := &TypeValidationResult{Valid: true, Errors: []TypeError{}, Warnings: []TypeWarning{}}
 
-	// Check universe level
+	// Check universe level.
 	if depType.Universe < 0 {
 		result.Valid = false
 		result.Errors = append(result.Errors, TypeError{
@@ -204,43 +204,44 @@ func (dtc *DependentTypeChecker) ValidateWellFormedness(depType *DependentType) 
 	return result, nil
 }
 
-// Effect Type Checker Methods
+// Effect Type Checker Methods.
 func (aec *AdvancedEffectChecker) CollectEffects(expr HIRExpression) []AdvancedEffect {
-	// Collect all effects used in expression
+	// Collect all effects used in expression.
 	effects := []AdvancedEffect{}
-	// Traverse expression and collect effects
+	// Traverse expression and collect effects.
 	return effects
 }
 
 func (aec *AdvancedEffectChecker) IsEffectAllowed(effect AdvancedEffect, effectSet []AdvancedEffect) bool {
-	// Check if effect is in allowed set
+	// Check if effect is in allowed set.
 	for _, allowedEffect := range effectSet {
 		if effect.Name == allowedEffect.Name && effect.Kind == allowedEffect.Kind {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (aec *AdvancedEffectChecker) ValidateOperation(operation EffectOperation, effect AdvancedEffect) bool {
-	// Validate operation is consistent with effect
+	// Validate operation is consistent with effect.
 	return operation.Name != "" && operation.ReturnType.Kind != TypeKindInvalid
 }
 
 func (aec *AdvancedEffectChecker) ValidateRegionAccess(region RegionInfo, expr HIRExpression) bool {
-	// Validate region access permissions
+	// Validate region access permissions.
 	return region.Name != ""
 }
 
 func (aec *AdvancedEffectChecker) ValidateHandler(handler EffectHandler, effectType *AdvancedEffectType) bool {
-	// Validate effect handler
+	// Validate effect handler.
 	return handler.EffectName != ""
 }
 
 func (aec *AdvancedEffectChecker) ValidateWellFormedness(effectType *AdvancedEffectType) (*TypeValidationResult, error) {
 	result := &TypeValidationResult{Valid: true, Errors: []TypeError{}, Warnings: []TypeWarning{}}
 
-	// Check effects are well-formed
+	// Check effects are well-formed.
 	for i, effect := range effectType.Effects {
 		if effect.Name == "" {
 			result.Valid = false
@@ -255,29 +256,29 @@ func (aec *AdvancedEffectChecker) ValidateWellFormedness(effectType *AdvancedEff
 	return result, nil
 }
 
-// Linear Type Checker Methods
+// Linear Type Checker Methods.
 type ResourceUsageResult struct {
-	ActualUsage int
 	Violations  []string
+	ActualUsage int
 }
 
 func (ltc *LinearTypeChecker) TrackResourceUsage(expr HIRExpression, linearType *LinearType) ResourceUsageResult {
-	// Track how resources are used in expression
+	// Track how resources are used in expression.
 	return ResourceUsageResult{ActualUsage: 1, Violations: []string{}}
 }
 
 func (ltc *LinearTypeChecker) ValidateLinearConstraint(constraint LinearConstraint, linearType *LinearType, expr HIRExpression) bool {
-	// Validate linear constraint
+	// Validate linear constraint.
 	return constraint.Message != ""
 }
 
 func (ltc *LinearTypeChecker) DetermineRequiredAccess(expr HIRExpression) AccessPermissions {
-	// Determine what access permissions are needed
+	// Determine what access permissions are needed.
 	return AccessPermissions{Read: true, Write: false, Move: false, Borrow: false}
 }
 
 func (ltc *LinearTypeChecker) HasSufficientAccess(available, required AccessPermissions) bool {
-	// Check if available permissions are sufficient
+	// Check if available permissions are sufficient.
 	return (available.Read || !required.Read) &&
 		(available.Write || !required.Write) &&
 		(available.Move || !required.Move) &&
@@ -285,14 +286,14 @@ func (ltc *LinearTypeChecker) HasSufficientAccess(available, required AccessPerm
 }
 
 func (ltc *LinearTypeChecker) ValidateLifetime(lifetime LifetimeInfo, expr HIRExpression) bool {
-	// Validate lifetime constraints
+	// Validate lifetime constraints.
 	return lifetime.Kind != LifetimeKind(255) // Invalid lifetime kind
 }
 
 func (ltc *LinearTypeChecker) ValidateWellFormedness(linearType *LinearType) (*TypeValidationResult, error) {
 	result := &TypeValidationResult{Valid: true, Errors: []TypeError{}, Warnings: []TypeWarning{}}
 
-	// Check multiplicity constraints
+	// Check multiplicity constraints.
 	if linearType.Multiplicity.Min > linearType.Multiplicity.Max {
 		result.Valid = false
 		result.Errors = append(result.Errors, TypeError{
@@ -305,21 +306,21 @@ func (ltc *LinearTypeChecker) ValidateWellFormedness(linearType *LinearType) (*T
 	return result, nil
 }
 
-// Refinement Type Checker Methods
+// Refinement Type Checker Methods.
 func (rtc *RefinementTypeChecker) ValidateRefinement(refinement Refinement, expr HIRExpression, context RefinementContext) bool {
-	// Validate refinement predicate
+	// Validate refinement predicate.
 	return refinement.Variable != ""
 }
 
 func (rtc *RefinementTypeChecker) ValidateContext(context RefinementContext, expr HIRExpression) bool {
-	// Validate refinement context
+	// Validate refinement context.
 	return len(context.Definitions) >= 0 // Always valid for now
 }
 
 func (rtc *RefinementTypeChecker) ValidateWellFormedness(refinementType *RefinementType) (*TypeValidationResult, error) {
 	result := &TypeValidationResult{Valid: true, Errors: []TypeError{}, Warnings: []TypeWarning{}}
 
-	// Check refinements are well-formed
+	// Check refinements are well-formed.
 	for i, refinement := range refinementType.Refinements {
 		if refinement.Variable == "" {
 			result.Valid = false
@@ -334,31 +335,31 @@ func (rtc *RefinementTypeChecker) ValidateWellFormedness(refinementType *Refinem
 	return result, nil
 }
 
-// Proof Engine Methods
+// Proof Engine Methods.
 type ProofResult struct {
+	Error         string
 	Success       bool
 	RequiredProof bool
-	Error         string
 }
 
 func (pe *ProofEngine) DischargeObligation(proof ProofObligation, context RefinementContext) ProofResult {
-	// Attempt to discharge proof obligation
+	// Attempt to discharge proof obligation.
 	if proof.Status == ProofComplete {
 		return ProofResult{Success: true, RequiredProof: false}
 	}
 
-	// Try automatic proof
+	// Try automatic proof.
 	if len(proof.Goals) == 0 {
 		return ProofResult{Success: true, RequiredProof: false}
 	}
 
-	// Require manual proof
+	// Require manual proof.
 	return ProofResult{Success: false, RequiredProof: true, Error: "Manual proof required"}
 }
 
-// Advanced Inference Engine Methods
+// Advanced Inference Engine Methods.
 func (aie *AdvancedInferenceEngine) InferType(expr HIRExpression, env *AdvancedTypeEnvironment) (TypeInfo, error) {
-	// Infer type of expression using type switch
+	// Infer type of expression using type switch.
 	switch e := expr.(type) {
 	case *HIRLiteral:
 		return aie.inferLiteralType(e)
@@ -392,11 +393,12 @@ func (aie *AdvancedInferenceEngine) inferVariableType(variable *HIRIdentifier, e
 	if t, exists := env.ValueBindings[variable.Name]; exists {
 		return t, nil
 	}
+
 	return TypeInfo{Kind: TypeKindInvalid}, fmt.Errorf("undefined variable: %s", variable.Name)
 }
 
 func (aie *AdvancedInferenceEngine) inferFunctionCallType(call *HIRCallExpression, env *AdvancedTypeEnvironment) (TypeInfo, error) {
-	// Infer function type and apply to arguments
+	// Infer function type and apply to arguments.
 	funcType, err := aie.InferType(call.Function, env)
 	if err != nil {
 		return TypeInfo{Kind: TypeKindInvalid}, err
@@ -406,18 +408,18 @@ func (aie *AdvancedInferenceEngine) inferFunctionCallType(call *HIRCallExpressio
 		return TypeInfo{Kind: TypeKindInvalid}, fmt.Errorf("cannot call non-function type: %v", funcType)
 	}
 
-	// Return the function's return type (simplified)
+	// Return the function's return type (simplified).
 	if funcType.Kind != TypeKindFunction {
 		return TypeInfo{Kind: TypeKindInvalid}, fmt.Errorf("expected function type, got %s", funcType.Name)
 	}
 
-	// For function types, we need to check if it has Methods information
+	// For function types, we need to check if it has Methods information.
 	if len(funcType.Methods) > 0 {
-		// Return the signature type from the method info
+		// Return the signature type from the method info.
 		return funcType.Methods[0].Signature, nil
 	}
 
-	// Simple function type case - return a generic type
+	// Simple function type case - return a generic type.
 	return TypeInfo{Kind: TypeKindInteger, Name: "Int"}, nil
 }
 
@@ -432,7 +434,7 @@ func (aie *AdvancedInferenceEngine) inferBinaryExpressionType(binExpr *HIRBinary
 		return TypeInfo{Kind: TypeKindInvalid}, err
 	}
 
-	// Unify types and determine result type
+	// Unify types and determine result type.
 	result, err := aie.UnificationEngine.Unify(leftType, rightType)
 	if err != nil || !result.Success {
 		return TypeInfo{Kind: TypeKindInvalid}, fmt.Errorf("cannot unify types in binary expression: %v and %v", leftType, rightType)

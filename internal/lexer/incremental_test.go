@@ -9,16 +9,16 @@ import (
 	"time"
 )
 
-// TestSpanAccuracy tests accuracy of span information
+// TestSpanAccuracy tests accuracy of span information.
 func TestSpanAccuracy(t *testing.T) {
 	source := "let x = 42;"
 	lexer := New(source)
 
 	expectedSpans := []struct {
+		literal   string
 		tokenType TokenType
 		startCol  int
 		endCol    int
-		literal   string
 	}{
 		{TokenLet, 1, 4, "let"},       // "let" starts at column 1, ends at 4
 		{TokenIdentifier, 5, 6, "x"},  // "x" starts at column 5, ends at 6
@@ -47,21 +47,21 @@ func TestSpanAccuracy(t *testing.T) {
 		}
 	}
 
-	// Verify EOF token
+	// Verify EOF token.
 	eofToken := lexer.NextToken()
 	if eofToken.Type != TokenEOF {
 		t.Errorf("Expected EOF token, got %v", eofToken.Type)
 	}
 }
 
-// TestIncrementalAccuracy tests correctness of incremental lexing results
+// TestIncrementalAccuracy tests correctness of incremental lexing results.
 func TestIncrementalAccuracy(t *testing.T) {
 	testCases := []struct {
 		name           string
 		originalSource string
-		changePos      int
 		insertion      string
-		expectedDiff   int // Expected difference in token count
+		changePos      int
+		expectedDiff   int
 	}{
 		{
 			name:           "Simple variable insertion",
@@ -88,32 +88,38 @@ func TestIncrementalAccuracy(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Get tokens from original source
+			// Get tokens from original source.
 			originalLexer := New(tc.originalSource)
+
 			var originalTokens []Token
+
 			for {
 				token := originalLexer.NextToken()
 				originalTokens = append(originalTokens, token)
+
 				if token.Type == TokenEOF {
 					break
 				}
 			}
 
-			// Create modified source
+			// Create modified source.
 			modifiedSource := tc.originalSource[:tc.changePos] + tc.insertion + tc.originalSource[tc.changePos:]
 
-			// Get tokens from modified source (full lexing for comparison)
+			// Get tokens from modified source (full lexing for comparison).
 			fullLexer := New(modifiedSource)
+
 			var fullTokens []Token
+
 			for {
 				token := fullLexer.NextToken()
 				fullTokens = append(fullTokens, token)
+
 				if token.Type == TokenEOF {
 					break
 				}
 			}
 
-			// Create cache from original tokens
+			// Create cache from original tokens.
 			cacheEntries := make([]CacheEntry, len(originalTokens))
 			for i, token := range originalTokens {
 				cacheEntries[i] = CacheEntry{
@@ -124,7 +130,7 @@ func TestIncrementalAccuracy(t *testing.T) {
 				}
 			}
 
-			// Perform incremental lexing
+			// Perform incremental lexing.
 			changeRegion := &ChangeRegion{
 				Start:  tc.changePos,
 				End:    tc.changePos,
@@ -132,16 +138,19 @@ func TestIncrementalAccuracy(t *testing.T) {
 			}
 
 			incrementalLexer := NewIncremental(modifiedSource, "test.oriz", cacheEntries, changeRegion)
+
 			var incrementalTokens []Token
+
 			for {
 				token := incrementalLexer.NextToken()
 				incrementalTokens = append(incrementalTokens, token)
+
 				if token.Type == TokenEOF {
 					break
 				}
 			}
 
-			// Verify token count difference
+			// Verify token count difference.
 			actualDiff := len(fullTokens) - len(originalTokens)
 			if actualDiff != tc.expectedDiff {
 				t.Errorf("Expected token count difference of %d, got %d", tc.expectedDiff, actualDiff)
@@ -150,17 +159,17 @@ func TestIncrementalAccuracy(t *testing.T) {
 	}
 }
 
-// TestCacheInvalidation tests cache invalidation scenarios
+// TestCacheInvalidation tests cache invalidation scenarios.
 func TestCacheInvalidation(t *testing.T) {
 	source := "let x = 42;"
 	lexer := New(source)
 
-	// Initially cache should be invalid
+	// Initially cache should be invalid.
 	if lexer.cacheValid {
 		t.Error("Expected cache to be invalid initially")
 	}
 
-	// Set up some cache data
+	// Set up some cache data.
 	lexer.UpdateCache([]Token{
 		{Type: TokenLet, Literal: "let"},
 		{Type: TokenIdentifier, Literal: "x"},
@@ -170,7 +179,7 @@ func TestCacheInvalidation(t *testing.T) {
 		t.Error("Expected cache to be valid after UpdateCache")
 	}
 
-	// Invalidate cache
+	// Invalidate cache.
 	lexer.InvalidateCache()
 
 	if lexer.cacheValid {
@@ -182,9 +191,9 @@ func TestCacheInvalidation(t *testing.T) {
 	}
 }
 
-// BenchmarkFullLexing benchmarks complete file lexing for baseline comparison
+// BenchmarkFullLexing benchmarks complete file lexing for baseline comparison.
 func BenchmarkFullLexing(b *testing.B) {
-	// Generate a realistic source code sample for testing
+	// Generate a realistic source code sample for testing.
 	source := generateRealisticSource(1000) // 1000 lines of code
 
 	b.ResetTimer()
@@ -197,31 +206,32 @@ func BenchmarkFullLexing(b *testing.B) {
 		for {
 			token := lexer.NextToken()
 			tokenCount++
+
 			if token.Type == TokenEOF {
 				break
 			}
 		}
 
-		// Ensure we processed meaningful tokens
+		// Ensure we processed meaningful tokens.
 		if tokenCount < 100 {
 			b.Fatalf("Expected at least 100 tokens, got %d", tokenCount)
 		}
 	}
 }
 
-// generateRealisticSource generates a realistic Orizon source code for benchmarking
+// generateRealisticSource generates a realistic Orizon source code for benchmarking.
 func generateRealisticSource(lines int) string {
 	var builder strings.Builder
 
-	// Generate a header comment
+	// Generate a header comment.
 	builder.WriteString("// Auto-generated test file for performance benchmarking\n")
 	builder.WriteString("// This file contains realistic Orizon code patterns\n\n")
 
-	// Generate imports
+	// Generate imports.
 	builder.WriteString("import std.io;\n")
 	builder.WriteString("import std.collections;\n\n")
 
-	// Generate struct definitions
+	// Generate struct definitions.
 	builder.WriteString("struct Point {\n")
 	builder.WriteString("    x: float,\n")
 	builder.WriteString("    y: float,\n")
@@ -229,10 +239,10 @@ func generateRealisticSource(lines int) string {
 
 	linesWritten := 8
 
-	// Generate functions and variables to reach target line count
+	// Generate functions and variables to reach target line count.
 	for linesWritten < lines {
 		if linesWritten+10 < lines {
-			// Generate a function
+			// Generate a function.
 			funcNum := (linesWritten - 8) / 10
 			builder.WriteString(fmt.Sprintf("func calculateDistance%d(p1: Point, p2: Point) -> float {\n", funcNum))
 			builder.WriteString("    let dx = p1.x - p2.x;\n")
@@ -240,15 +250,17 @@ func generateRealisticSource(lines int) string {
 			builder.WriteString("    let distanceSquared = dx * dx + dy * dy;\n")
 			builder.WriteString("    return sqrt(distanceSquared);\n")
 			builder.WriteString("}\n\n")
+
 			linesWritten += 7
 		} else {
-			// Generate simple statements to fill remaining lines
+			// Generate simple statements to fill remaining lines.
 			builder.WriteString(fmt.Sprintf("let variable%d = %d;\n", linesWritten, linesWritten*42))
+
 			linesWritten++
 		}
 	}
 
-	// Add main function
+	// Add main function.
 	builder.WriteString("func main() {\n")
 	builder.WriteString("    let origin = Point { x: 0.0, y: 0.0 };\n")
 	builder.WriteString("    let point = Point { x: 3.0, y: 4.0 };\n")
@@ -261,12 +273,13 @@ func generateRealisticSource(lines int) string {
 
 // ===== Phase 1.1.2: Incremental Lexical Analysis Tests =====
 
-// TestIncrementalLexer_BasicFunctionality tests the core incremental lexing capabilities
+// TestIncrementalLexer_BasicFunctionality tests the core incremental lexing capabilities.
 func TestIncrementalLexer_BasicFunctionality(t *testing.T) {
 	lexer := NewIncrementalLexer()
 
-	// Test case 1: Initial lexing
+	// Test case 1: Initial lexing.
 	content1 := []byte("func main() { print(\"hello\") }")
+
 	tokens1, err := lexer.LexIncremental("test.oriz", content1, nil)
 	if err != nil {
 		t.Fatalf("Initial lexing failed: %v", err)
@@ -276,13 +289,13 @@ func TestIncrementalLexer_BasicFunctionality(t *testing.T) {
 		t.Error("Expected tokens from initial lexing")
 	}
 
-	// Verify cache was created
+	// Verify cache was created.
 	stats := lexer.GetStats()
 	if stats.FilesAnalyzed != 1 {
 		t.Errorf("Expected 1 file analyzed, got %d", stats.FilesAnalyzed)
 	}
 
-	// Test case 2: No changes - should hit cache
+	// Test case 2: No changes - should hit cache.
 	tokens2, err := lexer.LexIncremental("test.oriz", content1, nil)
 	if err != nil {
 		t.Fatalf("Cache retrieval failed: %v", err)
@@ -292,30 +305,32 @@ func TestIncrementalLexer_BasicFunctionality(t *testing.T) {
 		t.Errorf("Cache retrieval returned different token count: expected %d, got %d", len(tokens1), len(tokens2))
 	}
 
-	// Verify cache hit
+	// Verify cache hit.
 	stats = lexer.GetStats()
 	if stats.CacheHits != 1 {
 		t.Errorf("Expected 1 cache hit, got %d", stats.CacheHits)
 	}
 }
 
-// TestIncrementalLexer_SimpleChanges tests basic incremental updates
+// TestIncrementalLexer_SimpleChanges tests basic incremental updates.
 func TestIncrementalLexer_SimpleChanges(t *testing.T) {
 	lexer := NewIncrementalLexer()
 
-	// Initial content
+	// Initial content.
 	content1 := []byte("func main() { print(\"hello\") }")
+
 	tokens1, err := lexer.LexIncremental("test.oriz", content1, nil)
 	if err != nil {
 		t.Fatalf("Initial lexing failed: %v", err)
 	}
 
 	t.Logf("Initial tokens: %d", len(tokens1))
+
 	for i, token := range tokens1 {
 		t.Logf("Token %d: %s = %q", i, token.Type, token.Literal)
 	}
 
-	// Modified content (change string literal)
+	// Modified content (change string literal).
 	content2 := []byte("func main() { print(\"world\") }")
 	changes := []Change{
 		{
@@ -333,20 +348,23 @@ func TestIncrementalLexer_SimpleChanges(t *testing.T) {
 	}
 
 	t.Logf("Updated tokens: %d", len(tokens2))
+
 	for i, token := range tokens2 {
 		t.Logf("Token %d: %s = %q", i, token.Type, token.Literal)
 	}
 
-	// Should have same number of tokens
+	// Should have same number of tokens.
 	if len(tokens2) != len(tokens1) {
 		t.Errorf("Token count changed unexpectedly: expected %d, got %d", len(tokens1), len(tokens2))
 	}
 
-	// Find the string token and verify it changed
+	// Find the string token and verify it changed.
 	var foundStringToken bool
+
 	for _, token := range tokens2 {
 		if token.Type == TokenString && strings.Contains(token.Literal, "world") {
 			foundStringToken = true
+
 			break
 		}
 	}
@@ -358,11 +376,12 @@ func TestIncrementalLexer_SimpleChanges(t *testing.T) {
 func TestIncrementalLexer_PerformanceMetrics(t *testing.T) {
 	lexer := NewIncrementalLexer()
 
-	// Large content for performance testing
+	// Large content for performance testing.
 	var contentBuilder strings.Builder
 	for i := 0; i < 1000; i++ {
 		contentBuilder.WriteString(fmt.Sprintf("func test%d() { print(\"line %d\") }\n", i, i))
 	}
+
 	content := []byte(contentBuilder.String())
 
 	start := time.Now()
@@ -377,7 +396,7 @@ func TestIncrementalLexer_PerformanceMetrics(t *testing.T) {
 		t.Error("Expected tokens from large content")
 	}
 
-	// Check performance stats
+	// Check performance stats.
 	stats := lexer.GetStats()
 	if stats.TotalLexingTime == 0 {
 		t.Error("Expected non-zero lexing time in stats")
@@ -390,7 +409,7 @@ func TestIncrementalLexer_PerformanceMetrics(t *testing.T) {
 	t.Logf("Lexed %d characters in %v (%.2f chars/ms)",
 		len(content), duration, float64(len(content))/float64(duration.Nanoseconds()/1000000))
 
-	// Test cache hit performance
+	// Test cache hit performance.
 	start = time.Now()
 	tokens2, err := lexer.LexIncremental("large.oriz", content, nil)
 	cacheHitDuration := time.Since(start)
@@ -403,7 +422,7 @@ func TestIncrementalLexer_PerformanceMetrics(t *testing.T) {
 		t.Error("Cache retrieval returned different token count")
 	}
 
-	// Cache hit should be significantly faster
+	// Cache hit should be significantly faster.
 	if cacheHitDuration > duration/10 {
 		t.Logf("Warning: Cache hit took %v, original lexing took %v (ratio: %.2fx)",
 			cacheHitDuration, duration, float64(duration)/float64(cacheHitDuration))
@@ -412,12 +431,12 @@ func TestIncrementalLexer_PerformanceMetrics(t *testing.T) {
 	t.Logf("Cache hit: %v (%.2fx speedup)", cacheHitDuration, float64(duration)/float64(cacheHitDuration))
 }
 
-// BenchmarkIncrementalLexer_CacheHit benchmarks cache hit performance
+// BenchmarkIncrementalLexer_CacheHit benchmarks cache hit performance.
 func BenchmarkIncrementalLexer_CacheHit(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	content := []byte("func main() { print(\"hello world\") }")
 
-	// Prime the cache
+	// Prime the cache.
 	_, err := lexer.LexIncremental("test.oriz", content, nil)
 	if err != nil {
 		b.Fatalf("Failed to prime cache: %v", err)
@@ -433,12 +452,12 @@ func BenchmarkIncrementalLexer_CacheHit(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_SmallChange benchmarks incremental updates
+// BenchmarkIncrementalLexer_SmallChange benchmarks incremental updates.
 func BenchmarkIncrementalLexer_SmallChange(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	baseContent := []byte("func main() { print(\"hello\") }")
 
-	// Prime the cache
+	// Prime the cache.
 	_, err := lexer.LexIncremental("test.oriz", baseContent, nil)
 	if err != nil {
 		b.Fatalf("Failed to prime cache: %v", err)
@@ -447,8 +466,9 @@ func BenchmarkIncrementalLexer_SmallChange(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		// Alternate between two versions
+		// Alternate between two versions.
 		var content []byte
+
 		var changes []Change
 
 		if i%2 == 0 {

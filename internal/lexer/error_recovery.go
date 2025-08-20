@@ -8,72 +8,56 @@ import (
 	"sort"
 )
 
-// ErrorRecovery provides sophisticated error handling and recovery capabilities
-// for lexical analysis, ensuring that a single syntax error doesn't prevent
+// ErrorRecovery provides sophisticated error handling and recovery capabilities.
+// for lexical analysis, ensuring that a single syntax error doesn't prevent.
 // the analysis of the entire source file.
 type ErrorRecovery struct {
-	// Error synchronization points for efficient recovery
-	syncPoints map[TokenType]bool
-
-	// Error classification for targeted recovery strategies
-	errorPatterns []ErrorPattern
-
-	// Suggestion engine for constructive error messages
+	syncPoints       map[TokenType]bool
 	suggestionEngine *SuggestionEngine
-
-	// Error history for duplicate detection and learning
-	errorHistory map[string]*ErrorFrequency
-
-	// Configuration for error reporting behavior
-	config ErrorConfig
+	errorHistory     map[string]*ErrorFrequency
+	errorPatterns    []ErrorPattern
+	config           ErrorConfig
 }
 
-// ErrorPattern defines patterns for common lexical errors and their recovery strategies
+// ErrorPattern defines patterns for common lexical errors and their recovery strategies.
 type ErrorPattern struct {
-	// Pattern identification
-	Name        string
-	Description string
-	Pattern     *regexp.Regexp
-
-	// Recovery strategy
-	RecoveryType   RecoveryType
-	SyncTokens     []TokenType
-	SkipCharacters int
-
-	// Message generation
-	MessageTemplate string
+	Pattern         *regexp.Regexp
 	SuggestionFunc  func(context string) []string
-
-	// Error classification
-	Severity  ErrorSeverity
-	Category  ErrorCategory
-	Frequency int // For learning and prioritization
+	Name            string
+	Description     string
+	MessageTemplate string
+	SyncTokens      []TokenType
+	RecoveryType    RecoveryType
+	SkipCharacters  int
+	Severity        ErrorSeverity
+	Category        ErrorCategory
+	Frequency       int
 }
 
-// RecoveryType defines different error recovery strategies
+// RecoveryType defines different error recovery strategies.
 type RecoveryType int
 
 const (
-	// Skip to next synchronization token (panic mode)
+	// Skip to next synchronization token (panic mode).
 	RecoveryPanicMode RecoveryType = iota
 
-	// Insert missing character(s)
+	// Insert missing character(s).
 	RecoveryInsertChar
 
-	// Delete erroneous character(s)
+	// Delete erroneous character(s).
 	RecoveryDeleteChar
 
-	// Replace character(s) with suggestion
+	// Replace character(s) with suggestion.
 	RecoveryReplaceChar
 
-	// Skip current invalid sequence
+	// Skip current invalid sequence.
 	RecoverySkipSequence
 
-	// Context-aware recovery using surrounding tokens
+	// Context-aware recovery using surrounding tokens.
 	RecoveryContextual
 )
 
-// ErrorSeverity classifies the severity of lexical errors
+// ErrorSeverity classifies the severity of lexical errors.
 type ErrorSeverity int
 
 const (
@@ -83,7 +67,7 @@ const (
 	SeverityCritical                      // Critical error, immediate abort
 )
 
-// ErrorCategory categorizes types of lexical errors for better organization
+// ErrorCategory categorizes types of lexical errors for better organization.
 type ErrorCategory int
 
 const (
@@ -96,128 +80,94 @@ const (
 	CategoryEncodingError                           // Character encoding issues
 )
 
-// ErrorFrequency tracks frequency and context of recurring errors
+// ErrorFrequency tracks frequency and context of recurring errors.
 type ErrorFrequency struct {
-	Count       int
-	LastSeen    int64  // Unix timestamp
-	Context     string // Surrounding code context
+	Context     string
 	Suggestions []string
+	Count       int
+	LastSeen    int64
 }
 
-// SuggestionEngine generates intelligent suggestions for error correction
+// SuggestionEngine generates intelligent suggestions for error correction.
 type SuggestionEngine struct {
-	// Dictionary of common identifiers and keywords for typo correction
+	// Dictionary of common identifiers and keywords for typo correction.
 	vocabulary map[string]int
 
-	// Pattern-based suggestions for common mistakes
+	// Pattern-based suggestions for common mistakes.
 	commonMistakes map[string]string
 
-	// Context-aware suggestion algorithms
+	// Context-aware suggestion algorithms.
 	contextRules []ContextRule
 }
 
-// ContextRule defines context-aware suggestion rules
+// ContextRule defines context-aware suggestion rules.
 type ContextRule struct {
-	Name        string
 	Pattern     *regexp.Regexp
 	Condition   func(context LexerContext) bool
 	Suggestions func(context LexerContext) []string
+	Name        string
 }
 
-// LexerContext provides context information for error recovery and suggestions
+// LexerContext provides context information for error recovery and suggestions.
 type LexerContext struct {
-	// Current position and surrounding text
-	Position    Position
-	CurrentChar rune
-	PrevChars   string
-	NextChars   string
-
-	// Token context
-	CurrentToken Token
-	PrevTokens   []Token
-
-	// Source file information
-	Filename    string
-	LineContent string
-
-	// Error information
+	PrevChars    string
+	NextChars    string
+	Filename     string
+	LineContent  string
 	ErrorMessage string
+	PrevTokens   []Token
+	CurrentToken Token
+	Position     Position
 	ErrorType    ErrorCategory
+	CurrentChar  rune
 }
 
-// ErrorConfig configures error reporting and recovery behavior
+// ErrorConfig configures error reporting and recovery behavior.
 type ErrorConfig struct {
-	// Maximum number of errors to report before stopping
-	MaxErrors int
-
-	// Whether to continue analysis after critical errors
-	ContinueOnCritical bool
-
-	// Suggestion generation settings
-	EnableSuggestions  bool
+	MaxErrors          int
 	MaxSuggestions     int
 	SuggestionMinScore float64
-
-	// Error message formatting
-	VerboseMessages bool
-	ShowContext     bool
-	ShowSuggestions bool
-	ColorizeOutput  bool
-
-	// Recovery behavior
+	ContinueOnCritical bool
+	EnableSuggestions  bool
+	VerboseMessages    bool
+	ShowContext        bool
+	ShowSuggestions    bool
+	ColorizeOutput     bool
 	AggressiveRecovery bool
 	PreservePrevious   bool
 }
 
-// LexicalError represents a detailed lexical error with recovery information
+// LexicalError represents a detailed lexical error with recovery information.
 type LexicalError struct {
-	// Basic error information
-	Position Position
-	Span     Span
-	Message  string
-
-	// Error classification
-	Type     ErrorCategory
-	Severity ErrorSeverity
-	Code     string // Unique error code for tooling
-
-	// Context information
-	Context     LexerContext
-	LineContent string
-
-	// Recovery information
-	RecoveryType      RecoveryType
+	Code              string
+	Source            string
+	Message           string
+	LineContent       string
+	Context           LexerContext
 	SyncTokensUsed    []TokenType
+	Suggestions       []ErrorSuggestion
+	RelatedErrors     []*LexicalError
+	Span              Span
+	Position          Position
+	Severity          ErrorSeverity
+	Type              ErrorCategory
+	RecoveryType      RecoveryType
 	CharactersSkipped int
-
-	// Suggestions for correction
-	Suggestions []ErrorSuggestion
-
-	// Related errors (for error chains)
-	RelatedErrors []*LexicalError
-
-	// Metadata for tooling and analysis
-	Timestamp int64
-	Source    string // Source of error detection
+	Timestamp         int64
 }
 
-// ErrorSuggestion represents a potential fix for a lexical error
+// ErrorSuggestion represents a potential fix for a lexical error.
 type ErrorSuggestion struct {
-	// Suggestion details
 	Description string
 	Replacement string
-	Confidence  float64 // 0.0 to 1.0
-
-	// Application information
-	StartPos Position
-	EndPos   Position
-
-	// Additional context
-	Category string
-	Example  string
+	Category    string
+	Example     string
+	StartPos    Position
+	EndPos      Position
+	Confidence  float64
 }
 
-// NewErrorRecovery creates a new error recovery system with optimized defaults
+// NewErrorRecovery creates a new error recovery system with optimized defaults.
 func NewErrorRecovery() *ErrorRecovery {
 	recovery := &ErrorRecovery{
 		syncPoints:    make(map[TokenType]bool),
@@ -237,35 +187,35 @@ func NewErrorRecovery() *ErrorRecovery {
 		},
 	}
 
-	// Initialize default synchronization points
+	// Initialize default synchronization points.
 	recovery.initDefaultSyncPoints()
 
-	// Initialize error patterns
+	// Initialize error patterns.
 	recovery.initErrorPatterns()
 
-	// Initialize suggestion engine
+	// Initialize suggestion engine.
 	recovery.suggestionEngine = NewSuggestionEngine()
 
 	return recovery
 }
 
-// initDefaultSyncPoints sets up the default token types used for error synchronization
+// initDefaultSyncPoints sets up the default token types used for error synchronization.
 func (er *ErrorRecovery) initDefaultSyncPoints() {
-	// Statement terminators and delimiters
+	// Statement terminators and delimiters.
 	er.syncPoints[TokenSemicolon] = true
 	er.syncPoints[TokenNewline] = true
 
-	// Block delimiters
+	// Block delimiters.
 	er.syncPoints[TokenLBrace] = true
 	er.syncPoints[TokenRBrace] = true
 
-	// Expression delimiters
+	// Expression delimiters.
 	er.syncPoints[TokenLParen] = true
 	er.syncPoints[TokenRParen] = true
 	er.syncPoints[TokenLBracket] = true
 	er.syncPoints[TokenRBracket] = true
 
-	// Keywords that often start new constructs
+	// Keywords that often start new constructs.
 	er.syncPoints[TokenFunc] = true
 	er.syncPoints[TokenLet] = true
 	er.syncPoints[TokenVar] = true
@@ -277,13 +227,13 @@ func (er *ErrorRecovery) initDefaultSyncPoints() {
 	er.syncPoints[TokenWhile] = true
 	er.syncPoints[TokenReturn] = true
 
-	// Import and module keywords
+	// Import and module keywords.
 	er.syncPoints[TokenImport] = true
 	er.syncPoints[TokenExport] = true
 	er.syncPoints[TokenModule] = true
 }
 
-// initErrorPatterns initializes common error patterns and their recovery strategies
+// initErrorPatterns initializes common error patterns and their recovery strategies.
 func (er *ErrorRecovery) initErrorPatterns() {
 	er.errorPatterns = []ErrorPattern{
 		{
@@ -370,25 +320,25 @@ func (er *ErrorRecovery) initErrorPatterns() {
 		},
 	}
 
-	// Sort patterns by frequency for optimization
+	// Sort patterns by frequency for optimization.
 	sort.Slice(er.errorPatterns, func(i, j int) bool {
 		return er.errorPatterns[i].Frequency > er.errorPatterns[j].Frequency
 	})
 }
 
-// RecoverFromError attempts to recover from a lexical error and continue analysis
+// RecoverFromError attempts to recover from a lexical error and continue analysis.
 func (er *ErrorRecovery) RecoverFromError(lexer *Lexer, err *LexicalError) (*Token, error) {
-	// Update error history for learning
+	// Update error history for learning.
 	er.updateErrorHistory(err)
 
-	// Find appropriate recovery strategy
+	// Find appropriate recovery strategy.
 	pattern := er.findMatchingPattern(err.Context)
 	if pattern == nil {
-		// Use default panic mode recovery
+		// Use default panic mode recovery.
 		return er.panicModeRecovery(lexer, err)
 	}
 
-	// Apply pattern-specific recovery
+	// Apply pattern-specific recovery.
 	switch pattern.RecoveryType {
 	case RecoveryPanicMode:
 		return er.panicModeRecovery(lexer, err)
@@ -413,13 +363,13 @@ func (er *ErrorRecovery) RecoverFromError(lexer *Lexer, err *LexicalError) (*Tok
 	}
 }
 
-// panicModeRecovery implements classic panic mode recovery by skipping to sync points
+// panicModeRecovery implements classic panic mode recovery by skipping to sync points.
 func (er *ErrorRecovery) panicModeRecovery(lexer *Lexer, err *LexicalError) (*Token, error) {
 	skippedChars := 0
 
-	// Skip characters until we find a synchronization point
+	// Skip characters until we find a synchronization point.
 	for lexer.position < len(lexer.input) {
-		// Try to tokenize from current position
+		// Try to tokenize from current position.
 		lexer.readPosition = lexer.position + 1
 		if lexer.readPosition < len(lexer.input) {
 			lexer.ch = lexer.input[lexer.readPosition]
@@ -427,77 +377,80 @@ func (er *ErrorRecovery) panicModeRecovery(lexer *Lexer, err *LexicalError) (*To
 			lexer.ch = 0
 		}
 
-		// Attempt to get next token
+		// Attempt to get next token.
 		token := lexer.NextToken()
 
-		// Check if this token is a sync point
+		// Check if this token is a sync point.
 		if er.syncPoints[token.Type] {
-			// Update recovery information
+			// Update recovery information.
 			err.CharactersSkipped = skippedChars
 			err.RecoveryType = RecoveryPanicMode
 
 			return &token, nil
 		}
 
-		// Move to next character
+		// Move to next character.
 		lexer.position++
 		skippedChars++
 
-		// Safety limit to prevent infinite loops
+		// Safety limit to prevent infinite loops.
 		if skippedChars > 1000 {
 			return nil, fmt.Errorf("panic mode recovery exceeded safety limit")
 		}
 	}
 
-	// Reached end of input
+	// Reached end of input.
 	return &Token{Type: TokenEOF}, nil
 }
 
-// insertCharRecovery attempts recovery by inserting missing characters
+// insertCharRecovery attempts recovery by inserting missing characters.
 func (er *ErrorRecovery) insertCharRecovery(lexer *Lexer, err *LexicalError, pattern *ErrorPattern) (*Token, error) {
-	// This is a placeholder for insert character recovery
-	// Implementation would depend on specific error patterns
+	// This is a placeholder for insert character recovery.
+	// Implementation would depend on specific error patterns.
 	return er.panicModeRecovery(lexer, err)
 }
 
-// deleteCharRecovery attempts recovery by deleting erroneous characters
+// deleteCharRecovery attempts recovery by deleting erroneous characters.
 func (er *ErrorRecovery) deleteCharRecovery(lexer *Lexer, err *LexicalError, pattern *ErrorPattern) (*Token, error) {
-	// Skip the problematic character and try again
+	// Skip the problematic character and try again.
 	if lexer.position < len(lexer.input) {
 		lexer.readChar()
+
 		err.CharactersSkipped = 1
 		err.RecoveryType = RecoveryDeleteChar
 
-		// Try to get next token from new position
+		// Try to get next token from new position.
 		token := lexer.NextToken()
+
 		return &token, nil
 	}
 
 	return er.panicModeRecovery(lexer, err)
 }
 
-// replaceCharRecovery attempts recovery by replacing characters with suggestions
+// replaceCharRecovery attempts recovery by replacing characters with suggestions.
 func (er *ErrorRecovery) replaceCharRecovery(lexer *Lexer, err *LexicalError, pattern *ErrorPattern) (*Token, error) {
-	// This is a placeholder for replace character recovery
-	// Implementation would involve trying suggested replacements
+	// This is a placeholder for replace character recovery.
+	// Implementation would involve trying suggested replacements.
 	return er.panicModeRecovery(lexer, err)
 }
 
-// skipSequenceRecovery skips an entire invalid sequence
+// skipSequenceRecovery skips an entire invalid sequence.
 func (er *ErrorRecovery) skipSequenceRecovery(lexer *Lexer, err *LexicalError, pattern *ErrorPattern) (*Token, error) {
 	skippedChars := 0
 
-	// Skip characters while they match the invalid pattern
+	// Skip characters while they match the invalid pattern.
 	for lexer.position < len(lexer.input) {
 		remaining := lexer.input[lexer.position:]
-		if !pattern.Pattern.Match([]byte(remaining)) {
+		if !pattern.Pattern.MatchString(remaining) {
 			break
 		}
 
 		lexer.readChar()
+
 		skippedChars++
 
-		// Safety limit
+		// Safety limit.
 		if skippedChars > 100 {
 			break
 		}
@@ -506,23 +459,24 @@ func (er *ErrorRecovery) skipSequenceRecovery(lexer *Lexer, err *LexicalError, p
 	err.CharactersSkipped = skippedChars
 	err.RecoveryType = RecoverySkipSequence
 
-	// Try to get next token
+	// Try to get next token.
 	if lexer.position < len(lexer.input) {
 		token := lexer.NextToken()
+
 		return &token, nil
 	}
 
 	return &Token{Type: TokenEOF}, nil
 }
 
-// contextualRecovery uses context information for intelligent recovery
+// contextualRecovery uses context information for intelligent recovery.
 func (er *ErrorRecovery) contextualRecovery(lexer *Lexer, err *LexicalError, pattern *ErrorPattern) (*Token, error) {
-	// This is a placeholder for context-aware recovery
-	// Implementation would analyze surrounding code for intelligent decisions
+	// This is a placeholder for context-aware recovery.
+	// Implementation would analyze surrounding code for intelligent decisions.
 	return er.panicModeRecovery(lexer, err)
 }
 
-// findMatchingPattern finds the best matching error pattern for the given context
+// findMatchingPattern finds the best matching error pattern for the given context.
 func (er *ErrorRecovery) findMatchingPattern(context LexerContext) *ErrorPattern {
 	contextStr := context.PrevChars + string(context.CurrentChar) + context.NextChars
 
@@ -530,6 +484,7 @@ func (er *ErrorRecovery) findMatchingPattern(context LexerContext) *ErrorPattern
 		pattern := &er.errorPatterns[i]
 		if pattern.Pattern.MatchString(contextStr) {
 			pattern.Frequency++ // Update frequency for learning
+
 			return pattern
 		}
 	}
@@ -537,7 +492,7 @@ func (er *ErrorRecovery) findMatchingPattern(context LexerContext) *ErrorPattern
 	return nil
 }
 
-// updateErrorHistory tracks error patterns for learning and improvement
+// updateErrorHistory tracks error patterns for learning and improvement.
 func (er *ErrorRecovery) updateErrorHistory(err *LexicalError) {
 	key := fmt.Sprintf("%d:%d:%d", int(err.Type), err.Position.Line, err.Position.Column)
 
@@ -553,7 +508,7 @@ func (er *ErrorRecovery) updateErrorHistory(err *LexicalError) {
 	}
 }
 
-// GenerateError creates a detailed error object with suggestions and recovery information
+// GenerateError creates a detailed error object with suggestions and recovery information.
 func (er *ErrorRecovery) GenerateError(lexer *Lexer, errorType ErrorCategory, message string) *LexicalError {
 	context := er.buildContext(lexer)
 
@@ -570,7 +525,7 @@ func (er *ErrorRecovery) GenerateError(lexer *Lexer, errorType ErrorCategory, me
 		Source:      "lexer",
 	}
 
-	// Generate suggestions if enabled
+	// Generate suggestions if enabled.
 	if er.config.EnableSuggestions {
 		err.Suggestions = er.generateSuggestions(context, errorType)
 	}
@@ -578,7 +533,7 @@ func (er *ErrorRecovery) GenerateError(lexer *Lexer, errorType ErrorCategory, me
 	return err
 }
 
-// buildContext creates detailed context information for error reporting
+// buildContext creates detailed context information for error reporting.
 func (er *ErrorRecovery) buildContext(lexer *Lexer) LexerContext {
 	return LexerContext{
 		Position:    lexer.getCurrentPosition(),
@@ -590,19 +545,22 @@ func (er *ErrorRecovery) buildContext(lexer *Lexer) LexerContext {
 	}
 }
 
-// Helper methods for context building
+// Helper methods for context building.
 func (er *ErrorRecovery) getPreviousChars(lexer *Lexer, count int) string {
 	start := lexer.position - count
 	if start < 0 {
 		start = 0
 	}
+
 	end := lexer.position
 	if end > len(lexer.input) {
 		end = len(lexer.input)
 	}
+
 	if start >= end {
 		return ""
 	}
+
 	return string(lexer.input[start:end])
 }
 
@@ -611,18 +569,21 @@ func (er *ErrorRecovery) getNextChars(lexer *Lexer, count int) string {
 	if start >= len(lexer.input) {
 		return ""
 	}
+
 	end := lexer.position + count
 	if end > len(lexer.input) {
 		end = len(lexer.input)
 	}
+
 	if start >= end {
 		return ""
 	}
+
 	return string(lexer.input[start:end])
 }
 
 func (er *ErrorRecovery) getLineContent(lexer *Lexer) string {
-	// Find the start and end of the current line
+	// Find the start and end of the current line.
 	start := lexer.position
 	for start > 0 && start-1 < len(lexer.input) && lexer.input[start-1] != '\n' {
 		start--
@@ -681,12 +642,12 @@ func (er *ErrorRecovery) getCurrentTimestamp() int64 {
 }
 
 func (er *ErrorRecovery) generateSuggestions(context LexerContext, errorType ErrorCategory) []ErrorSuggestion {
-	// This would integrate with the suggestion engine
-	// Placeholder implementation
+	// This would integrate with the suggestion engine.
+	// Placeholder implementation.
 	return []ErrorSuggestion{}
 }
 
-// NewSuggestionEngine creates a new suggestion engine for error correction
+// NewSuggestionEngine creates a new suggestion engine for error correction.
 func NewSuggestionEngine() *SuggestionEngine {
 	return &SuggestionEngine{
 		vocabulary:     make(map[string]int),

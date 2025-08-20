@@ -8,8 +8,8 @@ func TestBasicTokens(t *testing.T) {
 }`
 
 	tests := []struct {
-		expectedType  TokenType
 		expectedValue string
+		expectedType  TokenType
 	}{
 		{TokenFunc, "func"},
 		{TokenIdentifier, "main"},
@@ -48,8 +48,8 @@ func TestKeywords(t *testing.T) {
 	input := `func let var const struct enum trait impl`
 
 	tests := []struct {
-		expectedType  TokenType
 		expectedValue string
+		expectedType  TokenType
 	}{
 		{TokenFunc, "func"},
 		{TokenLet, "let"},

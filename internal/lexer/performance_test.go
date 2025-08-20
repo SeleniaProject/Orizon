@@ -1,4 +1,4 @@
-// Package lexer provides performance benchmarks for incremental lexical analysis
+// Package lexer provides performance benchmarks for incremental lexical analysis.
 // Phase 1.1.2: インクリメンタル字句解析パフォーマンステスト実装
 package lexer
 
@@ -8,18 +8,18 @@ import (
 	"testing"
 )
 
-// Performance test data generation utilities
+// Performance test data generation utilities.
 
-// generateRealisticOrizonCode creates realistic Orizon source code for performance testing
+// generateRealisticOrizonCode creates realistic Orizon source code for performance testing.
 func generateRealisticOrizonCode(functions int, linesPerFunction int) string {
 	var builder strings.Builder
 
-	// Add imports
+	// Add imports.
 	builder.WriteString("import \"std::io\";\n")
 	builder.WriteString("import \"std::math\";\n")
 	builder.WriteString("import \"std::collections\";\n\n")
 
-	// Add type definitions
+	// Add type definitions.
 	builder.WriteString("struct Point {\n")
 	builder.WriteString("    x: f64,\n")
 	builder.WriteString("    y: f64,\n")
@@ -31,12 +31,12 @@ func generateRealisticOrizonCode(functions int, linesPerFunction int) string {
 	builder.WriteString("    Blue { intensity: f32 },\n")
 	builder.WriteString("}\n\n")
 
-	// Generate functions with varied complexity
+	// Generate functions with varied complexity.
 	for i := 0; i < functions; i++ {
-		// Function signature
+		// Function signature.
 		builder.WriteString(fmt.Sprintf("func calculate_distance_%d(p1: Point, p2: Point) -> f64 {\n", i))
 
-		// Function body with realistic code patterns
+		// Function body with realistic code patterns.
 		for j := 0; j < linesPerFunction; j++ {
 			switch j % 8 {
 			case 0:
@@ -62,33 +62,36 @@ func generateRealisticOrizonCode(functions int, linesPerFunction int) string {
 		builder.WriteString("}\n\n")
 	}
 
-	// Add main function
+	// Add main function.
 	builder.WriteString("func main() {\n")
 	builder.WriteString("    let origin = Point { x: 0.0, y: 0.0 };\n")
+
 	for i := 0; i < min(10, functions); i++ {
 		builder.WriteString(fmt.Sprintf("    let point_%d = Point { x: %d.0, y: %d.0 };\n", i, i*3, i*4))
 		builder.WriteString(fmt.Sprintf("    let distance_%d = calculate_distance_%d(origin, point_%d);\n", i, i, i))
 		builder.WriteString(fmt.Sprintf("    print(\"Distance %d: \", distance_%d);\n", i, i))
 	}
+
 	builder.WriteString("}\n")
 
 	return builder.String()
 }
 
-// Utility function for min
+// Utility function for min.
 func min(a, b int) int {
 	if a < b {
 		return a
 	}
+
 	return b
 }
 
-// Benchmarks for incremental lexer performance
+// Benchmarks for incremental lexer performance.
 
-// BenchmarkIncrementalLexer_RealisticFile tests performance with realistic file sizes
+// BenchmarkIncrementalLexer_RealisticFile tests performance with realistic file sizes.
 func BenchmarkIncrementalLexer_RealisticFile(b *testing.B) {
 	lexer := NewIncrementalLexer()
-	// Generate more realistic content (about 10KB)
+	// Generate more realistic content (about 10KB).
 	content := []byte(generateRealisticOrizonCode(100, 25)) // ~2500 lines
 
 	b.ResetTimer()
@@ -96,6 +99,7 @@ func BenchmarkIncrementalLexer_RealisticFile(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		filename := fmt.Sprintf("realistic_%d.oriz", i%5)
+
 		_, err := lexer.LexIncremental(filename, content, nil)
 		if err != nil {
 			b.Fatalf("Failed to lex realistic file: %v", err)
@@ -103,13 +107,13 @@ func BenchmarkIncrementalLexer_RealisticFile(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_RealisticCacheHit tests performance on realistic cache hits
+// BenchmarkIncrementalLexer_RealisticCacheHit tests performance on realistic cache hits.
 func BenchmarkIncrementalLexer_RealisticCacheHit(b *testing.B) {
 	lexer := NewIncrementalLexer()
-	// Use more realistic content size (about 1KB)
+	// Use more realistic content size (about 1KB).
 	content := []byte(generateRealisticOrizonCode(10, 15)) // ~150 lines
 
-	// Prime the cache
+	// Prime the cache.
 	_, err := lexer.LexIncremental("test.oriz", content, nil)
 	if err != nil {
 		b.Fatalf("Failed to prime cache: %v", err)
@@ -134,6 +138,7 @@ func BenchmarkIncrementalLexer_MediumFile(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		filename := fmt.Sprintf("medium_%d.oriz", i%10)
+
 		_, err := lexer.LexIncremental(filename, content, nil)
 		if err != nil {
 			b.Fatalf("Failed to lex medium file: %v", err)
@@ -141,7 +146,7 @@ func BenchmarkIncrementalLexer_MediumFile(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_LargeFile tests performance on large files
+// BenchmarkIncrementalLexer_LargeFile tests performance on large files.
 func BenchmarkIncrementalLexer_LargeFile(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	content := []byte(generateRealisticOrizonCode(500, 50)) // ~25000 lines
@@ -151,6 +156,7 @@ func BenchmarkIncrementalLexer_LargeFile(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		filename := fmt.Sprintf("large_%d.oriz", i%3)
+
 		_, err := lexer.LexIncremental(filename, content, nil)
 		if err != nil {
 			b.Fatalf("Failed to lex large file: %v", err)
@@ -158,14 +164,15 @@ func BenchmarkIncrementalLexer_LargeFile(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_CacheHitRatio tests cache effectiveness
+// BenchmarkIncrementalLexer_CacheHitRatio tests cache effectiveness.
 func BenchmarkIncrementalLexer_CacheHitRatio(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	content := []byte(generateRealisticOrizonCode(20, 15))
 
-	// Prime cache with multiple files
+	// Prime cache with multiple files.
 	for i := 0; i < 10; i++ {
 		filename := fmt.Sprintf("cached_%d.oriz", i)
+
 		_, err := lexer.LexIncremental(filename, content, nil)
 		if err != nil {
 			b.Fatalf("Failed to prime cache: %v", err)
@@ -176,8 +183,9 @@ func BenchmarkIncrementalLexer_CacheHitRatio(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		// 80% cache hits, 20% new files
+		// 80% cache hits, 20% new files.
 		filename := fmt.Sprintf("cached_%d.oriz", i%12) // Files 0-9 exist, 10-11 are new
+
 		_, err := lexer.LexIncremental(filename, content, nil)
 		if err != nil {
 			b.Fatalf("Cache hit test failed: %v", err)
@@ -185,13 +193,13 @@ func BenchmarkIncrementalLexer_CacheHitRatio(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_SmallChanges tests incremental update performance
+// BenchmarkIncrementalLexer_SmallChanges tests incremental update performance.
 func BenchmarkIncrementalLexer_SmallChanges(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	baseContent := generateRealisticOrizonCode(10, 10)
 	content := []byte(baseContent)
 
-	// Prime the cache
+	// Prime the cache.
 	_, err := lexer.LexIncremental("test.oriz", content, nil)
 	if err != nil {
 		b.Fatalf("Failed to prime cache: %v", err)
@@ -201,7 +209,7 @@ func BenchmarkIncrementalLexer_SmallChanges(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		// Simulate typing by changing small parts
+		// Simulate typing by changing small parts.
 		modifiedContent := strings.Replace(baseContent,
 			fmt.Sprintf("calculate_distance_%d", i%10),
 			fmt.Sprintf("calculate_distance_%d_modified", i%10), 1)
@@ -223,13 +231,13 @@ func BenchmarkIncrementalLexer_SmallChanges(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_LineInsertion tests line insertion performance
+// BenchmarkIncrementalLexer_LineInsertion tests line insertion performance.
 func BenchmarkIncrementalLexer_LineInsertion(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	baseContent := generateRealisticOrizonCode(20, 10)
 	content := []byte(baseContent)
 
-	// Prime the cache
+	// Prime the cache.
 	_, err := lexer.LexIncremental("test.oriz", content, nil)
 	if err != nil {
 		b.Fatalf("Failed to prime cache: %v", err)
@@ -239,7 +247,7 @@ func BenchmarkIncrementalLexer_LineInsertion(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		// Insert a new line in the middle
+		// Insert a new line in the middle.
 		insertPos := len(baseContent) / 2
 		newLine := fmt.Sprintf("\n    let new_var_%d = %d;\n", i, i)
 		modifiedContent := baseContent[:insertPos] + newLine + baseContent[insertPos:]
@@ -261,7 +269,7 @@ func BenchmarkIncrementalLexer_LineInsertion(b *testing.B) {
 	}
 }
 
-// BenchmarkIncrementalLexer_ConcurrentAccess tests thread safety performance
+// BenchmarkIncrementalLexer_ConcurrentAccess tests thread safety performance.
 func BenchmarkIncrementalLexer_ConcurrentAccess(b *testing.B) {
 	lexer := NewIncrementalLexer()
 	content := []byte(generateRealisticOrizonCode(10, 8))
@@ -273,29 +281,34 @@ func BenchmarkIncrementalLexer_ConcurrentAccess(b *testing.B) {
 		fileID := 0
 		for pb.Next() {
 			filename := fmt.Sprintf("concurrent_%d.oriz", fileID%20)
+
 			_, err := lexer.LexIncremental(filename, content, nil)
 			if err != nil {
 				b.Fatalf("Concurrent access failed: %v", err)
 			}
+
 			fileID++
 		}
 	})
 }
 
-// BenchmarkCompareLexer_IncrementalVsStandard compares incremental vs standard lexer
+// BenchmarkCompareLexer_IncrementalVsStandard compares incremental vs standard lexer.
 func BenchmarkCompareLexer_IncrementalVsStandard(b *testing.B) {
 	content := generateRealisticOrizonCode(30, 15)
 
 	b.Run("Standard", func(b *testing.B) {
 		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			lexer := NewWithFilename(content, "test.oriz")
 			tokenCount := 0
+
 			for {
 				token := lexer.NextToken()
 				if token.Type == TokenEOF {
 					break
 				}
+
 				tokenCount++
 			}
 		}
@@ -303,9 +316,11 @@ func BenchmarkCompareLexer_IncrementalVsStandard(b *testing.B) {
 
 	b.Run("Incremental_CacheMiss", func(b *testing.B) {
 		b.ReportAllocs()
+
 		for i := 0; i < b.N; i++ {
 			lexer := NewIncrementalLexer()
 			filename := fmt.Sprintf("test_%d.oriz", i) // Always cache miss
+
 			_, err := lexer.LexIncremental(filename, []byte(content), nil)
 			if err != nil {
 				b.Fatalf("Incremental lexer failed: %v", err)
@@ -317,7 +332,7 @@ func BenchmarkCompareLexer_IncrementalVsStandard(b *testing.B) {
 		lexer := NewIncrementalLexer()
 		filename := "test.oriz"
 
-		// Prime the cache
+		// Prime the cache.
 		_, err := lexer.LexIncremental(filename, []byte(content), nil)
 		if err != nil {
 			b.Fatalf("Failed to prime cache: %v", err)
@@ -335,11 +350,11 @@ func BenchmarkCompareLexer_IncrementalVsStandard(b *testing.B) {
 	})
 }
 
-// BenchmarkIncrementalLexer_MemoryUsage tests memory efficiency
+// BenchmarkIncrementalLexer_MemoryUsage tests memory efficiency.
 func BenchmarkIncrementalLexer_MemoryUsage(b *testing.B) {
 	lexer := NewIncrementalLexer()
 
-	// Test with multiple files to simulate real IDE usage
+	// Test with multiple files to simulate real IDE usage.
 	files := make([][]byte, 100)
 	for i := 0; i < 100; i++ {
 		files[i] = []byte(generateRealisticOrizonCode(5+i%20, 8+i%15))
@@ -357,7 +372,7 @@ func BenchmarkIncrementalLexer_MemoryUsage(b *testing.B) {
 			b.Fatalf("Memory test failed: %v", err)
 		}
 
-		// Periodically clear cache to test memory management
+		// Periodically clear cache to test memory management.
 		if i%1000 == 999 {
 			lexer.ClearCache()
 		}

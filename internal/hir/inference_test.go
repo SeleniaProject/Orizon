@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// =============================================================================
-// Type Inference Engine Tests
-// =============================================================================
+// =============================================================================.
+// Type Inference Engine Tests.
+// =============================================================================.
 
 func TestTypeInferenceEngine_Creation(t *testing.T) {
 	engine := NewTypeInferenceEngine()
@@ -32,23 +32,26 @@ func TestTypeInferenceEngine_Creation(t *testing.T) {
 func TestTypeInferenceEngine_FreshTypeVariable(t *testing.T) {
 	engine := NewTypeInferenceEngine()
 
-	// Generate first type variable
+	// Generate first type variable.
 	var1 := engine.freshTypeVariable()
 	if var1.Kind != TypeKindVariable {
 		t.Errorf("Expected TypeKindVariable, got %v", var1.Kind)
 	}
+
 	if var1.Name != "'t1" {
 		t.Errorf("Expected name 't1', got %s", var1.Name)
 	}
+
 	if var1.VariableID == nil || *var1.VariableID != 1 {
 		t.Errorf("Expected variable ID 1, got %v", var1.VariableID)
 	}
 
-	// Generate second type variable
+	// Generate second type variable.
 	var2 := engine.freshTypeVariable()
 	if var2.Name != "'t2" {
 		t.Errorf("Expected name 't2', got %s", var2.Name)
 	}
+
 	if var2.VariableID == nil || *var2.VariableID != 2 {
 		t.Errorf("Expected variable ID 2, got %v", var2.VariableID)
 	}
@@ -57,7 +60,7 @@ func TestTypeInferenceEngine_FreshTypeVariable(t *testing.T) {
 func TestTypeInferenceEngine_InferLiteral(t *testing.T) {
 	engine := NewTypeInferenceEngine()
 
-	// Create integer literal
+	// Create integer literal.
 	intLiteral := &HIRLiteral{
 		Value: 42,
 		Type: TypeInfo{
@@ -74,14 +77,15 @@ func TestTypeInferenceEngine_InferLiteral(t *testing.T) {
 	if result.Kind != TypeKindInteger {
 		t.Errorf("Expected TypeKindInteger, got %v", result.Kind)
 	}
+
 	if result.Name != "int" {
 		t.Errorf("Expected name 'int', got %s", result.Name)
 	}
 }
 
-// =============================================================================
-// Substitution Tests
-// =============================================================================
+// =============================================================================.
+// Substitution Tests.
+// =============================================================================.
 
 func TestSubstitution_Creation(t *testing.T) {
 	subst := NewSubstitution()
@@ -98,7 +102,7 @@ func TestSubstitution_Creation(t *testing.T) {
 func TestSubstitution_AddAndApply(t *testing.T) {
 	subst := NewSubstitution()
 
-	// Create a type variable
+	// Create a type variable.
 	varID := 1
 	variable := TypeInfo{
 		Kind:       TypeKindVariable,
@@ -106,35 +110,36 @@ func TestSubstitution_AddAndApply(t *testing.T) {
 		VariableID: &varID,
 	}
 
-	// Create a concrete type
+	// Create a concrete type.
 	concrete := TypeInfo{
 		Kind: TypeKindInteger,
 		Name: "int",
 	}
 
-	// Add substitution
+	// Add substitution.
 	subst.Add(varID, concrete)
 
-	// Apply substitution to the variable
+	// Apply substitution to the variable.
 	result := subst.Apply(variable)
 
 	if result.Kind != TypeKindInteger {
 		t.Errorf("Expected TypeKindInteger after substitution, got %v", result.Kind)
 	}
+
 	if result.Name != "int" {
 		t.Errorf("Expected name 'int' after substitution, got %s", result.Name)
 	}
 
-	// Apply substitution to non-variable type should return unchanged
+	// Apply substitution to non-variable type should return unchanged.
 	result = subst.Apply(concrete)
 	if result.Kind != TypeKindInteger || result.Name != "int" {
 		t.Error("Expected concrete type to remain unchanged")
 	}
 }
 
-// =============================================================================
-// Unification Tests
-// =============================================================================
+// =============================================================================.
+// Unification Tests.
+// =============================================================================.
 
 func TestUnification_SameTypes(t *testing.T) {
 	engine := NewTypeInferenceEngine()
@@ -170,21 +175,21 @@ func TestUnification_VariableWithConcrete(t *testing.T) {
 		t.Errorf("Expected variable-concrete unification to succeed, got error: %v", err)
 	}
 
-	// Check that substitution was added
+	// Check that substitution was added.
 	result := engine.substitutions.Apply(variable)
 	if result.Kind != TypeKindInteger {
 		t.Error("Expected variable to be substituted with concrete type")
 	}
 }
 
-// =============================================================================
-// Integration Tests
-// =============================================================================
+// =============================================================================.
+// Integration Tests.
+// =============================================================================.
 
 func TestInferenceIntegration_SimpleExpression(t *testing.T) {
 	engine := NewTypeInferenceEngine()
 
-	// Create a simple integer literal
+	// Create a simple integer literal.
 	literal := &HIRLiteral{
 		Value: 42,
 		Type: TypeInfo{
@@ -206,7 +211,7 @@ func TestInferenceIntegration_SimpleExpression(t *testing.T) {
 func TestInferenceIntegration_ErrorCollection(t *testing.T) {
 	engine := NewTypeInferenceEngine()
 
-	// Add some errors manually to test error formatting
+	// Add some errors manually to test error formatting.
 	engine.addError(ErrorTypeMismatch, "Type mismatch", "test.oriz:5", nil, nil, "test context")
 	engine.addError(ErrorUndefinedVariable, "Undefined variable", "test.oriz:10", nil, nil, "")
 
@@ -223,14 +228,15 @@ func TestInferenceIntegration_ErrorCollection(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// Performance Tests
-// =============================================================================
+// =============================================================================.
+// Performance Tests.
+// =============================================================================.
 
 func BenchmarkFreshTypeVariable(b *testing.B) {
 	engine := NewTypeInferenceEngine()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		engine.freshTypeVariable()
 	}
@@ -240,7 +246,7 @@ func BenchmarkSubstitutionApply(b *testing.B) {
 	engine := NewTypeInferenceEngine()
 	subst := NewSubstitution()
 
-	// Create a complex type with multiple nested variables
+	// Create a complex type with multiple nested variables.
 	var1 := engine.freshTypeVariable()
 	var2 := engine.freshTypeVariable()
 
@@ -249,11 +255,12 @@ func BenchmarkSubstitutionApply(b *testing.B) {
 		Parameters: []TypeInfo{var1, var2},
 	}
 
-	// Add substitutions
+	// Add substitutions.
 	subst.Add(*var1.VariableID, TypeInfo{Kind: TypeKindInteger, Name: "int"})
 	subst.Add(*var2.VariableID, TypeInfo{Kind: TypeKindString, Name: "string"})
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		subst.Apply(complexType)
 	}
@@ -266,6 +273,7 @@ func BenchmarkUnification(b *testing.B) {
 	type2 := TypeInfo{Kind: TypeKindInteger, Name: "int"}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		engine.clearState()
 		engine.unify(type1, type2)

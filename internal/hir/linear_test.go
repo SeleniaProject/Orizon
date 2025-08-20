@@ -6,13 +6,13 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.4.1: Linear Type System Implementation Tests
-// =============================================================================
+// =============================================================================.
 
 func TestLinearTypeSystem(t *testing.T) {
 	t.Run("LinearResourceTypeCreation", func(t *testing.T) {
-		// Test linear resource type creation
+		// Test linear resource type creation.
 		linearType := &LinearResourceType{
 			ID:          TypeID(1),
 			BaseType:    &HIRIdentifier{Name: "File", Type: TypeInfo{Kind: TypeKindStruct, Name: "File"}},
@@ -80,7 +80,7 @@ func TestLinearTypeSystem(t *testing.T) {
 	})
 
 	t.Run("UsageTrackingAndAnalysis", func(t *testing.T) {
-		// Test usage tracking for linear resources
+		// Test usage tracking for linear resources.
 		analyzer := &UsageAnalyzer{
 			UsageMap:    make(map[string][]UsageOccurrence),
 			MoveMap:     make(map[string]position.Span),
@@ -89,7 +89,7 @@ func TestLinearTypeSystem(t *testing.T) {
 			Diagnostics: []LinearDiagnostic{},
 		}
 
-		// Record usage
+		// Record usage.
 		analyzer.UsageMap["file"] = []UsageOccurrence{
 			{
 				Location:  position.Span{Start: position.Position{Line: 1, Column: 1}},
@@ -99,7 +99,7 @@ func TestLinearTypeSystem(t *testing.T) {
 			},
 		}
 
-		// Record move
+		// Record move.
 		analyzer.MoveMap["file"] = position.Span{Start: position.Position{Line: 2, Column: 1}}
 
 		if len(analyzer.UsageMap) != 1 {
@@ -120,7 +120,7 @@ func TestLinearTypeSystem(t *testing.T) {
 	})
 
 	t.Run("MoveSemantics", func(t *testing.T) {
-		// Test move semantics implementation
+		// Test move semantics implementation.
 		moveSemantics := &MoveSemantics{
 			MoveOperations: []MoveOperation{
 				{
@@ -198,7 +198,7 @@ func TestLinearTypeSystem(t *testing.T) {
 
 func TestLinearTypeChecking(t *testing.T) {
 	t.Run("LinearChecker", func(t *testing.T) {
-		// Test linear type checker
+		// Test linear type checker.
 		checker := &LinearChecker{
 			Context: LinearContext{
 				Variables: []LinearBinding{
@@ -273,7 +273,7 @@ func TestLinearTypeChecking(t *testing.T) {
 	})
 
 	t.Run("LinearDiagnostics", func(t *testing.T) {
-		// Test linear type checking diagnostics
+		// Test linear type checking diagnostics.
 		diagnostic := &LinearDiagnostic{
 			Kind:     LinearDiagnosticDoubleUse,
 			Message:  "Variable 'file' used multiple times",
@@ -302,7 +302,7 @@ func TestLinearTypeChecking(t *testing.T) {
 
 func TestLinearResourceManagement(t *testing.T) {
 	t.Run("ResourceLifecycle", func(t *testing.T) {
-		// Test resource lifecycle tracking
+		// Test resource lifecycle tracking.
 		resource := &ResourceBinding{
 			Resource: "database_connection",
 			Type: LinearResourceType{
@@ -344,7 +344,7 @@ func TestLinearResourceManagement(t *testing.T) {
 	})
 
 	t.Run("BorrowingSystem", func(t *testing.T) {
-		// Test borrowing system
+		// Test borrowing system.
 		borrowInfo := &BorrowInfo{
 			Borrower: "worker_thread",
 			Location: position.Span{Start: position.Position{Line: 10, Column: 1}},
@@ -379,7 +379,7 @@ func TestPhase241Completion(t *testing.T) {
 	t.Log("=== Phase 2.4.1: Linear Type System - Linearity Checker Implementation - COMPLETE ===")
 
 	t.Run("LinearResourceTypes", func(t *testing.T) {
-		// Validate linear resource type system
+		// Validate linear resource type system.
 		linearType := &LinearResourceType{
 			ID:          TypeID(1),
 			UsagePolicy: LinearUsageOnce,
@@ -390,7 +390,7 @@ func TestPhase241Completion(t *testing.T) {
 	})
 
 	t.Run("UsageTracking", func(t *testing.T) {
-		// Validate usage tracking system
+		// Validate usage tracking system.
 		analyzer := &UsageAnalyzer{
 			UsageMap: make(map[string][]UsageOccurrence),
 		}
@@ -400,7 +400,7 @@ func TestPhase241Completion(t *testing.T) {
 	})
 
 	t.Run("MoveSemantics", func(t *testing.T) {
-		// Validate move semantics implementation
+		// Validate move semantics implementation.
 		moveOp := &MoveOperation{
 			Source:      "src",
 			Destination: "dst",
@@ -411,7 +411,7 @@ func TestPhase241Completion(t *testing.T) {
 	})
 
 	t.Run("LinearTypeChecking", func(t *testing.T) {
-		// Validate linear type checking infrastructure
+		// Validate linear type checking infrastructure.
 		checker := &LinearChecker{
 			Options: LinearCheckOptions{
 				StrictMode: true,
@@ -422,7 +422,7 @@ func TestPhase241Completion(t *testing.T) {
 		}
 	})
 
-	// Report completion
+	// Report completion.
 	t.Log("✅ Linear resource type system implemented")
 	t.Log("✅ Usage tracking and analysis implemented")
 	t.Log("✅ Move semantics with validation implemented")
@@ -434,13 +434,13 @@ func TestPhase241Completion(t *testing.T) {
 	t.Log("🎯 Phase 2.4.1 SUCCESSFULLY COMPLETED!")
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.4.2: Session Types Implementation Tests
-// =============================================================================
+// =============================================================================.
 
 func TestSessionTypes(t *testing.T) {
 	t.Run("SessionTypeCreation", func(t *testing.T) {
-		// Test session type creation
+		// Test session type creation.
 		sessionType := &SessionType{
 			ID: TypeID(1),
 			Protocol: SessionProtocol{
@@ -620,7 +620,7 @@ func TestSessionTypes(t *testing.T) {
 	})
 
 	t.Run("ProtocolVerification", func(t *testing.T) {
-		// Test protocol verification
+		// Test protocol verification.
 		verifier := &ProtocolVerifier{
 			Rules: []VerificationRule{
 				{
@@ -698,7 +698,7 @@ func TestSessionTypes(t *testing.T) {
 	})
 
 	t.Run("DeadlockDetection", func(t *testing.T) {
-		// Test deadlock detection
+		// Test deadlock detection.
 		analyzer := &DeadlockAnalyzer{
 			Algorithms: []DeadlockAlgorithm{
 				{
@@ -834,7 +834,7 @@ func TestPhase242Completion(t *testing.T) {
 	t.Log("=== Phase 2.4.2: Session Types Implementation - COMPLETE ===")
 
 	t.Run("SessionTypes", func(t *testing.T) {
-		// Validate session type system
+		// Validate session type system.
 		sessionType := &SessionType{
 			ID: TypeID(1),
 		}
@@ -844,7 +844,7 @@ func TestPhase242Completion(t *testing.T) {
 	})
 
 	t.Run("ProtocolVerification", func(t *testing.T) {
-		// Validate protocol verification system
+		// Validate protocol verification system.
 		verifier := &ProtocolVerifier{
 			Rules: []VerificationRule{},
 		}
@@ -854,7 +854,7 @@ func TestPhase242Completion(t *testing.T) {
 	})
 
 	t.Run("DeadlockDetection", func(t *testing.T) {
-		// Validate deadlock detection system
+		// Validate deadlock detection system.
 		analyzer := &DeadlockAnalyzer{
 			Algorithms: []DeadlockAlgorithm{},
 		}
@@ -863,7 +863,7 @@ func TestPhase242Completion(t *testing.T) {
 		}
 	})
 
-	// Report completion
+	// Report completion.
 	t.Log("✅ Session type definition and protocol specification implemented")
 	t.Log("✅ Communication protocol verification implemented")
 	t.Log("✅ Deadlock detection with multiple algorithms implemented")

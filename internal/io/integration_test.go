@@ -9,19 +9,19 @@ import (
 
 // TestMIRIntegration tests MIR code generation for I/O operations
 func TestMIRIntegration(t *testing.T) {
-	// Create a mock MIR module
+	// Create a mock MIR module.
 	module := &mir.Module{
 		Name:      "test_io",
 		Functions: []*mir.Function{},
 	}
 
-	// Create MIR integration
+	// Create MIR integration.
 	integration := NewIOMIRIntegration(module)
 	if integration == nil {
 		t.Fatal("Failed to create MIR integration")
 	}
 
-	// Test file operation function generation
+	// Test file operation function generation.
 	fileOpenFunc := integration.GenerateFileOpenFunction()
 	if fileOpenFunc == nil {
 		t.Error("Failed to generate file open function")
@@ -64,18 +64,18 @@ func TestMIRIntegration(t *testing.T) {
 
 // TestX64Integration tests x64 assembly generation for I/O operations
 func TestX64Integration(t *testing.T) {
-	// Create x64 integration
+	// Create x64 integration.
 	integration := NewX64IOIntegration()
 	if integration == nil {
 		t.Fatal("Failed to create x64 integration")
 	}
 
-	// Test complete file open function generation
+	// Test complete file open function generation.
 	fileOpenAsm := integration.GenerateCompleteFileOpenFunction()
 	if fileOpenAsm == "" {
 		t.Error("Failed to generate complete file open function")
 	} else {
-		// Verify assembly contains basic structure
+		// Verify assembly contains basic structure.
 		if !strings.Contains(fileOpenAsm, "push rbp") {
 			t.Error("File open assembly should contain function prologue")
 		}
@@ -84,12 +84,12 @@ func TestX64Integration(t *testing.T) {
 		}
 	}
 
-	// Test basic file operation assembly generation with enhanced validation
+	// Test basic file operation assembly generation with enhanced validation.
 	fileCloseAsm := integration.GenerateCompleteFileCloseFunction()
 	if fileCloseAsm == "" {
 		t.Error("Failed to generate complete file close function")
 	} else {
-		// Verify assembly contains proper function structure
+		// Verify assembly contains proper function structure.
 		requiredElements := []string{
 			"push rbp",     // Function prologue
 			"mov rbp, rsp", // Stack frame setup
@@ -126,7 +126,7 @@ func TestX64Integration(t *testing.T) {
 
 // TestConsoleIntegration tests console I/O integration
 func TestConsoleIntegration(t *testing.T) {
-	// Test MIR integration for console operations
+	// Test MIR integration for console operations.
 	module := &mir.Module{
 		Name:      "test_console",
 		Functions: []*mir.Function{},
@@ -155,7 +155,7 @@ func TestConsoleIntegration(t *testing.T) {
 		}
 	}
 
-	// Test x64 integration for console operations
+	// Test x64 integration for console operations.
 	x64Integration := NewX64IOIntegration()
 	if x64Integration == nil {
 		t.Fatal("Failed to create x64 integration")
@@ -165,7 +165,7 @@ func TestConsoleIntegration(t *testing.T) {
 	if consoleWriteAsm == "" {
 		t.Error("Failed to generate console write assembly")
 	} else {
-		// Console operations should use Windows API
+		// Console operations should use Windows API.
 		if !strings.Contains(consoleWriteAsm, "WriteConsole") && !strings.Contains(consoleWriteAsm, "WriteFile") {
 			t.Error("Console write assembly should contain Windows API calls")
 		}
@@ -181,9 +181,9 @@ func TestConsoleIntegration(t *testing.T) {
 	}
 }
 
-// TestThreadingIntegration tests threading integration
+// TestThreadingIntegration tests threading integration.
 func TestThreadingIntegration(t *testing.T) {
-	// Test MIR integration for threading operations
+	// Test MIR integration for threading operations.
 	module := &mir.Module{
 		Name:      "test_threading",
 		Functions: []*mir.Function{},
@@ -212,7 +212,7 @@ func TestThreadingIntegration(t *testing.T) {
 		}
 	}
 
-	// Test x64 integration for threading operations
+	// Test x64 integration for threading operations.
 	x64Integration := NewX64IOIntegration()
 	if x64Integration == nil {
 		t.Fatal("Failed to create x64 integration")
@@ -222,7 +222,7 @@ func TestThreadingIntegration(t *testing.T) {
 	if threadCreateAsm == "" {
 		t.Error("Failed to generate thread create assembly")
 	} else {
-		// Threading operations should use Windows threading API
+		// Threading operations should use Windows threading API.
 		if !strings.Contains(threadCreateAsm, "CreateThread") {
 			t.Error("Thread create assembly should contain CreateThread API call")
 		}
@@ -238,9 +238,9 @@ func TestThreadingIntegration(t *testing.T) {
 	}
 }
 
-// TestIntegrationConsistency tests consistency between MIR and x64 generations
+// TestIntegrationConsistency tests consistency between MIR and x64 generations.
 func TestIntegrationConsistency(t *testing.T) {
-	// Create integrations
+	// Create integrations.
 	module := &mir.Module{
 		Name:      "test_consistency",
 		Functions: []*mir.Function{},
@@ -256,7 +256,7 @@ func TestIntegrationConsistency(t *testing.T) {
 		t.Fatal("Failed to create x64 integration")
 	}
 
-	// Test that both integrations can generate code for the same operations
+	// Test that both integrations can generate code for the same operations.
 	mirOperations := []struct {
 		name   string
 		mirGen func() *mir.Function
@@ -285,13 +285,13 @@ func TestIntegrationConsistency(t *testing.T) {
 		{"mutex_lock", func() string { return x64Integration.GenerateMutexLockAsm("rcx", "rax") }},
 	}
 
-	// Verify both have the same number of operations
+	// Verify both have the same number of operations.
 	if len(mirOperations) != len(x64Operations) {
 		t.Errorf("MIR and x64 should support the same number of operations: MIR=%d, x64=%d",
 			len(mirOperations), len(x64Operations))
 	}
 
-	// Verify both have implementations for each operation
+	// Verify both have implementations for each operation.
 	for i, mirOp := range mirOperations {
 		if i >= len(x64Operations) {
 			t.Errorf("Missing x64 implementation for %s", mirOp.name)
@@ -303,19 +303,19 @@ func TestIntegrationConsistency(t *testing.T) {
 			t.Errorf("Operation mismatch: MIR=%s, x64=%s", mirOp.name, x64Op.name)
 		}
 
-		// Test MIR generation
+		// Test MIR generation.
 		mirFunc := mirOp.mirGen()
 		if mirFunc == nil {
 			t.Errorf("Missing MIR implementation for %s", mirOp.name)
 		}
 
-		// Test x64 generation
+		// Test x64 generation.
 		x64Asm := x64Op.x64Gen()
 		if x64Asm == "" {
 			t.Errorf("Missing x64 implementation for %s", x64Op.name)
 		}
 
-		// Both should succeed
+		// Both should succeed.
 		if mirFunc == nil || x64Asm == "" {
 			t.Errorf("Incomplete implementation for %s: MIR=%v, x64=%v",
 				mirOp.name, mirFunc != nil, x64Asm != "")
@@ -323,7 +323,7 @@ func TestIntegrationConsistency(t *testing.T) {
 	}
 }
 
-// TestMIRFunctionStructure tests the structure of generated MIR functions
+// TestMIRFunctionStructure tests the structure of generated MIR functions.
 func TestMIRFunctionStructure(t *testing.T) {
 	module := &mir.Module{
 		Name:      "test_structure",
@@ -335,53 +335,53 @@ func TestMIRFunctionStructure(t *testing.T) {
 		t.Fatal("Failed to create MIR integration")
 	}
 
-	// Test file open function structure
+	// Test file open function structure.
 	fileOpenFunc := integration.GenerateFileOpenFunction()
 	if fileOpenFunc == nil {
 		t.Fatal("Failed to generate file open function")
 	}
 
-	// Verify function has correct name
+	// Verify function has correct name.
 	if fileOpenFunc.Name == "" {
 		t.Error("Function should have a name")
 	}
 
-	// Verify function has parameters
+	// Verify function has parameters.
 	if len(fileOpenFunc.Parameters) == 0 {
 		t.Error("File open function should have parameters")
 	}
 
-	// Verify function has blocks
+	// Verify function has blocks.
 	if len(fileOpenFunc.Blocks) == 0 {
 		t.Error("Function should have basic blocks")
 	}
 
-	// Verify entry block exists
+	// Verify entry block exists.
 	entryBlock := fileOpenFunc.Blocks[0]
 	if entryBlock.Name != "entry" {
 		t.Error("First block should be entry block")
 	}
 
-	// Verify block has instructions
+	// Verify block has instructions.
 	if len(entryBlock.Instr) == 0 {
 		t.Error("Entry block should have instructions")
 	}
 }
 
-// TestX64AssemblyStructure tests the structure of generated x64 assembly
+// TestX64AssemblyStructure tests the structure of generated x64 assembly.
 func TestX64AssemblyStructure(t *testing.T) {
 	integration := NewX64IOIntegration()
 	if integration == nil {
 		t.Fatal("Failed to create x64 integration")
 	}
 
-	// Test complete file open function structure
+	// Test complete file open function structure.
 	fileOpenAsm := integration.GenerateCompleteFileOpenFunction()
 	if fileOpenAsm == "" {
 		t.Fatal("Failed to generate complete file open function")
 	}
 
-	// Verify assembly contains required elements
+	// Verify assembly contains required elements.
 	requiredElements := []string{
 		"orizon_io_file_open:", // Function label
 		"push rbp",             // Function prologue
@@ -396,7 +396,7 @@ func TestX64AssemblyStructure(t *testing.T) {
 		}
 	}
 
-	// Verify Windows API usage
+	// Verify Windows API usage.
 	windowsAPIs := []string{
 		"CreateFile",
 		"GetLastError",

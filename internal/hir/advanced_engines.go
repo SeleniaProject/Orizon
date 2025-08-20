@@ -4,11 +4,11 @@ import (
 	"fmt"
 )
 
-// =============================================================================
-// Advanced Unification Engine
-// =============================================================================
+// =============================================================================.
+// Advanced Unification Engine.
+// =============================================================================.
 
-// AdvancedUnificationEngine handles unification for advanced type systems
+// AdvancedUnificationEngine handles unification for advanced type systems.
 type AdvancedUnificationEngine struct {
 	RankNUnifier      *RankNUnifier
 	DependentUnifier  *DependentUnifier
@@ -18,25 +18,25 @@ type AdvancedUnificationEngine struct {
 	ConstraintSolver  *AdvancedConstraintSolver
 }
 
-// UnificationStep represents a step in the unification process
+// UnificationStep represents a step in the unification process.
 type UnificationStep struct {
+	Substitutions map[TypeVariable]TypeInfo
+	Result        UnificationResult
 	Type1         TypeInfo
 	Type2         TypeInfo
-	Result        UnificationResult
 	Constraints   []TypeConstraint
-	Substitutions map[TypeVariable]TypeInfo
 }
 
-// UnificationResult represents the result of type unification
+// UnificationResult represents the result of type unification.
 type UnificationResult struct {
-	Success      bool
-	UnifiedType  TypeInfo
-	Constraints  []TypeConstraint
 	Substitution map[TypeVariable]TypeInfo
+	UnifiedType  TypeInfo
 	ErrorMessage string
+	Constraints  []TypeConstraint
+	Success      bool
 }
 
-// NewAdvancedUnificationEngine creates a new advanced unification engine
+// NewAdvancedUnificationEngine creates a new advanced unification engine.
 func NewAdvancedUnificationEngine() *AdvancedUnificationEngine {
 	return &AdvancedUnificationEngine{
 		RankNUnifier:      NewRankNUnifier(),
@@ -48,13 +48,14 @@ func NewAdvancedUnificationEngine() *AdvancedUnificationEngine {
 	}
 }
 
-// Unify performs type unification for advanced type systems
+// Unify performs type unification for advanced type systems.
 func (aue *AdvancedUnificationEngine) Unify(type1, type2 TypeInfo) (*UnificationResult, error) {
-	// Check if either type is advanced
+	// Check if either type is advanced.
 	if advType1, isAdv1 := IsAdvancedType(type1); isAdv1 {
 		if advType2, isAdv2 := IsAdvancedType(type2); isAdv2 {
 			return aue.unifyAdvanced(advType1, advType2)
 		}
+
 		return aue.unifyAdvancedWithBasic(advType1, type2)
 	}
 
@@ -62,11 +63,11 @@ func (aue *AdvancedUnificationEngine) Unify(type1, type2 TypeInfo) (*Unification
 		return aue.unifyAdvancedWithBasic(advType2, type1)
 	}
 
-	// Both are basic types
+	// Both are basic types.
 	return aue.unifyBasic(type1, type2)
 }
 
-// unifyAdvanced unifies two advanced types
+// unifyAdvanced unifies two advanced types.
 func (aue *AdvancedUnificationEngine) unifyAdvanced(type1, type2 AdvancedTypeInfo) (*UnificationResult, error) {
 	if type1.GetAdvancedKind() != type2.GetAdvancedKind() {
 		return &UnificationResult{
@@ -94,7 +95,7 @@ func (aue *AdvancedUnificationEngine) unifyAdvanced(type1, type2 AdvancedTypeInf
 	}
 }
 
-// unifyAdvancedWithBasic unifies an advanced type with a basic type
+// unifyAdvancedWithBasic unifies an advanced type with a basic type.
 func (aue *AdvancedUnificationEngine) unifyAdvancedWithBasic(advType AdvancedTypeInfo, basicType TypeInfo) (*UnificationResult, error) {
 	return &UnificationResult{
 		Success:      false,
@@ -102,7 +103,7 @@ func (aue *AdvancedUnificationEngine) unifyAdvancedWithBasic(advType AdvancedTyp
 	}, nil
 }
 
-// unifyBasic unifies two basic types
+// unifyBasic unifies two basic types.
 func (aue *AdvancedUnificationEngine) unifyBasic(type1, type2 TypeInfo) (*UnificationResult, error) {
 	if type1.Kind == type2.Kind && type1.Name == type2.Name {
 		return &UnificationResult{
@@ -117,16 +118,18 @@ func (aue *AdvancedUnificationEngine) unifyBasic(type1, type2 TypeInfo) (*Unific
 	}, nil
 }
 
-// =============================================================================
-// Specialized Unifiers
-// =============================================================================
+// =============================================================================.
+// Specialized Unifiers.
+// =============================================================================.
 
-type RankNUnifier struct{}
-type DependentUnifier struct{}
-type AdvancedEffectUnifier struct{}
-type LinearUnifier struct{}
-type RefinementUnifier struct{}
-type AdvancedConstraintSolver struct{}
+type (
+	RankNUnifier             struct{}
+	DependentUnifier         struct{}
+	AdvancedEffectUnifier    struct{}
+	LinearUnifier            struct{}
+	RefinementUnifier        struct{}
+	AdvancedConstraintSolver struct{}
+)
 
 func NewRankNUnifier() *RankNUnifier                         { return &RankNUnifier{} }
 func NewDependentUnifier() *DependentUnifier                 { return &DependentUnifier{} }
@@ -135,7 +138,7 @@ func NewLinearUnifier() *LinearUnifier                       { return &LinearUni
 func NewRefinementUnifier() *RefinementUnifier               { return &RefinementUnifier{} }
 func NewAdvancedConstraintSolver() *AdvancedConstraintSolver { return &AdvancedConstraintSolver{} }
 
-// Unification methods for each specialized unifier
+// Unification methods for each specialized unifier.
 func (ru *RankNUnifier) Unify(type1, type2 *RankNType) (*UnificationResult, error) {
 	if type1 == nil || type2 == nil {
 		return &UnificationResult{
@@ -144,7 +147,7 @@ func (ru *RankNUnifier) Unify(type1, type2 *RankNType) (*UnificationResult, erro
 		}, nil
 	}
 
-	// Check rank compatibility
+	// Check rank compatibility.
 	if type1.Rank != type2.Rank {
 		return &UnificationResult{
 			Success:      false,
@@ -152,7 +155,7 @@ func (ru *RankNUnifier) Unify(type1, type2 *RankNType) (*UnificationResult, erro
 		}, nil
 	}
 
-	// Unify quantifiers
+	// Unify quantifiers.
 	if len(type1.Quantifiers) != len(type2.Quantifiers) {
 		return &UnificationResult{
 			Success:      false,
@@ -172,7 +175,7 @@ func (ru *RankNUnifier) Unify(type1, type2 *RankNType) (*UnificationResult, erro
 			}, nil
 		}
 
-		// Create substitution for type variables
+		// Create substitution for type variables.
 		if q1.Variable.Name != q2.Variable.Name {
 			substitutions[q2.Variable] = TypeInfo{
 				ID:   TypeID(q1.Variable.ID),
@@ -182,7 +185,7 @@ func (ru *RankNUnifier) Unify(type1, type2 *RankNType) (*UnificationResult, erro
 		}
 	}
 
-	// Unify body types with substitutions applied
+	// Unify body types with substitutions applied.
 	bodyResult, err := ru.unifyWithSubstitution(type1.Body, type2.Body, substitutions)
 	if err != nil {
 		return &UnificationResult{
@@ -204,7 +207,7 @@ func (ru *RankNUnifier) Unify(type1, type2 *RankNType) (*UnificationResult, erro
 }
 
 func (ru *RankNUnifier) unifyWithSubstitution(type1, type2 TypeInfo, subs map[TypeVariable]TypeInfo) (*UnificationResult, error) {
-	// Apply substitutions to types before unification
+	// Apply substitutions to types before unification.
 	appliedType1 := ru.applySubstitutions(type1, subs)
 	appliedType2 := ru.applySubstitutions(type2, subs)
 
@@ -219,7 +222,7 @@ func (ru *RankNUnifier) unifyWithSubstitution(type1, type2 TypeInfo, subs map[Ty
 }
 
 func (ru *RankNUnifier) applySubstitutions(t TypeInfo, subs map[TypeVariable]TypeInfo) TypeInfo {
-	// This is a simplified version - a full implementation would recursively apply substitutions
+	// This is a simplified version - a full implementation would recursively apply substitutions.
 	return t
 }
 
@@ -231,7 +234,7 @@ func (du *DependentUnifier) Unify(type1, type2 *DependentType) (*UnificationResu
 		}, nil
 	}
 
-	// Check universe level compatibility
+	// Check universe level compatibility.
 	if type1.Universe != type2.Universe {
 		return &UnificationResult{
 			Success:      false,
@@ -239,7 +242,7 @@ func (du *DependentUnifier) Unify(type1, type2 *DependentType) (*UnificationResu
 		}, nil
 	}
 
-	// Unify dependencies
+	// Unify dependencies.
 	if type1.Dependency.Kind != type2.Dependency.Kind {
 		return &UnificationResult{
 			Success:      false,
@@ -254,7 +257,7 @@ func (du *DependentUnifier) Unify(type1, type2 *DependentType) (*UnificationResu
 		}, nil
 	}
 
-	// Unify constructors
+	// Unify constructors.
 	if type1.Constructor.Name != type2.Constructor.Name {
 		return &UnificationResult{
 			Success:      false,
@@ -269,7 +272,7 @@ func (du *DependentUnifier) Unify(type1, type2 *DependentType) (*UnificationResu
 		}, nil
 	}
 
-	// Unify constructor parameters
+	// Unify constructor parameters.
 	for i, param1 := range type1.Constructor.Parameters {
 		param2 := type2.Constructor.Parameters[i]
 		if param1.Name != param2.Name {
@@ -279,7 +282,7 @@ func (du *DependentUnifier) Unify(type1, type2 *DependentType) (*UnificationResu
 			}, nil
 		}
 
-		// Unify parameter types
+		// Unify parameter types.
 		if param1.Type.Kind != param2.Type.Kind || param1.Type.Name != param2.Type.Name {
 			return &UnificationResult{
 				Success:      false,
@@ -288,7 +291,7 @@ func (du *DependentUnifier) Unify(type1, type2 *DependentType) (*UnificationResu
 		}
 	}
 
-	// Unify indices
+	// Unify indices.
 	if len(type1.Indices) != len(type2.Indices) {
 		return &UnificationResult{
 			Success:      false,
@@ -315,7 +318,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 		}, nil
 	}
 
-	// Check purity compatibility
+	// Check purity compatibility.
 	if type1.Purity != type2.Purity {
 		return &UnificationResult{
 			Success:      false,
@@ -323,7 +326,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 		}, nil
 	}
 
-	// Unify regions
+	// Unify regions.
 	if type1.Region.Kind != type2.Region.Kind {
 		return &UnificationResult{
 			Success:      false,
@@ -338,7 +341,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 		}, nil
 	}
 
-	// Unify effects - check if all effects from type1 are compatible with type2
+	// Unify effects - check if all effects from type1 are compatible with type2.
 	effectMap2 := make(map[string]AdvancedEffect)
 	for _, effect := range type2.Effects {
 		effectMap2[effect.Name] = effect
@@ -356,7 +359,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 			}, nil
 		}
 
-		// Unify effect kinds
+		// Unify effect kinds.
 		if effect1.Kind != effect2.Kind {
 			return &UnificationResult{
 				Success:      false,
@@ -364,7 +367,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 			}, nil
 		}
 
-		// Unify effect parameters
+		// Unify effect parameters.
 		if len(effect1.Parameters) != len(effect2.Parameters) {
 			return &UnificationResult{
 				Success:      false,
@@ -382,7 +385,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 			}
 		}
 
-		// Unify effect operations
+		// Unify effect operations.
 		if len(effect1.Operations) != len(effect2.Operations) {
 			return &UnificationResult{
 				Success:      false,
@@ -404,7 +407,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 				}, nil
 			}
 
-			// Unify operation return types
+			// Unify operation return types.
 			if op1.ReturnType.Kind != op2.ReturnType.Kind || op1.ReturnType.Name != op2.ReturnType.Name {
 				return &UnificationResult{
 					Success:      false,
@@ -413,7 +416,7 @@ func (eu *AdvancedEffectUnifier) Unify(type1, type2 *AdvancedEffectType) (*Unifi
 			}
 		}
 
-		// Check effect attributes compatibility
+		// Check effect attributes compatibility.
 		if effect1.Attributes.Atomic != effect2.Attributes.Atomic {
 			return &UnificationResult{
 				Success:      false,
@@ -438,7 +441,7 @@ func (lu *LinearUnifier) Unify(type1, type2 *LinearType) (*UnificationResult, er
 		}, nil
 	}
 
-	// Check usage compatibility
+	// Check usage compatibility.
 	if type1.Usage != type2.Usage {
 		return &UnificationResult{
 			Success:      false,
@@ -446,7 +449,7 @@ func (lu *LinearUnifier) Unify(type1, type2 *LinearType) (*UnificationResult, er
 		}, nil
 	}
 
-	// Check multiplicity compatibility
+	// Check multiplicity compatibility.
 	if type1.Multiplicity.Min != type2.Multiplicity.Min || type1.Multiplicity.Max != type2.Multiplicity.Max {
 		return &UnificationResult{
 			Success:      false,
@@ -454,7 +457,7 @@ func (lu *LinearUnifier) Unify(type1, type2 *LinearType) (*UnificationResult, er
 		}, nil
 	}
 
-	// Unify base types
+	// Unify base types.
 	if type1.BaseType.Kind != type2.BaseType.Kind || type1.BaseType.Name != type2.BaseType.Name {
 		return &UnificationResult{
 			Success:      false,
@@ -462,7 +465,7 @@ func (lu *LinearUnifier) Unify(type1, type2 *LinearType) (*UnificationResult, er
 		}, nil
 	}
 
-	// Check region compatibility
+	// Check region compatibility.
 	if type1.Region.Name != type2.Region.Name {
 		return &UnificationResult{
 			Success:      false,
@@ -477,11 +480,11 @@ func (lu *LinearUnifier) Unify(type1, type2 *LinearType) (*UnificationResult, er
 		}, nil
 	}
 
-	// Check access permissions compatibility
+	// Check access permissions compatibility.
 	access1 := type1.Region.Access
 	access2 := type2.Region.Access
 
-	// Linear types require compatible access permissions
+	// Linear types require compatible access permissions.
 	if access1.Read != access2.Read || access1.Write != access2.Write ||
 		access1.Move != access2.Move || access1.Borrow != access2.Borrow {
 		return &UnificationResult{
@@ -493,7 +496,7 @@ func (lu *LinearUnifier) Unify(type1, type2 *LinearType) (*UnificationResult, er
 	constraints := []TypeConstraint{}
 	substitutions := make(map[TypeVariable]TypeInfo)
 
-	// Add linear constraints for resource tracking
+	// Add linear constraints for resource tracking.
 	for _, constraint1 := range type1.Constraints {
 		constraints = append(constraints, TypeConstraint{
 			Kind:      HirConstraintKindPredicate,
@@ -518,7 +521,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 		}, nil
 	}
 
-	// Unify base types first
+	// Unify base types first.
 	if type1.BaseType.Kind != type2.BaseType.Kind || type1.BaseType.Name != type2.BaseType.Name {
 		return &UnificationResult{
 			Success:      false,
@@ -526,7 +529,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 		}, nil
 	}
 
-	// Check refinement compatibility
+	// Check refinement compatibility.
 	if len(type1.Refinements) != len(type2.Refinements) {
 		return &UnificationResult{
 			Success:      false,
@@ -537,7 +540,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 	constraints := []TypeConstraint{}
 	substitutions := make(map[TypeVariable]TypeInfo)
 
-	// Unify refinements
+	// Unify refinements.
 	for i, ref1 := range type1.Refinements {
 		ref2 := type2.Refinements[i]
 
@@ -563,7 +566,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 		}
 	}
 
-	// Check proof obligation compatibility
+	// Check proof obligation compatibility.
 	if type1.Proof.Status != type2.Proof.Status {
 		return &UnificationResult{
 			Success:      false,
@@ -571,7 +574,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 		}, nil
 	}
 
-	// Unify proof goals
+	// Unify proof goals.
 	if len(type1.Proof.Goals) != len(type2.Proof.Goals) {
 		return &UnificationResult{
 			Success:      false,
@@ -579,7 +582,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 		}, nil
 	}
 
-	// Unify refinement contexts
+	// Unify refinement contexts.
 	if len(type1.Context.Assumptions) != len(type2.Context.Assumptions) {
 		return &UnificationResult{
 			Success:      false,
@@ -594,7 +597,7 @@ func (ru *RefinementUnifier) Unify(type1, type2 *RefinementType) (*UnificationRe
 		}, nil
 	}
 
-	// Add proof obligations as constraints
+	// Add proof obligations as constraints.
 	for i := range type1.Proof.Goals {
 		constraints = append(constraints, TypeConstraint{
 			Kind:      HirConstraintKindPredicate,

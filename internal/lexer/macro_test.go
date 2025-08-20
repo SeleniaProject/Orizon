@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// TestMacroTokens tests lexer support for macro-related tokens
+// TestMacroTokens tests lexer support for macro-related tokens.
 func TestMacroTokens(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -92,14 +92,14 @@ func TestMacroTokens(t *testing.T) {
 	}
 }
 
-// TestMacroKeywordRecognition tests that 'macro' is recognized as a keyword
+// TestMacroKeywordRecognition tests that 'macro' is recognized as a keyword.
 func TestMacroKeywordRecognition(t *testing.T) {
 	input := "macro test_macro func"
 	l := New(input)
 
 	tests := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
 		{TokenMacro, "macro"},
 		{TokenIdentifier, "test_macro"},
@@ -124,12 +124,12 @@ func TestMacroKeywordRecognition(t *testing.T) {
 	t.Log("✅ Macro keyword recognition test passed")
 }
 
-// TestMacroInvokeOperator tests the macro invocation operator recognition
+// TestMacroInvokeOperator tests the macro invocation operator recognition.
 func TestMacroInvokeOperator(t *testing.T) {
 	input := "ident!("
 	l := New(input)
 
-	// Should get: IDENT, MACRO_INVOKE, LPAREN, EOF
+	// Should get: IDENT, MACRO_INVOKE, LPAREN, EOF.
 	tok1 := l.NextToken()
 	if tok1.Type != TokenIdentifier || tok1.Literal != "ident" {
 		t.Errorf("Expected TokenIdentifier 'ident', got %v %q", tok1.Type, tok1.Literal)

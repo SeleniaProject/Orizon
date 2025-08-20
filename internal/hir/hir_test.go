@@ -1,5 +1,5 @@
-// HIR package tests for the Orizon programming language
-// This file provides comprehensive tests for HIR construction, conversion, and verification
+// HIR package tests for the Orizon programming language.
+// This file provides comprehensive tests for HIR construction, conversion, and verification.
 
 package hir
 
@@ -10,7 +10,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// Test HIR program creation
+// Test HIR program creation.
 func TestHIRProgramCreation(t *testing.T) {
 	program := NewHIRProgram()
 
@@ -39,7 +39,7 @@ func TestHIRProgramCreation(t *testing.T) {
 	}
 }
 
-// Test global type information initialization
+// Test global type information initialization.
 func TestGlobalTypeInfoInitialization(t *testing.T) {
 	typeInfo := NewGlobalTypeInfo()
 
@@ -47,7 +47,7 @@ func TestGlobalTypeInfoInitialization(t *testing.T) {
 		t.Fatal("NewGlobalTypeInfo() returned nil")
 	}
 
-	// Check primitive types are initialized
+	// Check primitive types are initialized.
 	requiredPrimitives := []string{"void", "bool", "i32", "f64", "string"}
 
 	for _, prim := range requiredPrimitives {
@@ -56,7 +56,7 @@ func TestGlobalTypeInfoInitialization(t *testing.T) {
 		}
 	}
 
-	// Check type consistency
+	// Check type consistency.
 	for name, id := range typeInfo.Primitives {
 		if typ, exists := typeInfo.Types[id]; !exists {
 			t.Errorf("Type %s has ID %d but no corresponding type info", name, id)
@@ -66,7 +66,7 @@ func TestGlobalTypeInfoInitialization(t *testing.T) {
 	}
 }
 
-// Test HIR type builder
+// Test HIR type builder.
 func TestHIRTypeBuilder(t *testing.T) {
 	program := NewHIRProgram()
 	builder := NewHIRTypeBuilder(program)
@@ -76,7 +76,7 @@ func TestHIRTypeBuilder(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 4},
 	}
 
-	// Test basic type creation
+	// Test basic type creation.
 	intType := builder.BuildBasicType("i32", span)
 	if intType == nil {
 		t.Fatal("BuildBasicType returned nil")
@@ -86,7 +86,7 @@ func TestHIRTypeBuilder(t *testing.T) {
 		t.Errorf("Expected type name i32, got %s", intType.Name)
 	}
 
-	// Test array type creation
+	// Test array type creation.
 	arrayType := builder.BuildArrayType(intType, nil, span)
 	if arrayType == nil {
 		t.Fatal("BuildArrayType returned nil")
@@ -96,7 +96,7 @@ func TestHIRTypeBuilder(t *testing.T) {
 		t.Error("Array element type not set correctly")
 	}
 
-	// Test pointer type creation
+	// Test pointer type creation.
 	ptrType := builder.BuildPointerType(intType, false, span)
 	if ptrType == nil {
 		t.Fatal("BuildPointerType returned nil")
@@ -111,11 +111,11 @@ func TestHIRTypeBuilder(t *testing.T) {
 	}
 }
 
-// Test AST to HIR conversion
+// Test AST to HIR conversion.
 func TestASTToHIRConversion(t *testing.T) {
 	converter := NewASTToHIRConverter()
 
-	// Create a simple AST program
+	// Create a simple AST program.
 	astProgram := &ast.Program{
 		Span: position.Span{
 			Start: position.Position{Line: 1, Column: 1},
@@ -124,7 +124,7 @@ func TestASTToHIRConversion(t *testing.T) {
 		Declarations: []ast.Declaration{},
 	}
 
-	// Convert to HIR
+	// Convert to HIR.
 	hirProgram, errors := converter.ConvertProgram(astProgram)
 
 	if hirProgram == nil {
@@ -135,7 +135,7 @@ func TestASTToHIRConversion(t *testing.T) {
 		t.Errorf("Conversion had %d errors: %v", len(errors), errors)
 	}
 
-	// Check basic structure
+	// Check basic structure.
 	if hirProgram.ID == 0 {
 		t.Error("HIR program should have non-zero ID")
 	}
@@ -144,7 +144,7 @@ func TestASTToHIRConversion(t *testing.T) {
 		t.Error("HIR program should have at least one module")
 	}
 
-	// Check main module
+	// Check main module.
 	mainModule, exists := hirProgram.Modules[1]
 	if !exists {
 		t.Fatal("HIR program should have main module with ID 1")
@@ -155,11 +155,11 @@ func TestASTToHIRConversion(t *testing.T) {
 	}
 }
 
-// Test HIR function declaration conversion
+// Test HIR function declaration conversion.
 func TestHIRFunctionDeclarationConversion(t *testing.T) {
 	converter := NewASTToHIRConverter()
 
-	// Create AST function declaration
+	// Create AST function declaration.
 	astFunc := &ast.FunctionDeclaration{
 		Span: position.Span{
 			Start: position.Position{Line: 1, Column: 1},
@@ -180,14 +180,14 @@ func TestHIRFunctionDeclarationConversion(t *testing.T) {
 		},
 	}
 
-	// Convert function declaration
+	// Convert function declaration.
 	hirFunc := converter.convertFunctionDeclaration(astFunc)
 
 	if hirFunc == nil {
 		t.Fatal("convertFunctionDeclaration returned nil")
 	}
 
-	// Type assert to HIRFunctionDeclaration to access fields
+	// Type assert to HIRFunctionDeclaration to access fields.
 	funcDecl, ok := hirFunc.(*HIRFunctionDeclaration)
 	if !ok {
 		t.Fatal("Expected HIRFunctionDeclaration")
@@ -210,11 +210,11 @@ func TestHIRFunctionDeclarationConversion(t *testing.T) {
 	}
 }
 
-// Test HIR variable declaration conversion
+// Test HIR variable declaration conversion.
 func TestHIRVariableDeclarationConversion(t *testing.T) {
 	converter := NewASTToHIRConverter()
 
-	// Create AST variable declaration
+	// Create AST variable declaration.
 	astVar := &ast.VariableDeclaration{
 		Span: position.Span{
 			Start: position.Position{Line: 1, Column: 1},
@@ -238,14 +238,14 @@ func TestHIRVariableDeclarationConversion(t *testing.T) {
 		IsMutable: false,
 	}
 
-	// Convert variable declaration
+	// Convert variable declaration.
 	hirVar := converter.convertVariableDeclaration(astVar)
 
 	if hirVar == nil {
 		t.Fatal("convertVariableDeclaration returned nil")
 	}
 
-	// Type assert to HIRVariableDeclaration to access fields
+	// Type assert to HIRVariableDeclaration to access fields.
 	varDecl, ok := hirVar.(*HIRVariableDeclaration)
 	if !ok {
 		t.Fatal("Expected HIRVariableDeclaration")
@@ -268,11 +268,11 @@ func TestHIRVariableDeclarationConversion(t *testing.T) {
 	}
 }
 
-// Test HIR expression conversion
+// Test HIR expression conversion.
 func TestHIRExpressionConversion(t *testing.T) {
 	converter := NewASTToHIRConverter()
 
-	// Test literal conversion
+	// Test literal conversion.
 	astLit := &ast.Literal{
 		Span:  position.Span{Start: position.Position{Line: 1, Column: 1}, End: position.Position{Line: 1, Column: 3}},
 		Kind:  ast.LiteralInteger,
@@ -286,7 +286,7 @@ func TestHIRExpressionConversion(t *testing.T) {
 		t.Fatal("convertLiteral returned nil")
 	}
 
-	// Type assert to HIRLiteral to access fields
+	// Type assert to HIRLiteral to access fields.
 	litExpr, ok := hirLit.(*HIRLiteral)
 	if !ok {
 		t.Fatal("Expected HIRLiteral")
@@ -296,13 +296,13 @@ func TestHIRExpressionConversion(t *testing.T) {
 		t.Errorf("Expected literal value 42, got %v", litExpr.Value)
 	}
 
-	// Test identifier conversion
+	// Test identifier conversion.
 	astId := &ast.Identifier{
 		Span:  position.Span{Start: position.Position{Line: 1, Column: 1}, End: position.Position{Line: 1, Column: 2}},
 		Value: "x",
 	}
 
-	// Add symbol to symbol table first
+	// Add symbol to symbol table first.
 	converter.symbolTable.AddSymbol("x", &Symbol{
 		Name: "x",
 		Type: TypeInfo{Kind: TypeKindInteger, Name: "i32"},
@@ -315,7 +315,7 @@ func TestHIRExpressionConversion(t *testing.T) {
 		t.Fatal("convertIdentifier returned nil")
 	}
 
-	// Type assert to HIRIdentifier to access fields
+	// Type assert to HIRIdentifier to access fields.
 	idExpr, ok := hirId.(*HIRIdentifier)
 	if !ok {
 		t.Fatal("Expected HIRIdentifier")
@@ -326,11 +326,11 @@ func TestHIRExpressionConversion(t *testing.T) {
 	}
 }
 
-// Test HIR binary expression conversion
+// Test HIR binary expression conversion.
 func TestHIRBinaryExpressionConversion(t *testing.T) {
 	converter := NewASTToHIRConverter()
 
-	// Create AST binary expression (1 + 2)
+	// Create AST binary expression (1 + 2).
 	astBin := &ast.BinaryExpression{
 		Span: position.Span{
 			Start: position.Position{Line: 1, Column: 1},
@@ -357,7 +357,7 @@ func TestHIRBinaryExpressionConversion(t *testing.T) {
 		t.Fatal("convertBinaryExpression returned nil")
 	}
 
-	// Type assert to HIRBinaryExpression to access fields
+	// Type assert to HIRBinaryExpression to access fields.
 	binExpr, ok := hirBin.(*HIRBinaryExpression)
 	if !ok {
 		t.Fatal("Expected HIRBinaryExpression")
@@ -376,14 +376,14 @@ func TestHIRBinaryExpressionConversion(t *testing.T) {
 	}
 }
 
-// Test HIR verification
+// Test HIR verification.
 func TestHIRVerification(t *testing.T) {
 	verifier := NewHIRVerifier()
 
-	// Create a valid HIR program
+	// Create a valid HIR program.
 	program := NewHIRProgram()
 
-	// Create main module
+	// Create main module.
 	mainModule := &HIRModule{
 		ID:           generateNodeID(),
 		ModuleID:     1,
@@ -400,22 +400,22 @@ func TestHIRVerification(t *testing.T) {
 
 	program.Modules[1] = mainModule
 
-	// Verify program
+	// Verify program.
 	errors, warnings := verifier.VerifyProgram(program)
 
 	if len(errors) > 0 {
 		t.Errorf("Valid HIR program should have no errors, got %d: %v", len(errors), errors)
 	}
 
-	// Warnings are acceptable for minimal programs
+	// Warnings are acceptable for minimal programs.
 	t.Logf("Verification completed with %d warnings", len(warnings))
 }
 
-// Test HIR verification with errors
+// Test HIR verification with errors.
 func TestHIRVerificationWithErrors(t *testing.T) {
 	verifier := NewHIRVerifier()
 
-	// Create an invalid HIR program (nil modules)
+	// Create an invalid HIR program (nil modules).
 	program := &HIRProgram{
 		ID:         generateNodeID(),
 		Modules:    nil, // This should cause an error
@@ -429,7 +429,7 @@ func TestHIRVerificationWithErrors(t *testing.T) {
 		},
 	}
 
-	// Verify program
+	// Verify program.
 	errors, _ := verifier.VerifyProgram(program)
 
 	if len(errors) == 0 {
@@ -439,15 +439,15 @@ func TestHIRVerificationWithErrors(t *testing.T) {
 	t.Logf("Found expected errors: %d", len(errors))
 }
 
-// Test effect set operations
+// Test effect set operations.
 func TestEffectSetOperations(t *testing.T) {
-	// Test empty effect set
+	// Test empty effect set.
 	effects1 := NewEffectSet()
 	if !effects1.Pure {
 		t.Error("New effect set should be pure")
 	}
 
-	// Test adding effect
+	// Test adding effect.
 	effect := Effect{
 		ID:          1,
 		Kind:        EffectKindMemoryRead,
@@ -466,7 +466,7 @@ func TestEffectSetOperations(t *testing.T) {
 		t.Error("Effect set should contain added effect")
 	}
 
-	// Test effect union
+	// Test effect union.
 	effects2 := NewEffectSet()
 	effect2 := Effect{
 		ID:          2,
@@ -492,12 +492,12 @@ func TestEffectSetOperations(t *testing.T) {
 	}
 }
 
-// Test region set operations
+// Test region set operations.
 func TestRegionSetOperations(t *testing.T) {
-	// Test empty region set
+	// Test empty region set.
 	regions1 := NewRegionSet()
 
-	// Test adding region
+	// Test adding region.
 	region := Region{
 		ID:   1,
 		Kind: RegionKindStack,
@@ -521,7 +521,7 @@ func TestRegionSetOperations(t *testing.T) {
 		t.Error("Region set should contain added region")
 	}
 
-	// Test region union
+	// Test region union.
 	regions2 := NewRegionSet()
 	region2 := Region{
 		ID:   2,
@@ -548,49 +548,49 @@ func TestRegionSetOperations(t *testing.T) {
 	}
 }
 
-// Test type assignability
+// Test type assignability.
 func TestTypeAssignability(t *testing.T) {
-	// Create type infos
+	// Create type infos.
 	i32Type := TypeInfo{ID: 1, Kind: TypeKindInteger, Name: "i32", Size: 4}
 	i64Type := TypeInfo{ID: 2, Kind: TypeKindInteger, Name: "i64", Size: 8}
 	boolType := TypeInfo{ID: 3, Kind: TypeKindBoolean, Name: "bool", Size: 1}
 
-	// Test same type assignability
+	// Test same type assignability.
 	if !IsAssignableTo(i32Type, i32Type) {
 		t.Error("Same types should be assignable")
 	}
 
-	// Test integer widening
+	// Test integer widening.
 	if !IsAssignableTo(i32Type, i64Type) {
 		t.Error("i32 should be assignable to i64")
 	}
 
-	// Test incompatible types
+	// Test incompatible types.
 	if IsAssignableTo(boolType, i32Type) {
 		t.Error("bool should not be assignable to i32")
 	}
 }
 
-// Test common type resolution
+// Test common type resolution.
 func TestCommonTypeResolution(t *testing.T) {
 	i32Type := TypeInfo{ID: 1, Kind: TypeKindInteger, Name: "i32", Size: 4}
 	i64Type := TypeInfo{ID: 2, Kind: TypeKindInteger, Name: "i64", Size: 8}
 	f64Type := TypeInfo{ID: 3, Kind: TypeKindFloat, Name: "f64", Size: 8}
 
-	// Test integer promotion
+	// Test integer promotion.
 	common := GetCommonType(i32Type, i64Type)
 	if common.ID != i64Type.ID {
 		t.Errorf("Common type of i32 and i64 should be i64, got %s", common.Name)
 	}
 
-	// Test float promotion
+	// Test float promotion.
 	common = GetCommonType(i32Type, f64Type)
 	if common.ID != f64Type.ID {
 		t.Errorf("Common type of i32 and f64 should be f64, got %s", common.Name)
 	}
 }
 
-// Benchmark HIR program creation
+// Benchmark HIR program creation.
 func BenchmarkHIRProgramCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		program := NewHIRProgram()
@@ -598,9 +598,9 @@ func BenchmarkHIRProgramCreation(b *testing.B) {
 	}
 }
 
-// Benchmark AST to HIR conversion
+// Benchmark AST to HIR conversion.
 func BenchmarkASTToHIRConversion(b *testing.B) {
-	// Create a simple AST program
+	// Create a simple AST program.
 	astProgram := &ast.Program{
 		Span: position.Span{
 			Start: position.Position{Line: 1, Column: 1},
@@ -617,9 +617,9 @@ func BenchmarkASTToHIRConversion(b *testing.B) {
 	}
 }
 
-// Benchmark HIR verification
+// Benchmark HIR verification.
 func BenchmarkHIRVerification(b *testing.B) {
-	// Create a HIR program
+	// Create a HIR program.
 	program := NewHIRProgram()
 	mainModule := &HIRModule{
 		ID:           generateNodeID(),

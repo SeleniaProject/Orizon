@@ -4,12 +4,12 @@ import (
 	"testing"
 )
 
-// TestPhase243ResourceTypes validates Phase 2.4.3 Resource Types implementation
+// TestPhase243ResourceTypes validates Phase 2.4.3 Resource Types implementation.
 func TestPhase243ResourceTypes(t *testing.T) {
 	t.Log("Phase 2.4.3: Resource Types - File, network, and other managed resources with automatic cleanup and monitoring")
 
 	t.Run("ResourceTypeDefinition", func(t *testing.T) {
-		// Test basic resource type creation using existing type definitions
+		// Test basic resource type creation using existing type definitions.
 		resourceType := ResourceType{
 			ID: TypeID(1001),
 		}
@@ -20,7 +20,7 @@ func TestPhase243ResourceTypes(t *testing.T) {
 	})
 
 	t.Run("ResourceCleanupMechanisms", func(t *testing.T) {
-		// Test automatic cleanup mechanisms
+		// Test automatic cleanup mechanisms.
 		cleanup := ResourceCleanup{
 			Automatic: true,
 			Strategy:  CleanupStrategyOnExit,
@@ -29,13 +29,14 @@ func TestPhase243ResourceTypes(t *testing.T) {
 		if !cleanup.Automatic {
 			t.Error("Automatic cleanup validation failed")
 		}
+
 		if cleanup.Strategy != CleanupStrategyOnExit {
 			t.Error("Cleanup strategy validation failed")
 		}
 	})
 
 	t.Run("ResourceStates", func(t *testing.T) {
-		// Test resource state management
+		// Test resource state management.
 		states := []ResourceState{
 			ResourceStateCreated,
 			ResourceStateActive,
@@ -45,12 +46,13 @@ func TestPhase243ResourceTypes(t *testing.T) {
 		if len(states) != 3 {
 			t.Error("Resource states validation failed")
 		}
+
 		if states[0] != ResourceStateCreated {
 			t.Error("Resource state creation validation failed")
 		}
 	})
 
-	// Report completion
+	// Report completion.
 	t.Log("✅ Resource type definition with lifecycle management implemented")
 	t.Log("✅ File, network, and database resource support implemented")
 	t.Log("✅ Automatic cleanup with multiple strategies implemented")

@@ -6,18 +6,18 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// =============================================================================
-// Advanced Type Interface System
-// =============================================================================
+// =============================================================================.
+// Advanced Type Interface System.
+// =============================================================================.
 
-// AdvancedTypeInfo represents the interface for all advanced types
+// AdvancedTypeInfo represents the interface for all advanced types.
 type AdvancedTypeInfo interface {
 	TypeInfo() TypeInfo
 	GetAdvancedKind() AdvancedTypeKind
 	IsAdvanced() bool
 }
 
-// AdvancedTypeKind represents different kinds of advanced types
+// AdvancedTypeKind represents different kinds of advanced types.
 type AdvancedTypeKind int
 
 const (
@@ -28,7 +28,7 @@ const (
 	AdvancedTypeRefinement
 )
 
-// Helper function to check if a TypeInfo is an advanced type
+// Helper function to check if a TypeInfo is an advanced type.
 func IsAdvancedType(t TypeInfo) (AdvancedTypeInfo, bool) {
 	if t.StructInfo != nil && t.StructInfo.Extensions != nil {
 		if at, ok := t.StructInfo.Extensions["advanced"]; ok {
@@ -37,10 +37,11 @@ func IsAdvancedType(t TypeInfo) (AdvancedTypeInfo, bool) {
 			}
 		}
 	}
+
 	return nil, false
 }
 
-// QuantifierScope defines where type quantification applies
+// QuantifierScope defines where type quantification applies.
 type QuantifierScope int
 
 const (
@@ -50,18 +51,18 @@ const (
 	QuantifierScopeRankN
 )
 
-// =============================================================================
-// Rank-N Types (Higher-Rank Polymorphism)
-// =============================================================================
+// =============================================================================.
+// Rank-N Types (Higher-Rank Polymorphism).
+// =============================================================================.
 
-// RankNType represents a higher-rank polymorphic type
+// RankNType represents a higher-rank polymorphic type.
 type RankNType struct {
+	Context     *PolymorphicContext
+	Body        TypeInfo
+	Quantifiers []TypeQuantifier
+	Constraints []RankConstraint
 	ID          TypeID
 	Rank        int
-	Quantifiers []TypeQuantifier
-	Body        TypeInfo
-	Constraints []RankConstraint
-	Context     *PolymorphicContext
 }
 
 func (rnt *RankNType) TypeInfo() TypeInfo {
@@ -85,26 +86,26 @@ func (rnt *RankNType) IsAdvanced() bool {
 	return true
 }
 
-// TypeQuantifier represents a quantified type variable
+// TypeQuantifier represents a quantified type variable.
 type TypeQuantifier struct {
+	Constraints []TypeConstraint
 	Variable    TypeVariable
 	Kind        TypeKind
 	Scope       QuantifierScope
-	Constraints []TypeConstraint
 }
 
-// RankConstraint represents constraints in rank-N types
+// RankConstraint represents constraints in rank-N types.
 type RankConstraint struct {
-	Kind        RankConstraintKind
-	Variable    TypeVariable
 	Type        TypeInfo
-	MinRank     int
-	MaxRank     int
 	Requirement string
 	Context     string
+	Variable    TypeVariable
+	Kind        RankConstraintKind
+	MinRank     int
+	MaxRank     int
 }
 
-// RankConstraintKind represents different kinds of rank constraints
+// RankConstraintKind represents different kinds of rank constraints.
 type RankConstraintKind int
 
 const (
@@ -114,7 +115,7 @@ const (
 	RankConstraintPolymorphic
 )
 
-// TypeClassInstance represents an instance of a type class
+// TypeClassInstance represents an instance of a type class.
 type TypeClassInstance struct {
 	ClassName   string              // Name of the type class
 	TypeArgs    []TypeInfo          // Type arguments for the instance
@@ -122,36 +123,36 @@ type TypeClassInstance struct {
 	Constraints []TypeConstraint    // Additional constraints
 }
 
-// PolymorphicContext tracks type instantiation context
+// PolymorphicContext tracks type instantiation context.
 type PolymorphicContext struct {
-	Level          int
 	Instantiations map[TypeVariable]TypeInfo
-	Skolems        []SkolemVariable
 	Evidence       map[string]*TypeClassInstance
+	Skolems        []SkolemVariable
+	Level          int
 }
 
-// SkolemVariable represents a skolem constant for type checking
+// SkolemVariable represents a skolem constant for type checking.
 type SkolemVariable struct {
 	Name   string
-	Kind   TypeKind
 	Origin TypeVariable
+	Kind   TypeKind
 	Scope  ScopeLevel
 }
 
-// ScopeLevel represents nesting level in type checking
+// ScopeLevel represents nesting level in type checking.
 type ScopeLevel int
 
-// =============================================================================
-// Dependent Types
-// =============================================================================
+// =============================================================================.
+// Dependent Types.
+// =============================================================================.
 
-// DependentType represents a type that depends on values
+// DependentType represents a type that depends on values.
 type DependentType struct {
-	ID          TypeID
-	Dependency  ValueDependency
 	Constructor DependentConstructor
-	Eliminator  DependentEliminator
+	Dependency  ValueDependency
 	Indices     []DependentIndex
+	Eliminator  DependentEliminator
+	ID          TypeID
 	Universe    UniverseLevel
 }
 
@@ -176,15 +177,15 @@ func (dt *DependentType) IsAdvanced() bool {
 	return true
 }
 
-// ValueDependency represents a dependency on a value
+// ValueDependency represents a dependency on a value.
 type ValueDependency struct {
-	Kind       DependencyKind
 	Expression HIRExpression
-	Variable   string
 	Constraint DependencyConstraint
+	Variable   string
+	Kind       DependencyKind
 }
 
-// DependencyKind represents different kinds of value dependencies
+// DependencyKind represents different kinds of value dependencies.
 type DependencyKind int
 
 const (
@@ -195,24 +196,24 @@ const (
 	DependencyProperty
 )
 
-// DependentConstructor represents type construction rules
+// DependentConstructor represents type construction rules.
 type DependentConstructor struct {
+	Body       TypeInfo
 	Name       string
 	Parameters []DependentParameter
 	Conditions []ConstructorCondition
-	Body       TypeInfo
 }
 
-// DependentParameter represents a parameter in dependent type construction
+// DependentParameter represents a parameter in dependent type construction.
 type DependentParameter struct {
-	Name        string
 	Type        TypeInfo
+	Name        string
+	Constraints []DependentConstraint
 	IsImplicit  bool
 	IsErased    bool
-	Constraints []DependentConstraint
 }
 
-// ParameterKind represents kinds of parameters
+// ParameterKind represents kinds of parameters.
 type ParameterKind int
 
 const (
@@ -222,7 +223,7 @@ const (
 	ParameterType
 )
 
-// DependentEliminator represents type elimination rules
+// DependentEliminator represents type elimination rules.
 type DependentEliminator struct {
 	Name      string
 	Motive    TypeInfo
@@ -230,29 +231,29 @@ type DependentEliminator struct {
 	Induction bool
 }
 
-// EliminationMethod represents a method for eliminating dependent types
+// EliminationMethod represents a method for eliminating dependent types.
 type EliminationMethod struct {
 	Constructor string
 	Body        HIRExpression
 	Type        TypeInfo
 }
 
-// DependentIndex represents an index in an indexed type family
+// DependentIndex represents an index in an indexed type family.
 type DependentIndex struct {
-	Name       string
-	Type       TypeInfo
 	Constraint IndexConstraint
+	Type       TypeInfo
+	Name       string
 }
 
-// DependentConstraint represents constraints in dependent types
+// DependentConstraint represents constraints in dependent types.
 type DependentConstraint struct {
-	Kind       DependentConstraintKind
 	Expression HIRExpression
 	Type       TypeInfo
 	Message    string
+	Kind       DependentConstraintKind
 }
 
-// DependentConstraintKind represents kinds of dependent constraints
+// DependentConstraintKind represents kinds of dependent constraints.
 type DependentConstraintKind int
 
 const (
@@ -263,18 +264,18 @@ const (
 	DependentConstraintUniqueness
 )
 
-// UniverseLevel represents type universe levels
+// UniverseLevel represents type universe levels.
 type UniverseLevel int
 
-// IndexConstraint represents constraints on type indices
+// IndexConstraint represents constraints on type indices.
 type IndexConstraint struct {
-	Kind       IndexConstraintKind
 	LowerBound *HIRExpression
 	UpperBound *HIRExpression
 	Predicate  *HIRExpression
+	Kind       IndexConstraintKind
 }
 
-// IndexConstraintKind represents kinds of index constraints
+// IndexConstraintKind represents kinds of index constraints.
 type IndexConstraintKind int
 
 const (
@@ -284,20 +285,20 @@ const (
 	IndexConstraintCountable
 )
 
-// ConstructorCondition represents conditions for type construction
+// ConstructorCondition represents conditions for type construction.
 type ConstructorCondition struct {
 	Condition HIRExpression
 	Error     string
 }
 
-// DependencyConstraint represents constraints on dependent values
+// DependencyConstraint represents constraints on dependent values.
 type DependencyConstraint struct {
-	Kind      DependencyConstraintKind
 	Predicate HIRExpression
 	Message   string
+	Kind      DependencyConstraintKind
 }
 
-// DependencyConstraintKind represents kinds of dependency constraints
+// DependencyConstraintKind represents kinds of dependency constraints.
 type DependencyConstraintKind int
 
 const (
@@ -307,19 +308,19 @@ const (
 	DependencyConstraintWellFounded
 )
 
-// =============================================================================
-// Effect Types
-// =============================================================================
+// =============================================================================.
+// Effect Types.
+// =============================================================================.
 
-// AdvancedEffectType represents computational effects in the type system
+// AdvancedEffectType represents computational effects in the type system.
 type AdvancedEffectType struct {
-	ID           TypeID
-	Effects      []AdvancedEffect
-	Purity       PurityLevel
 	Region       RegionInfo
+	Transform    EffectTransform
+	Effects      []AdvancedEffect
 	Capabilities []Capability
 	Handlers     []EffectHandler
-	Transform    EffectTransform
+	ID           TypeID
+	Purity       PurityLevel
 }
 
 func (aet *AdvancedEffectType) TypeInfo() TypeInfo {
@@ -343,17 +344,17 @@ func (aet *AdvancedEffectType) IsAdvanced() bool {
 	return true
 }
 
-// AdvancedEffect represents a single computational effect
+// AdvancedEffect represents a single computational effect.
 type AdvancedEffect struct {
 	Name       string
-	Kind       AdvancedEffectKind
 	Parameters []EffectParameter
 	Operations []EffectOperation
-	Attributes EffectAttributes
+	Kind       AdvancedEffectKind
 	Visibility EffectVisibility
+	Attributes EffectAttributes
 }
 
-// AdvancedEffectKind represents different kinds of advanced effects
+// AdvancedEffectKind represents different kinds of advanced effects.
 type AdvancedEffectKind int
 
 const (
@@ -369,15 +370,15 @@ const (
 	AdvancedEffectRandom
 )
 
-// EffectParameter represents parameters to effects
+// EffectParameter represents parameters to effects.
 type EffectParameter struct {
-	Name       string
-	Type       TypeInfo
-	IsImplicit bool
 	Default    *HIRExpression
+	Type       TypeInfo
+	Name       string
+	IsImplicit bool
 }
 
-// EffectOperation represents operations within an effect
+// EffectOperation represents operations within an effect.
 type EffectOperation struct {
 	Name        string
 	Parameters  []EffectParameter
@@ -386,7 +387,7 @@ type EffectOperation struct {
 	Semantics   OperationSemantics
 }
 
-// EffectAttributes represents attributes of effects
+// EffectAttributes represents attributes of effects.
 type EffectAttributes struct {
 	Commutative bool
 	Associative bool
@@ -395,7 +396,7 @@ type EffectAttributes struct {
 	Atomic      bool
 }
 
-// EffectVisibility represents effect visibility
+// EffectVisibility represents effect visibility.
 type EffectVisibility int
 
 const (
@@ -404,26 +405,26 @@ const (
 	EffectInternal
 )
 
-// EffectHandler represents a handler for effects
+// EffectHandler represents a handler for effects.
 type EffectHandler struct {
-	EffectName string
-	Effect     AdvancedEffect
 	Operations map[string]HIRExpression
 	Resume     *HIRExpression
 	Finally    *HIRExpression
+	EffectName string
 	Transform  HandlerTransform
+	Effect     AdvancedEffect
 }
 
-// EffectTransform represents effect transformations
+// EffectTransform represents effect transformations.
 type EffectTransform struct {
-	Kind       TransformKind
+	Transform  HIRExpression
 	Source     []AdvancedEffect
 	Target     []AdvancedEffect
-	Transform  HIRExpression
 	Conditions []TransformCondition
+	Kind       TransformKind
 }
 
-// TransformKind represents kinds of effect transformations
+// TransformKind represents kinds of effect transformations.
 type TransformKind int
 
 const (
@@ -433,14 +434,14 @@ const (
 	TransformSubstitution
 )
 
-// HandlerTransform represents handler transformations
+// HandlerTransform represents handler transformations.
 type HandlerTransform struct {
-	Kind       HandlerTransformKind
 	Transform  HIRExpression
 	Conditions []HandlerCondition
+	Kind       HandlerTransformKind
 }
 
-// HandlerTransformKind represents kinds of handler transformations
+// HandlerTransformKind represents kinds of handler transformations.
 type HandlerTransformKind int
 
 const (
@@ -449,15 +450,15 @@ const (
 	HandlerTransformBidirectional
 )
 
-// EffectConstraint represents constraints on effects
+// EffectConstraint represents constraints on effects.
 type EffectConstraint struct {
-	Kind       EffectConstraintKind
-	Effect     AdvancedEffect
 	Constraint HIRExpression
 	Message    string
+	Effect     AdvancedEffect
+	Kind       EffectConstraintKind
 }
 
-// EffectConstraintKind represents kinds of effect constraints
+// EffectConstraintKind represents kinds of effect constraints.
 type EffectConstraintKind int
 
 const (
@@ -467,7 +468,7 @@ const (
 	EffectConstraintResource
 )
 
-// OperationSemantics represents the semantics of effect operations
+// OperationSemantics represents the semantics of effect operations.
 type OperationSemantics struct {
 	Precondition  *HIRExpression
 	Postcondition *HIRExpression
@@ -475,32 +476,32 @@ type OperationSemantics struct {
 	Complexity    ComplexityBound
 }
 
-// TransformCondition represents conditions for effect transformations
+// TransformCondition represents conditions for effect transformations.
 type TransformCondition struct {
 	Condition HIRExpression
 	Message   string
 }
 
-// HandlerCondition represents conditions for handler transformations
+// HandlerCondition represents conditions for handler transformations.
 type HandlerCondition struct {
 	Condition HIRExpression
 	Message   string
 }
 
-// ComplexityBound represents computational complexity bounds
+// ComplexityBound represents computational complexity bounds.
 type ComplexityBound struct {
 	Time  ComplexityExpression
 	Space ComplexityExpression
 }
 
-// ComplexityExpression represents complexity expressions
+// ComplexityExpression represents complexity expressions.
 type ComplexityExpression struct {
-	Kind       ComplexityKind
 	Expression HIRExpression
 	Variables  []string
+	Kind       ComplexityKind
 }
 
-// ComplexityKind represents kinds of complexity
+// ComplexityKind represents kinds of complexity.
 type ComplexityKind int
 
 const (
@@ -512,18 +513,18 @@ const (
 	ComplexityUnknown
 )
 
-// =============================================================================
-// Linear Types
-// =============================================================================
+// =============================================================================.
+// Linear Types.
+// =============================================================================.
 
-// LinearType represents a linear (affine) type
+// LinearType represents a linear (affine) type.
 type LinearType struct {
-	ID           TypeID
 	BaseType     TypeInfo
-	Usage        UsageKind
-	Multiplicity Multiplicity
 	Constraints  []LinearConstraint
 	Region       LinearRegion
+	Multiplicity Multiplicity
+	ID           TypeID
+	Usage        UsageKind
 }
 
 func (lt *LinearType) TypeInfo() TypeInfo {
@@ -547,7 +548,7 @@ func (lt *LinearType) IsAdvanced() bool {
 	return true
 }
 
-// UsageKind represents how linear resources can be used
+// UsageKind represents how linear resources can be used.
 type UsageKind int
 
 const (
@@ -557,20 +558,20 @@ const (
 	UsageUnrestricted
 )
 
-// Multiplicity represents resource multiplicity
+// Multiplicity represents resource multiplicity.
 type Multiplicity struct {
 	Min int
 	Max int // -1 for unbounded
 }
 
-// LinearConstraint represents constraints on linear types
+// LinearConstraint represents constraints on linear types.
 type LinearConstraint struct {
-	Kind       LinearConstraintKind
 	Expression HIRExpression
 	Message    string
+	Kind       LinearConstraintKind
 }
 
-// LinearConstraintKind represents kinds of linear constraints
+// LinearConstraintKind represents kinds of linear constraints.
 type LinearConstraintKind int
 
 const (
@@ -580,21 +581,21 @@ const (
 	LinearConstraintLifetime
 )
 
-// LinearRegion represents memory regions for linear types
+// LinearRegion represents memory regions for linear types.
 type LinearRegion struct {
 	Name     string
 	Lifetime LifetimeInfo
 	Access   AccessPermissions
 }
 
-// LifetimeInfo represents lifetime information
+// LifetimeInfo represents lifetime information.
 type LifetimeInfo struct {
 	Start position.Span
 	End   position.Span
 	Kind  LifetimeKind
 }
 
-// LifetimeKind represents kinds of lifetimes
+// LifetimeKind represents kinds of lifetimes.
 type LifetimeKind int
 
 const (
@@ -604,7 +605,7 @@ const (
 	LifetimeInferred
 )
 
-// AccessPermissions represents access permissions for linear resources
+// AccessPermissions represents access permissions for linear resources.
 type AccessPermissions struct {
 	Read   bool
 	Write  bool
@@ -612,17 +613,17 @@ type AccessPermissions struct {
 	Borrow bool
 }
 
-// =============================================================================
-// Refinement Types
-// =============================================================================
+// =============================================================================.
+// Refinement Types.
+// =============================================================================.
 
-// RefinementType represents a type refined with logical predicates
+// RefinementType represents a type refined with logical predicates.
 type RefinementType struct {
-	ID          TypeID
 	BaseType    TypeInfo
+	Context     RefinementContext
 	Refinements []Refinement
 	Proof       ProofObligation
-	Context     RefinementContext
+	ID          TypeID
 }
 
 func (rt *RefinementType) TypeInfo() TypeInfo {
@@ -646,15 +647,15 @@ func (rt *RefinementType) IsAdvanced() bool {
 	return true
 }
 
-// Refinement represents a logical refinement of a type
+// Refinement represents a logical refinement of a type.
 type Refinement struct {
-	Variable  string
 	Predicate HIRExpression
+	Variable  string
 	Kind      RefinementKind
 	Strength  RefinementStrength
 }
 
-// RefinementKind represents kinds of refinements
+// RefinementKind represents kinds of refinements.
 type RefinementKind int
 
 const (
@@ -665,7 +666,7 @@ const (
 	RefinementAssertion
 )
 
-// RefinementStrength represents the strength of refinements
+// RefinementStrength represents the strength of refinements.
 type RefinementStrength int
 
 const (
@@ -674,7 +675,7 @@ const (
 	StrengthComplete
 )
 
-// ProofObligation represents proof obligations for refinement types
+// ProofObligation represents proof obligations for refinement types.
 type ProofObligation struct {
 	Goals      []ProofGoal
 	Hypotheses []Hypothesis
@@ -682,14 +683,14 @@ type ProofObligation struct {
 	Status     ProofStatus
 }
 
-// ProofGoal represents a goal in a proof
+// ProofGoal represents a goal in a proof.
 type ProofGoal struct {
 	Statement HIRExpression
 	Context   []Hypothesis
 	Kind      GoalKind
 }
 
-// GoalKind represents kinds of proof goals
+// GoalKind represents kinds of proof goals.
 type GoalKind int
 
 const (
@@ -701,14 +702,14 @@ const (
 	GoalUniqueness
 )
 
-// Hypothesis represents a hypothesis in a proof
+// Hypothesis represents a hypothesis in a proof.
 type Hypothesis struct {
-	Name      string
 	Statement HIRExpression
+	Name      string
 	Kind      HypothesisKind
 }
 
-// HypothesisKind represents kinds of hypotheses
+// HypothesisKind represents kinds of hypotheses.
 type HypothesisKind int
 
 const (
@@ -718,20 +719,20 @@ const (
 	HypothesisDefinition
 )
 
-// ProofTactic represents a tactic for proof construction
+// ProofTactic represents a tactic for proof construction.
 type ProofTactic struct {
 	Name       string
 	Arguments  []HIRExpression
 	Conditions []TacticCondition
 }
 
-// TacticCondition represents conditions for proof tactics
+// TacticCondition represents conditions for proof tactics.
 type TacticCondition struct {
 	Condition HIRExpression
 	Message   string
 }
 
-// ProofStatus represents the status of a proof
+// ProofStatus represents the status of a proof.
 type ProofStatus int
 
 const (
@@ -741,7 +742,7 @@ const (
 	ProofFailed
 )
 
-// RefinementContext represents context for refinement checking
+// RefinementContext represents context for refinement checking.
 type RefinementContext struct {
 	Assumptions []HIRExpression
 	Definitions map[string]HIRExpression
@@ -749,21 +750,21 @@ type RefinementContext struct {
 	Lemmas      []ProofLemma
 }
 
-// ProofLemma represents a proved lemma
+// ProofLemma represents a proved lemma.
 type ProofLemma struct {
 	Name      string
 	Statement HIRExpression
 	Proof     ProofTerm
 }
 
-// ProofTerm represents a proof term
+// ProofTerm represents a proof term.
 type ProofTerm struct {
-	Kind      ProofTermKind
 	Term      HIRExpression
 	SubProofs []ProofTerm
+	Kind      ProofTermKind
 }
 
-// ProofTermKind represents kinds of proof terms
+// ProofTermKind represents kinds of proof terms.
 type ProofTermKind int
 
 const (
@@ -776,20 +777,20 @@ const (
 	ProofTermTransitivity
 )
 
-// =============================================================================
-// Capability System
-// =============================================================================
+// =============================================================================.
+// Capability System.
+// =============================================================================.
 
-// Capability represents a capability in the type system
+// Capability represents a capability in the type system.
 type Capability struct {
 	Name        string
-	Kind        CapabilityKind
 	Permissions []Permission
 	Resources   []Resource
 	Constraints []CapabilityConstraint
+	Kind        CapabilityKind
 }
 
-// CapabilityKind represents different kinds of capabilities
+// CapabilityKind represents different kinds of capabilities.
 type CapabilityKind int
 
 const (
@@ -803,22 +804,22 @@ const (
 	CapabilitySystem
 )
 
-// Permission represents a permission within a capability
+// Permission represents a permission within a capability.
 type Permission struct {
 	Action     string
-	Resource   Resource
 	Conditions []PermissionCondition
+	Resource   Resource
 }
 
-// Resource represents a resource that capabilities can access
+// Resource represents a resource that capabilities can access.
 type Resource struct {
 	Name       string
-	Kind       ResourceKind
 	Location   ResourceLocation
+	Kind       ResourceKind
 	Properties ResourceProperties
 }
 
-// ResourceKind represents kinds of resources
+// ResourceKind represents kinds of resources.
 type ResourceKind int
 
 const (
@@ -829,14 +830,14 @@ const (
 	ResourceService
 )
 
-// ResourceLocation represents where a resource is located
+// ResourceLocation represents where a resource is located.
 type ResourceLocation struct {
-	Kind    LocationKind
 	Address string
+	Kind    LocationKind
 	Scope   AdvancedResourceScope
 }
 
-// LocationKind represents kinds of resource locations
+// LocationKind represents kinds of resource locations.
 type LocationKind int
 
 const (
@@ -846,7 +847,7 @@ const (
 	LocationPhysical
 )
 
-// AdvancedResourceScope represents the scope of resource access
+// AdvancedResourceScope represents the scope of resource access.
 type AdvancedResourceScope int
 
 const (
@@ -856,7 +857,7 @@ const (
 	AdvancedScopeSystem
 )
 
-// ResourceProperties represents properties of resources
+// ResourceProperties represents properties of resources.
 type ResourceProperties struct {
 	Persistent bool
 	Exclusive  bool
@@ -864,14 +865,14 @@ type ResourceProperties struct {
 	Cacheable  bool
 }
 
-// CapabilityConstraint represents constraints on capabilities
+// CapabilityConstraint represents constraints on capabilities.
 type CapabilityConstraint struct {
-	Kind       CapabilityConstraintKind
 	Expression HIRExpression
 	Message    string
+	Kind       CapabilityConstraintKind
 }
 
-// CapabilityConstraintKind represents kinds of capability constraints
+// CapabilityConstraintKind represents kinds of capability constraints.
 type CapabilityConstraintKind int
 
 const (
@@ -881,13 +882,13 @@ const (
 	CapabilityConstraintConditional
 )
 
-// PermissionCondition represents conditions for permissions
+// PermissionCondition represents conditions for permissions.
 type PermissionCondition struct {
 	Condition HIRExpression
 	Message   string
 }
 
-// PurityLevel represents levels of computational purity
+// PurityLevel represents levels of computational purity.
 type PurityLevel int
 
 const (
@@ -898,17 +899,17 @@ const (
 	PurityImpure
 )
 
-// RegionInfo represents information about memory regions
+// RegionInfo represents information about memory regions.
 type RegionInfo struct {
-	Name        string
-	Kind        AdvancedRegionKind
-	Lifetime    LifetimeInfo
-	Permissions AccessPermissions
 	Parent      *RegionInfo
+	Name        string
 	Children    []*RegionInfo
+	Lifetime    LifetimeInfo
+	Kind        AdvancedRegionKind
+	Permissions AccessPermissions
 }
 
-// AdvancedRegionKind represents kinds of memory regions in advanced type system
+// AdvancedRegionKind represents kinds of memory regions in advanced type system.
 type AdvancedRegionKind int
 
 const (
@@ -919,7 +920,7 @@ const (
 	AdvancedRegionShared
 )
 
-// TypeClass represents a type class definition
+// TypeClass represents a type class definition.
 type TypeClass struct {
 	Name         string              // Name of the type class
 	Parameters   []TypeVariable      // Type parameters
@@ -928,30 +929,30 @@ type TypeClass struct {
 	Dependencies []TypeConstraint    // Additional dependencies
 }
 
-// =============================================================================
-// Advanced Type Environment and Context
-// =============================================================================
+// =============================================================================.
+// Advanced Type Environment and Context.
+// =============================================================================.
 
-// AdvancedTypeEnvironment manages types and variables in advanced type system
+// AdvancedTypeEnvironment manages types and variables in advanced type system.
 type AdvancedTypeEnvironment struct {
 	TypeBindings      map[TypeVariable]TypeInfo
 	ValueBindings     map[string]TypeInfo
 	TypeDefinitions   map[string]AdvancedTypeInfo
 	TypeClasses       map[string]*TypeClass
 	Instances         []*TypeClassInstance
-	CurrentTypeID     TypeID
 	ScopeStack        []TypeScope
 	ConstraintHistory []TypeConstraint
+	CurrentTypeID     TypeID
 }
 
-// TypeScope represents a scope in the type environment
+// TypeScope represents a scope in the type environment.
 type TypeScope struct {
-	Level     int
 	Bindings  map[string]TypeInfo
 	Variables map[TypeVariable]TypeInfo
+	Level     int
 }
 
-// NewAdvancedTypeEnvironment creates a new advanced type environment
+// NewAdvancedTypeEnvironment creates a new advanced type environment.
 func NewAdvancedTypeEnvironment() *AdvancedTypeEnvironment {
 	return &AdvancedTypeEnvironment{
 		TypeBindings:      make(map[TypeVariable]TypeInfo),
@@ -965,37 +966,39 @@ func NewAdvancedTypeEnvironment() *AdvancedTypeEnvironment {
 	}
 }
 
-// GenerateTypeID generates a unique type ID
+// GenerateTypeID generates a unique type ID.
 func (ate *AdvancedTypeEnvironment) GenerateTypeID() TypeID {
 	id := ate.CurrentTypeID
 	ate.CurrentTypeID++
+
 	return id
 }
 
-// BindTypeVariable binds a type variable to a type
+// BindTypeVariable binds a type variable to a type.
 func (ate *AdvancedTypeEnvironment) BindTypeVariable(variable TypeVariable, t TypeInfo) {
 	ate.TypeBindings[variable] = t
 }
 
-// LookupTypeVariable looks up the type bound to a type variable
+// LookupTypeVariable looks up the type bound to a type variable.
 func (ate *AdvancedTypeEnvironment) LookupTypeVariable(variable TypeVariable) (TypeInfo, bool) {
 	t, exists := ate.TypeBindings[variable]
+
 	return t, exists
 }
 
-// AdvancedTypeContext manages type checking context for advanced types
+// AdvancedTypeContext manages type checking context for advanced types.
 type AdvancedTypeContext struct {
-	ScopeLevel       int
 	TypeVariables    map[string]TypeVariable
 	SkolemGenerator  *SkolemGenerator
-	ConstraintStack  []TypeConstraint
 	ProofContext     *ProofContext
 	LinearityTracker *LinearityTracker
 	EffectTracker    *EffectTracker
 	CapabilitySet    map[string]Capability
+	ConstraintStack  []TypeConstraint
+	ScopeLevel       int
 }
 
-// ProofContext manages proof obligations and tactics
+// ProofContext manages proof obligations and tactics.
 type ProofContext struct {
 	Goals       []ProofGoal
 	Hypotheses  []Hypothesis
@@ -1003,21 +1006,21 @@ type ProofContext struct {
 	Assumptions []HIRExpression
 }
 
-// LinearityTracker tracks linear resource usage
+// LinearityTracker tracks linear resource usage.
 type LinearityTracker struct {
 	UsedResources       map[string]int
 	BorrowedResources   map[string]AccessPermissions
 	ResourceConstraints []LinearConstraint
 }
 
-// EffectTracker tracks effect usage and permissions
+// EffectTracker tracks effect usage and permissions.
 type EffectTracker struct {
 	ActiveEffects  []AdvancedEffect
 	HandledEffects map[string]EffectHandler
 	EffectHistory  []EffectOperation
 }
 
-// NewAdvancedTypeContext creates a new advanced type context
+// NewAdvancedTypeContext creates a new advanced type context.
 func NewAdvancedTypeContext() *AdvancedTypeContext {
 	return &AdvancedTypeContext{
 		ScopeLevel:       0,
@@ -1031,19 +1034,19 @@ func NewAdvancedTypeContext() *AdvancedTypeContext {
 	}
 }
 
-// EnterScope enters a new type checking scope
+// EnterScope enters a new type checking scope.
 func (atc *AdvancedTypeContext) EnterScope() {
 	atc.ScopeLevel++
 }
 
-// ExitScope exits the current type checking scope
+// ExitScope exits the current type checking scope.
 func (atc *AdvancedTypeContext) ExitScope() {
 	if atc.ScopeLevel > 0 {
 		atc.ScopeLevel--
 	}
 }
 
-// NewProofContext creates a new proof context
+// NewProofContext creates a new proof context.
 func NewProofContext() *ProofContext {
 	return &ProofContext{
 		Goals:       []ProofGoal{},
@@ -1053,7 +1056,7 @@ func NewProofContext() *ProofContext {
 	}
 }
 
-// NewLinearityTracker creates a new linearity tracker
+// NewLinearityTracker creates a new linearity tracker.
 func NewLinearityTracker() *LinearityTracker {
 	return &LinearityTracker{
 		UsedResources:       make(map[string]int),
@@ -1062,7 +1065,7 @@ func NewLinearityTracker() *LinearityTracker {
 	}
 }
 
-// NewEffectTracker creates a new effect tracker
+// NewEffectTracker creates a new effect tracker.
 func NewEffectTracker() *EffectTracker {
 	return &EffectTracker{
 		ActiveEffects:  []AdvancedEffect{},
@@ -1071,50 +1074,51 @@ func NewEffectTracker() *EffectTracker {
 	}
 }
 
-// SkolemGenerator generates unique skolem constants for existential types
+// SkolemGenerator generates unique skolem constants for existential types.
 type SkolemGenerator struct {
 	counter int
 }
 
-// NewSkolemGenerator creates a new SkolemGenerator
+// NewSkolemGenerator creates a new SkolemGenerator.
 func NewSkolemGenerator() *SkolemGenerator {
 	return &SkolemGenerator{counter: 0}
 }
 
-// GenerateSkolem generates a unique skolem constant
+// GenerateSkolem generates a unique skolem constant.
 func (sg *SkolemGenerator) GenerateSkolem() string {
 	sg.counter++
+
 	return fmt.Sprintf("skolem_%d", sg.counter)
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.1: Refinement Type System Extensions
-// =============================================================================
+// =============================================================================.
 
-// Enhanced PredicateExpression interface (extending existing concepts)
-// Note: Using composition with existing HIRExpression system
+// Enhanced PredicateExpression interface (extending existing concepts).
+// Note: Using composition with existing HIRExpression system.
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.2: Index Types
-// =============================================================================
+// =============================================================================.
 
-// IndexType represents types with index constraints for array bounds checking
+// IndexType represents types with index constraints for array bounds checking.
 type IndexType struct {
-	ID               TypeID
 	BaseType         TypeInfo
-	IndexConstraints []IndexConstraint
 	ElementType      TypeInfo
+	IndexConstraints []IndexConstraint
 	Verification     BoundsVerification
+	ID               TypeID
 }
 
-// BoundsVerification represents bounds verification strategy
+// BoundsVerification represents bounds verification strategy.
 type BoundsVerification struct {
-	Strategy       VerificationStrategy
 	CheckPoints    []VerificationPoint
+	Strategy       VerificationStrategy
 	OptimizeChecks bool
 }
 
-// VerificationStrategy represents verification strategies
+// VerificationStrategy represents verification strategies.
 type VerificationStrategy int
 
 const (
@@ -1123,14 +1127,14 @@ const (
 	VerificationHybrid
 )
 
-// VerificationPoint represents points where bounds are verified
+// VerificationPoint represents points where bounds are verified.
 type VerificationPoint struct {
 	Location HIRExpression
 	Checks   []BoundsCheck
 	Strategy VerificationStrategy
 }
 
-// BoundsCheck represents a bounds check operation
+// BoundsCheck represents a bounds check operation.
 type BoundsCheck struct {
 	Index  HIRExpression
 	Lower  HIRExpression
@@ -1139,7 +1143,7 @@ type BoundsCheck struct {
 	Status CheckStatus
 }
 
-// CheckKind represents kinds of bounds checks
+// CheckKind represents kinds of bounds checks.
 type CheckKind int
 
 const (
@@ -1149,7 +1153,7 @@ const (
 	CheckNonNull
 )
 
-// CheckStatus represents the status of bounds checks
+// CheckStatus represents the status of bounds checks.
 type CheckStatus int
 
 const (
@@ -1159,7 +1163,7 @@ const (
 	CheckVerified
 )
 
-// BoundsOptimizer handles bounds check optimization
+// BoundsOptimizer handles bounds check optimization.
 type BoundsOptimizer struct {
 	Strategy        OptimizationStrategy
 	RemoveRedundant bool
@@ -1167,7 +1171,7 @@ type BoundsOptimizer struct {
 	CacheResults    bool
 }
 
-// OptimizationStrategy represents optimization strategies
+// OptimizationStrategy represents optimization strategies.
 type OptimizationStrategy int
 
 const (
@@ -1176,29 +1180,29 @@ const (
 	OptimizationNone
 )
 
-// LengthDependentType represents types dependent on length parameters
+// LengthDependentType represents types dependent on length parameters.
 type LengthDependentType struct {
-	ID           TypeID
-	BaseType     TypeInfo
 	LengthExpr   HIRExpression
 	MinLength    HIRExpression
 	MaxLength    HIRExpression
+	BaseType     TypeInfo
 	Dependencies []LengthDependency
+	ID           TypeID
 }
 
-// LengthDependency represents dependencies on length parameters
+// LengthDependency represents dependencies on length parameters.
 type LengthDependency struct {
-	Variable   string
 	Expression HIRExpression
+	Variable   string
 	Kind       DependencyKind
 }
 
-// Constants for Phase 2.3.2 Index Types
+// Constants for Phase 2.3.2 Index Types.
 const (
 	ConstraintRange = IndexConstraintRange
 )
 
-// HIRArrayAccess represents array access expressions in HIR
+// HIRArrayAccess represents array access expressions in HIR.
 type HIRArrayAccess struct {
 	Array HIRExpression
 	Index HIRExpression
@@ -1207,24 +1211,24 @@ type HIRArrayAccess struct {
 
 func (e *HIRArrayAccess) GetType() TypeInfo { return e.Type }
 func (e *HIRArrayAccess) Accept(v HIRVisitor) error {
-	// Simplified visitor pattern - would be implemented properly in a real system
+	// Simplified visitor pattern - would be implemented properly in a real system.
 	return nil
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.3: Dependent Function Types
-// =============================================================================
+// =============================================================================.
 
-// PiType represents dependent function types (Pi types)
+// PiType represents dependent function types (Pi types).
 type PiType struct {
-	ID          TypeID
+	ReturnType  HIRExpression
 	Parameter   DependentParameter
-	ReturnType  HIRExpression // Type dependent on parameter
 	Context     DependentContext
 	Constraints []DependentConstraint
+	ID          TypeID
 }
 
-// HIRLambdaExpression represents lambda functions
+// HIRLambdaExpression represents lambda functions.
 type HIRLambdaExpression struct {
 	Parameters []HIRExpression
 	Body       HIRExpression
@@ -1232,7 +1236,7 @@ type HIRLambdaExpression struct {
 	Captures   []HIRExpression
 }
 
-// Implement HIRNode interface
+// Implement HIRNode interface.
 func (e *HIRLambdaExpression) GetID() NodeID                         { return NodeID(0) }
 func (e *HIRLambdaExpression) GetSpan() position.Span                { return position.Span{} }
 func (e *HIRLambdaExpression) GetType() TypeInfo                     { return e.Type }
@@ -1243,14 +1247,14 @@ func (e *HIRLambdaExpression) Accept(visitor HIRVisitor) interface{} { return ni
 func (e *HIRLambdaExpression) GetChildren() []HIRNode                { return nil }
 func (e *HIRLambdaExpression) hirExpressionNode()                    {}
 
-// HIRApplicationExpression represents function applications
+// HIRApplicationExpression represents function applications.
 type HIRApplicationExpression struct {
 	Function  HIRExpression
-	Arguments []HIRExpression
 	Type      TypeInfo
+	Arguments []HIRExpression
 }
 
-// Implement HIRNode interface
+// Implement HIRNode interface.
 func (e *HIRApplicationExpression) GetID() NodeID                         { return NodeID(0) }
 func (e *HIRApplicationExpression) GetSpan() position.Span                { return position.Span{} }
 func (e *HIRApplicationExpression) GetType() TypeInfo                     { return e.Type }
@@ -1261,35 +1265,35 @@ func (e *HIRApplicationExpression) Accept(visitor HIRVisitor) interface{} { retu
 func (e *HIRApplicationExpression) GetChildren() []HIRNode                { return nil }
 func (e *HIRApplicationExpression) hirExpressionNode()                    {}
 
-// VariableBinding represents variable bindings in dependent context
+// VariableBinding represents variable bindings in dependent context.
 type VariableBinding struct {
-	Name  string
 	Type  HIRExpression
 	Value HIRExpression
+	Name  string
 }
 
-// DependentContext represents context for dependent types
+// DependentContext represents context for dependent types.
 type DependentContext struct {
 	Variables []VariableBinding
 	Types     []TypeBinding
 	Axioms    []DependentAxiom
 }
 
-// TypeBinding represents type bindings in dependent context
+// TypeBinding represents type bindings in dependent context.
 type TypeBinding struct {
+	Definition HIRExpression
 	Name       string
 	Kind       TypeKind
-	Definition HIRExpression
 }
 
-// DependentAxiom represents axioms in dependent type theory
+// DependentAxiom represents axioms in dependent type theory.
 type DependentAxiom struct {
-	Name      string
 	Statement HIRExpression
+	Name      string
 	Kind      AxiomKind
 }
 
-// AxiomKind represents kinds of axioms
+// AxiomKind represents kinds of axioms.
 type AxiomKind int
 
 const (
@@ -1299,35 +1303,35 @@ const (
 	AxiomExtensionality
 )
 
-// DependentPatternMatch represents dependent pattern matching
+// DependentPatternMatch represents dependent pattern matching.
 type DependentPatternMatch struct {
-	ID        PatternID
 	Scrutinee HIRExpression
-	Cases     []DependentCase
 	Type      HIRExpression
-	Motive    HIRExpression // Dependent elimination motive
+	Motive    HIRExpression
+	Cases     []DependentCase
+	ID        PatternID
 }
 
-// PatternID represents unique pattern identifiers
+// PatternID represents unique pattern identifiers.
 type PatternID int
 
-// DependentCase represents a case in dependent pattern matching
+// DependentCase represents a case in dependent pattern matching.
 type DependentCase struct {
-	Pattern     DependentPattern
 	Constructor HIRExpression
 	Body        HIRExpression
 	Type        HIRExpression
+	Pattern     DependentPattern
 }
 
-// DependentPattern represents patterns in dependent matching
+// DependentPattern represents patterns in dependent matching.
 type DependentPattern struct {
-	Kind        PatternKind
 	Constructor string
 	Variables   []string
 	Subpatterns []DependentPattern
+	Kind        PatternKind
 }
 
-// PatternKind represents kinds of patterns
+// PatternKind represents kinds of patterns.
 type PatternKind int
 
 const (
@@ -1337,19 +1341,19 @@ const (
 	PatternLiteral
 )
 
-// TypeLevelComputation represents computations at the type level
+// TypeLevelComputation represents computations at the type level.
 type TypeLevelComputation struct {
-	ID          ComputationID
 	Expression  HIRExpression
-	Reduction   ReductionStrategy
-	Environment ComputationEnvironment
 	Result      HIRExpression
+	Environment ComputationEnvironment
+	ID          ComputationID
+	Reduction   ReductionStrategy
 }
 
-// ComputationID represents unique computation identifiers
+// ComputationID represents unique computation identifiers.
 type ComputationID int
 
-// ReductionStrategy represents reduction strategies for type computation
+// ReductionStrategy represents reduction strategies for type computation.
 type ReductionStrategy int
 
 const (
@@ -1359,22 +1363,22 @@ const (
 	ReductionCallByValue
 )
 
-// ComputationEnvironment represents environment for type computation
+// ComputationEnvironment represents environment for type computation.
 type ComputationEnvironment struct {
 	Definitions map[string]HIRExpression
 	Reductions  []ReductionRule
 	Context     DependentContext
 }
 
-// ReductionRule represents rules for type-level reduction
+// ReductionRule represents rules for type-level reduction.
 type ReductionRule struct {
-	Name      string
 	Pattern   HIRExpression
 	Reduct    HIRExpression
 	Condition HIRExpression
+	Name      string
 }
 
-// DependentChecker represents type checker for dependent types (Phase 2.3.3)
+// DependentChecker represents type checker for dependent types (Phase 2.3.3).
 type DependentChecker struct {
 	Context     DependentContext
 	Unification DependentUnification
@@ -1382,14 +1386,14 @@ type DependentChecker struct {
 	Constraints DependentConstraintSolver
 }
 
-// DependentUnification handles unification in dependent type systems
+// DependentUnification handles unification in dependent type systems.
 type DependentUnification struct {
+	Higher   HigherOrderUnification
 	Strategy UnificationStrategy
 	Occurs   OccursCheck
-	Higher   HigherOrderUnification
 }
 
-// UnificationStrategy represents strategies for dependent unification
+// UnificationStrategy represents strategies for dependent unification.
 type UnificationStrategy int
 
 const (
@@ -1398,34 +1402,34 @@ const (
 	UnificationHigherOrder
 )
 
-// OccursCheck represents occurs check configuration
+// OccursCheck represents occurs check configuration.
 type OccursCheck struct {
 	Enabled bool
 	Strict  bool
 }
 
-// HigherOrderUnification represents higher-order unification
+// HigherOrderUnification represents higher-order unification.
 type HigherOrderUnification struct {
-	Enabled  bool
-	MaxDepth int
 	Patterns []UnificationPattern
+	MaxDepth int
+	Enabled  bool
 }
 
-// UnificationPattern represents patterns for unification
+// UnificationPattern represents patterns for unification.
 type UnificationPattern struct {
 	Left         HIRExpression
 	Right        HIRExpression
 	Substitution map[string]HIRExpression
 }
 
-// TypeNormalizer handles normalization of dependent types
+// TypeNormalizer handles normalization of dependent types.
 type TypeNormalizer struct {
+	Environment ComputationEnvironment
 	Strategy    NormalizationStrategy
 	Depth       int
-	Environment ComputationEnvironment
 }
 
-// NormalizationStrategy represents normalization strategies
+// NormalizationStrategy represents normalization strategies.
 type NormalizationStrategy int
 
 const (
@@ -1435,14 +1439,14 @@ const (
 	NormalizationLazy
 )
 
-// DependentConstraintSolver solves constraints in dependent type checking (Phase 2.3.3)
+// DependentConstraintSolver solves constraints in dependent type checking (Phase 2.3.3).
 type DependentConstraintSolver struct {
-	Strategy   SolverStrategy
 	Heuristics []SolverHeuristic
+	Strategy   SolverStrategy
 	Timeout    int
 }
 
-// SolverStrategy represents constraint solving strategies
+// SolverStrategy represents constraint solving strategies.
 type SolverStrategy int
 
 const (
@@ -1451,51 +1455,51 @@ const (
 	SolverHybrid
 )
 
-// SolverHeuristic represents heuristics for constraint solving
+// SolverHeuristic represents heuristics for constraint solving.
 type SolverHeuristic struct {
+	Apply    func([]DependentConstraint) []DependentConstraint
 	Name     string
 	Priority int
-	Apply    func([]DependentConstraint) []DependentConstraint
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.3: Dependent Function Types - Method Implementations
-// =============================================================================
+// =============================================================================.
 
-// Methods for dependent function type system
+// Methods for dependent function type system.
 func (pi *PiType) Instantiate(argument HIRExpression) HIRExpression {
-	// Instantiate Pi type with concrete argument
-	// Replace parameter with argument in return type
+	// Instantiate Pi type with concrete argument.
+	// Replace parameter with argument in return type.
 	return pi.ReturnType // Simplified - would perform substitution
 }
 
 func (pi *PiType) CheckParameter(arg HIRExpression, checker *DependentChecker) bool {
-	// Check if argument satisfies parameter constraints
+	// Check if argument satisfies parameter constraints.
 	return true // Simplified implementation
 }
 
 func (checker *DependentChecker) CheckPiType(pi *PiType) error {
-	// Check well-formedness of Pi type
+	// Check well-formedness of Pi type.
 	return nil // Simplified implementation
 }
 
 func (checker *DependentChecker) InferDependentType(expr HIRExpression) (HIRExpression, error) {
-	// Infer type of expression in dependent context
+	// Infer type of expression in dependent context.
 	return expr, nil // Simplified implementation
 }
 
 func (normalizer *TypeNormalizer) Normalize(expr HIRExpression) HIRExpression {
-	// Normalize type expression
+	// Normalize type expression.
 	return expr // Simplified implementation
 }
 
 func (unification *DependentUnification) Unify(left, right HIRExpression) (map[string]HIRExpression, error) {
-	// Unify two dependent types
+	// Unify two dependent types.
 	return make(map[string]HIRExpression), nil // Simplified implementation
 }
 
 func (solver *DependentConstraintSolver) Solve(constraints []DependentConstraint) (*TypeSolution, error) {
-	// Solve dependent type constraints
+	// Solve dependent type constraints.
 	return &TypeSolution{
 		Substitutions: make(map[string]HIRExpression),
 		Constraints:   constraints,
@@ -1505,21 +1509,21 @@ func (solver *DependentConstraintSolver) Solve(constraints []DependentConstraint
 }
 
 func (computation *TypeLevelComputation) Execute() HIRExpression {
-	// Execute type-level computation
+	// Execute type-level computation.
 	return computation.Expression // Simplified implementation
 }
 
 func (pattern *DependentPatternMatch) CheckExhaustiveness() bool {
-	// Check if pattern match is exhaustive
+	// Check if pattern match is exhaustive.
 	return len(pattern.Cases) > 0 // Simplified check
 }
 
 func (pattern *DependentPatternMatch) TypeCheck(checker *DependentChecker) error {
-	// Type check dependent pattern match
+	// Type check dependent pattern match.
 	return nil // Simplified implementation
 }
 
-// Additional types for Phase 2.3.3 completion
+// Additional types for Phase 2.3.3 completion.
 type TypeComputation struct {
 	Input       HIRExpression
 	Output      HIRExpression
@@ -1535,10 +1539,10 @@ type ComputationStep struct {
 }
 
 type DependentTypeInference struct {
+	Checker     *DependentChecker
 	Context     DependentContext
 	Constraints []DependentConstraint
 	Solution    TypeSolution
-	Checker     *DependentChecker
 }
 
 type TypeSolution struct {
@@ -1548,24 +1552,24 @@ type TypeSolution struct {
 	Principal     bool
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.4: Linear Type System
-// =============================================================================
+// =============================================================================.
 
 // Phase 2.4.1: Linear Type Checker
-// Linear type checker enforces unique resource usage through static analysis
+// Linear type checker enforces unique resource usage through static analysis.
 
-// LinearResourceType represents a linear type with usage tracking
+// LinearResourceType represents a linear type with usage tracking.
 type LinearResourceType struct {
-	ID                   TypeID
 	BaseType             HIRExpression
-	UsagePolicy          LinearUsagePolicy
 	ResourceMultiplicity LinearMultiplicity
 	Capabilities         []LinearCapability
 	Constraints          []LinearResourceConstraint
+	ID                   TypeID
+	UsagePolicy          LinearUsagePolicy
 }
 
-// LinearUsagePolicy defines how linear resources can be used
+// LinearUsagePolicy defines how linear resources can be used.
 type LinearUsagePolicy int
 
 const (
@@ -1575,39 +1579,39 @@ const (
 	LinearUsageUnrestricted                   // Any number of times
 )
 
-// LinearMultiplicity tracks how many times a resource can be used
+// LinearMultiplicity tracks how many times a resource can be used.
 type LinearMultiplicity struct {
-	Min       int                     // Minimum usage count
-	Max       int                     // Maximum usage count (-1 for unlimited)
-	Exact     int                     // Exact usage count (-1 if not exact)
-	Variables []LinearMultiplicityVar // Variables in multiplicity expressions
+	Variables []LinearMultiplicityVar
+	Min       int
+	Max       int
+	Exact     int
 }
 
-// LinearMultiplicityVar represents a variable in multiplicity expressions
+// LinearMultiplicityVar represents a variable in multiplicity expressions.
 type LinearMultiplicityVar struct {
 	Name       string
-	Bounds     LinearMultiplicityBounds
 	Context    string
+	Bounds     LinearMultiplicityBounds
 	IsInferred bool
 }
 
-// LinearMultiplicityBounds constrains multiplicity variables
+// LinearMultiplicityBounds constrains multiplicity variables.
 type LinearMultiplicityBounds struct {
 	Lower int
 	Upper int // -1 for unbounded
 }
 
-// LinearCapability represents what operations are allowed on linear types
+// LinearCapability represents what operations are allowed on linear types.
 type LinearCapability struct {
-	Name          string
-	Operation     LinearOperation
 	Precondition  HIRExpression
 	Postcondition HIRExpression
-	Consumes      []string // Resources consumed
-	Produces      []string // Resources produced
+	Name          string
+	Consumes      []string
+	Produces      []string
+	Operation     LinearOperation
 }
 
-// LinearOperation defines types of operations on linear resources
+// LinearOperation defines types of operations on linear resources.
 type LinearOperation int
 
 const (
@@ -1621,16 +1625,16 @@ const (
 	LinearOpMerge
 )
 
-// LinearResourceConstraint enforces linear typing rules
+// LinearResourceConstraint enforces linear typing rules.
 type LinearResourceConstraint struct {
-	Kind       LinearResourceConstraintKind
-	Variable   string
 	Expression HIRExpression
-	Context    LinearContext
+	Variable   string
 	Message    string
+	Context    LinearContext
+	Kind       LinearResourceConstraintKind
 }
 
-// LinearResourceConstraintKind represents different kinds of linear constraints
+// LinearResourceConstraintKind represents different kinds of linear constraints.
 type LinearResourceConstraintKind int
 
 const (
@@ -1642,7 +1646,7 @@ const (
 	LinearResourceConstraintUnrestricted
 )
 
-// LinearContext tracks the context for linear type checking
+// LinearContext tracks the context for linear type checking.
 type LinearContext struct {
 	Variables   []LinearBinding
 	Resources   []ResourceBinding
@@ -1650,45 +1654,45 @@ type LinearContext struct {
 	Trace       []LinearAction
 }
 
-// LinearBinding represents variable bindings in linear context
+// LinearBinding represents variable bindings in linear context.
 type LinearBinding struct {
 	Name        string
 	Type        LinearResourceType
+	Permissions []LinearPermission
+	LastUsed    position.Span
 	UsageCount  int
 	IsConsumed  bool
 	IsMoved     bool
-	LastUsed    position.Span
-	Permissions []LinearPermission
 }
 
-// ResourceBinding tracks resource lifecycle
+// ResourceBinding tracks resource lifecycle.
 type ResourceBinding struct {
 	Resource  string
-	Type      LinearResourceType
-	State     ResourceState
-	Lifecycle []ResourceAction
 	Owner     string
+	Type      LinearResourceType
+	Lifecycle []ResourceAction
 	Borrowers []string
+	State     ResourceState
 }
 
-// ResourceAction represents actions taken on resources
+// ResourceAction represents actions taken on resources.
 type ResourceAction struct {
-	Action    LinearOperation
-	Location  position.Span
 	Actor     string
+	Location  position.Span
+	Action    LinearOperation
 	Timestamp int64
 }
 
-// LinearPermission represents what operations are allowed
+// LinearPermission represents what operations are allowed.
 type LinearPermission struct {
 	Resource  string
+	Grantee   string
 	Operation LinearOperation
 	Scope     LinearPermissionScope
 	IsUnique  bool
-	Grantee   string
 }
 
-// LinearPermissionScope defines the scope of a permission
+// LinearPermissionScope defines the scope of a permission.
 type LinearPermissionScope int
 
 const (
@@ -1698,15 +1702,15 @@ const (
 	LinearPermissionScopeGlobal
 )
 
-// LinearAction represents an action in the linear type checking trace
+// LinearAction represents an action in the linear type checking trace.
 type LinearAction struct {
 	Action   string
 	Variable string
-	Location position.Span
 	Effect   LinearEffect
+	Location position.Span
 }
 
-// LinearEffect describes the effect of a linear action
+// LinearEffect describes the effect of a linear action.
 type LinearEffect struct {
 	Consumes []string
 	Produces []string
@@ -1714,7 +1718,7 @@ type LinearEffect struct {
 	Shares   []string
 }
 
-// LinearChecker performs linear type checking
+// LinearChecker performs linear type checking.
 type LinearChecker struct {
 	Context     LinearContext
 	Constraints []LinearResourceConstraint
@@ -1722,7 +1726,7 @@ type LinearChecker struct {
 	Options     LinearCheckOptions
 }
 
-// LinearCheckOptions configure linear type checking
+// LinearCheckOptions configure linear type checking.
 type LinearCheckOptions struct {
 	StrictMode       bool
 	AllowPartialMove bool
@@ -1731,16 +1735,16 @@ type LinearCheckOptions struct {
 	GenerateTrace    bool
 }
 
-// LinearDiagnostic represents linear type checking errors
+// LinearDiagnostic represents linear type checking errors.
 type LinearDiagnostic struct {
-	Kind     LinearDiagnosticKind
 	Message  string
-	Location position.Span
 	Variable string
+	Location position.Span
+	Kind     LinearDiagnosticKind
 	Severity LinearDiagnosticSeverity
 }
 
-// LinearDiagnosticKind categorizes linear type errors
+// LinearDiagnosticKind categorizes linear type errors.
 type LinearDiagnosticKind int
 
 const (
@@ -1752,7 +1756,7 @@ const (
 	LinearDiagnosticInvalidShare
 )
 
-// LinearDiagnosticSeverity indicates the severity of a diagnostic
+// LinearDiagnosticSeverity indicates the severity of a diagnostic.
 type LinearDiagnosticSeverity int
 
 const (
@@ -1762,7 +1766,7 @@ const (
 	LinearDiagnosticSeverityHint
 )
 
-// UsageAnalyzer tracks resource usage patterns
+// UsageAnalyzer tracks resource usage patterns.
 type UsageAnalyzer struct {
 	UsageMap    map[string][]UsageOccurrence
 	MoveMap     map[string]position.Span
@@ -1771,15 +1775,15 @@ type UsageAnalyzer struct {
 	Diagnostics []LinearDiagnostic
 }
 
-// UsageOccurrence records where and how a resource is used
+// UsageOccurrence records where and how a resource is used.
 type UsageOccurrence struct {
+	Context   string
 	Location  position.Span
 	Operation LinearOperation
-	Context   string
 	IsValid   bool
 }
 
-// BorrowInfo tracks borrowing relationships
+// BorrowInfo tracks borrowing relationships.
 type BorrowInfo struct {
 	Borrower  string
 	Location  position.Span
@@ -1788,51 +1792,51 @@ type BorrowInfo struct {
 	IsMutable bool
 }
 
-// BorrowDuration specifies how long a borrow lasts
+// BorrowDuration specifies how long a borrow lasts.
 type BorrowDuration struct {
 	Start position.Span
 	End   position.Span
 	Scope LinearPermissionScope
 }
 
-// MoveSemantics implements move semantics for linear types
+// MoveSemantics implements move semantics for linear types.
 type MoveSemantics struct {
 	MoveOperations []MoveOperation
 	Validator      MoveValidator
 	Optimizer      MoveOptimizer
 }
 
-// MoveOperation represents a move operation
+// MoveOperation represents a move operation.
 type MoveOperation struct {
 	Source      string
 	Destination string
-	Location    position.Span
 	Type        LinearResourceType
+	Location    position.Span
 	IsExplicit  bool
 }
 
-// MoveValidator validates move operations
+// MoveValidator validates move operations.
 type MoveValidator struct {
 	Rules       []MoveRule
 	Constraints []MoveConstraint
 }
 
-// MoveRule defines when moves are allowed
+// MoveRule defines when moves are allowed.
 type MoveRule struct {
-	Pattern   MovePattern
 	Condition HIRExpression
+	Pattern   MovePattern
 	Action    MoveAction
 	Priority  int
 }
 
-// MovePattern matches move scenarios
+// MovePattern matches move scenarios.
 type MovePattern struct {
 	SourceType HIRExpression
 	TargetType HIRExpression
 	Context    MoveContext
 }
 
-// MoveContext provides context for move operations
+// MoveContext provides context for move operations.
 type MoveContext struct {
 	Function  string
 	Block     string
@@ -1841,7 +1845,7 @@ type MoveContext struct {
 	IsAssign  bool
 }
 
-// MoveAction defines what happens during a move
+// MoveAction defines what happens during a move.
 type MoveAction int
 
 const (
@@ -1851,36 +1855,36 @@ const (
 	MoveActionConvert
 )
 
-// MoveConstraint constrains when moves can occur
+// MoveConstraint constrains when moves can occur.
 type MoveConstraint struct {
 	Variable   string
 	Constraint HIRExpression
 	Message    string
 }
 
-// MoveOptimizer optimizes move operations
+// MoveOptimizer optimizes move operations.
 type MoveOptimizer struct {
 	Strategies []LinearOptimizationStrategy
 	Metrics    LinearOptimizationMetrics
 }
 
-// LinearOptimizationStrategy defines move optimization approaches
+// LinearOptimizationStrategy defines move optimization approaches.
 type LinearOptimizationStrategy struct {
+	Transform MoveTransform
 	Name      string
 	Pattern   MovePattern
-	Transform MoveTransform
 	Benefit   int
 	Cost      int
 }
 
-// MoveTransform specifies how to transform moves
+// MoveTransform specifies how to transform moves.
 type MoveTransform struct {
 	Before HIRExpression
 	After  HIRExpression
 	Guard  HIRExpression
 }
 
-// LinearOptimizationMetrics track optimization effectiveness
+// LinearOptimizationMetrics track optimization effectiveness.
 type LinearOptimizationMetrics struct {
 	MovesEliminated int
 	CopiesAvoided   int
@@ -1888,21 +1892,21 @@ type LinearOptimizationMetrics struct {
 	PerformanceGain float64
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.4.2: Session Types
-// =============================================================================
+// =============================================================================.
 
-// SessionType represents communication protocol types
+// SessionType represents communication protocol types.
 type SessionType struct {
-	ID           TypeID
-	Protocol     SessionProtocol
 	State        SessionState
 	Participants []SessionParticipant
 	Channels     []SessionChannel
 	Constraints  []SessionConstraint
+	Protocol     SessionProtocol
+	ID           TypeID
 }
 
-// SessionProtocol defines communication patterns
+// SessionProtocol defines communication patterns.
 type SessionProtocol struct {
 	Name          string
 	Operations    []SessionOperation
@@ -1911,17 +1915,17 @@ type SessionProtocol struct {
 	LivenessCheck LivenessCheck
 }
 
-// SessionOperation represents protocol operations
+// SessionOperation represents protocol operations.
 type SessionOperation struct {
-	Type      SessionOpType
-	Message   MessageType
-	Channel   string
-	Direction Direction
 	Guard     HIRExpression
-	Timeout   int64 // milliseconds
+	Channel   string
+	Message   MessageType
+	Type      SessionOpType
+	Direction Direction
+	Timeout   int64
 }
 
-// SessionOpType categorizes session operations
+// SessionOpType categorizes session operations.
 type SessionOpType int
 
 const (
@@ -1934,16 +1938,16 @@ const (
 	SessionOpJoin
 )
 
-// MessageType defines message structure
+// MessageType defines message structure.
 type MessageType struct {
-	Name     string
 	Type     HIRExpression
+	Name     string
 	Size     int64
 	Priority MessagePriority
 	Encoding MessageEncoding
 }
 
-// MessagePriority for message ordering
+// MessagePriority for message ordering.
 type MessagePriority int
 
 const (
@@ -1953,7 +1957,7 @@ const (
 	MessagePriorityUrgent
 )
 
-// MessageEncoding specifies serialization
+// MessageEncoding specifies serialization.
 type MessageEncoding int
 
 const (
@@ -1963,7 +1967,7 @@ const (
 	MessageEncodingCustom
 )
 
-// Direction of communication
+// Direction of communication.
 type Direction int
 
 const (
@@ -1972,37 +1976,37 @@ const (
 	DirectionBidirectional
 )
 
-// SessionState tracks protocol state
+// SessionState tracks protocol state.
 type SessionState struct {
+	Transitions map[string][]string
 	Current     string
 	Valid       []string
 	Invalid     []string
-	Transitions map[string][]string
 	IsFinal     bool
 }
 
-// SessionStateTransition defines state changes
+// SessionStateTransition defines state changes.
 type SessionStateTransition struct {
+	Condition HIRExpression
+	Operation SessionOperation
 	From      string
 	To        string
-	Operation SessionOperation
-	Condition HIRExpression
 	Cost      int
 }
 
-// SessionParticipant in the protocol
+// SessionParticipant in the protocol.
 type SessionParticipant struct {
 	ID       ParticipantID
-	Role     ParticipantRole
 	Type     SessionType
 	Channels []string
 	State    ParticipantState
+	Role     ParticipantRole
 }
 
-// ParticipantID uniquely identifies participants
+// ParticipantID uniquely identifies participants.
 type ParticipantID string
 
-// ParticipantRole defines participant responsibilities
+// ParticipantRole defines participant responsibilities.
 type ParticipantRole int
 
 const (
@@ -2012,26 +2016,26 @@ const (
 	ParticipantRoleBroker
 )
 
-// ParticipantState tracks participant status
+// ParticipantState tracks participant status.
 type ParticipantState struct {
-	Active      bool
-	Connected   bool
 	Protocol    string
 	LastMessage int64
 	ErrorCount  int
+	Active      bool
+	Connected   bool
 }
 
-// SessionChannel for typed communication
+// SessionChannel for typed communication.
 type SessionChannel struct {
 	Name         string
+	Participants []ParticipantID
+	State        ChannelState
 	Type         ChannelType
 	BufferSize   int
 	Direction    Direction
-	Participants []ParticipantID
-	State        ChannelState
 }
 
-// ChannelType categorizes channels
+// ChannelType categorizes channels.
 type ChannelType int
 
 const (
@@ -2041,7 +2045,7 @@ const (
 	ChannelTypeUnreliable
 )
 
-// ChannelState tracks channel status
+// ChannelState tracks channel status.
 type ChannelState struct {
 	Open             bool
 	MessageCount     int64
@@ -2050,16 +2054,16 @@ type ChannelState struct {
 	ErrorCount       int
 }
 
-// SessionConstraint enforces protocol rules
+// SessionConstraint enforces protocol rules.
 type SessionConstraint struct {
-	Kind         SessionConstraintKind
 	Expression   HIRExpression
-	Participants []ParticipantID
 	Message      string
+	Participants []ParticipantID
+	Kind         SessionConstraintKind
 	Severity     SessionSeverity
 }
 
-// SessionConstraintKind categorizes constraints
+// SessionConstraintKind categorizes constraints.
 type SessionConstraintKind int
 
 const (
@@ -2070,7 +2074,7 @@ const (
 	SessionConstraintProgress
 )
 
-// SessionSeverity for constraint violations
+// SessionSeverity for constraint violations.
 type SessionSeverity int
 
 const (
@@ -2079,16 +2083,16 @@ const (
 	SessionSeverityInfo
 )
 
-// DeadlockInfo describes potential deadlocks
+// DeadlockInfo describes potential deadlocks.
 type DeadlockInfo struct {
+	Description  string
 	Participants []ParticipantID
 	Channels     []string
 	States       []string
-	Description  string
 	Probability  float64
 }
 
-// LivenessCheck verifies protocol progress
+// LivenessCheck verifies protocol progress.
 type LivenessCheck struct {
 	Properties  []LivenessProperty
 	Invariants  []LivenessInvariant
@@ -2096,15 +2100,15 @@ type LivenessCheck struct {
 	Progress    ProgressCheck
 }
 
-// LivenessProperty defines liveness requirements
+// LivenessProperty defines liveness requirements.
 type LivenessProperty struct {
-	Name         string
 	Expression   HIRExpression
-	Type         LivenessType
+	Name         string
 	Participants []ParticipantID
+	Type         LivenessType
 }
 
-// LivenessType categorizes liveness properties
+// LivenessType categorizes liveness properties.
 type LivenessType int
 
 const (
@@ -2114,65 +2118,65 @@ const (
 	LivenessTypeUntil
 )
 
-// LivenessInvariant defines safety properties
+// LivenessInvariant defines safety properties.
 type LivenessInvariant struct {
-	Name       string
 	Expression HIRExpression
-	Global     bool
+	Name       string
 	Scope      []ParticipantID
+	Global     bool
 }
 
-// TerminationCheck verifies protocol termination
+// TerminationCheck verifies protocol termination.
 type TerminationCheck struct {
-	Guaranteed bool
 	Conditions []HIRExpression
 	MaxSteps   int
 	TimeoutMs  int64
+	Guaranteed bool
 }
 
-// ProgressCheck verifies progress properties
+// ProgressCheck verifies progress properties.
 type ProgressCheck struct {
-	Required   bool
 	Conditions []HIRExpression
 	MinSteps   int
 	MaxDelay   int64
+	Required   bool
 }
 
-// ProtocolChecker validates session types
+// ProtocolChecker validates session types.
 type ProtocolChecker struct {
-	Protocols []SessionProtocol
 	Verifier  ProtocolVerifier
+	Protocols []SessionProtocol
 	Analyzer  DeadlockAnalyzer
-	Generator ProtocolGenerator
 	Optimizer ProtocolOptimizer
+	Generator ProtocolGenerator
 }
 
-// ProtocolVerifier checks protocol correctness
+// ProtocolVerifier checks protocol correctness.
 type ProtocolVerifier struct {
 	Rules       []VerificationRule
 	Strategies  []SessionVerificationStrategy
-	Cache       VerificationCache
 	Diagnostics []ProtocolDiagnostic
+	Cache       VerificationCache
 }
 
-// VerificationRule defines verification conditions
+// VerificationRule defines verification conditions.
 type VerificationRule struct {
+	Condition HIRExpression
 	Name      string
 	Pattern   ProtocolPattern
-	Condition HIRExpression
 	Action    VerificationAction
 	Priority  int
 }
 
-// ProtocolPattern matches protocol structures
+// ProtocolPattern matches protocol structures.
 type ProtocolPattern struct {
 	Operations   []SessionOpType
 	States       []string
-	Participants int
 	Constraints  []SessionConstraintKind
+	Participants int
 }
 
-// VerificationAction defines verification responses
+// VerificationAction defines verification responses.
 type VerificationAction int
 
 const (
@@ -2182,7 +2186,7 @@ const (
 	VerificationActionTransform
 )
 
-// SessionVerificationStrategy defines checking approaches
+// SessionVerificationStrategy defines checking approaches.
 type SessionVerificationStrategy struct {
 	Name     string
 	Type     StrategyType
@@ -2191,7 +2195,7 @@ type SessionVerificationStrategy struct {
 	Accuracy float64
 }
 
-// StrategyType categorizes verification strategies
+// StrategyType categorizes verification strategies.
 type StrategyType int
 
 const (
@@ -2201,7 +2205,7 @@ const (
 	StrategyTypeStaticAnalysis
 )
 
-// StrategyConfig configures verification
+// StrategyConfig configures verification.
 type StrategyConfig struct {
 	MaxDepth    int
 	MaxTime     int64
@@ -2209,7 +2213,7 @@ type StrategyConfig struct {
 	CacheSize   int
 }
 
-// VerificationCache caches verification results
+// VerificationCache caches verification results.
 type VerificationCache struct {
 	Results map[string]VerificationResult
 	Stats   CacheStats
@@ -2217,24 +2221,24 @@ type VerificationCache struct {
 	TTL     int64
 }
 
-// VerificationResult stores verification outcomes
+// VerificationResult stores verification outcomes.
 type VerificationResult struct {
-	Valid       bool
 	Errors      []ProtocolError
 	Warnings    []ProtocolWarning
 	Performance VerificationMetrics
 	Timestamp   int64
+	Valid       bool
 }
 
-// ProtocolError represents verification errors
+// ProtocolError represents verification errors.
 type ProtocolError struct {
-	Kind     ProtocolErrorKind
 	Message  string
 	Location string
 	Context  ProtocolContext
+	Kind     ProtocolErrorKind
 }
 
-// ProtocolErrorKind categorizes errors
+// ProtocolErrorKind categorizes errors.
 type ProtocolErrorKind int
 
 const (
@@ -2245,15 +2249,15 @@ const (
 	ProtocolErrorProgressViolation
 )
 
-// ProtocolWarning represents verification warnings
+// ProtocolWarning represents verification warnings.
 type ProtocolWarning struct {
-	Kind     ProtocolWarningKind
 	Message  string
 	Location string
+	Kind     ProtocolWarningKind
 	Severity SessionSeverity
 }
 
-// ProtocolWarningKind categorizes warnings
+// ProtocolWarningKind categorizes warnings.
 type ProtocolWarningKind int
 
 const (
@@ -2263,7 +2267,7 @@ const (
 	ProtocolWarningResourceUsage
 )
 
-// ProtocolContext provides verification context
+// ProtocolContext provides verification context.
 type ProtocolContext struct {
 	Protocol     string
 	State        string
@@ -2271,7 +2275,7 @@ type ProtocolContext struct {
 	Step         int
 }
 
-// VerificationMetrics track verification performance
+// VerificationMetrics track verification performance.
 type VerificationMetrics struct {
 	TimeMs      int64
 	MemoryBytes int64
@@ -2280,7 +2284,7 @@ type VerificationMetrics struct {
 	CacheMisses int
 }
 
-// CacheStats track cache performance
+// CacheStats track cache performance.
 type CacheStats struct {
 	Hits      int64
 	Misses    int64
@@ -2289,16 +2293,16 @@ type CacheStats struct {
 	HitRate   float64
 }
 
-// ProtocolDiagnostic represents verification diagnostics
+// ProtocolDiagnostic represents verification diagnostics.
 type ProtocolDiagnostic struct {
-	Kind     ProtocolDiagnosticKind
 	Message  string
 	Location string
 	Protocol string
+	Kind     ProtocolDiagnosticKind
 	Severity SessionSeverity
 }
 
-// ProtocolDiagnosticKind categorizes diagnostics
+// ProtocolDiagnosticKind categorizes diagnostics.
 type ProtocolDiagnosticKind int
 
 const (
@@ -2309,7 +2313,7 @@ const (
 	ProtocolDiagnosticPerformance
 )
 
-// DeadlockAnalyzer detects deadlocks
+// DeadlockAnalyzer detects deadlocks.
 type DeadlockAnalyzer struct {
 	Algorithms []DeadlockAlgorithm
 	Detectors  []DeadlockDetector
@@ -2317,16 +2321,16 @@ type DeadlockAnalyzer struct {
 	Monitor    DeadlockMonitor
 }
 
-// DeadlockAlgorithm defines detection methods
+// DeadlockAlgorithm defines detection methods.
 type DeadlockAlgorithm struct {
-	Name        string
-	Type        AlgorithmType
 	Complexity  Complexity
-	Accuracy    float64
+	Name        string
 	Performance AlgorithmMetrics
+	Type        AlgorithmType
+	Accuracy    float64
 }
 
-// AlgorithmType categorizes algorithms
+// AlgorithmType categorizes algorithms.
 type AlgorithmType int
 
 const (
@@ -2336,13 +2340,13 @@ const (
 	AlgorithmTypeStaticAnalysis
 )
 
-// Complexity measures algorithm complexity
+// Complexity measures algorithm complexity.
 type Complexity struct {
 	Time  string // Big-O notation
 	Space string // Big-O notation
 }
 
-// AlgorithmMetrics track algorithm performance
+// AlgorithmMetrics track algorithm performance.
 type AlgorithmMetrics struct {
 	AverageTimeMs int64
 	MaxTimeMs     int64
@@ -2350,15 +2354,15 @@ type AlgorithmMetrics struct {
 	SuccessRate   float64
 }
 
-// DeadlockDetector implements detection logic
+// DeadlockDetector implements detection logic.
 type DeadlockDetector struct {
+	State      DetectorState
 	Algorithm  DeadlockAlgorithm
 	Config     DetectorConfig
-	State      DetectorState
 	Statistics DetectorStatistics
 }
 
-// DetectorConfig configures detection
+// DetectorConfig configures detection.
 type DetectorConfig struct {
 	Enabled   bool
 	Interval  int64   // milliseconds
@@ -2367,24 +2371,24 @@ type DetectorConfig struct {
 	BatchSize int
 }
 
-// DetectorState tracks detector status
+// DetectorState tracks detector status.
 type DetectorState struct {
-	Running    bool
-	LastCheck  int64
-	CheckCount int64
 	Deadlocks  []DeadlockInfo
 	Errors     []DetectorError
+	LastCheck  int64
+	CheckCount int64
+	Running    bool
 }
 
-// DetectorError represents detection errors
+// DetectorError represents detection errors.
 type DetectorError struct {
-	Kind      DetectorErrorKind
 	Message   string
-	Timestamp int64
 	Context   string
+	Kind      DetectorErrorKind
+	Timestamp int64
 }
 
-// DetectorErrorKind categorizes detection errors
+// DetectorErrorKind categorizes detection errors.
 type DetectorErrorKind int
 
 const (
@@ -2394,7 +2398,7 @@ const (
 	DetectorErrorInternal
 )
 
-// DetectorStatistics track detection performance
+// DetectorStatistics track detection performance.
 type DetectorStatistics struct {
 	TotalChecks     int64
 	DeadlocksFound  int64
@@ -2403,14 +2407,14 @@ type DetectorStatistics struct {
 	PeakMemoryBytes int64
 }
 
-// DeadlockResolver implements resolution strategies
+// DeadlockResolver implements resolution strategies.
 type DeadlockResolver struct {
 	Strategy      ResolutionStrategy
 	Config        ResolverConfig
 	Effectiveness ResolverEffectiveness
 }
 
-// ResolutionStrategy defines resolution approaches
+// ResolutionStrategy defines resolution approaches.
 type ResolutionStrategy int
 
 const (
@@ -2420,7 +2424,7 @@ const (
 	ResolutionStrategyRestart
 )
 
-// ResolverConfig configures resolution
+// ResolverConfig configures resolution.
 type ResolverConfig struct {
 	Enabled     bool
 	MaxAttempts int
@@ -2428,7 +2432,7 @@ type ResolverConfig struct {
 	Priority    int
 }
 
-// ResolverEffectiveness measures resolution success
+// ResolverEffectiveness measures resolution success.
 type ResolverEffectiveness struct {
 	SuccessRate   float64
 	AverageTimeMs int64
@@ -2436,33 +2440,33 @@ type ResolverEffectiveness struct {
 	SideEffects   int
 }
 
-// DeadlockMonitor provides runtime monitoring
+// DeadlockMonitor provides runtime monitoring.
 type DeadlockMonitor struct {
-	Active    bool
 	Watchers  []DeadlockWatcher
 	Alerts    []DeadlockAlert
 	Dashboard MonitorDashboard
-}
-
-// DeadlockWatcher monitors specific conditions
-type DeadlockWatcher struct {
-	Name      string
-	Condition HIRExpression
-	Threshold float64
 	Active    bool
+}
+
+// DeadlockWatcher monitors specific conditions.
+type DeadlockWatcher struct {
+	Condition HIRExpression
+	Name      string
+	Threshold float64
 	Triggered int64
+	Active    bool
 }
 
-// DeadlockAlert represents deadlock notifications
+// DeadlockAlert represents deadlock notifications.
 type DeadlockAlert struct {
-	Level        AlertLevel
 	Message      string
-	Timestamp    int64
-	Participants []ParticipantID
 	Context      string
+	Participants []ParticipantID
+	Level        AlertLevel
+	Timestamp    int64
 }
 
-// AlertLevel categorizes alert severity
+// AlertLevel categorizes alert severity.
 type AlertLevel int
 
 const (
@@ -2472,7 +2476,7 @@ const (
 	AlertLevelCritical
 )
 
-// MonitorDashboard provides monitoring interface
+// MonitorDashboard provides monitoring interface.
 type MonitorDashboard struct {
 	Metrics    []MonitorMetric
 	Charts     []MonitorChart
@@ -2480,16 +2484,16 @@ type MonitorDashboard struct {
 	LastUpdate int64
 }
 
-// MonitorMetric tracks monitoring data
+// MonitorMetric tracks monitoring data.
 type MonitorMetric struct {
 	Name      string
-	Value     float64
 	Unit      string
+	Value     float64
 	Trend     TrendDirection
 	Timestamp int64
 }
 
-// TrendDirection indicates metric trends
+// TrendDirection indicates metric trends.
 type TrendDirection int
 
 const (
@@ -2499,15 +2503,15 @@ const (
 	TrendDirectionUnknown
 )
 
-// MonitorChart visualizes monitoring data
+// MonitorChart visualizes monitoring data.
 type MonitorChart struct {
-	Type   ChartType
+	Config ChartConfig
 	Title  string
 	Data   []ChartDataPoint
-	Config ChartConfig
+	Type   ChartType
 }
 
-// ChartType categorizes charts
+// ChartType categorizes charts.
 type ChartType int
 
 const (
@@ -2517,24 +2521,24 @@ const (
 	ChartTypeScatter
 )
 
-// ChartDataPoint represents chart data
+// ChartDataPoint represents chart data.
 type ChartDataPoint struct {
+	Label     string
 	X         float64
 	Y         float64
-	Label     string
 	Timestamp int64
 }
 
-// ChartConfig configures chart display
+// ChartConfig configures chart display.
 type ChartConfig struct {
+	ColorScheme string
 	Width       int
 	Height      int
 	ShowLegend  bool
 	ShowGrid    bool
-	ColorScheme string
 }
 
-// ProtocolGenerator creates session types
+// ProtocolGenerator creates session types.
 type ProtocolGenerator struct {
 	Templates []ProtocolTemplate
 	Patterns  []GenerationPattern
@@ -2542,7 +2546,7 @@ type ProtocolGenerator struct {
 	Validator GenerationValidator
 }
 
-// ProtocolTemplate defines protocol skeletons
+// ProtocolTemplate defines protocol skeletons.
 type ProtocolTemplate struct {
 	Name        string
 	Pattern     ProtocolPattern
@@ -2551,22 +2555,22 @@ type ProtocolTemplate struct {
 	Instances   []ProtocolInstance
 }
 
-// TemplateParameter configures templates
+// TemplateParameter configures templates.
 type TemplateParameter struct {
-	Name     string
 	Type     HIRExpression
 	Default  HIRExpression
+	Name     string
 	Optional bool
 }
 
-// TemplateConstraint limits template usage
+// TemplateConstraint limits template usage.
 type TemplateConstraint struct {
 	Parameter string
 	Condition HIRExpression
 	Message   string
 }
 
-// ProtocolInstance represents template instantiation
+// ProtocolInstance represents template instantiation.
 type ProtocolInstance struct {
 	Template   string
 	Parameters map[string]HIRExpression
@@ -2574,16 +2578,16 @@ type ProtocolInstance struct {
 	Valid      bool
 }
 
-// GenerationPattern guides protocol creation
+// GenerationPattern guides protocol creation.
 type GenerationPattern struct {
 	Name        string
-	Type        PatternType
-	Probability float64
 	Conditions  []HIRExpression
 	Actions     []GenerationAction
+	Type        PatternType
+	Probability float64
 }
 
-// PatternType categorizes generation patterns
+// PatternType categorizes generation patterns.
 type PatternType int
 
 const (
@@ -2593,45 +2597,45 @@ const (
 	PatternTypeBroadcast
 )
 
-// GenerationAction defines generation steps
+// GenerationAction defines generation steps.
 type GenerationAction struct {
-	Type      ActionType
-	Target    string
 	Operation HIRExpression
+	Target    string
+	Type      ActionType
 	Priority  int
 }
 
-// GenerationOptimizer optimizes generated protocols
+// GenerationOptimizer optimizes generated protocols.
 type GenerationOptimizer struct {
-	Strategies []OptimizationStrategy
-	Metrics    GenerationMetrics
 	Config     OptimizerConfig
+	Metrics    GenerationMetrics
+	Strategies []OptimizationStrategy
 }
 
-// GenerationMetrics track generation performance
+// GenerationMetrics track generation performance.
 type GenerationMetrics struct {
+	OptimizationGains  map[string]float64
 	ProtocolsGenerated int64
 	AverageTimeMs      float64
 	SuccessRate        float64
-	OptimizationGains  map[string]float64
 }
 
-// OptimizerConfig configures optimization
+// OptimizerConfig configures optimization.
 type OptimizerConfig struct {
-	Enabled       bool
-	MaxIterations int
-	TargetMetrics []string
 	Thresholds    map[string]float64
+	TargetMetrics []string
+	MaxIterations int
+	Enabled       bool
 }
 
-// GenerationValidator validates generated protocols
+// GenerationValidator validates generated protocols.
 type GenerationValidator struct {
 	Rules      []ValidationRule
 	Checkers   []ProtocolChecker
 	Statistics ValidationStatistics
 }
 
-// ValidationRule defines validation criteria
+// ValidationRule defines validation criteria.
 type ValidationRule struct {
 	Name      string
 	Condition HIRExpression
@@ -2639,7 +2643,7 @@ type ValidationRule struct {
 	Severity  SessionSeverity
 }
 
-// ValidationStatistics track validation performance
+// ValidationStatistics track validation performance.
 type ValidationStatistics struct {
 	ProtocolsValidated int64
 	ValidationsPassed  int64
@@ -2647,23 +2651,23 @@ type ValidationStatistics struct {
 	AverageTimeMs      float64
 }
 
-// ProtocolOptimizer optimizes session protocols
+// ProtocolOptimizer optimizes session protocols.
 type ProtocolOptimizer struct {
 	Strategies []ProtocolOptimizationStrategy
 	Metrics    ProtocolOptimizationMetrics
 	Config     ProtocolOptimizerConfig
 }
 
-// ProtocolOptimizationStrategy defines optimization approaches
+// ProtocolOptimizationStrategy defines optimization approaches.
 type ProtocolOptimizationStrategy struct {
-	Name          string
-	Type          OptimizationType
 	Applicability func(SessionProtocol) bool
 	Transform     func(SessionProtocol) SessionProtocol
+	Name          string
+	Type          OptimizationType
 	Benefit       float64
 }
 
-// OptimizationType categorizes optimizations
+// OptimizationType categorizes optimizations.
 type OptimizationType int
 
 const (
@@ -2673,47 +2677,47 @@ const (
 	OptimizationTypeThroughput
 )
 
-// ProtocolOptimizationMetrics track optimization results
+// ProtocolOptimizationMetrics track optimization results.
 type ProtocolOptimizationMetrics struct {
-	ProtocolsOptimized  int64
 	PerformanceGains    map[string]float64
 	MemoryReductions    map[string]int64
 	LatencyImprovements map[string]float64
+	ProtocolsOptimized  int64
 }
 
-// ProtocolOptimizerConfig configures optimization
+// ProtocolOptimizerConfig configures optimization.
 type ProtocolOptimizerConfig struct {
-	Enabled        bool
-	MaxPasses      int
 	TargetMetrics  []string
+	MaxPasses      int
 	MinImprovement float64
+	Enabled        bool
 }
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.4.3: Resource Types
-// =============================================================================
+// =============================================================================.
 
-// ResourceType represents file, network, and other managed resources
+// ResourceType represents file, network, and other managed resources.
 type ResourceType struct {
-	ID          TypeID
-	Kind        ResourceManagementKind
 	Properties  ResourceManagementProperties
 	Lifecycle   ResourceLifecycle
+	Cleanup     ResourceCleanup
+	Kind        ResourceManagementKind
 	Permissions []ResourcePermission
 	Constraints []ResourceConstraint
-	Cleanup     ResourceCleanup
+	ID          TypeID
 }
 
-// ResourceManagementKind categorizes different types of resources
+// ResourceManagementKind categorizes different types of resources.
 type ResourceManagementKind struct {
-	Category     ResourceCategory
 	SubType      string
 	Protocol     string
 	Version      string
 	Capabilities []ResourceCapability
+	Category     ResourceCategory
 }
 
-// ResourceCategory defines major resource categories
+// ResourceCategory defines major resource categories.
 type ResourceCategory int
 
 const (
@@ -2727,7 +2731,7 @@ const (
 	ResourceCategoryCustom
 )
 
-// ResourceCapability defines what operations a resource supports
+// ResourceCapability defines what operations a resource supports.
 type ResourceCapability struct {
 	Name        string
 	Operations  []OperationType
@@ -2735,45 +2739,45 @@ type ResourceCapability struct {
 	Constraints []string
 }
 
-// ResourceManagementProperties define resource characteristics
+// ResourceManagementProperties define resource characteristics.
 type ResourceManagementProperties struct {
+	Attributes    map[string]interface{}
+	Configuration map[string]interface{}
 	Name          string
+	Metadata      ResourceMetadata
 	Size          int64
+	MaxUsers      int
+	Timeout       int64
 	IsExclusive   bool
 	IsShareable   bool
 	IsThreadSafe  bool
 	IsReentrant   bool
-	MaxUsers      int
-	Timeout       int64 // milliseconds
-	Attributes    map[string]interface{}
-	Metadata      ResourceMetadata
-	Configuration map[string]interface{}
 }
 
-// ResourceMetadata contains resource metadata
+// ResourceMetadata contains resource metadata.
 type ResourceMetadata struct {
 	Version     string
 	Owner       string
+	Tags        []string
 	Created     int64
 	Modified    int64
 	Permissions int
-	Tags        []string
 }
 
-// ResourceLifecycle defines resource management phases
+// ResourceLifecycle defines resource management phases.
 type ResourceLifecycle struct {
-	State       ResourceState
-	Phases      []LifecyclePhase
 	Transitions map[string][]string
+	Monitoring  ResourceMonitoring
+	Release     ResourceRelease
+	Phases      []LifecyclePhase
 	Events      []LifecycleEvent
 	Hooks       []LifecycleHook
 	Acquisition ResourceAcquisition
 	Usage       ResourceUsage
-	Release     ResourceRelease
-	Monitoring  ResourceMonitoring
+	State       ResourceState
 }
 
-// ResourceState defines current state of a resource
+// ResourceState defines current state of a resource.
 type ResourceState int
 
 const (
@@ -2786,7 +2790,7 @@ const (
 	ResourceStateError
 )
 
-// LifecyclePhase defines a phase in resource lifecycle
+// LifecyclePhase defines a phase in resource lifecycle.
 type LifecyclePhase struct {
 	Name           string
 	Actions        []LifecycleAction
@@ -2796,16 +2800,16 @@ type LifecyclePhase struct {
 	Transitions    []PhaseTransition
 }
 
-// LifecycleAction defines actions during lifecycle phases
+// LifecycleAction defines actions during lifecycle phases.
 type LifecycleAction struct {
-	Type       ActionType
-	Command    string
 	Parameters map[string]interface{}
-	Required   bool
+	Command    string
+	Type       ActionType
 	Timeout    int64
+	Required   bool
 }
 
-// ActionType defines types of lifecycle actions
+// ActionType defines types of lifecycle actions.
 type ActionType int
 
 const (
@@ -2820,43 +2824,43 @@ const (
 	ActionTypeCleanup
 )
 
-// PhaseTimeout defines timeout for lifecycle phases
+// PhaseTimeout defines timeout for lifecycle phases.
 type PhaseTimeout struct {
-	Duration int64
 	Action   string
+	Duration int64
 }
 
-// PhaseTransition defines transitions between phases
+// PhaseTransition defines transitions between phases.
 type PhaseTransition struct {
 	To        string
 	Condition HIRExpression
 	Action    string
 }
 
-// LifecycleEvent defines events during resource lifecycle
+// LifecycleEvent defines events during resource lifecycle.
 type LifecycleEvent struct {
-	Type    string
 	Handler HIRExpression
 	Context map[string]HIRExpression
+	Type    string
 }
 
-// LifecycleHook defines hooks for lifecycle events
+// LifecycleHook defines hooks for lifecycle events.
 type LifecycleHook struct {
+	Action HIRExpression
 	Phase  string
 	Type   string
-	Action HIRExpression
 }
 
-// ResourceAcquisition defines how resources are obtained
+// ResourceAcquisition defines how resources are obtained.
 type ResourceAcquisition struct {
-	Method         AcquisitionMethod
 	Parameters     []AcquisitionParameter
 	Preconditions  []HIRExpression
 	Postconditions []HIRExpression
+	Method         AcquisitionMethod
 	FailureMode    FailureMode
 }
 
-// AcquisitionMethod categorizes acquisition approaches
+// AcquisitionMethod categorizes acquisition approaches.
 type AcquisitionMethod int
 
 const (
@@ -2868,16 +2872,16 @@ const (
 	AcquisitionMethodClone
 )
 
-// AcquisitionParameter configures resource acquisition
+// AcquisitionParameter configures resource acquisition.
 type AcquisitionParameter struct {
-	Name     string
 	Type     HIRExpression
 	Value    HIRExpression
-	Required bool
 	Default  HIRExpression
+	Name     string
+	Required bool
 }
 
-// FailureMode defines acquisition failure behavior
+// FailureMode defines acquisition failure behavior.
 type FailureMode int
 
 const (
@@ -2887,7 +2891,7 @@ const (
 	FailureModeWait
 )
 
-// ResourceUsage defines how resources can be used
+// ResourceUsage defines how resources can be used.
 type ResourceUsage struct {
 	Operations   []ResourceOperation
 	Patterns     []UsagePattern
@@ -2895,17 +2899,17 @@ type ResourceUsage struct {
 	Metrics      UsageMetrics
 }
 
-// ResourceOperation defines allowed operations
+// ResourceOperation defines allowed operations.
 type ResourceOperation struct {
 	Name           string
-	Type           OperationType
 	Parameters     []OperationParameter
 	Preconditions  []HIRExpression
 	Postconditions []HIRExpression
 	SideEffects    []SideEffect
+	Type           OperationType
 }
 
-// OperationType categorizes operations
+// OperationType categorizes operations.
 type OperationType int
 
 const (
@@ -2918,16 +2922,16 @@ const (
 	OperationTypeExecute
 )
 
-// OperationParameter defines operation inputs
+// OperationParameter defines operation inputs.
 type OperationParameter struct {
-	Name       string
 	Type       HIRExpression
+	Validation HIRExpression
+	Name       string
 	Direction  ParameterDirection
 	Optional   bool
-	Validation HIRExpression
 }
 
-// ParameterDirection indicates parameter flow
+// ParameterDirection indicates parameter flow.
 type ParameterDirection int
 
 const (
@@ -2936,15 +2940,15 @@ const (
 	ParameterDirectionInOut
 )
 
-// SideEffect describes operation effects
+// SideEffect describes operation effects.
 type SideEffect struct {
-	Type        EffectType
 	Target      string
 	Description string
+	Type        EffectType
 	Severity    EffectSeverity
 }
 
-// EffectType categorizes side effects
+// EffectType categorizes side effects.
 type EffectType int
 
 const (
@@ -2955,7 +2959,7 @@ const (
 	EffectTypeLogging
 )
 
-// EffectSeverity indicates effect importance
+// EffectSeverity indicates effect importance.
 type EffectSeverity int
 
 const (
@@ -2965,16 +2969,16 @@ const (
 	EffectSeverityCritical
 )
 
-// UsagePattern defines common usage scenarios
+// UsagePattern defines common usage scenarios.
 type UsagePattern struct {
+	Context   PatternContext
 	Name      string
 	Sequence  []ResourceOperation
-	Frequency PatternFrequency
-	Context   PatternContext
 	Benefits  []PatternBenefit
+	Frequency PatternFrequency
 }
 
-// PatternFrequency indicates how often pattern occurs
+// PatternFrequency indicates how often pattern occurs.
 type PatternFrequency int
 
 const (
@@ -2984,7 +2988,7 @@ const (
 	PatternFrequencyConstant
 )
 
-// PatternContext provides pattern usage context
+// PatternContext provides pattern usage context.
 type PatternContext struct {
 	Application string
 	Module      string
@@ -2992,14 +2996,14 @@ type PatternContext struct {
 	Thread      string
 }
 
-// PatternBenefit describes pattern advantages
+// PatternBenefit describes pattern advantages.
 type PatternBenefit struct {
-	Type        BenefitType
 	Description string
+	Type        BenefitType
 	Magnitude   float64
 }
 
-// BenefitType categorizes pattern benefits
+// BenefitType categorizes pattern benefits.
 type BenefitType int
 
 const (
@@ -3009,16 +3013,16 @@ const (
 	BenefitTypeMaintainability
 )
 
-// UsageRestriction limits resource usage
+// UsageRestriction limits resource usage.
 type UsageRestriction struct {
-	Type      RestrictionType
 	Condition HIRExpression
-	Action    RestrictionAction
 	Message   string
+	Type      RestrictionType
+	Action    RestrictionAction
 	Severity  RestrictionSeverity
 }
 
-// RestrictionType categorizes restrictions
+// RestrictionType categorizes restrictions.
 type RestrictionType int
 
 const (
@@ -3029,7 +3033,7 @@ const (
 	RestrictionTypeRate
 )
 
-// RestrictionAction defines restriction enforcement
+// RestrictionAction defines restriction enforcement.
 type RestrictionAction int
 
 const (
@@ -3039,7 +3043,7 @@ const (
 	RestrictionActionQueue
 )
 
-// RestrictionSeverity indicates restriction importance
+// RestrictionSeverity indicates restriction importance.
 type RestrictionSeverity int
 
 const (
@@ -3049,7 +3053,7 @@ const (
 	RestrictionSeverityCritical
 )
 
-// UsageMetrics track resource usage statistics
+// UsageMetrics track resource usage statistics.
 type UsageMetrics struct {
 	TotalOperations      int64
 	SuccessfulOperations int64
@@ -3060,17 +3064,17 @@ type UsageMetrics struct {
 	ErrorRate            float64
 }
 
-// ResourceRelease defines how resources are freed
+// ResourceRelease defines how resources are freed.
 type ResourceRelease struct {
-	Method        ReleaseMethod
-	Automatic     bool
-	Deterministic bool
-	Timeout       int64
 	Cleanup       []CleanupAction
 	Verification  []ReleaseVerification
+	Method        ReleaseMethod
+	Timeout       int64
+	Automatic     bool
+	Deterministic bool
 }
 
-// ReleaseMethod categorizes release approaches
+// ReleaseMethod categorizes release approaches.
 type ReleaseMethod int
 
 const (
@@ -3082,21 +3086,21 @@ const (
 	ReleaseMethodFinalize
 )
 
-// CleanupAction defines cleanup steps
+// CleanupAction defines cleanup steps.
 type CleanupAction struct {
-	Type        ActionType
-	Command     string
 	Parameters  map[string]interface{}
-	Timeout     int64
-	Required    bool
-	FailureMode CleanupFailureMode
+	Command     string
 	Name        string
 	Target      string
+	Type        ActionType
+	Timeout     int64
+	FailureMode CleanupFailureMode
 	Order       int
+	Required    bool
 	Optional    bool
 }
 
-// CleanupType categorizes cleanup actions
+// CleanupType categorizes cleanup actions.
 type CleanupType int
 
 const (
@@ -3107,7 +3111,7 @@ const (
 	CleanupTypeLog
 )
 
-// CleanupFailureMode defines cleanup failure handling
+// CleanupFailureMode defines cleanup failure handling.
 type CleanupFailureMode int
 
 const (
@@ -3117,33 +3121,33 @@ const (
 	CleanupFailureModeAbort
 )
 
-// ReleaseVerification ensures proper release
+// ReleaseVerification ensures proper release.
 type ReleaseVerification struct {
 	Check    HIRExpression
-	Required bool
-	Timeout  int64
 	Message  string
+	Timeout  int64
+	Required bool
 }
 
-// ResourceMonitoring tracks resource health
+// ResourceMonitoring tracks resource health.
 type ResourceMonitoring struct {
-	Enabled  bool
-	Interval int64 // milliseconds
 	Metrics  []MonitoringMetric
 	Alerts   []MonitoringAlert
 	Actions  []MonitoringAction
+	Interval int64
+	Enabled  bool
 }
 
-// MonitoringMetric defines what to monitor
+// MonitoringMetric defines what to monitor.
 type MonitoringMetric struct {
 	Name      string
-	Type      MetricType
 	Source    string
-	Threshold float64
 	Unit      string
+	Type      MetricType
+	Threshold float64
 }
 
-// MetricType categorizes metrics
+// MetricType categorizes metrics.
 type MetricType int
 
 const (
@@ -3153,16 +3157,16 @@ const (
 	MetricTypeSummary
 )
 
-// MonitoringAlert defines alert conditions
+// MonitoringAlert defines alert conditions.
 type MonitoringAlert struct {
-	Name      string
 	Condition HIRExpression
+	Name      string
+	Message   string
 	Level     AlertLevel
 	Action    AlertAction
-	Message   string
 }
 
-// AlertAction defines alert responses
+// AlertAction defines alert responses.
 type AlertAction int
 
 const (
@@ -3172,15 +3176,15 @@ const (
 	AlertActionShutdown
 )
 
-// MonitoringAction defines monitoring responses
+// MonitoringAction defines monitoring responses.
 type MonitoringAction struct {
 	Trigger    HIRExpression
-	Action     ActionType
-	Target     string
 	Parameters map[string]HIRExpression
+	Target     string
+	Action     ActionType
 }
 
-// PermissionScope defines the scope of a resource permission
+// PermissionScope defines the scope of a resource permission.
 type PermissionScope int
 
 const (
@@ -3192,27 +3196,27 @@ const (
 	PermissionScopeNetwork
 )
 
-// ResourcePermission defines access rights
+// ResourcePermission defines access rights.
 type ResourcePermission struct {
 	Principal  string
 	Operations []OperationType
-	Scope      PermissionScope
 	Conditions []HIRExpression
+	Scope      PermissionScope
 	Expiration int64
 	Revokable  bool
 }
 
-// ResourceConstraint enforces resource rules
+// ResourceConstraint enforces resource rules.
 type ResourceConstraint struct {
-	Type        ConstraintType
 	Rule        HIRExpression
 	Expression  HIRExpression
-	Enforcement ConstraintEnforcement
 	Message     string
+	Type        ConstraintType
+	Enforcement ConstraintEnforcement
 	Severity    ConstraintSeverity
 }
 
-// ConstraintType categorizes resource constraints
+// ConstraintType categorizes resource constraints.
 type ConstraintType int
 
 const (
@@ -3223,7 +3227,7 @@ const (
 	ConstraintTypeCompliance
 )
 
-// ConstraintEnforcement defines enforcement timing
+// ConstraintEnforcement defines enforcement timing.
 type ConstraintEnforcement int
 
 const (
@@ -3232,7 +3236,7 @@ const (
 	ConstraintEnforcementBoth
 )
 
-// ConstraintSeverity indicates constraint importance
+// ConstraintSeverity indicates constraint importance.
 type ConstraintSeverity int
 
 const (
@@ -3242,17 +3246,17 @@ const (
 	ConstraintSeverityFatal
 )
 
-// ResourceCleanup defines automatic cleanup
+// ResourceCleanup defines automatic cleanup.
 type ResourceCleanup struct {
-	Automatic    bool
-	Strategy     CleanupStrategy
+	Recovery     CleanupRecovery
 	Conditions   []CleanupCondition
 	Actions      []CleanupAction
 	Verification []CleanupVerification
-	Recovery     CleanupRecovery
+	Strategy     CleanupStrategy
+	Automatic    bool
 }
 
-// CleanupStrategy defines cleanup approaches
+// CleanupStrategy defines cleanup approaches.
 type CleanupStrategy int
 
 const (
@@ -3262,15 +3266,15 @@ const (
 	CleanupStrategyOnExit
 )
 
-// CleanupCondition defines when cleanup occurs
+// CleanupCondition defines when cleanup occurs.
 type CleanupCondition struct {
-	Type       ConditionType
 	Expression HIRExpression
+	Type       ConditionType
 	Priority   int
 	Required   bool
 }
 
-// ConditionType categorizes cleanup conditions
+// ConditionType categorizes cleanup conditions.
 type ConditionType int
 
 const (
@@ -3280,7 +3284,7 @@ const (
 	ConditionTypeResource
 )
 
-// CleanupVerification ensures cleanup success
+// CleanupVerification ensures cleanup success.
 type CleanupVerification struct {
 	Check     HIRExpression
 	Timeout   int64
@@ -3288,15 +3292,15 @@ type CleanupVerification struct {
 	OnFailure CleanupFailureMode
 }
 
-// CleanupRecovery handles cleanup failures
+// CleanupRecovery handles cleanup failures.
 type CleanupRecovery struct {
-	Enabled  bool
+	Fallback []CleanupAction
 	Attempts int
 	Backoff  BackoffStrategy
-	Fallback []CleanupAction
+	Enabled  bool
 }
 
-// BackoffStrategy defines retry timing
+// BackoffStrategy defines retry timing.
 type BackoffStrategy int
 
 const (
@@ -3306,7 +3310,7 @@ const (
 	BackoffStrategyRandom
 )
 
-// ResourceManager manages resource lifecycles
+// ResourceManager manages resource lifecycles.
 type ResourceManager struct {
 	Resources  []ManagedResource
 	Pools      []ResourcePool
@@ -3315,20 +3319,20 @@ type ResourceManager struct {
 	Policies   []ResourcePolicy
 }
 
-// ManagedResource represents a managed resource instance
+// ManagedResource represents a managed resource instance.
 type ManagedResource struct {
 	ID          ResourceID
-	Type        ResourceType
-	State       ResourceState
 	Owner       string
+	Type        ResourceType
 	Allocations []ResourceAllocation
 	Statistics  ResourceStatistics
+	State       ResourceState
 }
 
-// ResourceID uniquely identifies resources
+// ResourceID uniquely identifies resources.
 type ResourceID string
 
-// ResourceAllocation tracks resource usage
+// ResourceAllocation tracks resource usage.
 type ResourceAllocation struct {
 	ID        AllocationID
 	User      string
@@ -3338,10 +3342,10 @@ type ResourceAllocation struct {
 	Status    AllocationStatus
 }
 
-// AllocationID uniquely identifies allocations
+// AllocationID uniquely identifies allocations.
 type AllocationID string
 
-// AllocationStatus tracks allocation state
+// AllocationStatus tracks allocation state.
 type AllocationStatus int
 
 const (
@@ -3352,7 +3356,7 @@ const (
 	AllocationStatusFailed
 )
 
-// ResourceStatistics track resource performance
+// ResourceStatistics track resource performance.
 type ResourceStatistics struct {
 	TotalAllocations  int64
 	ActiveAllocations int64
@@ -3363,20 +3367,20 @@ type ResourceStatistics struct {
 	ErrorCount        int64
 }
 
-// ResourcePool manages resource collections
+// ResourcePool manages resource collections.
 type ResourcePool struct {
 	ID          PoolID
 	Type        ResourceType
-	Capacity    PoolCapacity
-	Allocation  PoolAllocation
 	Maintenance PoolMaintenance
+	Allocation  PoolAllocation
 	Statistics  PoolStatistics
+	Capacity    PoolCapacity
 }
 
-// PoolID uniquely identifies resource pools
+// PoolID uniquely identifies resource pools.
 type PoolID string
 
-// PoolCapacity defines pool limits
+// PoolCapacity defines pool limits.
 type PoolCapacity struct {
 	MinSize     int
 	MaxSize     int
@@ -3385,15 +3389,15 @@ type PoolCapacity struct {
 	ShrinkRate  float64
 }
 
-// PoolAllocation manages pool resource distribution
+// PoolAllocation manages pool resource distribution.
 type PoolAllocation struct {
-	Strategy    AllocationStrategy
-	Queue       AllocationQueue
 	Prioritizer AllocationPrioritizer
 	Balancer    LoadBalancer
+	Queue       AllocationQueue
+	Strategy    AllocationStrategy
 }
 
-// AllocationStrategy defines allocation approaches
+// AllocationStrategy defines allocation approaches.
 type AllocationStrategy int
 
 const (
@@ -3403,7 +3407,7 @@ const (
 	AllocationStrategyWeighted
 )
 
-// AllocationQueue manages allocation requests
+// AllocationQueue manages allocation requests.
 type AllocationQueue struct {
 	Type     QueueType
 	Capacity int
@@ -3411,7 +3415,7 @@ type AllocationQueue struct {
 	Timeout  int64
 }
 
-// QueueType categorizes allocation queues
+// QueueType categorizes allocation queues.
 type QueueType int
 
 const (
@@ -3421,20 +3425,20 @@ const (
 	QueueTypeWeighted
 )
 
-// AllocationPrioritizer determines allocation order
+// AllocationPrioritizer determines allocation order.
 type AllocationPrioritizer struct {
 	Rules    []PriorityRule
 	Fallback PriorityFallback
 }
 
-// PriorityRule defines priority calculation
+// PriorityRule defines priority calculation.
 type PriorityRule struct {
 	Condition HIRExpression
 	Priority  int
 	Weight    float64
 }
 
-// PriorityFallback handles unknown priorities
+// PriorityFallback handles unknown priorities.
 type PriorityFallback int
 
 const (
@@ -3444,14 +3448,14 @@ const (
 	PriorityFallbackRandom
 )
 
-// LoadBalancer distributes load across resources
+// LoadBalancer distributes load across resources.
 type LoadBalancer struct {
-	Algorithm LoadBalancingAlgorithm
 	Health    HealthChecker
 	Metrics   LoadBalancingMetrics
+	Algorithm LoadBalancingAlgorithm
 }
 
-// LoadBalancingAlgorithm defines load distribution
+// LoadBalancingAlgorithm defines load distribution.
 type LoadBalancingAlgorithm int
 
 const (
@@ -3461,25 +3465,25 @@ const (
 	LoadBalancingAlgorithmResourceBased
 )
 
-// HealthChecker monitors resource health
+// HealthChecker monitors resource health.
 type HealthChecker struct {
-	Enabled   bool
+	Checks    []HealthCheck
 	Interval  int64
 	Timeout   int64
-	Checks    []HealthCheck
 	OnFailure HealthFailureAction
+	Enabled   bool
 }
 
-// HealthCheck defines health verification
+// HealthCheck defines health verification.
 type HealthCheck struct {
-	Name      string
-	Type      HealthCheckType
-	Target    string
 	Condition HIRExpression
+	Name      string
+	Target    string
+	Type      HealthCheckType
 	Timeout   int64
 }
 
-// HealthCheckType categorizes health checks
+// HealthCheckType categorizes health checks.
 type HealthCheckType int
 
 const (
@@ -3489,7 +3493,7 @@ const (
 	HealthCheckTypeCustom
 )
 
-// HealthFailureAction defines failure responses
+// HealthFailureAction defines failure responses.
 type HealthFailureAction int
 
 const (
@@ -3499,7 +3503,7 @@ const (
 	HealthFailureActionIgnore
 )
 
-// LoadBalancingMetrics track load balancing performance
+// LoadBalancingMetrics track load balancing performance.
 type LoadBalancingMetrics struct {
 	RequestCount    int64
 	ResponseTime    float64
@@ -3508,24 +3512,24 @@ type LoadBalancingMetrics struct {
 	ActiveResources int
 }
 
-// PoolMaintenance handles pool upkeep
+// PoolMaintenance handles pool upkeep.
 type PoolMaintenance struct {
-	Enabled  bool
 	Schedule MaintenanceSchedule
-	Tasks    []MaintenanceTask
 	Window   MaintenanceWindow
+	Tasks    []MaintenanceTask
+	Enabled  bool
 }
 
-// MaintenanceSchedule defines when maintenance occurs
+// MaintenanceSchedule defines when maintenance occurs.
 type MaintenanceSchedule struct {
+	Time     string
+	Timezone string
+	Days     []int
 	Type     ScheduleType
 	Interval int64
-	Time     string
-	Days     []int
-	Timezone string
 }
 
-// ScheduleType categorizes maintenance schedules
+// ScheduleType categorizes maintenance schedules.
 type ScheduleType int
 
 const (
@@ -3536,17 +3540,17 @@ const (
 	ScheduleTypeCustom
 )
 
-// MaintenanceTask defines maintenance work
+// MaintenanceTask defines maintenance work.
 type MaintenanceTask struct {
-	Name       string
-	Type       TaskType
-	Target     string
 	Parameters map[string]HIRExpression
+	Name       string
+	Target     string
+	Type       TaskType
 	Duration   int64
 	Critical   bool
 }
 
-// TaskType categorizes maintenance tasks
+// TaskType categorizes maintenance tasks.
 type TaskType int
 
 const (
@@ -3557,7 +3561,7 @@ const (
 	TaskTypeBackup
 )
 
-// MaintenanceWindow defines maintenance timing
+// MaintenanceWindow defines maintenance timing.
 type MaintenanceWindow struct {
 	Start     string
 	End       string
@@ -3565,7 +3569,7 @@ type MaintenanceWindow struct {
 	Emergency bool
 }
 
-// PoolStatistics track pool performance
+// PoolStatistics track pool performance.
 type PoolStatistics struct {
 	TotalRequests      int64
 	SuccessfulRequests int64
@@ -3576,20 +3580,20 @@ type PoolStatistics struct {
 	HealthScore        float64
 }
 
-// ResourceScheduler manages resource timing
+// ResourceScheduler manages resource timing.
 type ResourceScheduler struct {
 	ID         SchedulerID
-	Type       SchedulerType
 	Policy     SchedulingPolicy
-	Queue      SchedulingQueue
 	Algorithms []SchedulingAlgorithm
+	Queue      SchedulingQueue
 	Metrics    SchedulingMetrics
+	Type       SchedulerType
 }
 
-// SchedulerID uniquely identifies schedulers
+// SchedulerID uniquely identifies schedulers.
 type SchedulerID string
 
-// SchedulerType categorizes schedulers
+// SchedulerType categorizes schedulers.
 type SchedulerType int
 
 const (
@@ -3599,7 +3603,7 @@ const (
 	SchedulerTypeBatch
 )
 
-// SchedulingPolicy defines scheduling rules
+// SchedulingPolicy defines scheduling rules.
 type SchedulingPolicy struct {
 	Name        string
 	Rules       []SchedulingRule
@@ -3607,7 +3611,7 @@ type SchedulingPolicy struct {
 	Constraints []SchedulingConstraint
 }
 
-// SchedulingRule defines scheduling logic
+// SchedulingRule defines scheduling logic.
 type SchedulingRule struct {
 	Condition HIRExpression
 	Action    SchedulingAction
@@ -3615,7 +3619,7 @@ type SchedulingRule struct {
 	Weight    float64
 }
 
-// SchedulingAction defines scheduling responses
+// SchedulingAction defines scheduling responses.
 type SchedulingAction int
 
 const (
@@ -3625,23 +3629,23 @@ const (
 	SchedulingActionPreempt
 )
 
-// SchedulingPriority defines task priorities
+// SchedulingPriority defines task priorities.
 type SchedulingPriority struct {
-	Level       int
 	Description string
+	Level       int
 	Weight      float64
 	Preemptible bool
 }
 
-// SchedulingConstraint limits scheduling
+// SchedulingConstraint limits scheduling.
 type SchedulingConstraint struct {
-	Type      SchedulingConstraintType
 	Condition HIRExpression
-	Action    ConstraintAction
 	Message   string
+	Type      SchedulingConstraintType
+	Action    ConstraintAction
 }
 
-// SchedulingConstraintType categorizes scheduling constraints
+// SchedulingConstraintType categorizes scheduling constraints.
 type SchedulingConstraintType int
 
 const (
@@ -3651,7 +3655,7 @@ const (
 	SchedulingConstraintTypeAffinity
 )
 
-// ConstraintAction defines constraint responses
+// ConstraintAction defines constraint responses.
 type ConstraintAction int
 
 const (
@@ -3661,16 +3665,16 @@ const (
 	ConstraintActionFallback
 )
 
-// SchedulingQueue manages scheduling requests
+// SchedulingQueue manages scheduling requests.
 type SchedulingQueue struct {
+	Priorities []int
 	Type       QueueType
 	Capacity   int
-	Priorities []int
 	Timeout    int64
 	Overflow   OverflowStrategy
 }
 
-// OverflowStrategy handles queue overflow
+// OverflowStrategy handles queue overflow.
 type OverflowStrategy int
 
 const (
@@ -3680,15 +3684,15 @@ const (
 	OverflowStrategyPreempt
 )
 
-// SchedulingAlgorithm implements scheduling logic
+// SchedulingAlgorithm implements scheduling logic.
 type SchedulingAlgorithm struct {
-	Name        string
-	Type        AlgorithmType
 	Parameters  map[string]HIRExpression
+	Name        string
 	Performance SchedulingPerformance
+	Type        AlgorithmType
 }
 
-// SchedulingPerformance tracks algorithm metrics
+// SchedulingPerformance tracks algorithm metrics.
 type SchedulingPerformance struct {
 	AverageLatency     float64
 	MaxLatency         float64
@@ -3697,7 +3701,7 @@ type SchedulingPerformance struct {
 	ResourceEfficiency float64
 }
 
-// SchedulingMetrics track scheduler performance
+// SchedulingMetrics track scheduler performance.
 type SchedulingMetrics struct {
 	TasksScheduled      int64
 	TasksCompleted      int64
@@ -3708,16 +3712,16 @@ type SchedulingMetrics struct {
 	ContextSwitches     int64
 }
 
-// ResourceSystemMonitor provides system-wide monitoring
+// ResourceSystemMonitor provides system-wide monitoring.
 type ResourceSystemMonitor struct {
-	Enabled    bool
-	Dashboard  SystemDashboard
 	Collectors []MetricCollector
 	Analyzers  []SystemAnalyzer
 	Alerts     []SystemAlert
+	Dashboard  SystemDashboard
+	Enabled    bool
 }
 
-// SystemDashboard provides monitoring interface
+// SystemDashboard provides monitoring interface.
 type SystemDashboard struct {
 	Widgets    []DashboardWidget
 	Metrics    []SystemMetric
@@ -3725,16 +3729,16 @@ type SystemDashboard struct {
 	LastUpdate int64
 }
 
-// DashboardWidget displays information
+// DashboardWidget displays information.
 type DashboardWidget struct {
-	ID     string
-	Type   WidgetType
-	Title  string
 	Data   interface{}
 	Config WidgetConfig
+	ID     string
+	Title  string
+	Type   WidgetType
 }
 
-// WidgetType categorizes dashboard widgets
+// WidgetType categorizes dashboard widgets.
 type WidgetType int
 
 const (
@@ -3745,24 +3749,24 @@ const (
 	WidgetTypeLog
 )
 
-// WidgetConfig configures widget display
+// WidgetConfig configures widget display.
 type WidgetConfig struct {
+	ColorScheme string
 	RefreshRate int64
 	AutoScale   bool
 	ShowLegend  bool
-	ColorScheme string
 }
 
-// SystemMetric tracks system-wide metrics
+// SystemMetric tracks system-wide metrics.
 type SystemMetric struct {
 	Name      string
-	Value     float64
 	Unit      string
+	Value     float64
 	Category  MetricCategory
 	Timestamp int64
 }
 
-// MetricCategory categorizes system metrics
+// MetricCategory categorizes system metrics.
 type MetricCategory int
 
 const (
@@ -3772,24 +3776,24 @@ const (
 	MetricCategorySecurity
 )
 
-// SystemChart visualizes system data
+// SystemChart visualizes system data.
 type SystemChart struct {
 	ID      string
-	Type    ChartType
 	Title   string
 	Series  []ChartSeries
+	Type    ChartType
 	Options ChartOptions
 }
 
-// ChartSeries represents chart data series
+// ChartSeries represents chart data series.
 type ChartSeries struct {
 	Name  string
-	Data  []ChartDataPoint
 	Color string
+	Data  []ChartDataPoint
 	Style ChartStyle
 }
 
-// ChartStyle defines chart appearance
+// ChartStyle defines chart appearance.
 type ChartStyle int
 
 const (
@@ -3799,7 +3803,7 @@ const (
 	ChartStyleScatter
 )
 
-// ChartOptions configure chart display
+// ChartOptions configure chart display.
 type ChartOptions struct {
 	ShowGrid    bool
 	ShowLegend  bool
@@ -3807,17 +3811,17 @@ type ChartOptions struct {
 	Interactive bool
 }
 
-// MetricCollector gathers system metrics
+// MetricCollector gathers system metrics.
 type MetricCollector struct {
 	Name     string
-	Type     CollectorType
 	Target   string
+	Filters  []MetricFilter
+	Type     CollectorType
 	Interval int64
 	Enabled  bool
-	Filters  []MetricFilter
 }
 
-// CollectorType categorizes metric collectors
+// CollectorType categorizes metric collectors.
 type CollectorType int
 
 const (
@@ -3827,14 +3831,14 @@ const (
 	CollectorTypeCustom
 )
 
-// MetricFilter filters collected metrics
+// MetricFilter filters collected metrics.
 type MetricFilter struct {
-	Name      string
 	Condition HIRExpression
+	Name      string
 	Action    FilterAction
 }
 
-// FilterAction defines filter responses
+// FilterAction defines filter responses.
 type FilterAction int
 
 const (
@@ -3844,17 +3848,17 @@ const (
 	FilterActionAggregate
 )
 
-// SystemAnalyzer analyzes system behavior
+// SystemAnalyzer analyzes system behavior.
 type SystemAnalyzer struct {
 	Name      string
-	Type      AnalyzerType
-	Input     []string
-	Output    []string
 	Algorithm AnalysisAlgorithm
 	Schedule  AnalysisSchedule
+	Input     []string
+	Output    []string
+	Type      AnalyzerType
 }
 
-// AnalyzerType categorizes system analyzers
+// AnalyzerType categorizes system analyzers.
 type AnalyzerType int
 
 const (
@@ -3864,23 +3868,23 @@ const (
 	AnalyzerTypeOptimization
 )
 
-// AnalysisAlgorithm defines analysis logic
+// AnalysisAlgorithm defines analysis logic.
 type AnalysisAlgorithm struct {
-	Name       string
-	Type       AlgorithmType
 	Parameters map[string]HIRExpression
+	Name       string
 	Model      AnalysisModel
+	Type       AlgorithmType
 }
 
-// AnalysisModel represents analysis models
+// AnalysisModel represents analysis models.
 type AnalysisModel struct {
-	Type       ModelType
 	Parameters map[string]float64
+	Type       ModelType
 	Accuracy   float64
 	Trained    bool
 }
 
-// ModelType categorizes analysis models
+// ModelType categorizes analysis models.
 type ModelType int
 
 const (
@@ -3890,32 +3894,32 @@ const (
 	ModelTypeHeuristic
 )
 
-// AnalysisSchedule defines when analysis runs
+// AnalysisSchedule defines when analysis runs.
 type AnalysisSchedule struct {
+	Triggers  []AnalysisTrigger
 	Type      ScheduleType
 	Frequency int64
-	Triggers  []AnalysisTrigger
 }
 
-// AnalysisTrigger defines analysis activation
+// AnalysisTrigger defines analysis activation.
 type AnalysisTrigger struct {
 	Condition HIRExpression
 	Priority  int
 	OneShot   bool
 }
 
-// SystemAlert represents system-wide alerts
+// SystemAlert represents system-wide alerts.
 type SystemAlert struct {
 	ID           string
-	Level        AlertLevel
 	Message      string
+	Actions      []AlertAction
+	Level        AlertLevel
 	Category     AlertCategory
 	Timestamp    int64
 	Acknowledged bool
-	Actions      []AlertAction
 }
 
-// AlertCategory categorizes system alerts
+// AlertCategory categorizes system alerts.
 type AlertCategory int
 
 const (
@@ -3925,17 +3929,17 @@ const (
 	AlertCategoryHealth
 )
 
-// ResourcePolicy defines resource management rules
+// ResourcePolicy defines resource management rules.
 type ResourcePolicy struct {
 	Name        string
-	Type        PolicyType
 	Scope       PolicyScope
 	Rules       []PolicyRule
-	Enforcement PolicyEnforcement
 	Metrics     PolicyMetrics
+	Enforcement PolicyEnforcement
+	Type        PolicyType
 }
 
-// PolicyType categorizes resource policies
+// PolicyType categorizes resource policies.
 type PolicyType int
 
 const (
@@ -3945,24 +3949,24 @@ const (
 	PolicyTypeLifecycle
 )
 
-// PolicyScope defines policy application
+// PolicyScope defines policy application.
 type PolicyScope struct {
-	Global       bool
 	Applications []string
 	Users        []string
 	Resources    []ResourceType
+	Global       bool
 }
 
-// PolicyRule defines policy logic
+// PolicyRule defines policy logic.
 type PolicyRule struct {
-	Name      string
 	Condition HIRExpression
+	Name      string
 	Action    PolicyAction
 	Priority  int
 	Enabled   bool
 }
 
-// PolicyAction defines policy responses
+// PolicyAction defines policy responses.
 type PolicyAction int
 
 const (
@@ -3972,14 +3976,14 @@ const (
 	PolicyActionLog
 )
 
-// PolicyEnforcement defines enforcement strategy
+// PolicyEnforcement defines enforcement strategy.
 type PolicyEnforcement struct {
 	Mode       EnforcementMode
 	Strictness EnforcementStrictness
 	Fallback   EnforcementFallback
 }
 
-// EnforcementMode categorizes enforcement timing
+// EnforcementMode categorizes enforcement timing.
 type EnforcementMode int
 
 const (
@@ -3988,7 +3992,7 @@ const (
 	EnforcementModeCorrective
 )
 
-// EnforcementStrictness defines enforcement rigor
+// EnforcementStrictness defines enforcement rigor.
 type EnforcementStrictness int
 
 const (
@@ -3997,7 +4001,7 @@ const (
 	EnforcementStrictnessStrict
 )
 
-// EnforcementFallback handles enforcement failures
+// EnforcementFallback handles enforcement failures.
 type EnforcementFallback int
 
 const (
@@ -4007,7 +4011,7 @@ const (
 	EnforcementFallbackEscalate
 )
 
-// PolicyMetrics track policy effectiveness
+// PolicyMetrics track policy effectiveness.
 type PolicyMetrics struct {
 	RulesEvaluated     int64
 	ActionsExecuted    int64

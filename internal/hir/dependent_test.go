@@ -4,13 +4,13 @@ import (
 	"testing"
 )
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.3: Dependent Function Types Implementation Tests
-// =============================================================================
+// =============================================================================.
 
 func TestPiTypeSystem(t *testing.T) {
 	t.Run("PiTypeCreation", func(t *testing.T) {
-		// Test Pi type creation for dependent functions
+		// Test Pi type creation for dependent functions.
 		piType := &PiType{
 			ID: TypeID(1),
 			Parameter: DependentParameter{
@@ -46,7 +46,7 @@ func TestPiTypeSystem(t *testing.T) {
 	})
 
 	t.Run("DependentFunctionType", func(t *testing.T) {
-		// Test dependent function type: (n: Nat) -> Vector n
+		// Test dependent function type: (n: Nat) -> Vector n.
 		depFunc := &PiType{
 			ID: TypeID(2),
 			Parameter: DependentParameter{
@@ -87,7 +87,7 @@ func TestPiTypeSystem(t *testing.T) {
 	})
 
 	t.Run("TypeLevelComputation", func(t *testing.T) {
-		// Test type-level computation
+		// Test type-level computation.
 		computation := &TypeLevelComputation{
 			ID: ComputationID(1),
 			Expression: &HIRBinaryExpression{
@@ -134,7 +134,7 @@ func TestPiTypeSystem(t *testing.T) {
 
 func TestDependentPatternMatching(t *testing.T) {
 	t.Run("DependentPatternCreation", func(t *testing.T) {
-		// Test dependent pattern matching
+		// Test dependent pattern matching.
 		pattern := &DependentPatternMatch{
 			ID: PatternID(1),
 			Scrutinee: &HIRIdentifier{
@@ -216,7 +216,7 @@ func TestDependentPatternMatching(t *testing.T) {
 	})
 
 	t.Run("MotiveCalculation", func(t *testing.T) {
-		// Test motive calculation for dependent elimination
+		// Test motive calculation for dependent elimination.
 		motive := &HIRLambdaExpression{
 			Parameters: []HIRExpression{
 				&HIRIdentifier{
@@ -260,7 +260,7 @@ func TestDependentPatternMatching(t *testing.T) {
 
 func TestDependentTypeChecking(t *testing.T) {
 	t.Run("DependentChecker", func(t *testing.T) {
-		// Test dependent type checker
+		// Test dependent type checker.
 		checker := &DependentChecker{
 			Context: DependentContext{
 				Variables: []VariableBinding{},
@@ -309,7 +309,7 @@ func TestDependentTypeChecking(t *testing.T) {
 	})
 
 	t.Run("TypeNormalization", func(t *testing.T) {
-		// Test type normalization
+		// Test type normalization.
 		normalizer := &TypeNormalizer{
 			Strategy: NormalizationFull,
 			Depth:    5,
@@ -350,14 +350,14 @@ func TestDependentTypeChecking(t *testing.T) {
 	})
 
 	t.Run("ConstraintSolving", func(t *testing.T) {
-		// Test constraint solving
+		// Test constraint solving.
 		solver := &DependentConstraintSolver{
 			Strategy:   SolverBacktrack,
 			Heuristics: []SolverHeuristic{},
 			Timeout:    5000,
 		}
 
-		// Test constraint solving (simplified)
+		// Test constraint solving (simplified).
 		constraints := []DependentConstraint{
 			{
 				Kind: DependentConstraintEquality,
@@ -372,7 +372,7 @@ func TestDependentTypeChecking(t *testing.T) {
 			},
 		}
 
-		// Simplified constraint solving test
+		// Simplified constraint solving test.
 		solved := solveConstraints(solver, constraints)
 		if !solved {
 			t.Log("Constraint solving completed (simplified implementation)")
@@ -383,36 +383,36 @@ func TestDependentTypeChecking(t *testing.T) {
 func TestPhase233Completion(t *testing.T) {
 	t.Log("=== Phase 2.3.3: Dependent Function Types Implementation - COMPLETE ===")
 
-	// Test all major components
+	// Test all major components.
 	t.Run("PiTypes", func(t *testing.T) {
-		// Pi type functionality
+		// Pi type functionality.
 		if !testPiTypeBasics() {
 			t.Error("Pi type basics failed")
 		}
 	})
 
 	t.Run("DependentPatternMatching", func(t *testing.T) {
-		// Dependent pattern matching
+		// Dependent pattern matching.
 		if !testDependentPatternMatching() {
 			t.Error("Dependent pattern matching failed")
 		}
 	})
 
 	t.Run("TypeLevelComputation", func(t *testing.T) {
-		// Type-level computation
+		// Type-level computation.
 		if !testTypeLevelComputation() {
 			t.Error("Type-level computation failed")
 		}
 	})
 
 	t.Run("DependentTypeChecking", func(t *testing.T) {
-		// Dependent type checking
+		// Dependent type checking.
 		if !testDependentTypeChecking() {
 			t.Error("Dependent type checking failed")
 		}
 	})
 
-	// Report completion
+	// Report completion.
 	t.Log("✅ Pi type implementation completed")
 	t.Log("✅ Dependent pattern matching implemented")
 	t.Log("✅ Type-level computation implemented")
@@ -424,21 +424,22 @@ func TestPhase233Completion(t *testing.T) {
 	t.Log("🎯 Phase 2.3.3 SUCCESSFULLY COMPLETED!")
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
+// =============================================================================.
+// Helper Functions.
+// =============================================================================.
 
 func solveConstraints(solver *DependentConstraintSolver, constraints []DependentConstraint) bool {
-	// Simplified constraint solving
+	// Simplified constraint solving.
 	if solver.Strategy == SolverBacktrack {
-		// Backtracking solver would attempt to find solutions
+		// Backtracking solver would attempt to find solutions.
 		return len(constraints) == 0 || true // Simplified: assume solvable
 	}
+
 	return false
 }
 
 func testPiTypeBasics() bool {
-	// Test basic Pi type creation and usage
+	// Test basic Pi type creation and usage.
 	piType := &PiType{
 		ID: TypeID(1),
 		Parameter: DependentParameter{
@@ -452,11 +453,12 @@ func testPiTypeBasics() bool {
 		Context:     DependentContext{},
 		Constraints: []DependentConstraint{},
 	}
+
 	return piType != nil
 }
 
 func testDependentPatternMatching() bool {
-	// Test dependent pattern matching
+	// Test dependent pattern matching.
 	pattern := &DependentPatternMatch{
 		ID:        PatternID(1),
 		Scrutinee: &HIRIdentifier{Name: "x"},
@@ -464,11 +466,12 @@ func testDependentPatternMatching() bool {
 		Type:      &HIRIdentifier{Name: "Type"},
 		Motive:    &HIRLambdaExpression{},
 	}
+
 	return pattern != nil
 }
 
 func testTypeLevelComputation() bool {
-	// Test type-level computation
+	// Test type-level computation.
 	computation := &TypeLevelComputation{
 		ID:         ComputationID(1),
 		Expression: &HIRLiteral{Value: 42},
@@ -478,11 +481,12 @@ func testTypeLevelComputation() bool {
 		},
 		Result: &HIRLiteral{Value: 42},
 	}
+
 	return computation != nil
 }
 
 func testDependentTypeChecking() bool {
-	// Test dependent type checking
+	// Test dependent type checking.
 	checker := &DependentChecker{
 		Context: DependentContext{},
 		Unification: DependentUnification{
@@ -495,5 +499,6 @@ func testDependentTypeChecking() bool {
 			Strategy: SolverBacktrack,
 		},
 	}
+
 	return checker != nil
 }

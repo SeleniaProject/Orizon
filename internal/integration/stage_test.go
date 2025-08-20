@@ -1,5 +1,5 @@
 // Package integration provides additional helper tests for the staged pipeline testing system.
-// This file contains smaller, focused tests that validate individual components
+// This file contains smaller, focused tests that validate individual components.
 // before running the full end-to-end pipeline tests.
 package integration
 
@@ -11,11 +11,11 @@ import (
 	"github.com/orizon-lang/orizon/internal/parser"
 )
 
-// TestStage1_HIRBasics tests the basic HIR creation and structure
+// TestStage1_HIRBasics tests the basic HIR creation and structure.
 func TestStage1_HIRBasics(t *testing.T) {
 	suite := NewPipelineTestSuite("../../tmp/stage1_test_output")
 
-	// Test simple HIR creation
+	// Test simple HIR creation.
 	t.Run("SimpleHIRCreation", func(t *testing.T) {
 		hirModule, err := suite.parseToHIR("fn test() -> i32 { return 42; }")
 		if err != nil {
@@ -38,12 +38,12 @@ func TestStage1_HIRBasics(t *testing.T) {
 	})
 }
 
-// TestStage2_MIRTransformation tests the HIR to MIR transformation
+// TestStage2_MIRTransformation tests the HIR to MIR transformation.
 func TestStage2_MIRTransformation(t *testing.T) {
 	suite := NewPipelineTestSuite("../../tmp/stage2_test_output")
 
 	t.Run("HIRToMIRBasic", func(t *testing.T) {
-		// Create a simple HIR module
+		// Create a simple HIR module.
 		hirModule := &parser.HIRModule{
 			Name: "test_module",
 			Functions: []*parser.HIRFunction{
@@ -55,7 +55,7 @@ func TestStage2_MIRTransformation(t *testing.T) {
 			},
 		}
 
-		// Transform to MIR
+		// Transform to MIR.
 		mirModule, err := suite.transformToMIR(hirModule, true)
 		if err != nil {
 			t.Fatalf("MIR transformation failed: %v", err)
@@ -73,7 +73,7 @@ func TestStage2_MIRTransformation(t *testing.T) {
 			t.Errorf("Expected 1 function, got %d", len(mirModule.Functions))
 		}
 
-		// Check function structure
+		// Check function structure.
 		mirFunc := mirModule.Functions[0]
 		if mirFunc.Name != "test_function" {
 			t.Errorf("Expected function name 'test_function', got '%s'", mirFunc.Name)
@@ -88,12 +88,12 @@ func TestStage2_MIRTransformation(t *testing.T) {
 	})
 }
 
-// TestStage3_LIRTransformation tests the MIR to LIR transformation
+// TestStage3_LIRTransformation tests the MIR to LIR transformation.
 func TestStage3_LIRTransformation(t *testing.T) {
 	suite := NewPipelineTestSuite("../../tmp/stage3_test_output")
 
 	t.Run("MIRToLIRBasic", func(t *testing.T) {
-		// Create a simple MIR module
+		// Create a simple MIR module.
 		mirModule := &mir.Module{
 			Name: "test_module",
 			Functions: []*mir.Function{
@@ -112,7 +112,7 @@ func TestStage3_LIRTransformation(t *testing.T) {
 			},
 		}
 
-		// Transform to LIR
+		// Transform to LIR.
 		lirModule, err := suite.transformToLIR(mirModule)
 		if err != nil {
 			t.Fatalf("LIR transformation failed: %v", err)
@@ -130,7 +130,7 @@ func TestStage3_LIRTransformation(t *testing.T) {
 			t.Errorf("Expected 1 function, got %d", len(lirModule.Functions))
 		}
 
-		// Check function structure
+		// Check function structure.
 		lirFunc := lirModule.Functions[0]
 		if lirFunc.Name != "test_function" {
 			t.Errorf("Expected function name 'test_function', got '%s'", lirFunc.Name)
@@ -140,7 +140,7 @@ func TestStage3_LIRTransformation(t *testing.T) {
 			t.Error("Function should have at least one basic block")
 		}
 
-		// Check that instructions were converted
+		// Check that instructions were converted.
 		lirBlock := lirFunc.Blocks[0]
 		if len(lirBlock.Insns) == 0 {
 			t.Error("LIR block should have at least one instruction")
@@ -151,15 +151,15 @@ func TestStage3_LIRTransformation(t *testing.T) {
 	})
 }
 
-// TestStage4_CodeGeneration tests the LIR to assembly generation
+// TestStage4_CodeGeneration tests the LIR to assembly generation.
 func TestStage4_CodeGeneration(t *testing.T) {
 	suite := NewPipelineTestSuite("../../tmp/stage4_test_output")
 
 	t.Run("LIRToAssemblyBasic", func(t *testing.T) {
-		// Create a simple LIR module using the existing LIR structures
+		// Create a simple LIR module using the existing LIR structures.
 		lirModule := createSimpleLIRModule()
 
-		// Generate assembly
+		// Generate assembly.
 		asmCode, err := suite.generateAssembly(lirModule, 0)
 		if err != nil {
 			t.Fatalf("Assembly generation failed: %v", err)
@@ -169,7 +169,7 @@ func TestStage4_CodeGeneration(t *testing.T) {
 			t.Fatal("Generated assembly is empty")
 		}
 
-		// Basic validation that assembly contains expected elements
+		// Basic validation that assembly contains expected elements.
 		if !containsString(asmCode, "test_function") {
 			t.Error("Assembly should contain function name")
 		}
@@ -179,12 +179,12 @@ func TestStage4_CodeGeneration(t *testing.T) {
 	})
 }
 
-// TestStage5_MemorySafetyValidation tests memory safety features
+// TestStage5_MemorySafetyValidation tests memory safety features.
 func TestStage5_MemorySafetyValidation(t *testing.T) {
 	suite := NewPipelineTestSuite("../../tmp/stage5_test_output")
 
 	t.Run("MemorySafetyBasic", func(t *testing.T) {
-		// Create HIR with memory operations
+		// Create HIR with memory operations.
 		hirModule := &parser.HIRModule{
 			Name: "memory_test",
 			Functions: []*parser.HIRFunction{
@@ -196,7 +196,7 @@ func TestStage5_MemorySafetyValidation(t *testing.T) {
 			},
 		}
 
-		// Transform with memory safety enabled
+		// Transform with memory safety enabled.
 		mirModule, err := suite.transformToMIR(hirModule, true)
 		if err != nil {
 			t.Fatalf("MIR transformation with memory safety failed: %v", err)
@@ -211,9 +211,9 @@ func TestStage5_MemorySafetyValidation(t *testing.T) {
 	})
 }
 
-// Helper functions
+// Helper functions.
 
-// createSimpleLIRModule creates a basic LIR module for testing
+// createSimpleLIRModule creates a basic LIR module for testing.
 func createSimpleLIRModule() *lir.Module {
 	return &lir.Module{
 		Name: "test_module",
@@ -233,7 +233,7 @@ func createSimpleLIRModule() *lir.Module {
 	}
 }
 
-// containsString checks if a string contains a substring
+// containsString checks if a string contains a substring.
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
@@ -243,6 +243,7 @@ func containsString(s, substr string) bool {
 						return true
 					}
 				}
+
 				return false
 			}()))
 }

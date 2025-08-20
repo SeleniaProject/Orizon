@@ -1,105 +1,105 @@
 package hir
 
-// =============================================================================
-// Refinement Types Implementation and Utilities
-// =============================================================================
+// =============================================================================.
+// Refinement Types Implementation and Utilities.
+// =============================================================================.
 
-// Refinement type checking and inference utilities
+// Refinement type checking and inference utilities.
 
-// InferRefinementType infers the refinement type of an expression
+// InferRefinementType infers the refinement type of an expression.
 func InferRefinementType(expr HIRExpression) (*RefinementType, error) {
-	// Implementation for refinement type inference
+	// Implementation for refinement type inference.
 	return nil, nil
 }
 
-// CheckRefinementConstraints validates refinement constraints
+// CheckRefinementConstraints validates refinement constraints.
 func CheckRefinementConstraints(refinement *Refinement, context *RefinementContext) error {
-	// Implementation for refinement constraint checking
+	// Implementation for refinement constraint checking.
 	return nil
 }
 
-// ProveRefinement attempts to prove a refinement constraint
+// ProveRefinement attempts to prove a refinement constraint.
 func ProveRefinement(refinement *Refinement, context *RefinementContext) (*ProofTerm, error) {
-	// Implementation for refinement proving
+	// Implementation for refinement proving.
 	return nil, nil
 }
 
-// RefineType applies a refinement to a base type
+// RefineType applies a refinement to a base type.
 func RefineType(baseType TypeInfo, refinement *Refinement) (*RefinementType, error) {
-	// Implementation for type refinement
+	// Implementation for type refinement.
 	return nil, nil
 }
 
-// =============================================================================
-// Refinement Context Management
-// =============================================================================
+// =============================================================================.
+// Refinement Context Management.
+// =============================================================================.
 
-// RefinementContextHelper represents helper functions for refinement context
+// RefinementContextHelper represents helper functions for refinement context.
 type RefinementContextHelper struct{}
 
-// CreateRefinementContextHelper creates a new refinement context helper
+// CreateRefinementContextHelper creates a new refinement context helper.
 func CreateRefinementContextHelper() *RefinementContextHelper {
 	return &RefinementContextHelper{}
 }
 
-// =============================================================================
-// Refinement Type Analysis
-// =============================================================================
+// =============================================================================.
+// Refinement Type Analysis.
+// =============================================================================.
 
-// AnalyzeRefinement analyzes a refinement for validity and completeness
+// AnalyzeRefinement analyzes a refinement for validity and completeness.
 func AnalyzeRefinement(refinement *Refinement, context *RefinementContext) (*RefinementAnalysis, error) {
-	// Implementation for refinement analysis
+	// Implementation for refinement analysis.
 	return nil, nil
 }
 
-// RefinementAnalysis represents the result of refinement analysis
+// RefinementAnalysis represents the result of refinement analysis.
 type RefinementAnalysis struct {
-	IsValid      bool
-	IsComplete   bool
 	Dependencies []string
 	ProofSteps   []*ProofStep
 	Obligations  []*ProofObligation
+	IsValid      bool
+	IsComplete   bool
 }
 
-// ProofStep represents a step in a proof
+// ProofStep represents a step in a proof.
 type ProofStep struct {
-	Rule          string
-	Premises      []HIRExpression
 	Conclusion    HIRExpression
+	Rule          string
 	Justification string
+	Premises      []HIRExpression
 }
 
-// ValidateRefinementProof validates a proof for a refinement
+// ValidateRefinementProof validates a proof for a refinement.
 func ValidateRefinementProof(proof *ProofTerm, obligation *ProofObligation) error {
-	// Implementation for proof validation
+	// Implementation for proof validation.
 	return nil
 }
 
-// SimplifyRefinement simplifies a refinement by removing redundant conditions
+// SimplifyRefinement simplifies a refinement by removing redundant conditions.
 func SimplifyRefinement(refinement *Refinement, context *RefinementContext) (*Refinement, error) {
-	// Implementation for refinement simplification
+	// Implementation for refinement simplification.
 	return nil, nil
 }
 
-// =============================================================================
-// Proof Term Construction
-// =============================================================================
+// =============================================================================.
+// Proof Term Construction.
+// =============================================================================.
 
-// ConstructProofTerm constructs a proof term for a refinement
+// ConstructProofTerm constructs a proof term for a refinement.
 func ConstructProofTerm(refinement *Refinement, context *RefinementContext) (*ProofTerm, error) {
-	// Implementation for proof term construction
+	// Implementation for proof term construction.
 	return nil, nil
 }
 
-// ProofTermHelper represents helper functions for proof terms
+// ProofTermHelper represents helper functions for proof terms.
 type ProofTermHelper struct {
-	Kind       ProofKind
+	Conclusion HIRExpression
 	Hypothesis string
 	Steps      []*ProofStep
-	Conclusion HIRExpression
+	Kind       ProofKind
 }
 
-// ProofKind represents different kinds of proofs
+// ProofKind represents different kinds of proofs.
 type ProofKind int
 
 const (
@@ -109,30 +109,31 @@ const (
 	ProofByCase
 )
 
-// ElaborateProof elaborates a proof term with detailed steps
+// ElaborateProof elaborates a proof term with detailed steps.
 func ElaborateProof(proof *ProofTerm, context *RefinementContext) (*ProofTerm, error) {
-	// Implementation for proof elaboration
+	// Implementation for proof elaboration.
 	return nil, nil
 }
 
-// CheckProofCorrectness checks the correctness of a proof term
+// CheckProofCorrectness checks the correctness of a proof term.
 func CheckProofCorrectness(proof *ProofTerm, context *RefinementContext) error {
-	// Implementation for proof correctness checking
+	// Implementation for proof correctness checking.
 	return nil
 }
 
-// =============================================================================
-// Logical Reasoning
-// =============================================================================
+// =============================================================================.
+// Logical Reasoning.
+// =============================================================================.
 
-// ApplyLogicalRule applies a logical inference rule
+// ApplyLogicalRule applies a logical inference rule.
 func ApplyLogicalRule(rule LogicalRule, premises []HIRExpression) (HIRExpression, error) {
-	// Implementation for logical rule application
+	// Implementation for logical rule application.
 	var result HIRExpression
+
 	return result, nil
 }
 
-// LogicalRule represents logical inference rules
+// LogicalRule represents logical inference rules.
 type LogicalRule int
 
 const (
@@ -146,48 +147,48 @@ const (
 	RuleExistentialGeneralization
 )
 
-// SolveConstraint attempts to solve a logical constraint
+// SolveConstraint attempts to solve a logical constraint.
 func SolveConstraint(constraint HIRExpression, context *RefinementContext) (map[string]HIRExpression, error) {
-	// Implementation for constraint solving
+	// Implementation for constraint solving.
 	return nil, nil
 }
 
-// GenerateCounterexample generates a counterexample for an invalid refinement
+// GenerateCounterexample generates a counterexample for an invalid refinement.
 func GenerateCounterexample(refinement *Refinement, context *RefinementContext) (*Counterexample, error) {
-	// Implementation for counterexample generation
+	// Implementation for counterexample generation.
 	return nil, nil
 }
 
-// Counterexample represents a counterexample to a refinement
+// Counterexample represents a counterexample to a refinement.
 type Counterexample struct {
+	Witness     HIRExpression
 	Values      map[string]HIRExpression
 	Explanation string
-	Witness     HIRExpression
 }
 
-// =============================================================================
-// Refinement Type Transformations
-// =============================================================================
+// =============================================================================.
+// Refinement Type Transformations.
+// =============================================================================.
 
-// WeakenRefinement weakens a refinement by relaxing constraints
+// WeakenRefinement weakens a refinement by relaxing constraints.
 func WeakenRefinement(refinement *Refinement, weakening HIRExpression) (*Refinement, error) {
-	// Implementation for refinement weakening
+	// Implementation for refinement weakening.
 	return nil, nil
 }
 
-// StrengthenRefinement strengthens a refinement by adding constraints
+// StrengthenRefinement strengthens a refinement by adding constraints.
 func StrengthenRefinement(refinement *Refinement, strengthening HIRExpression) (*Refinement, error) {
-	// Implementation for refinement strengthening
+	// Implementation for refinement strengthening.
 	return nil, nil
 }
 
-// ComposeRefinements composes multiple refinements
+// ComposeRefinements composes multiple refinements.
 func ComposeRefinements(refinements []*Refinement, operation RefinementOperation) (*Refinement, error) {
-	// Implementation for refinement composition
+	// Implementation for refinement composition.
 	return nil, nil
 }
 
-// RefinementOperation represents operations on refinements
+// RefinementOperation represents operations on refinements.
 type RefinementOperation int
 
 const (
@@ -197,8 +198,8 @@ const (
 	RefinementNot
 )
 
-// DecomposeRefinement decomposes a composite refinement
+// DecomposeRefinement decomposes a composite refinement.
 func DecomposeRefinement(refinement *Refinement) ([]*Refinement, error) {
-	// Implementation for refinement decomposition
+	// Implementation for refinement decomposition.
 	return nil, nil
 }

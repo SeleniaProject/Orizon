@@ -19,7 +19,7 @@ const (
 	Stderr
 )
 
-// String returns the string representation of StandardStream
+// String returns the string representation of StandardStream.
 func (s StandardStream) String() string {
 	switch s {
 	case Stdin:
@@ -33,7 +33,7 @@ func (s StandardStream) String() string {
 	}
 }
 
-// ConsoleHandle represents a handle to a console stream
+// ConsoleHandle represents a handle to a console stream.
 type ConsoleHandle struct {
 	stream StandardStream
 	file   *os.File
@@ -60,10 +60,10 @@ type ConsoleStats struct {
 	ErrorCount         uint64
 }
 
-// GlobalConsoleManager is the global console manager instance
+// GlobalConsoleManager is the global console manager instance.
 var GlobalConsoleManager *ConsoleManager
 
-// InitializeConsole initializes the global console manager
+// InitializeConsole initializes the global console manager.
 func InitializeConsole() error {
 	manager := &ConsoleManager{
 		stdin: &ConsoleHandle{
@@ -84,7 +84,7 @@ func InitializeConsole() error {
 	return nil
 }
 
-// ReadConsole reads data from stdin
+// ReadConsole reads data from stdin.
 func (cm *ConsoleManager) ReadConsole(buffer unsafe.Pointer, size int) IOResult {
 	if buffer == nil || size <= 0 {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "invalid buffer"}
@@ -93,13 +93,13 @@ func (cm *ConsoleManager) ReadConsole(buffer unsafe.Pointer, size int) IOResult 
 	cm.stdin.mu.Lock()
 	defer cm.stdin.mu.Unlock()
 
-	// Create Go slice from unsafe pointer
+	// Create Go slice from unsafe pointer.
 	data := (*[1 << 30]byte)(buffer)[:size:size]
 
-	// Read from stdin
+	// Read from stdin.
 	n, err := cm.stdin.file.Read(data)
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&cm.stats.StdinBytesRead, uint64(n))
 	atomic.AddUint64(&cm.stats.ReadOperations, 1)
 
@@ -118,7 +118,7 @@ func (cm *ConsoleManager) ReadConsole(buffer unsafe.Pointer, size int) IOResult 
 	}
 }
 
-// WriteConsole writes data to stdout or stderr
+// WriteConsole writes data to stdout or stderr.
 func (cm *ConsoleManager) WriteConsole(stream StandardStream, buffer unsafe.Pointer, size int) IOResult {
 	if buffer == nil || size <= 0 {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "invalid buffer"}
@@ -137,13 +137,13 @@ func (cm *ConsoleManager) WriteConsole(stream StandardStream, buffer unsafe.Poin
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
 
-	// Create Go slice from unsafe pointer
+	// Create Go slice from unsafe pointer.
 	data := (*[1 << 30]byte)(buffer)[:size:size]
 
-	// Write to stream
+	// Write to stream.
 	n, err := handle.file.Write(data)
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&cm.stats.WriteOperations, 1)
 	if stream == Stdout {
 		atomic.AddUint64(&cm.stats.StdoutBytesWritten, uint64(n))
@@ -166,7 +166,7 @@ func (cm *ConsoleManager) WriteConsole(stream StandardStream, buffer unsafe.Poin
 	}
 }
 
-// FlushConsole flushes a console stream
+// FlushConsole flushes a console stream.
 func (cm *ConsoleManager) FlushConsole(stream StandardStream) IOResult {
 	var handle *ConsoleHandle
 	switch stream {
@@ -181,7 +181,7 @@ func (cm *ConsoleManager) FlushConsole(stream StandardStream) IOResult {
 	handle.mu.RLock()
 	defer handle.mu.RUnlock()
 
-	// Sync the file (best effort for console streams)
+	// Sync the file (best effort for console streams).
 	err := handle.file.Sync()
 
 	atomic.AddUint64(&cm.stats.FlushOperations, 1)
@@ -197,7 +197,7 @@ func (cm *ConsoleManager) FlushConsole(stream StandardStream) IOResult {
 	return IOResult{Error: IOErrorNone}
 }
 
-// PrintString prints a string to stdout
+// PrintString prints a string to stdout.
 func (cm *ConsoleManager) PrintString(str string) IOResult {
 	if len(str) == 0 {
 		return IOResult{Error: IOErrorNone}
@@ -207,7 +207,7 @@ func (cm *ConsoleManager) PrintString(str string) IOResult {
 	return cm.WriteConsole(Stdout, unsafe.Pointer(&data[0]), len(data))
 }
 
-// PrintLine prints a string followed by a newline to stdout
+// PrintLine prints a string followed by a newline to stdout.
 func (cm *ConsoleManager) PrintLine(str string) IOResult {
 	result := cm.PrintString(str)
 	if !result.IsSuccess() {
@@ -218,7 +218,7 @@ func (cm *ConsoleManager) PrintLine(str string) IOResult {
 	return cm.WriteConsole(Stdout, unsafe.Pointer(&newline[0]), 1)
 }
 
-// PrintError prints a string to stderr
+// PrintError prints a string to stderr.
 func (cm *ConsoleManager) PrintError(str string) IOResult {
 	if len(str) == 0 {
 		return IOResult{Error: IOErrorNone}
@@ -228,7 +228,7 @@ func (cm *ConsoleManager) PrintError(str string) IOResult {
 	return cm.WriteConsole(Stderr, unsafe.Pointer(&data[0]), len(data))
 }
 
-// PrintErrorLine prints a string followed by a newline to stderr
+// PrintErrorLine prints a string followed by a newline to stderr.
 func (cm *ConsoleManager) PrintErrorLine(str string) IOResult {
 	result := cm.PrintError(str)
 	if !result.IsSuccess() {
@@ -239,7 +239,7 @@ func (cm *ConsoleManager) PrintErrorLine(str string) IOResult {
 	return cm.WriteConsole(Stderr, unsafe.Pointer(&newline[0]), 1)
 }
 
-// ReadLine reads a line from stdin (up to newline or buffer size)
+// ReadLine reads a line from stdin (up to newline or buffer size).
 func (cm *ConsoleManager) ReadLine(buffer unsafe.Pointer, maxSize int) IOResult {
 	if buffer == nil || maxSize <= 0 {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "invalid buffer"}
@@ -265,13 +265,13 @@ func (cm *ConsoleManager) ReadLine(buffer unsafe.Pointer, maxSize int) IOResult 
 
 		totalBytes += n
 
-		// Check for newline
+		// Check for newline.
 		if data[totalBytes-1] == '\n' {
 			break
 		}
 	}
 
-	// Null-terminate the string
+	// Null-terminate the string.
 	if totalBytes < maxSize {
 		data[totalBytes] = 0
 	}
@@ -292,7 +292,7 @@ func (cm *ConsoleManager) GetConsoleStats() ConsoleStats {
 	return cm.stats
 }
 
-// IsTerminal checks if a stream is connected to a terminal
+// IsTerminal checks if a stream is connected to a terminal.
 func (cm *ConsoleManager) IsTerminal(stream StandardStream) bool {
 	var file *os.File
 	switch stream {
@@ -306,19 +306,19 @@ func (cm *ConsoleManager) IsTerminal(stream StandardStream) bool {
 		return false
 	}
 
-	// Simple check - in a real implementation, this would use platform-specific APIs
+	// Simple check - in a real implementation, this would use platform-specific APIs.
 	stat, err := file.Stat()
 	if err != nil {
 		return false
 	}
 
-	// Check if it's a character device (typical for terminals)
+	// Check if it's a character device (typical for terminals).
 	return stat.Mode()&os.ModeCharDevice != 0
 }
 
 // Global convenience functions for console I/O
 
-// ReadConsole reads from stdin using the global console manager
+// ReadConsole reads from stdin using the global console manager.
 func ReadConsole(buffer unsafe.Pointer, size int) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -326,7 +326,7 @@ func ReadConsole(buffer unsafe.Pointer, size int) IOResult {
 	return GlobalConsoleManager.ReadConsole(buffer, size)
 }
 
-// WriteStdout writes to stdout using the global console manager
+// WriteStdout writes to stdout using the global console manager.
 func WriteStdout(buffer unsafe.Pointer, size int) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -334,7 +334,7 @@ func WriteStdout(buffer unsafe.Pointer, size int) IOResult {
 	return GlobalConsoleManager.WriteConsole(Stdout, buffer, size)
 }
 
-// WriteStderr writes to stderr using the global console manager
+// WriteStderr writes to stderr using the global console manager.
 func WriteStderr(buffer unsafe.Pointer, size int) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -342,7 +342,7 @@ func WriteStderr(buffer unsafe.Pointer, size int) IOResult {
 	return GlobalConsoleManager.WriteConsole(Stderr, buffer, size)
 }
 
-// PrintString prints a string to stdout
+// PrintString prints a string to stdout.
 func PrintString(str string) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -350,7 +350,7 @@ func PrintString(str string) IOResult {
 	return GlobalConsoleManager.PrintString(str)
 }
 
-// PrintLine prints a string with newline to stdout
+// PrintLine prints a string with newline to stdout.
 func PrintLine(str string) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -358,7 +358,7 @@ func PrintLine(str string) IOResult {
 	return GlobalConsoleManager.PrintLine(str)
 }
 
-// PrintError prints a string to stderr
+// PrintError prints a string to stderr.
 func PrintError(str string) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -366,7 +366,7 @@ func PrintError(str string) IOResult {
 	return GlobalConsoleManager.PrintError(str)
 }
 
-// PrintErrorLine prints a string with newline to stderr
+// PrintErrorLine prints a string with newline to stderr.
 func PrintErrorLine(str string) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -374,7 +374,7 @@ func PrintErrorLine(str string) IOResult {
 	return GlobalConsoleManager.PrintErrorLine(str)
 }
 
-// ReadLine reads a line from stdin
+// ReadLine reads a line from stdin.
 func ReadLine(buffer unsafe.Pointer, maxSize int) IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -382,7 +382,7 @@ func ReadLine(buffer unsafe.Pointer, maxSize int) IOResult {
 	return GlobalConsoleManager.ReadLine(buffer, maxSize)
 }
 
-// FlushStdout flushes stdout
+// FlushStdout flushes stdout.
 func FlushStdout() IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -390,7 +390,7 @@ func FlushStdout() IOResult {
 	return GlobalConsoleManager.FlushConsole(Stdout)
 }
 
-// FlushStderr flushes stderr
+// FlushStderr flushes stderr.
 func FlushStderr() IOResult {
 	if GlobalConsoleManager == nil {
 		return IOResult{Error: IOErrorUnknown, SystemError: "console manager not initialized"}
@@ -398,7 +398,7 @@ func FlushStderr() IOResult {
 	return GlobalConsoleManager.FlushConsole(Stderr)
 }
 
-// GetConsoleStats returns global console statistics
+// GetConsoleStats returns global console statistics.
 func GetConsoleStats() ConsoleStats {
 	if GlobalConsoleManager == nil {
 		return ConsoleStats{}
@@ -406,7 +406,7 @@ func GetConsoleStats() ConsoleStats {
 	return GlobalConsoleManager.GetConsoleStats()
 }
 
-// IsTerminal checks if a stream is a terminal
+// IsTerminal checks if a stream is a terminal.
 func IsTerminal(stream StandardStream) bool {
 	if GlobalConsoleManager == nil {
 		return false
@@ -414,13 +414,13 @@ func IsTerminal(stream StandardStream) bool {
 	return GlobalConsoleManager.IsTerminal(stream)
 }
 
-// Printf prints formatted output to stdout
+// Printf prints formatted output to stdout.
 func Printf(format string, args ...interface{}) IOResult {
 	str := fmt.Sprintf(format, args...)
 	return PrintString(str)
 }
 
-// Eprintf prints formatted output to stderr
+// Eprintf prints formatted output to stderr.
 func Eprintf(format string, args ...interface{}) IOResult {
 	str := fmt.Sprintf(format, args...)
 	return PrintError(str)

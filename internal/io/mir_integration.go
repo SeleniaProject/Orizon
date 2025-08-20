@@ -1,4 +1,4 @@
-// Package io provides MIR (Mid-level Intermediate Representation) integration
+// Package io provides MIR (Mid-level Intermediate Representation) integration.
 // for I/O operations in the Orizon compiler. This enables code generation
 // for file I/O, console I/O, and threading primitives.
 package io
@@ -21,7 +21,7 @@ func NewIOMIRIntegration(module *mir.Module) *IOMIRIntegration {
 
 // File I/O MIR Operations
 
-// GenerateFileOpenFunction generates a MIR function for opening files
+// GenerateFileOpenFunction generates a MIR function for opening files.
 func (iom *IOMIRIntegration) GenerateFileOpenFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_file_open",
@@ -52,7 +52,7 @@ func (iom *IOMIRIntegration) GenerateFileOpenFunction() *mir.Function {
 	return function
 }
 
-// GenerateFileCloseFunction generates a MIR function for closing files
+// GenerateFileCloseFunction generates a MIR function for closing files.
 func (iom *IOMIRIntegration) GenerateFileCloseFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_file_close",
@@ -81,7 +81,7 @@ func (iom *IOMIRIntegration) GenerateFileCloseFunction() *mir.Function {
 	return function
 }
 
-// GenerateFileReadFunction generates a MIR function for reading from files
+// GenerateFileReadFunction generates a MIR function for reading from files.
 func (iom *IOMIRIntegration) GenerateFileReadFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_file_read",
@@ -114,7 +114,7 @@ func (iom *IOMIRIntegration) GenerateFileReadFunction() *mir.Function {
 	return function
 }
 
-// GenerateFileWriteFunction generates a MIR function for writing to files
+// GenerateFileWriteFunction generates a MIR function for writing to files.
 func (iom *IOMIRIntegration) GenerateFileWriteFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_file_write",
@@ -149,7 +149,7 @@ func (iom *IOMIRIntegration) GenerateFileWriteFunction() *mir.Function {
 
 // Console I/O MIR Operations
 
-// GenerateConsoleWriteFunction generates a MIR function for writing to console
+// GenerateConsoleWriteFunction generates a MIR function for writing to console.
 func (iom *IOMIRIntegration) GenerateConsoleWriteFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_console_write",
@@ -182,7 +182,7 @@ func (iom *IOMIRIntegration) GenerateConsoleWriteFunction() *mir.Function {
 	return function
 }
 
-// GenerateConsoleReadFunction generates a MIR function for reading from console
+// GenerateConsoleReadFunction generates a MIR function for reading from console.
 func (iom *IOMIRIntegration) GenerateConsoleReadFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_console_read",
@@ -213,9 +213,9 @@ func (iom *IOMIRIntegration) GenerateConsoleReadFunction() *mir.Function {
 	return function
 }
 
-// Threading MIR Operations
+// Threading MIR Operations.
 
-// GenerateThreadCreateFunction generates a MIR function for creating threads
+// GenerateThreadCreateFunction generates a MIR function for creating threads.
 func (iom *IOMIRIntegration) GenerateThreadCreateFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_thread_create",
@@ -248,7 +248,7 @@ func (iom *IOMIRIntegration) GenerateThreadCreateFunction() *mir.Function {
 	return function
 }
 
-// GenerateThreadJoinFunction generates a MIR function for joining threads
+// GenerateThreadJoinFunction generates a MIR function for joining threads.
 func (iom *IOMIRIntegration) GenerateThreadJoinFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_thread_join",
@@ -279,9 +279,9 @@ func (iom *IOMIRIntegration) GenerateThreadJoinFunction() *mir.Function {
 	return function
 }
 
-// Synchronization MIR Operations
+// Synchronization MIR Operations.
 
-// GenerateMutexCreateFunction generates a MIR function for creating mutexes
+// GenerateMutexCreateFunction generates a MIR function for creating mutexes.
 func (iom *IOMIRIntegration) GenerateMutexCreateFunction() *mir.Function {
 	function := &mir.Function{
 		Name:       "orizon_mutex_create",
@@ -306,7 +306,7 @@ func (iom *IOMIRIntegration) GenerateMutexCreateFunction() *mir.Function {
 	return function
 }
 
-// GenerateMutexLockFunction generates a MIR function for locking mutexes
+// GenerateMutexLockFunction generates a MIR function for locking mutexes.
 func (iom *IOMIRIntegration) GenerateMutexLockFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_io_mutex_lock",
@@ -335,7 +335,7 @@ func (iom *IOMIRIntegration) GenerateMutexLockFunction() *mir.Function {
 	return function
 }
 
-// GenerateChannelCreateFunction generates a MIR function for creating channels
+// GenerateChannelCreateFunction generates a MIR function for creating channels.
 func (iom *IOMIRIntegration) GenerateChannelCreateFunction() *mir.Function {
 	function := &mir.Function{
 		Name: "orizon_channel_create",
@@ -394,11 +394,11 @@ func (iom *IOMIRIntegration) GetExternalFunctions() []string {
 		"system_console_write",
 		"system_console_read",
 
-		// Threading functions
+		// Threading functions.
 		"system_create_thread",
 		"system_join_thread",
 
-		// Synchronization functions
+		// Synchronization functions.
 		"system_create_mutex",
 		"system_lock_mutex",
 		"system_create_channel",

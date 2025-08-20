@@ -30,7 +30,7 @@ const (
 	IOErrorUnknown
 )
 
-// String returns the string representation of an IOError
+// String returns the string representation of an IOError.
 func (e IOError) String() string {
 	switch e {
 	case IOErrorNone:
@@ -63,12 +63,12 @@ type IOResult struct {
 	SystemError    string
 }
 
-// IsSuccess returns true if the operation succeeded
+// IsSuccess returns true if the operation succeeded.
 func (r *IOResult) IsSuccess() bool {
 	return r.Error == IOErrorNone
 }
 
-// FileHandle represents a handle to an open file
+// FileHandle represents a handle to an open file.
 type FileHandle struct {
 	id       uint64
 	path     string
@@ -79,7 +79,7 @@ type FileHandle struct {
 	mu       sync.RWMutex
 }
 
-// FileMode represents file access mode
+// FileMode represents file access mode.
 type FileMode int
 
 const (
@@ -91,7 +91,7 @@ const (
 	FileModeCreateExclusive
 )
 
-// String returns the string representation of FileMode
+// String returns the string representation of FileMode.
 func (m FileMode) String() string {
 	switch m {
 	case FileModeReadOnly:
@@ -111,7 +111,7 @@ func (m FileMode) String() string {
 	}
 }
 
-// toGoFileMode converts FileMode to Go's file mode
+// toGoFileMode converts FileMode to Go's file mode.
 func (m FileMode) toGoFileMode() (int, error) {
 	switch m {
 	case FileModeReadOnly:
@@ -172,7 +172,7 @@ func InitializeIO(allocator allocator.Allocator, options ...IOOption) error {
 		defaultBufferSize: 8192,
 	}
 
-	// Apply options
+	// Apply options.
 	for _, opt := range options {
 		opt(manager)
 	}
@@ -184,27 +184,27 @@ func InitializeIO(allocator allocator.Allocator, options ...IOOption) error {
 // IOOption configures the I/O manager
 type IOOption func(*IOManager)
 
-// WithTempDir sets the temporary directory
+// WithTempDir sets the temporary directory.
 func WithTempDir(dir string) IOOption {
 	return func(m *IOManager) { m.tempDir = dir }
 }
 
-// WithMaxOpenFiles sets the maximum number of open files
+// WithMaxOpenFiles sets the maximum number of open files.
 func WithMaxOpenFiles(max int) IOOption {
 	return func(m *IOManager) { m.maxOpenFiles = max }
 }
 
-// WithBufferSize sets the default buffer size
+// WithBufferSize sets the default buffer size.
 func WithBufferSize(size int) IOOption {
 	return func(m *IOManager) { m.defaultBufferSize = size }
 }
 
-// OpenFile opens a file with the specified mode
+// OpenFile opens a file with the specified mode.
 func (iom *IOManager) OpenFile(path string, mode FileMode) (*FileHandle, IOResult) {
 	iom.mu.Lock()
 	defer iom.mu.Unlock()
 
-	// Check file limit
+	// Check file limit.
 	if len(iom.openFiles) >= iom.maxOpenFiles {
 		return nil, IOResult{
 			Error:       IOErrorOutOfSpace,
@@ -212,7 +212,7 @@ func (iom *IOManager) OpenFile(path string, mode FileMode) (*FileHandle, IOResul
 		}
 	}
 
-	// Convert file mode
+	// Convert file mode.
 	goMode, err := mode.toGoFileMode()
 	if err != nil {
 		return nil, IOResult{
@@ -221,7 +221,7 @@ func (iom *IOManager) OpenFile(path string, mode FileMode) (*FileHandle, IOResul
 		}
 	}
 
-	// Open the file
+	// Open the file.
 	file, err := os.OpenFile(path, goMode, 0644)
 	if err != nil {
 		return nil, IOResult{
@@ -230,14 +230,14 @@ func (iom *IOManager) OpenFile(path string, mode FileMode) (*FileHandle, IOResul
 		}
 	}
 
-	// Get file size
+	// Get file size.
 	stat, err := file.Stat()
 	var size int64
 	if err == nil {
 		size = stat.Size()
 	}
 
-	// Create file handle
+	// Create file handle.
 	handleID := atomic.AddUint64(&iom.nextHandleID, 1)
 	handle := &FileHandle{
 		id:       handleID,
@@ -248,17 +248,17 @@ func (iom *IOManager) OpenFile(path string, mode FileMode) (*FileHandle, IOResul
 		size:     size,
 	}
 
-	// Store handle
+	// Store handle.
 	iom.openFiles[handleID] = handle
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&iom.stats.FilesOpened, 1)
 	atomic.AddInt32(&iom.stats.OpenFiles, 1)
 
 	return handle, IOResult{Error: IOErrorNone}
 }
 
-// CloseFile closes a file handle
+// CloseFile closes a file handle.
 func (iom *IOManager) CloseFile(handle *FileHandle) IOResult {
 	if handle == nil {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "nil handle"}
@@ -267,10 +267,10 @@ func (iom *IOManager) CloseFile(handle *FileHandle) IOResult {
 	iom.mu.Lock()
 	defer iom.mu.Unlock()
 
-	// Remove from open files
+	// Remove from open files.
 	delete(iom.openFiles, handle.id)
 
-	// Close the underlying file
+	// Close the underlying file.
 	handle.mu.Lock()
 	var err error
 	if handle.file != nil {
@@ -279,7 +279,7 @@ func (iom *IOManager) CloseFile(handle *FileHandle) IOResult {
 	}
 	handle.mu.Unlock()
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&iom.stats.FilesClosed, 1)
 	atomic.AddInt32(&iom.stats.OpenFiles, -1)
 
@@ -293,7 +293,7 @@ func (iom *IOManager) CloseFile(handle *FileHandle) IOResult {
 	return IOResult{Error: IOErrorNone}
 }
 
-// ReadFile reads data from a file handle
+// ReadFile reads data from a file handle.
 func (iom *IOManager) ReadFile(handle *FileHandle, buffer unsafe.Pointer, size int) IOResult {
 	if handle == nil {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "nil handle"}
@@ -310,16 +310,16 @@ func (iom *IOManager) ReadFile(handle *FileHandle, buffer unsafe.Pointer, size i
 		return IOResult{Error: IOErrorCorrupted, SystemError: "file not open"}
 	}
 
-	// Create Go slice from unsafe pointer
+	// Create Go slice from unsafe pointer.
 	data := (*[1 << 30]byte)(buffer)[:size:size]
 
-	// Read from file
+	// Read from file.
 	n, err := handle.file.Read(data)
 
-	// Update position
+	// Update position.
 	handle.position += int64(n)
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&iom.stats.BytesRead, uint64(n))
 	atomic.AddUint64(&iom.stats.ReadOperations, 1)
 
@@ -337,7 +337,7 @@ func (iom *IOManager) ReadFile(handle *FileHandle, buffer unsafe.Pointer, size i
 	}
 }
 
-// WriteFile writes data to a file handle
+// WriteFile writes data to a file handle.
 func (iom *IOManager) WriteFile(handle *FileHandle, buffer unsafe.Pointer, size int) IOResult {
 	if handle == nil {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "nil handle"}
@@ -354,19 +354,19 @@ func (iom *IOManager) WriteFile(handle *FileHandle, buffer unsafe.Pointer, size 
 		return IOResult{Error: IOErrorCorrupted, SystemError: "file not open"}
 	}
 
-	// Create Go slice from unsafe pointer
+	// Create Go slice from unsafe pointer.
 	data := (*[1 << 30]byte)(buffer)[:size:size]
 
-	// Write to file
+	// Write to file.
 	n, err := handle.file.Write(data)
 
-	// Update position and size
+	// Update position and size.
 	handle.position += int64(n)
 	if handle.position > handle.size {
 		handle.size = handle.position
 	}
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&iom.stats.BytesWritten, uint64(n))
 	atomic.AddUint64(&iom.stats.WriteOperations, 1)
 
@@ -384,7 +384,7 @@ func (iom *IOManager) WriteFile(handle *FileHandle, buffer unsafe.Pointer, size 
 	}
 }
 
-// SeekFile sets the file position
+// SeekFile sets the file position.
 func (iom *IOManager) SeekFile(handle *FileHandle, offset int64, whence int) IOResult {
 	if handle == nil {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "nil handle"}
@@ -413,7 +413,7 @@ func (iom *IOManager) SeekFile(handle *FileHandle, offset int64, whence int) IOR
 	}
 }
 
-// FlushFile ensures all data is written to storage
+// FlushFile ensures all data is written to storage.
 func (iom *IOManager) FlushFile(handle *FileHandle) IOResult {
 	if handle == nil {
 		return IOResult{Error: IOErrorInvalidPath, SystemError: "nil handle"}
@@ -437,7 +437,7 @@ func (iom *IOManager) FlushFile(handle *FileHandle) IOResult {
 	return IOResult{Error: IOErrorNone}
 }
 
-// GetFileInfo returns information about a file
+// GetFileInfo returns information about a file.
 func (iom *IOManager) GetFileInfo(path string) (FileInfo, IOResult) {
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -458,7 +458,7 @@ func (iom *IOManager) GetFileInfo(path string) (FileInfo, IOResult) {
 	return info, IOResult{Error: IOErrorNone}
 }
 
-// FileInfo represents file information
+// FileInfo represents file information.
 type FileInfo struct {
 	Path     string
 	Size     int64
@@ -467,7 +467,7 @@ type FileInfo struct {
 	Mode     int
 }
 
-// DeleteFile deletes a file
+// DeleteFile deletes a file.
 func (iom *IOManager) DeleteFile(path string) IOResult {
 	err := os.Remove(path)
 	if err != nil {
@@ -480,7 +480,7 @@ func (iom *IOManager) DeleteFile(path string) IOResult {
 	return IOResult{Error: IOErrorNone}
 }
 
-// CreateDirectory creates a directory
+// CreateDirectory creates a directory.
 func (iom *IOManager) CreateDirectory(path string) IOResult {
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
@@ -493,7 +493,7 @@ func (iom *IOManager) CreateDirectory(path string) IOResult {
 	return IOResult{Error: IOErrorNone}
 }
 
-// ListDirectory lists files in a directory
+// ListDirectory lists files in a directory.
 func (iom *IOManager) ListDirectory(path string) ([]FileInfo, IOResult) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -533,27 +533,27 @@ func (iom *IOManager) GetStats() IOStats {
 	return stats
 }
 
-// Shutdown closes all open files and cleans up resources
+// Shutdown closes all open files and cleans up resources.
 func (iom *IOManager) Shutdown() IOResult {
 	iom.mu.Lock()
 	defer iom.mu.Unlock()
 
 	var lastError IOResult = IOResult{Error: IOErrorNone}
 
-	// Close all open files
+	// Close all open files.
 	for _, handle := range iom.openFiles {
 		if result := iom.CloseFile(handle); !result.IsSuccess() {
 			lastError = result
 		}
 	}
 
-	// Clear the map
+	// Clear the map.
 	iom.openFiles = make(map[uint64]*FileHandle)
 
 	return lastError
 }
 
-// mapSystemError maps Go system errors to IOError
+// mapSystemError maps Go system errors to IOError.
 func mapSystemError(err error) IOError {
 	if err == nil {
 		return IOErrorNone
@@ -571,7 +571,7 @@ func mapSystemError(err error) IOError {
 	}
 }
 
-// Global convenience functions
+// Global convenience functions.
 
 // OpenFile opens a file using the global I/O manager
 func OpenFile(path string, mode FileMode) (*FileHandle, IOResult) {

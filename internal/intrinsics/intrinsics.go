@@ -1,14 +1,14 @@
-// Package intrinsics provides compiler-dependent intrinsic functions and external declarations
+// Package intrinsics provides compiler-dependent intrinsic functions and external declarations.
 // for the Orizon programming language. These are essential for self-hosting and low-level operations.
 package intrinsics
 
 import "fmt"
 
-// IntrinsicKind represents the type of intrinsic function
+// IntrinsicKind represents the type of intrinsic function.
 type IntrinsicKind int
 
 const (
-	// Memory Management Intrinsics
+	// Memory Management Intrinsics.
 	IntrinsicAlloc IntrinsicKind = iota
 	IntrinsicFree
 	IntrinsicRealloc
@@ -16,7 +16,7 @@ const (
 	IntrinsicMemset
 	IntrinsicMemmove
 
-	// Atomic Operations
+	// Atomic Operations.
 	IntrinsicAtomicLoad
 	IntrinsicAtomicStore
 	IntrinsicAtomicCAS
@@ -26,18 +26,18 @@ const (
 	IntrinsicAtomicOr
 	IntrinsicAtomicAnd
 
-	// Bit Operations
+	// Bit Operations.
 	IntrinsicCtlz // Count leading zeros
 	IntrinsicCttz // Count trailing zeros
 	IntrinsicPopcount
 	IntrinsicBswap // Byte swap
 
-	// Arithmetic with Overflow
+	// Arithmetic with Overflow.
 	IntrinsicAddOverflow
 	IntrinsicSubOverflow
 	IntrinsicMulOverflow
 
-	// Compiler Magic
+	// Compiler Magic.
 	IntrinsicSizeof
 	IntrinsicAlignof
 	IntrinsicUnreachable
@@ -45,28 +45,28 @@ const (
 	IntrinsicTypeName
 	IntrinsicTypeID
 
-	// SIMD Operations (basic)
+	// SIMD Operations (basic).
 	IntrinsicVecAdd
 	IntrinsicVecSub
 	IntrinsicVecMul
 	IntrinsicVecDiv
 
-	// Architecture-specific (x64)
+	// Architecture-specific (x64).
 	IntrinsicRdtsc
 	IntrinsicCpuid
 	IntrinsicPrefetch
 )
 
-// IntrinsicInfo describes an intrinsic function
+// IntrinsicInfo describes an intrinsic function.
 type IntrinsicInfo struct {
 	Name      string
-	Kind      IntrinsicKind
 	Signature IntrinsicSignature
+	Kind      IntrinsicKind
 	Category  IntrinsicCategory
 	Platform  PlatformSupport
 }
 
-// IntrinsicSignature describes function signature
+// IntrinsicSignature describes function signature.
 type IntrinsicSignature struct {
 	Parameters []IntrinsicParameter
 	ReturnType IntrinsicType
@@ -74,13 +74,13 @@ type IntrinsicSignature struct {
 	IsUnsafe   bool
 }
 
-// IntrinsicParameter describes a parameter
+// IntrinsicParameter describes a parameter.
 type IntrinsicParameter struct {
 	Name string
 	Type IntrinsicType
 }
 
-// IntrinsicType represents intrinsic parameter/return types
+// IntrinsicType represents intrinsic parameter/return types.
 type IntrinsicType int
 
 const (
@@ -102,7 +102,7 @@ const (
 	IntrinsicUSize
 )
 
-// IntrinsicCategory categorizes intrinsics
+// IntrinsicCategory categorizes intrinsics.
 type IntrinsicCategory int
 
 const (
@@ -115,7 +115,7 @@ const (
 	CategoryArchSpecific
 )
 
-// PlatformSupport indicates platform availability
+// PlatformSupport indicates platform availability.
 type PlatformSupport int
 
 const (
@@ -125,16 +125,16 @@ const (
 	PlatformWasm
 )
 
-// GlobalIntrinsicRegistry contains all available intrinsics
+// GlobalIntrinsicRegistry contains all available intrinsics.
 var GlobalIntrinsicRegistry *IntrinsicRegistry
 
-// IntrinsicRegistry manages intrinsic function definitions
+// IntrinsicRegistry manages intrinsic function definitions.
 type IntrinsicRegistry struct {
 	intrinsics map[string]*IntrinsicInfo
 	byCategory map[IntrinsicCategory][]*IntrinsicInfo
 }
 
-// NewIntrinsicRegistry creates a new intrinsic registry
+// NewIntrinsicRegistry creates a new intrinsic registry.
 func NewIntrinsicRegistry() *IntrinsicRegistry {
 	return &IntrinsicRegistry{
 		intrinsics: make(map[string]*IntrinsicInfo),
@@ -142,57 +142,58 @@ func NewIntrinsicRegistry() *IntrinsicRegistry {
 	}
 }
 
-// Register registers an intrinsic function
+// Register registers an intrinsic function.
 func (ir *IntrinsicRegistry) Register(info *IntrinsicInfo) {
 	ir.intrinsics[info.Name] = info
 	ir.byCategory[info.Category] = append(ir.byCategory[info.Category], info)
 }
 
-// Lookup finds an intrinsic by name
+// Lookup finds an intrinsic by name.
 func (ir *IntrinsicRegistry) Lookup(name string) (*IntrinsicInfo, bool) {
 	info, exists := ir.intrinsics[name]
+
 	return info, exists
 }
 
-// GetByCategory returns all intrinsics in a category
+// GetByCategory returns all intrinsics in a category.
 func (ir *IntrinsicRegistry) GetByCategory(category IntrinsicCategory) []*IntrinsicInfo {
 	return ir.byCategory[category]
 }
 
-// GetAll returns all registered intrinsics
+// GetAll returns all registered intrinsics.
 func (ir *IntrinsicRegistry) GetAll() map[string]*IntrinsicInfo {
 	return ir.intrinsics
 }
 
-// InitializeIntrinsics initializes the global intrinsic registry
+// InitializeIntrinsics initializes the global intrinsic registry.
 func InitializeIntrinsics() {
 	GlobalIntrinsicRegistry = NewIntrinsicRegistry()
 
-	// Register memory management intrinsics
+	// Register memory management intrinsics.
 	registerMemoryIntrinsics()
 
-	// Register atomic operations
+	// Register atomic operations.
 	registerAtomicIntrinsics()
 
-	// Register bit operations
+	// Register bit operations.
 	registerBitIntrinsics()
 
-	// Register arithmetic with overflow
+	// Register arithmetic with overflow.
 	registerArithmeticIntrinsics()
 
-	// Register compiler magic
+	// Register compiler magic.
 	registerCompilerMagicIntrinsics()
 
-	// Register SIMD operations
+	// Register SIMD operations.
 	registerSIMDIntrinsics()
 
-	// Register architecture-specific
+	// Register architecture-specific.
 	registerArchSpecificIntrinsics()
 }
 
-// Memory Management Intrinsics
+// Memory Management Intrinsics.
 func registerMemoryIntrinsics() {
-	// orizon_alloc(size: usize) -> *void
+	// orizon_alloc(size: usize) -> *void.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_alloc",
 		Kind: IntrinsicAlloc,
@@ -207,7 +208,7 @@ func registerMemoryIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_free(ptr: *void) -> void
+	// orizon_free(ptr: *void) -> void.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_free",
 		Kind: IntrinsicFree,
@@ -222,7 +223,7 @@ func registerMemoryIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_realloc(ptr: *void, new_size: usize) -> *void
+	// orizon_realloc(ptr: *void, new_size: usize) -> *void.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_realloc",
 		Kind: IntrinsicRealloc,
@@ -238,7 +239,7 @@ func registerMemoryIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_memcpy(dest: *void, src: *void, count: usize) -> *void
+	// orizon_memcpy(dest: *void, src: *void, count: usize) -> *void.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_memcpy",
 		Kind: IntrinsicMemcpy,
@@ -255,7 +256,7 @@ func registerMemoryIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_memset(ptr: *void, value: i32, count: usize) -> *void
+	// orizon_memset(ptr: *void, value: i32, count: usize) -> *void.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_memset",
 		Kind: IntrinsicMemset,
@@ -273,9 +274,9 @@ func registerMemoryIntrinsics() {
 	})
 }
 
-// Atomic Operations Intrinsics
+// Atomic Operations Intrinsics.
 func registerAtomicIntrinsics() {
-	// orizon_atomic_load(ptr: *T) -> T
+	// orizon_atomic_load(ptr: *T) -> T.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_atomic_load",
 		Kind: IntrinsicAtomicLoad,
@@ -290,7 +291,7 @@ func registerAtomicIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_atomic_store(ptr: *T, value: T) -> void
+	// orizon_atomic_store(ptr: *T, value: T) -> void.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_atomic_store",
 		Kind: IntrinsicAtomicStore,
@@ -306,7 +307,7 @@ func registerAtomicIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_atomic_cas(ptr: *T, expected: T, desired: T) -> bool
+	// orizon_atomic_cas(ptr: *T, expected: T, desired: T) -> bool.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_atomic_cas",
 		Kind: IntrinsicAtomicCAS,
@@ -324,9 +325,9 @@ func registerAtomicIntrinsics() {
 	})
 }
 
-// Bit Operations Intrinsics
+// Bit Operations Intrinsics.
 func registerBitIntrinsics() {
-	// orizon_ctlz(value: u64) -> u32
+	// orizon_ctlz(value: u64) -> u32.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_ctlz",
 		Kind: IntrinsicCtlz,
@@ -340,7 +341,7 @@ func registerBitIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_cttz(value: u64) -> u32
+	// orizon_cttz(value: u64) -> u32.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_cttz",
 		Kind: IntrinsicCttz,
@@ -354,7 +355,7 @@ func registerBitIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_popcount(value: u64) -> u32
+	// orizon_popcount(value: u64) -> u32.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_popcount",
 		Kind: IntrinsicPopcount,
@@ -369,9 +370,9 @@ func registerBitIntrinsics() {
 	})
 }
 
-// Arithmetic with Overflow Intrinsics
+// Arithmetic with Overflow Intrinsics.
 func registerArithmeticIntrinsics() {
-	// orizon_add_overflow(a: T, b: T) -> (T, bool)
+	// orizon_add_overflow(a: T, b: T) -> (T, bool).
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_add_overflow",
 		Kind: IntrinsicAddOverflow,
@@ -387,9 +388,9 @@ func registerArithmeticIntrinsics() {
 	})
 }
 
-// Compiler Magic Intrinsics
+// Compiler Magic Intrinsics.
 func registerCompilerMagicIntrinsics() {
-	// orizon_sizeof(type: type) -> usize
+	// orizon_sizeof(type: type) -> usize.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_sizeof",
 		Kind: IntrinsicSizeof,
@@ -403,7 +404,7 @@ func registerCompilerMagicIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_alignof(type: type) -> usize
+	// orizon_alignof(type: type) -> usize.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_alignof",
 		Kind: IntrinsicAlignof,
@@ -417,7 +418,7 @@ func registerCompilerMagicIntrinsics() {
 		Platform: PlatformAll,
 	})
 
-	// orizon_unreachable() -> !
+	// orizon_unreachable() -> !.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_unreachable",
 		Kind: IntrinsicUnreachable,
@@ -430,16 +431,16 @@ func registerCompilerMagicIntrinsics() {
 	})
 }
 
-// SIMD Operations Intrinsics
+// SIMD Operations Intrinsics.
 func registerSIMDIntrinsics() {
-	// Basic vector operations for 128-bit vectors
-	// These would be expanded based on target architecture
+	// Basic vector operations for 128-bit vectors.
+	// These would be expanded based on target architecture.
 }
 
-// Architecture-Specific Intrinsics
+// Architecture-Specific Intrinsics.
 func registerArchSpecificIntrinsics() {
-	// x64-specific intrinsics
-	// orizon_rdtsc() -> u64
+	// x64-specific intrinsics.
+	// orizon_rdtsc() -> u64.
 	GlobalIntrinsicRegistry.Register(&IntrinsicInfo{
 		Name: "orizon_rdtsc",
 		Kind: IntrinsicRdtsc,
@@ -453,7 +454,7 @@ func registerArchSpecificIntrinsics() {
 	})
 }
 
-// String returns the string representation of an intrinsic type
+// String returns the string representation of an intrinsic type.
 func (it IntrinsicType) String() string {
 	switch it {
 	case IntrinsicVoid:
@@ -493,9 +494,9 @@ func (it IntrinsicType) String() string {
 	}
 }
 
-// GetIntrinsicType converts a type to IntrinsicType with type system integration
+// GetIntrinsicType converts a type to IntrinsicType with type system integration.
 func GetIntrinsicType(typeName string) IntrinsicType {
-	// Handle basic types
+	// Handle basic types.
 	switch typeName {
 	case "bool", "boolean":
 		return IntrinsicBool
@@ -528,45 +529,49 @@ func GetIntrinsicType(typeName string) IntrinsicType {
 	case "void":
 		return IntrinsicVoid
 	default:
-		// Handle pointer types
+		// Handle pointer types.
 		if len(typeName) > 0 && typeName[0] == '*' {
 			return IntrinsicPtr
 		}
-		// Handle array types
+		// Handle array types.
 		if len(typeName) > 2 && typeName[0] == '[' && typeName[len(typeName)-1] == ']' {
 			return IntrinsicPtr // Arrays are represented as pointers
 		}
-		// Handle slice types
+		// Handle slice types.
 		if len(typeName) > 2 && typeName[:2] == "[]" {
 			return IntrinsicPtr // Slices are represented as pointers
 		}
-		// Handle generic or complex types
+		// Handle generic or complex types.
 		if len(typeName) > 0 && typeName[0] >= 'A' && typeName[0] <= 'Z' {
-			// Could be a user-defined type or generic
+			// Could be a user-defined type or generic.
 			return IntrinsicVoid // Default to void for unknown types
 		}
+
 		return IntrinsicVoid
 	}
 }
 
-// IsIntrinsic checks if a function name is an intrinsic
+// IsIntrinsic checks if a function name is an intrinsic.
 func IsIntrinsic(name string) bool {
 	if GlobalIntrinsicRegistry == nil {
 		return false
 	}
+
 	_, exists := GlobalIntrinsicRegistry.Lookup(name)
+
 	return exists
 }
 
-// GetIntrinsic returns intrinsic info for a function name
+// GetIntrinsic returns intrinsic info for a function name.
 func GetIntrinsic(name string) (*IntrinsicInfo, bool) {
 	if GlobalIntrinsicRegistry == nil {
 		return nil, false
 	}
+
 	return GlobalIntrinsicRegistry.Lookup(name)
 }
 
-// ValidateIntrinsicCall validates that an intrinsic call has correct arguments
+// ValidateIntrinsicCall validates that an intrinsic call has correct arguments.
 func ValidateIntrinsicCall(intrinsic *IntrinsicInfo, args []IntrinsicType) error {
 	if len(args) != len(intrinsic.Signature.Parameters) {
 		return fmt.Errorf("intrinsic %s expects %d arguments, got %d",
@@ -583,7 +588,7 @@ func ValidateIntrinsicCall(intrinsic *IntrinsicInfo, args []IntrinsicType) error
 	return nil
 }
 
-// GetIntrinsicReturnType returns the return type of an intrinsic call
+// GetIntrinsicReturnType returns the return type of an intrinsic call.
 func GetIntrinsicReturnType(intrinsic *IntrinsicInfo, args []IntrinsicType) (IntrinsicType, error) {
 	if err := ValidateIntrinsicCall(intrinsic, args); err != nil {
 		return IntrinsicVoid, err
@@ -592,7 +597,7 @@ func GetIntrinsicReturnType(intrinsic *IntrinsicInfo, args []IntrinsicType) (Int
 	return intrinsic.Signature.ReturnType, nil
 }
 
-// ConvertToNativeType converts an IntrinsicType to a platform-specific native type
+// ConvertToNativeType converts an IntrinsicType to a platform-specific native type.
 func ConvertToNativeType(intrinsicType IntrinsicType) string {
 	switch intrinsicType {
 	case IntrinsicBool:
@@ -630,7 +635,7 @@ func ConvertToNativeType(intrinsicType IntrinsicType) string {
 	}
 }
 
-// IsNumericType checks if the intrinsic type is numeric
+// IsNumericType checks if the intrinsic type is numeric.
 func IsNumericType(intrinsicType IntrinsicType) bool {
 	switch intrinsicType {
 	case IntrinsicI8, IntrinsicI16, IntrinsicI32, IntrinsicI64,
@@ -642,7 +647,7 @@ func IsNumericType(intrinsicType IntrinsicType) bool {
 	}
 }
 
-// IsIntegerType checks if the intrinsic type is an integer
+// IsIntegerType checks if the intrinsic type is an integer.
 func IsIntegerType(intrinsicType IntrinsicType) bool {
 	switch intrinsicType {
 	case IntrinsicI8, IntrinsicI16, IntrinsicI32, IntrinsicI64,
@@ -654,12 +659,12 @@ func IsIntegerType(intrinsicType IntrinsicType) bool {
 	}
 }
 
-// IsFloatType checks if the intrinsic type is a floating point type
+// IsFloatType checks if the intrinsic type is a floating point type.
 func IsFloatType(intrinsicType IntrinsicType) bool {
 	return intrinsicType == IntrinsicF32 || intrinsicType == IntrinsicF64
 }
 
-// GetTypeSizeInBytes returns the size of an intrinsic type in bytes
+// GetTypeSizeInBytes returns the size of an intrinsic type in bytes.
 func GetTypeSizeInBytes(intrinsicType IntrinsicType) int {
 	switch intrinsicType {
 	case IntrinsicBool, IntrinsicI8, IntrinsicU8:

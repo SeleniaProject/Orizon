@@ -4,13 +4,13 @@ import (
 	"testing"
 )
 
-// =============================================================================
+// =============================================================================.
 // Phase 2.3.2: Index Types Implementation Tests
-// =============================================================================
+// =============================================================================.
 
 func TestIndexTypeSystem(t *testing.T) {
 	t.Run("ArrayIndexTypes", func(t *testing.T) {
-		// Test array index type creation
+		// Test array index type creation.
 		arrayType := &IndexType{
 			ID:               TypeID(1),
 			BaseType:         TypeInfo{Kind: TypeKindArray, Name: "Array"},
@@ -37,7 +37,7 @@ func TestIndexTypeSystem(t *testing.T) {
 	})
 
 	t.Run("LengthDependentTypes", func(t *testing.T) {
-		// Test length-dependent types
+		// Test length-dependent types.
 		lengthType := &LengthDependentType{
 			ID:           TypeID(2),
 			BaseType:     TypeInfo{Kind: TypeKindString, Name: "String"},
@@ -57,7 +57,7 @@ func TestIndexTypeSystem(t *testing.T) {
 	})
 
 	t.Run("BoundsCheckOptimization", func(t *testing.T) {
-		// Test bounds check optimization
+		// Test bounds check optimization.
 		optimizer := &BoundsOptimizer{
 			Strategy:        OptimizationAggressive,
 			RemoveRedundant: true,
@@ -65,7 +65,7 @@ func TestIndexTypeSystem(t *testing.T) {
 			CacheResults:    true,
 		}
 
-		// Create a simple bounds check
+		// Create a simple bounds check.
 		check := BoundsCheck{
 			Index:  &HIRLiteral{Value: 5, Type: TypeInfo{Kind: TypeKindInteger, Name: "Int"}},
 			Lower:  &HIRLiteral{Value: 0, Type: TypeInfo{Kind: TypeKindInteger, Name: "Int"}},
@@ -80,7 +80,7 @@ func TestIndexTypeSystem(t *testing.T) {
 			t.Log("Check optimization completed")
 		}
 
-		// In a real implementation, we would verify the optimization results
+		// In a real implementation, we would verify the optimization results.
 		if optimizer.Strategy != OptimizationAggressive {
 			t.Error("Optimizer strategy should be aggressive")
 		}
@@ -89,7 +89,7 @@ func TestIndexTypeSystem(t *testing.T) {
 
 func TestIndexTypeChecking(t *testing.T) {
 	t.Run("StaticBoundsVerification", func(t *testing.T) {
-		// Test static bounds verification
+		// Test static bounds verification.
 		arrayAccess := &HIRArrayAccess{
 			Array: &HIRIdentifier{
 				Name: "arr",
@@ -102,13 +102,13 @@ func TestIndexTypeChecking(t *testing.T) {
 			Type: TypeInfo{Kind: TypeKindInteger, Name: "Int"},
 		}
 
-		// Verify bounds statically
+		// Verify bounds statically.
 		inBounds := verifyArrayBounds(arrayAccess, 10)
 		if !inBounds {
 			t.Error("Valid array access should be verified as in bounds")
 		}
 
-		// Test out of bounds access
+		// Test out of bounds access.
 		outOfBoundsAccess := &HIRArrayAccess{
 			Array: &HIRIdentifier{
 				Name: "arr",
@@ -128,7 +128,7 @@ func TestIndexTypeChecking(t *testing.T) {
 	})
 
 	t.Run("DynamicBoundsChecking", func(t *testing.T) {
-		// Test dynamic bounds checking insertion
+		// Test dynamic bounds checking insertion.
 		dynamicAccess := &HIRArrayAccess{
 			Array: &HIRIdentifier{
 				Name: "arr",
@@ -141,7 +141,7 @@ func TestIndexTypeChecking(t *testing.T) {
 			Type: TypeInfo{Kind: TypeKindInteger, Name: "Int"},
 		}
 
-		// Generate bounds check
+		// Generate bounds check.
 		boundsCheck := generateBoundsCheck(dynamicAccess)
 		if boundsCheck == nil {
 			t.Error("Should generate bounds check for dynamic access")
@@ -153,7 +153,7 @@ func TestIndexTypeChecking(t *testing.T) {
 	})
 
 	t.Run("LengthConstraintVerification", func(t *testing.T) {
-		// Test length constraint verification
+		// Test length constraint verification.
 		stringType := &LengthDependentType{
 			ID:           TypeID(3),
 			BaseType:     TypeInfo{Kind: TypeKindString, Name: "String"},
@@ -163,7 +163,7 @@ func TestIndexTypeChecking(t *testing.T) {
 			Dependencies: []LengthDependency{},
 		}
 
-		// Verify length constraint
+		// Verify length constraint.
 		validLength := verifyLengthConstraint(stringType, 10)
 		if !validLength {
 			t.Error("Valid length should satisfy constraint")
@@ -178,7 +178,7 @@ func TestIndexTypeChecking(t *testing.T) {
 
 func TestIndexTypeIntegration(t *testing.T) {
 	t.Run("ArrayWithIndexTypes", func(t *testing.T) {
-		// Test array operations with index types
+		// Test array operations with index types.
 		indexType := &IndexType{
 			ID:               TypeID(4),
 			BaseType:         TypeInfo{Kind: TypeKindArray, Name: "Array"},
@@ -201,7 +201,7 @@ func TestIndexTypeIntegration(t *testing.T) {
 	})
 
 	t.Run("MultiDimensionalArrays", func(t *testing.T) {
-		// Test multi-dimensional array index types
+		// Test multi-dimensional array index types.
 		multiArrayType := &IndexType{
 			ID:               TypeID(5),
 			BaseType:         TypeInfo{Kind: TypeKindArray, Name: "Array2D"},
@@ -223,36 +223,36 @@ func TestIndexTypeIntegration(t *testing.T) {
 func TestPhase232Completion(t *testing.T) {
 	t.Log("=== Phase 2.3.2: Index Types Implementation - COMPLETE ===")
 
-	// Test all major components
+	// Test all major components.
 	t.Run("IndexTypes", func(t *testing.T) {
-		// Basic index type functionality
+		// Basic index type functionality.
 		if !testIndexTypeBasics() {
 			t.Error("Index type basics failed")
 		}
 	})
 
 	t.Run("LengthDependentTypes", func(t *testing.T) {
-		// Length-dependent type functionality
+		// Length-dependent type functionality.
 		if !testLengthDependentTypes() {
 			t.Error("Length-dependent types failed")
 		}
 	})
 
 	t.Run("BoundsVerification", func(t *testing.T) {
-		// Bounds verification system
+		// Bounds verification system.
 		if !testBoundsVerification() {
 			t.Error("Bounds verification failed")
 		}
 	})
 
 	t.Run("CheckOptimization", func(t *testing.T) {
-		// Bounds check optimization
+		// Bounds check optimization.
 		if !testCheckOptimization() {
 			t.Error("Check optimization failed")
 		}
 	})
 
-	// Report completion
+	// Report completion.
 	t.Log("✅ Array index types implemented")
 	t.Log("✅ Length-dependent types implemented")
 	t.Log("✅ Bounds verification system implemented")
@@ -264,22 +264,23 @@ func TestPhase232Completion(t *testing.T) {
 	t.Log("🎯 Phase 2.3.2 SUCCESSFULLY COMPLETED!")
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
+// =============================================================================.
+// Helper Functions.
+// =============================================================================.
 
 func verifyArrayBounds(access *HIRArrayAccess, arraySize int) bool {
-	// Simplified bounds verification
+	// Simplified bounds verification.
 	if literal, ok := access.Index.(*HIRLiteral); ok {
 		if index, ok := literal.Value.(int); ok {
 			return index >= 0 && index < arraySize
 		}
 	}
+
 	return true // For non-literal indices, assume valid for simplification
 }
 
 func generateBoundsCheck(access *HIRArrayAccess) *BoundsCheck {
-	// Generate bounds check for array access
+	// Generate bounds check for array access.
 	return &BoundsCheck{
 		Index:  access.Index,
 		Lower:  &HIRLiteral{Value: 0, Type: TypeInfo{Kind: TypeKindInteger, Name: "Int"}},
@@ -290,30 +291,32 @@ func generateBoundsCheck(access *HIRArrayAccess) *BoundsCheck {
 }
 
 func verifyLengthConstraint(lengthType *LengthDependentType, length int) bool {
-	// Simplified length constraint verification
+	// Simplified length constraint verification.
 	if minLit, ok := lengthType.MinLength.(*HIRLiteral); ok {
 		if min, ok := minLit.Value.(int); ok && length < min {
 			return false
 		}
 	}
+
 	if maxLit, ok := lengthType.MaxLength.(*HIRLiteral); ok {
 		if max, ok := maxLit.Value.(int); ok && length > max {
 			return false
 		}
 	}
+
 	return true
 }
 
 func (opt *BoundsOptimizer) OptimizeCheck(check BoundsCheck) bool {
-	// Simplified bounds check optimization
+	// Simplified bounds check optimization.
 	if literal, ok := check.Index.(*HIRLiteral); ok {
 		if index, ok := literal.Value.(int); ok {
-			// If index is a compile-time constant, we can optimize
+			// If index is a compile-time constant, we can optimize.
 			if lowerLit, ok := check.Lower.(*HIRLiteral); ok {
 				if upperLit, ok := check.Upper.(*HIRLiteral); ok {
 					if lower, ok := lowerLit.Value.(int); ok {
 						if upper, ok := upperLit.Value.(int); ok {
-							// Static verification - no runtime check needed
+							// Static verification - no runtime check needed.
 							return index >= lower && index < upper
 						}
 					}
@@ -321,11 +324,12 @@ func (opt *BoundsOptimizer) OptimizeCheck(check BoundsCheck) bool {
 			}
 		}
 	}
+
 	return false // Dynamic check required
 }
 
 func testIndexTypeBasics() bool {
-	// Test basic index type creation and usage
+	// Test basic index type creation and usage.
 	indexType := &IndexType{
 		ID:               TypeID(1),
 		BaseType:         TypeInfo{Kind: TypeKindArray, Name: "Array"},
@@ -337,11 +341,12 @@ func testIndexTypeBasics() bool {
 			OptimizeChecks: true,
 		},
 	}
+
 	return indexType != nil
 }
 
 func testLengthDependentTypes() bool {
-	// Test length-dependent types
+	// Test length-dependent types.
 	lengthType := &LengthDependentType{
 		ID:           TypeID(2),
 		BaseType:     TypeInfo{Kind: TypeKindString, Name: "String"},
@@ -350,26 +355,29 @@ func testLengthDependentTypes() bool {
 		MaxLength:    &HIRLiteral{Value: 20, Type: TypeInfo{Kind: TypeKindInteger, Name: "Int"}},
 		Dependencies: []LengthDependency{},
 	}
+
 	return lengthType != nil
 }
 
 func testBoundsVerification() bool {
-	// Test bounds verification system
+	// Test bounds verification system.
 	verification := BoundsVerification{
 		Strategy:       VerificationStatic,
 		CheckPoints:    []VerificationPoint{},
 		OptimizeChecks: true,
 	}
+
 	return verification.Strategy == VerificationStatic
 }
 
 func testCheckOptimization() bool {
-	// Test bounds check optimization
+	// Test bounds check optimization.
 	optimizer := &BoundsOptimizer{
 		Strategy:        OptimizationAggressive,
 		RemoveRedundant: true,
 		HoistChecks:     true,
 		CacheResults:    true,
 	}
+
 	return optimizer.Strategy == OptimizationAggressive
 }

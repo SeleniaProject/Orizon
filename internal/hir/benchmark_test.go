@@ -4,12 +4,13 @@ import (
 	"testing"
 )
 
-// BenchmarkTypeEquality benchmarks type equality operations
+// BenchmarkTypeEquality benchmarks type equality operations.
 func BenchmarkTypeEquality(b *testing.B) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 	intType2 := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		result := intType.Equals(intType2)
 		if !result {
@@ -18,12 +19,13 @@ func BenchmarkTypeEquality(b *testing.B) {
 	}
 }
 
-// BenchmarkTypeConversion benchmarks type conversion checks
+// BenchmarkTypeConversion benchmarks type conversion checks.
 func BenchmarkTypeConversion(b *testing.B) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 	floatType := TypeInfo{Kind: TypeKindFloat, Name: "float", Size: 4, Alignment: 4}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		result := intType.CanConvertTo(floatType)
 		if !result {
@@ -32,7 +34,7 @@ func BenchmarkTypeConversion(b *testing.B) {
 	}
 }
 
-// BenchmarkStructLayout benchmarks struct layout calculation
+// BenchmarkStructLayout benchmarks struct layout calculation.
 func BenchmarkStructLayout(b *testing.B) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 	floatType := TypeInfo{Kind: TypeKindFloat, Name: "float", Size: 4, Alignment: 4}
@@ -45,6 +47,7 @@ func BenchmarkStructLayout(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		layout := CalculateStructLayout(fields)
 		if layout.Size <= 0 {
@@ -53,7 +56,7 @@ func BenchmarkStructLayout(b *testing.B) {
 	}
 }
 
-// BenchmarkFunctionTypeCreation benchmarks function type creation
+// BenchmarkFunctionTypeCreation benchmarks function type creation.
 func BenchmarkFunctionTypeCreation(b *testing.B) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 
@@ -68,6 +71,7 @@ func BenchmarkFunctionTypeCreation(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		funcType := CreateFunctionType(signature)
 		if funcType.Kind != TypeKindFunction {
@@ -76,7 +80,7 @@ func BenchmarkFunctionTypeCreation(b *testing.B) {
 	}
 }
 
-// BenchmarkClosureLayout benchmarks closure layout calculation
+// BenchmarkClosureLayout benchmarks closure layout calculation.
 func BenchmarkClosureLayout(b *testing.B) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 	floatType := TypeInfo{Kind: TypeKindFloat, Name: "float", Size: 4, Alignment: 4}
@@ -90,6 +94,7 @@ func BenchmarkClosureLayout(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		layout := CalculateClosureLayout(env)
 		if layout.TotalSize <= 0 {
@@ -98,29 +103,30 @@ func BenchmarkClosureLayout(b *testing.B) {
 	}
 }
 
-// BenchmarkComplexTypeOperations benchmarks complex type operations
+// BenchmarkComplexTypeOperations benchmarks complex type operations.
 func BenchmarkComplexTypeOperations(b *testing.B) {
 	intType := TypeInfo{Kind: TypeKindInteger, Name: "int", Size: 4, Alignment: 4}
 	floatType := TypeInfo{Kind: TypeKindFloat, Name: "float", Size: 4, Alignment: 4}
 
-	// Create struct type
+	// Create struct type.
 	fields := []FieldInfo{
 		{Name: "x", Type: intType},
 		{Name: "y", Type: floatType},
 	}
 	structType := CreateStructType("Point", fields)
 
-	// Create array type
+	// Create array type.
 	arrayType := TypeInfo{Kind: TypeKindArray, Name: "[]int", Parameters: []TypeInfo{intType}}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
-		// Multiple operations
+		// Multiple operations.
 		_ = structType.Equals(structType)
 		_ = arrayType.CanConvertTo(arrayType)
 		_ = CalculateStructLayout(fields)
 
-		// Function type operations
+		// Function type operations.
 		signature := FunctionSignature{
 			Name: "process",
 			Parameters: []Parameter{

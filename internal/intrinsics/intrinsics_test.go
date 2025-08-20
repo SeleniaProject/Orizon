@@ -5,29 +5,31 @@ import (
 )
 
 func TestIntrinsicRegistry(t *testing.T) {
-	// Initialize registries
+	// Initialize registries.
 	InitializeIntrinsics()
 
 	if GlobalIntrinsicRegistry == nil {
 		t.Fatal("Failed to initialize GlobalIntrinsicRegistry")
 	}
 
-	// Test intrinsic registry
+	// Test intrinsic registry.
 	if GlobalIntrinsicRegistry == nil {
 		t.Fatal("Global intrinsic registry not initialized")
 	}
 
-	// Test specific intrinsics
+	// Test specific intrinsics.
 	alloc, exists := GlobalIntrinsicRegistry.Lookup("orizon_alloc")
 	if !exists {
 		t.Error("orizon_alloc intrinsic not found")
+
 		return // Early return to avoid nil pointer
 	}
+
 	if alloc.Kind != IntrinsicAlloc {
 		t.Error("orizon_alloc intrinsic has wrong kind")
 	}
 
-	// Test memory management intrinsics
+	// Test memory management intrinsics.
 	memoryIntrinsics := []string{
 		"orizon_alloc", "orizon_free", "orizon_realloc", "orizon_memcpy", "orizon_memset",
 	}
@@ -37,7 +39,7 @@ func TestIntrinsicRegistry(t *testing.T) {
 		}
 	}
 
-	// Test atomic intrinsics
+	// Test atomic intrinsics.
 	atomicIntrinsics := []string{
 		"orizon_atomic_load", "orizon_atomic_store", "orizon_atomic_cas",
 	}
@@ -47,7 +49,7 @@ func TestIntrinsicRegistry(t *testing.T) {
 		}
 	}
 
-	// Test bit operation intrinsics
+	// Test bit operation intrinsics.
 	bitIntrinsics := []string{
 		"orizon_popcount",
 	}
@@ -57,7 +59,7 @@ func TestIntrinsicRegistry(t *testing.T) {
 		}
 	}
 
-	// Test overflow intrinsics
+	// Test overflow intrinsics.
 	overflowIntrinsics := []string{
 		"orizon_add_overflow",
 	}
@@ -67,7 +69,7 @@ func TestIntrinsicRegistry(t *testing.T) {
 		}
 	}
 
-	// Test compiler magic intrinsics
+	// Test compiler magic intrinsics.
 	magicIntrinsics := []string{
 		"orizon_sizeof",
 	}
@@ -79,15 +81,15 @@ func TestIntrinsicRegistry(t *testing.T) {
 }
 
 func TestExternRegistry(t *testing.T) {
-	// Initialize registries
+	// Initialize registries.
 	InitializeExterns()
 
-	// Test extern registry
+	// Test extern registry.
 	if GlobalExternRegistry == nil {
 		t.Fatal("Global extern registry not initialized")
 	}
 
-	// Test C runtime functions
+	// Test C runtime functions.
 	cRuntimeFunctions := []string{
 		"malloc", "free", "realloc", "memcpy", "memset", "printf",
 	}
@@ -97,26 +99,30 @@ func TestExternRegistry(t *testing.T) {
 		}
 	}
 
-	// Test malloc specifically
+	// Test malloc specifically.
 	malloc, exists := GlobalExternRegistry.Lookup("malloc")
 	if !exists {
 		t.Error("malloc extern not found")
 	}
+
 	if malloc.Kind != ExternMalloc {
 		t.Error("malloc extern has wrong kind")
 	}
+
 	if len(malloc.Signature.Parameters) != 1 {
 		t.Error("malloc should have 1 parameter")
 	}
+
 	if malloc.Signature.ReturnType != IntrinsicPtr {
 		t.Error("malloc should return pointer")
 	}
 
-	// Test printf (varargs function)
+	// Test printf (varargs function).
 	printf, exists := GlobalExternRegistry.Lookup("printf")
 	if !exists {
 		t.Error("printf extern not found")
 	}
+
 	if !printf.Signature.IsVarArgs {
 		t.Error("printf should be varargs")
 	}
@@ -128,7 +134,7 @@ func TestHIRIntegration(t *testing.T) {
 		t.Fatal("Failed to create HIR integration")
 	}
 
-	// Test alloc intrinsic processing
+	// Test alloc intrinsic processing.
 	call := &CallExpression{
 		Function:  &NameExpression{Name: "orizon_alloc"},
 		Arguments: []interface{}{8}, // size argument
@@ -139,11 +145,12 @@ func TestHIRIntegration(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to process orizon_alloc intrinsic: %v", err)
 	}
+
 	if result == nil {
 		t.Error("orizon_alloc intrinsic returned nil result")
 	}
 
-	// Test invalid intrinsic
+	// Test invalid intrinsic.
 	invalidCall := &CallExpression{
 		Function:  &NameExpression{Name: "nonexistent"},
 		Arguments: []interface{}{},
@@ -154,7 +161,7 @@ func TestHIRIntegration(t *testing.T) {
 		t.Error("Expected error for nonexistent intrinsic")
 	}
 
-	// Test extern function processing
+	// Test extern function processing.
 	externCall := &CallExpression{
 		Function:  &NameExpression{Name: "malloc"},
 		Arguments: []interface{}{64}, // size argument
@@ -164,16 +171,17 @@ func TestHIRIntegration(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to process malloc extern: %v", err)
 	}
+
 	if result == nil {
 		t.Error("malloc extern returned nil result")
 	}
 }
 
 func TestIntrinsicTypes(t *testing.T) {
-	// Test intrinsic type conversions
+	// Test intrinsic type conversions.
 	testCases := []struct {
-		intrinsicType IntrinsicType
 		expected      string
+		intrinsicType IntrinsicType
 	}{
 		{IntrinsicVoid, "void"},
 		{IntrinsicBool, "bool"},
@@ -200,10 +208,10 @@ func TestIntrinsicTypes(t *testing.T) {
 }
 
 func TestPlatformSupport(t *testing.T) {
-	// Test platform support classifications
+	// Test platform support classifications.
 	testCases := []struct {
-		platform PlatformSupport
 		expected string
+		platform PlatformSupport
 	}{
 		{PlatformAll, "all"},
 		{PlatformX64, "x64"},
@@ -211,7 +219,7 @@ func TestPlatformSupport(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		// Platform support doesn't have String method, so we test the enum values
+		// Platform support doesn't have String method, so we test the enum values.
 		if tc.platform < PlatformAll || tc.platform > PlatformARM64 {
 			t.Errorf("Invalid platform value: %v", tc.platform)
 		}
@@ -219,10 +227,10 @@ func TestPlatformSupport(t *testing.T) {
 }
 
 func TestCallingConventions(t *testing.T) {
-	// Test calling convention strings
+	// Test calling convention strings.
 	testCases := []struct {
-		convention CallingConvention
 		expected   string
+		convention CallingConvention
 	}{
 		{CallingC, "C"},
 		{CallingStdcall, "stdcall"},
@@ -240,32 +248,32 @@ func TestCallingConventions(t *testing.T) {
 }
 
 func TestIntrinsicValidation(t *testing.T) {
-	// Test that all intrinsics have valid signatures
+	// Test that all intrinsics have valid signatures.
 	InitializeIntrinsics()
 
 	for name, intrinsic := range GlobalIntrinsicRegistry.intrinsics {
-		// Check that intrinsic has a name
+		// Check that intrinsic has a name.
 		if intrinsic.Name == "" {
 			t.Errorf("Intrinsic %s has empty name", name)
 		}
 
-		// Check that name matches map key
+		// Check that name matches map key.
 		if intrinsic.Name != name {
 			t.Errorf("Intrinsic name %s doesn't match map key %s", intrinsic.Name, name)
 		}
 
-		// Check that intrinsic has valid signature
+		// Check that intrinsic has valid signature.
 		if len(intrinsic.Signature.Parameters) == 0 && intrinsic.Kind != IntrinsicUnreachable {
-			// Most intrinsics should have parameters (except unreachable)
+			// Most intrinsics should have parameters (except unreachable).
 			switch intrinsic.Kind {
 			case IntrinsicUnreachable:
-				// unreachable has no parameters - this is fine
+				// unreachable has no parameters - this is fine.
 			default:
-				// Other intrinsics might have no parameters in some cases
+				// Other intrinsics might have no parameters in some cases.
 			}
 		}
 
-		// Check return type is valid
+		// Check return type is valid.
 		if intrinsic.Signature.ReturnType < IntrinsicVoid || intrinsic.Signature.ReturnType > IntrinsicUSize {
 			t.Errorf("Intrinsic %s has invalid return type: %v", name, intrinsic.Signature.ReturnType)
 		}
@@ -273,31 +281,31 @@ func TestIntrinsicValidation(t *testing.T) {
 }
 
 func TestExternValidation(t *testing.T) {
-	// Test that all extern functions have valid signatures
+	// Test that all extern functions have valid signatures.
 	InitializeExterns()
 
 	for name, extern := range GlobalExternRegistry.externs {
-		// Check that extern has a name
+		// Check that extern has a name.
 		if extern.Name == "" {
 			t.Errorf("Extern %s has empty name", name)
 		}
 
-		// Check that name matches map key
+		// Check that name matches map key.
 		if extern.Name != name {
 			t.Errorf("Extern name %s doesn't match map key %s", extern.Name, name)
 		}
 
-		// Check that extern has a library
+		// Check that extern has a library.
 		if extern.Library == "" {
 			t.Errorf("Extern %s has no library specified", name)
 		}
 
-		// Check return type is valid
+		// Check return type is valid.
 		if extern.Signature.ReturnType < IntrinsicVoid || extern.Signature.ReturnType > IntrinsicUSize {
 			t.Errorf("Extern %s has invalid return type: %v", name, extern.Signature.ReturnType)
 		}
 
-		// Check parameter types
+		// Check parameter types.
 		for i, param := range extern.Signature.Parameters {
 			if param.Type < IntrinsicVoid || param.Type > IntrinsicUSize {
 				t.Errorf("Extern %s parameter %d has invalid type: %v", name, i, param.Type)
@@ -310,6 +318,7 @@ func BenchmarkIntrinsicLookup(b *testing.B) {
 	InitializeIntrinsics()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = GlobalIntrinsicRegistry.Lookup("orizon_alloc")
 	}
@@ -319,6 +328,7 @@ func BenchmarkExternLookup(b *testing.B) {
 	InitializeExterns()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = GlobalExternRegistry.Lookup("malloc")
 	}
@@ -327,6 +337,7 @@ func BenchmarkExternLookup(b *testing.B) {
 func BenchmarkHIRIntegration(b *testing.B) {
 	InitializeIntrinsics()
 	InitializeExterns()
+
 	integration := NewHIRIntrinsicIntegration()
 
 	call := &CallExpression{
@@ -336,6 +347,7 @@ func BenchmarkHIRIntegration(b *testing.B) {
 	builder := &IRBuilder{}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = integration.ProcessIntrinsicCall(call, builder)
 	}
