@@ -12,11 +12,11 @@ import (
 func RunComprehensiveDiagnosticsDemo() {
 	fmt.Println("=== Orizon Compiler - Comprehensive Diagnostics System Demo ===")
 
-	// Initialize the diagnostic system
+	// Initialize the diagnostic system.
 	manager := NewDiagnosticManager()
 	cd := &CompilerDiagnostics{manager: manager}
 
-	// Create various diagnostic scenarios
+	// Create various diagnostic scenarios.
 	demonstrateLexicalAnalysis(cd)
 	demonstrateParsingAnalysis(cd)
 	demonstrateTypeAnalysis(cd)
@@ -24,7 +24,7 @@ func RunComprehensiveDiagnosticsDemo() {
 	demonstratePerformanceAnalysis(cd)
 	demonstrateAST_Analysis(cd)
 
-	// Display comprehensive results
+	// Display comprehensive results.
 	displayDiagnosticSummary(manager)
 	displayDetailedDiagnostics(manager)
 }
@@ -82,7 +82,7 @@ func demonstrateSecurityAnalysis(cd *CompilerDiagnostics) {
 		End:   position.Position{Line: 12, Column: 25, Offset: 320},
 	}
 
-	// Test with unsafe function call
+	// Test with unsafe function call.
 	callExpr := &ast.CallExpression{
 		Span:      span,
 		Function:  &ast.Identifier{Span: span, Value: "eval"},
@@ -91,7 +91,7 @@ func demonstrateSecurityAnalysis(cd *CompilerDiagnostics) {
 
 	cd.PerformSecurityAnalysis(callExpr, "example.oriz")
 
-	// Test with SQL injection pattern
+	// Test with SQL injection pattern.
 	sqlLiteral := &ast.Literal{
 		Span:  span,
 		Kind:  ast.LiteralString,
@@ -128,7 +128,7 @@ func demonstrateAST_Analysis(cd *CompilerDiagnostics) {
 		End:   position.Position{Line: 25, Column: 1, Offset: 600},
 	}
 
-	// Create a complex AST structure for analysis
+	// Create a complex AST structure for analysis.
 	binaryExpr := &ast.BinaryExpression{
 		Span:     span,
 		Left:     &ast.Identifier{Span: span, Value: "x"},
@@ -142,7 +142,7 @@ func demonstrateAST_Analysis(cd *CompilerDiagnostics) {
 		Body:      &ast.BlockStatement{Span: span, Statements: []ast.Statement{}},
 	}
 
-	// Create function with dead code
+	// Create function with dead code.
 	returnStmt := &ast.ReturnStatement{
 		Span:  span,
 		Value: &ast.Identifier{Span: span, Value: "result"},
@@ -164,7 +164,7 @@ func demonstrateAST_Analysis(cd *CompilerDiagnostics) {
 		Body: body,
 	}
 
-	// Perform comprehensive AST analysis
+	// Perform comprehensive AST analysis.
 	cd.analyzeBinaryExpression(binaryExpr, "example.oriz")
 	cd.analyzeWhileStatement(whileStmt, "example.oriz")
 	cd.PerformDeadCodeAnalysis(function, "example.oriz")
@@ -186,7 +186,7 @@ func displayDiagnosticSummary(manager *DiagnosticManager) {
 
 	fmt.Println()
 
-	// Display summary by category
+	// Display summary by category.
 	categories := []DiagnosticCategory{
 		CategorySyntax,
 		CategoryParsing,
@@ -199,6 +199,7 @@ func displayDiagnosticSummary(manager *DiagnosticManager) {
 	}
 
 	fmt.Println("Breakdown by Category:")
+
 	for _, category := range categories {
 		diags := manager.GetDiagnosticsByCategory(category)
 		if len(diags) > 0 {
@@ -220,11 +221,11 @@ func displayDetailedDiagnostics(manager *DiagnosticManager) {
 		fmt.Println()
 	}
 
-	// Display final summary
+	// Display final summary.
 	fmt.Println(manager.FormatSummary())
 }
 
-// Initialize demonstration
+// Initialize demonstration.
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }

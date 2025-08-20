@@ -202,17 +202,17 @@ func TestLayoutRequirementAnalysis(t *testing.T) {
 
 	req := emitter.analyzeLayoutRequirements(function)
 
-	// Check that array allocation was detected
+	// Check that array allocation was detected.
 	if len(req.LocalArrays) != 1 {
 		t.Errorf("Expected 1 array allocation, got %d", len(req.LocalArrays))
 	}
 
-	// Check that slice allocation was detected
+	// Check that slice allocation was detected.
 	if len(req.LocalSlices) != 1 {
 		t.Errorf("Expected 1 slice allocation, got %d", len(req.LocalSlices))
 	}
 
-	// Check stack offset calculation
+	// Check stack offset calculation.
 	stackSize := emitter.calculateStackRequirements(req)
 	if stackSize == 0 {
 		t.Error("Expected non-zero stack size for layout requirements")
@@ -225,7 +225,7 @@ func TestLayoutRequirementAnalysis(t *testing.T) {
 func TestLayoutAwareInstructions(t *testing.T) {
 	emitter := NewLayoutAwareEmitter()
 
-	// Create dummy layout requirements
+	// Create dummy layout requirements.
 	req := &LayoutRequirement{
 		LocalArrays:  make(map[string]*layout.ArrayLayout),
 		LocalSlices:  make(map[string]*layout.SliceLayout),
@@ -284,7 +284,7 @@ func TestLayoutAwareInstructions(t *testing.T) {
 func TestSliceLayoutGeneration(t *testing.T) {
 	emitter := NewLayoutAwareEmitter()
 
-	// Test slice header initialization
+	// Test slice header initialization.
 	instruction := lir.Alloc{Name: "slice_i32", Dst: "%slice"}
 
 	req := &LayoutRequirement{
@@ -294,7 +294,7 @@ func TestSliceLayoutGeneration(t *testing.T) {
 		StackOffset:  map[string]int64{"%slice": 32},
 	}
 
-	// Add slice layout to requirements
+	// Add slice layout to requirements.
 	sliceLayout, _ := emitter.Calculator.CalculateSliceLayout("i32", 4, 4)
 	req.LocalSlices["%slice"] = sliceLayout
 
@@ -321,7 +321,7 @@ func TestSliceLayoutGeneration(t *testing.T) {
 func TestArrayLayoutGeneration(t *testing.T) {
 	emitter := NewLayoutAwareEmitter()
 
-	// Test array allocation and initialization
+	// Test array allocation and initialization.
 	instruction := lir.Alloc{Name: "array_10_i32", Dst: "%arr"}
 
 	req := &LayoutRequirement{
@@ -331,7 +331,7 @@ func TestArrayLayoutGeneration(t *testing.T) {
 		StackOffset:  map[string]int64{"%arr": 48},
 	}
 
-	// Add array layout to requirements
+	// Add array layout to requirements.
 	arrayLayout, _ := emitter.Calculator.CalculateArrayLayout("i32", 4, 4, 10)
 	req.LocalArrays["%arr"] = arrayLayout
 
@@ -453,6 +453,7 @@ func BenchmarkLayoutAwareEmission(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, err := emitter.EmitWithLayouts(module)
 		if err != nil {

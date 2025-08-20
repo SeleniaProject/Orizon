@@ -12,13 +12,13 @@ func TestCompilerDiagnostics_IntegrationFlow(t *testing.T) {
 	manager := NewDiagnosticManager()
 	cd := &CompilerDiagnostics{manager: manager}
 
-	// Test position span
+	// Test position span.
 	span := position.Span{
 		Start: position.Position{Line: 1, Column: 1, Offset: 0},
 		End:   position.Position{Line: 1, Column: 10, Offset: 9},
 	}
 
-	// Test various diagnostic scenarios
+	// Test various diagnostic scenarios.
 	testCases := []struct {
 		name        string
 		testFunc    func()
@@ -64,7 +64,9 @@ func TestCompilerDiagnostics_IntegrationFlow(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			initialCount := len(manager.GetDiagnostics())
+
 			tc.testFunc()
+
 			newCount := len(manager.GetDiagnostics())
 
 			if newCount != initialCount+1 {
@@ -85,13 +87,13 @@ func TestCompilerDiagnostics_AST_Analysis(t *testing.T) {
 	manager := NewDiagnosticManager()
 	cd := &CompilerDiagnostics{manager: manager}
 
-	// Test AST analysis capabilities
+	// Test AST analysis capabilities.
 	span := position.Span{
 		Start: position.Position{Line: 1, Column: 1, Offset: 0},
 		End:   position.Position{Line: 1, Column: 20, Offset: 19},
 	}
 
-	// Create test AST nodes
+	// Create test AST nodes.
 	binaryExpr := &ast.BinaryExpression{
 		Span:     span,
 		Left:     &ast.Identifier{Span: span, Value: "x"},
@@ -112,19 +114,19 @@ func TestCompilerDiagnostics_AST_Analysis(t *testing.T) {
 		Raw:   "\"SELECT * FROM users WHERE id = 1\"",
 	}
 
-	// Test analysis methods
+	// Test analysis methods.
 	cd.analyzeBinaryExpression(binaryExpr, "test.oriz")
 	cd.analyzeWhileStatement(whileStmt, "test.oriz")
 	cd.analyzeLiteral(literal, "test.oriz")
 
 	diagnostics := manager.GetDiagnostics()
 
-	// Should have diagnostics for division by zero warning and SQL injection
+	// Should have diagnostics for division by zero warning and SQL injection.
 	if len(diagnostics) < 2 {
 		t.Errorf("Expected at least 2 diagnostics, got %d", len(diagnostics))
 	}
 
-	// Check for specific diagnostic types
+	// Check for specific diagnostic types.
 	hasSecurityDiag := false
 	hasPerformanceDiag := false
 
@@ -155,7 +157,7 @@ func TestCompilerDiagnostics_DiagnosticBuilder(t *testing.T) {
 		End:   position.Position{Line: 5, Column: 25, Offset: 115},
 	}
 
-	// Test the diagnostic builder pattern
+	// Test the diagnostic builder pattern.
 	builder := cd.NewDiagnostic(span)
 	diagnostic := builder.Warning().
 		WithCategory(CategoryPerformance).
@@ -164,7 +166,7 @@ func TestCompilerDiagnostics_DiagnosticBuilder(t *testing.T) {
 		AddManualFix("Fix suggestion").
 		Build()
 
-	// Manually add the diagnostic to test the builder
+	// Manually add the diagnostic to test the builder.
 	cd.manager.AddDiagnostic(diagnostic)
 
 	diagnostics := manager.GetDiagnostics()
@@ -191,8 +193,8 @@ func TestCompilerDiagnostics_DiagnosticBuilder(t *testing.T) {
 		t.Errorf("Expected source file 'builder_test.oriz', got '%s'", diag.SourceFile)
 	}
 
-	// The FixSuggestions might be empty due to enhancement processing
-	// Just check that the diagnostic was properly created
+	// The FixSuggestions might be empty due to enhancement processing.
+	// Just check that the diagnostic was properly created.
 	if len(diag.FixSuggestions) == 0 {
 		t.Logf("Note: Fix suggestions were not added (may be processed during enhancement)")
 	}
@@ -207,7 +209,7 @@ func TestCompilerDiagnostics_SecurityAnalysis(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 10, Offset: 9},
 	}
 
-	// Test unsafe function call detection
+	// Test unsafe function call detection.
 	callExpr := &ast.CallExpression{
 		Span:      span,
 		Function:  &ast.Identifier{Span: span, Value: "eval"},
@@ -242,7 +244,7 @@ func TestCompilerDiagnostics_DeadCodeAnalysis(t *testing.T) {
 		End:   position.Position{Line: 5, Column: 1, Offset: 50},
 	}
 
-	// Create a function with dead code
+	// Create a function with dead code.
 	returnStmt := &ast.ReturnStatement{
 		Span:  span,
 		Value: &ast.Identifier{Span: span, Value: "result"},
@@ -272,11 +274,13 @@ func TestCompilerDiagnostics_DeadCodeAnalysis(t *testing.T) {
 		t.Error("Expected dead code diagnostic")
 	}
 
-	// Check for unreachable code diagnostic
+	// Check for unreachable code diagnostic.
 	hasUnreachable := false
+
 	for _, diag := range diagnostics {
 		if contains(diag.Message, "Unreachable") {
 			hasUnreachable = true
+
 			break
 		}
 	}
@@ -295,10 +299,10 @@ func TestCompilerDiagnostics_ComprehensiveFlow(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 20, Offset: 19},
 	}
 
-	// Test comprehensive analysis flow
+	// Test comprehensive analysis flow.
 	sourceFile := "comprehensive_test.oriz"
 
-	// Add various types of issues
+	// Add various types of issues.
 	cd.LexError("Unexpected character", span, sourceFile)
 	cd.ParseError("Missing semicolon", span, sourceFile)
 	cd.TypeMismatch("int", "float", span, sourceFile)
@@ -313,7 +317,7 @@ func TestCompilerDiagnostics_ComprehensiveFlow(t *testing.T) {
 		t.Errorf("Expected 7 diagnostics, got %d", len(diagnostics))
 	}
 
-	// Test diagnostic filtering by level
+	// Test diagnostic filtering by level.
 	errors := manager.GetDiagnosticsByLevel(DiagnosticError)
 	warnings := manager.GetDiagnosticsByLevel(DiagnosticWarning)
 
@@ -325,7 +329,7 @@ func TestCompilerDiagnostics_ComprehensiveFlow(t *testing.T) {
 		t.Error("Expected some warning diagnostics")
 	}
 
-	// Test diagnostic filtering by category
+	// Test diagnostic filtering by category.
 	syntaxDiags := manager.GetDiagnosticsByCategory(CategorySyntax)
 	parsingDiags := manager.GetDiagnosticsByCategory(CategoryParsing)
 	typeDiags := manager.GetDiagnosticsByCategory(CategoryTypeError)
@@ -342,7 +346,7 @@ func TestCompilerDiagnostics_ComprehensiveFlow(t *testing.T) {
 		t.Error("Expected type diagnostics")
 	}
 
-	// Test diagnostic summary
+	// Test diagnostic summary.
 	summary := manager.GetDiagnosticSummary()
 
 	if summary.TotalCount != 7 {
@@ -358,7 +362,7 @@ func TestCompilerDiagnostics_ComprehensiveFlow(t *testing.T) {
 	}
 }
 
-// Helper function
+// Helper function.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||

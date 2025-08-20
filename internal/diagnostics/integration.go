@@ -1,4 +1,4 @@
-// Package diagnostics - Integration with compiler components
+// Package diagnostics - Integration with compiler components.
 package diagnostics
 
 import (
@@ -9,26 +9,26 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// CompilerDiagnostics provides diagnostic integration for all compiler phases
+// CompilerDiagnostics provides diagnostic integration for all compiler phases.
 type CompilerDiagnostics struct {
 	manager *DiagnosticManager
 }
 
-// NewCompilerDiagnostics creates a new compiler diagnostics system
+// NewCompilerDiagnostics creates a new compiler diagnostics system.
 func NewCompilerDiagnostics() *CompilerDiagnostics {
 	return &CompilerDiagnostics{
 		manager: NewDiagnosticManager(),
 	}
 }
 
-// GetManager returns the underlying diagnostic manager
+// GetManager returns the underlying diagnostic manager.
 func (cd *CompilerDiagnostics) GetManager() *DiagnosticManager {
 	return cd.manager
 }
 
-// === Lexer Integration ===
+// === Lexer Integration ===.
 
-// LexerError reports a lexical analysis error
+// LexerError reports a lexical analysis error.
 func (cd *CompilerDiagnostics) LexerError(message string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -44,7 +44,7 @@ func (cd *CompilerDiagnostics) LexerError(message string, span position.Span, so
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// InvalidCharacterError reports an invalid character error
+// InvalidCharacterError reports an invalid character error.
 func (cd *CompilerDiagnostics) InvalidCharacterError(char rune, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -61,7 +61,7 @@ func (cd *CompilerDiagnostics) InvalidCharacterError(char rune, span position.Sp
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UnterminatedStringError reports an unterminated string literal
+// UnterminatedStringError reports an unterminated string literal.
 func (cd *CompilerDiagnostics) UnterminatedStringError(span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -79,9 +79,9 @@ func (cd *CompilerDiagnostics) UnterminatedStringError(span position.Span, sourc
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Parser Integration ===
+// === Parser Integration ===.
 
-// ParseError reports a parsing error
+// ParseError reports a parsing error.
 func (cd *CompilerDiagnostics) ParseError(message string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -97,7 +97,7 @@ func (cd *CompilerDiagnostics) ParseError(message string, span position.Span, so
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UnexpectedTokenError reports an unexpected token error
+// UnexpectedTokenError reports an unexpected token error.
 func (cd *CompilerDiagnostics) UnexpectedTokenError(expected, actual string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -115,7 +115,7 @@ func (cd *CompilerDiagnostics) UnexpectedTokenError(expected, actual string, spa
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// MissingSemicolonError reports a missing semicolon
+// MissingSemicolonError reports a missing semicolon.
 func (cd *CompilerDiagnostics) MissingSemicolonError(span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -133,9 +133,9 @@ func (cd *CompilerDiagnostics) MissingSemicolonError(span position.Span, sourceF
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Type System Integration ===
+// === Type System Integration ===.
 
-// TypeError reports a type system error
+// TypeError reports a type system error.
 func (cd *CompilerDiagnostics) TypeError(message string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -151,21 +151,21 @@ func (cd *CompilerDiagnostics) TypeError(message string, span position.Span, sou
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// TypeMismatch reports a type mismatch
+// TypeMismatch reports a type mismatch.
 func (cd *CompilerDiagnostics) TypeMismatch(expected, actual string, span position.Span, sourceFile string) {
 	diagnostic := TypeMismatchError(expected, actual, span)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UndefinedVariable reports an undefined variable
+// UndefinedVariable reports an undefined variable.
 func (cd *CompilerDiagnostics) UndefinedVariable(name string, span position.Span, sourceFile string, suggestions []string) {
 	diagnostic := UndefinedVariableError(name, span, suggestions)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UndefinedFunction reports an undefined function
+// UndefinedFunction reports an undefined function.
 func (cd *CompilerDiagnostics) UndefinedFunction(name string, span position.Span, sourceFile string, suggestions []string) {
 	builder := NewDiagnosticBuilder().
 		Error().
@@ -184,7 +184,7 @@ func (cd *CompilerDiagnostics) UndefinedFunction(name string, span position.Span
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UndefinedType reports an undefined type
+// UndefinedType reports an undefined type.
 func (cd *CompilerDiagnostics) UndefinedType(name string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -202,7 +202,7 @@ func (cd *CompilerDiagnostics) UndefinedType(name string, span position.Span, so
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// RedefinitionError reports a redefinition error
+// RedefinitionError reports a redefinition error.
 func (cd *CompilerDiagnostics) RedefinitionError(name string, span position.Span, originalSpan position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -221,23 +221,23 @@ func (cd *CompilerDiagnostics) RedefinitionError(name string, span position.Span
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Control Flow Analysis ===
+// === Control Flow Analysis ===.
 
-// UnreachableCode reports unreachable code
+// UnreachableCode reports unreachable code.
 func (cd *CompilerDiagnostics) UnreachableCode(span position.Span, sourceFile string) {
 	diagnostic := DeadCodeWarning(span)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// MissingReturn reports a missing return statement
+// MissingReturn reports a missing return statement.
 func (cd *CompilerDiagnostics) MissingReturn(functionName string, span position.Span, sourceFile string, returnType string) {
 	diagnostic := MissingReturnError(functionName, span, returnType)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// InfiniteLoop reports a potential infinite loop
+// InfiniteLoop reports a potential infinite loop.
 func (cd *CompilerDiagnostics) InfiniteLoop(span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().
@@ -255,16 +255,16 @@ func (cd *CompilerDiagnostics) InfiniteLoop(span position.Span, sourceFile strin
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Code Quality Analysis ===
+// === Code Quality Analysis ===.
 
-// UnusedVariable reports an unused variable
+// UnusedVariable reports an unused variable.
 func (cd *CompilerDiagnostics) UnusedVariable(name string, span position.Span, sourceFile string) {
 	diagnostic := UnusedVariableWarning(name, span)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UnusedFunction reports an unused function
+// UnusedFunction reports an unused function.
 func (cd *CompilerDiagnostics) UnusedFunction(name string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().
@@ -282,7 +282,7 @@ func (cd *CompilerDiagnostics) UnusedFunction(name string, span position.Span, s
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UnusedImport reports an unused import
+// UnusedImport reports an unused import.
 func (cd *CompilerDiagnostics) UnusedImport(name string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().
@@ -299,16 +299,16 @@ func (cd *CompilerDiagnostics) UnusedImport(name string, span position.Span, sou
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Performance Analysis ===
+// === Performance Analysis ===.
 
-// PerformanceIssue reports a performance issue
+// PerformanceIssue reports a performance issue.
 func (cd *CompilerDiagnostics) PerformanceIssue(issue string, span position.Span, sourceFile string, suggestion string) {
 	diagnostic := PerformanceWarning(issue, span, suggestion)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// InEfficientAlgorithm reports an inefficient algorithm
+// InEfficientAlgorithm reports an inefficient algorithm.
 func (cd *CompilerDiagnostics) InEfficientAlgorithm(description string, span position.Span, sourceFile string, betterApproach string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().
@@ -325,16 +325,16 @@ func (cd *CompilerDiagnostics) InEfficientAlgorithm(description string, span pos
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Memory Safety Analysis ===
+// === Memory Safety Analysis ===.
 
-// MemoryLeak reports a potential memory leak
+// MemoryLeak reports a potential memory leak.
 func (cd *CompilerDiagnostics) MemoryLeak(resource string, span position.Span, sourceFile string) {
 	diagnostic := MemoryLeakWarning(resource, span)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// UseAfterFree reports a use-after-free error
+// UseAfterFree reports a use-after-free error.
 func (cd *CompilerDiagnostics) UseAfterFree(variable string, span position.Span, freeSpan position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -352,7 +352,7 @@ func (cd *CompilerDiagnostics) UseAfterFree(variable string, span position.Span,
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// DanglingPointer reports a dangling pointer
+// DanglingPointer reports a dangling pointer.
 func (cd *CompilerDiagnostics) DanglingPointer(pointer string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -369,16 +369,16 @@ func (cd *CompilerDiagnostics) DanglingPointer(pointer string, span position.Spa
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Security Analysis ===
+// === Security Analysis ===.
 
-// SecurityIssue reports a security issue
+// SecurityIssue reports a security issue.
 func (cd *CompilerDiagnostics) SecurityIssue(issue string, span position.Span, sourceFile string) {
 	diagnostic := SecurityWarning(issue, span)
 	diagnostic.SourceFile = sourceFile
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// BufferOverflow reports a potential buffer overflow
+// BufferOverflow reports a potential buffer overflow.
 func (cd *CompilerDiagnostics) BufferOverflow(span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -396,9 +396,9 @@ func (cd *CompilerDiagnostics) BufferOverflow(span position.Span, sourceFile str
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === Style and Convention Analysis ===
+// === Style and Convention Analysis ===.
 
-// NamingConvention reports a naming convention violation
+// NamingConvention reports a naming convention violation.
 func (cd *CompilerDiagnostics) NamingConvention(name string, span position.Span, sourceFile string, expectedPattern string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().
@@ -415,9 +415,9 @@ func (cd *CompilerDiagnostics) NamingConvention(name string, span position.Span,
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// === AST Analysis Integration ===
+// === AST Analysis Integration ===.
 
-// AnalyzeASTNode performs comprehensive analysis on an AST node
+// AnalyzeASTNode performs comprehensive analysis on an AST node.
 func (cd *CompilerDiagnostics) AnalyzeASTNode(node ast.Node, sourceFile string) {
 	if node == nil {
 		return
@@ -425,7 +425,7 @@ func (cd *CompilerDiagnostics) AnalyzeASTNode(node ast.Node, sourceFile string) 
 
 	span := node.GetSpan()
 
-	// Analyze based on node type
+	// Analyze based on node type.
 	switch n := node.(type) {
 	case *ast.FunctionDeclaration:
 		cd.analyzeFunctionDeclaration(n, sourceFile)
@@ -439,48 +439,48 @@ func (cd *CompilerDiagnostics) AnalyzeASTNode(node ast.Node, sourceFile string) 
 		cd.analyzeBinaryExpression(n, sourceFile)
 	}
 
-	// Generic analysis for all nodes
+	// Generic analysis for all nodes.
 	cd.analyzeNodeForCommonIssues(node, span, sourceFile)
 }
 
-// analyzeFunctionDeclaration analyzes function declarations
+// analyzeFunctionDeclaration analyzes function declarations.
 func (cd *CompilerDiagnostics) analyzeFunctionDeclaration(fn *ast.FunctionDeclaration, sourceFile string) {
-	// Check for missing documentation
+	// Check for missing documentation.
 	if fn.Name.Value != "main" { // Skip main function
-		// In a real implementation, check for doc comments
+		// In a real implementation, check for doc comments.
 		cd.StyleIssue("missing documentation comment", fn.GetSpan(), sourceFile, "Add documentation comment")
 	}
 
-	// Check for long parameter lists
+	// Check for long parameter lists.
 	if len(fn.Parameters) > 5 {
 		cd.PerformanceIssue("function has many parameters", fn.GetSpan(), sourceFile, "Consider using a struct for parameters")
 	}
 }
 
-// analyzeVariableDeclaration analyzes variable declarations
+// analyzeVariableDeclaration analyzes variable declarations.
 func (cd *CompilerDiagnostics) analyzeVariableDeclaration(vardecl *ast.VariableDeclaration, sourceFile string) {
 	name := vardecl.Name.Value
 
-	// Check naming conventions
+	// Check naming conventions.
 	if len(name) == 1 && name != "i" && name != "j" && name != "k" {
 		cd.NamingConvention(name, vardecl.GetSpan(), sourceFile, "descriptive names")
 	}
 }
 
-// analyzeIfStatement analyzes if statements
+// analyzeIfStatement analyzes if statements.
 func (cd *CompilerDiagnostics) analyzeIfStatement(ifStmt *ast.IfStatement, sourceFile string) {
 	// Check for empty then/else blocks
-	// This would require analyzing the block structure
+	// This would require analyzing the block structure.
 }
 
-// analyzeWhileStatement analyzes while statements
+// analyzeWhileStatement analyzes while statements.
 func (cd *CompilerDiagnostics) analyzeWhileStatement(whileStmt *ast.WhileStatement, sourceFile string) {
 	builder := cd.NewDiagnostic(whileStmt.GetSpan())
 
-	// Check for potential infinite loops by analyzing condition
+	// Check for potential infinite loops by analyzing condition.
 	if whileStmt.Condition != nil {
-		// This is a placeholder for more sophisticated analysis
-		// In a real implementation, we'd check if the condition can ever become false
+		// This is a placeholder for more sophisticated analysis.
+		// In a real implementation, we'd check if the condition can ever become false.
 		cd.analyzeExpression(whileStmt.Condition, sourceFile)
 	} else {
 		builder.Warning().WithCategory(CategoryPerformance).
@@ -489,41 +489,41 @@ func (cd *CompilerDiagnostics) analyzeWhileStatement(whileStmt *ast.WhileStateme
 			Build()
 	}
 
-	// Analyze the body
+	// Analyze the body.
 	if whileStmt.Body != nil {
 		cd.analyzeStatement(whileStmt.Body, sourceFile)
 	}
 }
 
-// analyzeBinaryExpression analyzes binary expressions
+// analyzeBinaryExpression analyzes binary expressions.
 func (cd *CompilerDiagnostics) analyzeBinaryExpression(binExpr *ast.BinaryExpression, sourceFile string) {
-	// Check for potential division by zero
+	// Check for potential division by zero.
 	if binExpr.Operator == ast.OpDiv {
-		// This would require constant folding analysis
+		// This would require constant folding analysis.
 		cd.WarnIssue("Potential division by zero", binExpr.GetSpan(), sourceFile, "Check divisor before division")
 	}
 
-	// Check for comparison with floating point equality
+	// Check for comparison with floating point equality.
 	if binExpr.Operator == ast.OpEq || binExpr.Operator == ast.OpNe {
-		// This would require type analysis to check if operands are floating point
-		// For now, just a placeholder
+		// This would require type analysis to check if operands are floating point.
+		// For now, just a placeholder.
 	}
 }
 
-// analyzeNodeForCommonIssues performs common analysis on any node
+// analyzeNodeForCommonIssues performs common analysis on any node.
 func (cd *CompilerDiagnostics) analyzeNodeForCommonIssues(node ast.Node, span position.Span, sourceFile string) {
-	// Check for very long lines (style issue)
+	// Check for very long lines (style issue).
 	if span.End.Column-span.Start.Column > 120 {
 		cd.StyleIssue("line too long", span, sourceFile, "Break long lines")
 	}
 }
 
-// NewDiagnostic creates a new diagnostic builder
+// NewDiagnostic creates a new diagnostic builder.
 func (cd *CompilerDiagnostics) NewDiagnostic(span position.Span) *DiagnosticBuilder {
 	return NewDiagnosticBuilder().WithSpan(span)
 }
 
-// WarnIssue creates a warning diagnostic
+// WarnIssue creates a warning diagnostic.
 func (cd *CompilerDiagnostics) WarnIssue(message string, span position.Span, sourceFile string, help string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().
@@ -537,7 +537,7 @@ func (cd *CompilerDiagnostics) WarnIssue(message string, span position.Span, sou
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// StyleIssue creates a style-related diagnostic
+// StyleIssue creates a style-related diagnostic.
 func (cd *CompilerDiagnostics) StyleIssue(message string, span position.Span, sourceFile string, help string) {
 	diagnostic := NewDiagnosticBuilder().
 		Info().
@@ -551,7 +551,7 @@ func (cd *CompilerDiagnostics) StyleIssue(message string, span position.Span, so
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// analyzeExpression analyzes expressions recursively
+// analyzeExpression analyzes expressions recursively.
 func (cd *CompilerDiagnostics) analyzeExpression(expr ast.Expression, sourceFile string) {
 	if expr == nil {
 		return
@@ -566,19 +566,20 @@ func (cd *CompilerDiagnostics) analyzeExpression(expr ast.Expression, sourceFile
 		cd.analyzeExpression(e.Operand, sourceFile)
 	case *ast.CallExpression:
 		cd.analyzeExpression(e.Function, sourceFile)
+
 		for _, arg := range e.Arguments {
 			cd.analyzeExpression(arg, sourceFile)
 		}
 	case *ast.Identifier:
-		// Check for undefined variables (would require symbol table)
-		// Placeholder for variable resolution
+		// Check for undefined variables (would require symbol table).
+		// Placeholder for variable resolution.
 	case *ast.Literal:
-		// Literals are generally safe, but could check for overflow
+		// Literals are generally safe, but could check for overflow.
 		cd.analyzeLiteral(e, sourceFile)
 	}
 }
 
-// analyzeStatement analyzes statements recursively
+// analyzeStatement analyzes statements recursively.
 func (cd *CompilerDiagnostics) analyzeStatement(stmt ast.Statement, sourceFile string) {
 	if stmt == nil {
 		return
@@ -601,20 +602,21 @@ func (cd *CompilerDiagnostics) analyzeStatement(stmt ast.Statement, sourceFile s
 		}
 	case *ast.VariableDeclaration:
 		cd.analyzeVariableDeclaration(s, sourceFile)
+
 		if s.Value != nil {
 			cd.analyzeExpression(s.Value, sourceFile)
 		}
 	}
 }
 
-// analyzeLiteral analyzes literal expressions
+// analyzeLiteral analyzes literal expressions.
 func (cd *CompilerDiagnostics) analyzeLiteral(lit *ast.Literal, sourceFile string) {
-	// Check for potential overflow in integer literals
+	// Check for potential overflow in integer literals.
 	if lit.Kind == ast.LiteralInteger {
-		// This would require constant value analysis
+		// This would require constant value analysis.
 	}
 
-	// Check for SQL injection patterns in string literals
+	// Check for SQL injection patterns in string literals.
 	if lit.Kind == ast.LiteralString {
 		if value, ok := lit.Value.(string); ok {
 			cd.checkStringLiteralSecurity(value, lit.GetSpan(), sourceFile)
@@ -622,38 +624,39 @@ func (cd *CompilerDiagnostics) analyzeLiteral(lit *ast.Literal, sourceFile strin
 	}
 }
 
-// checkStringLiteralSecurity checks string literals for security issues
+// checkStringLiteralSecurity checks string literals for security issues.
 func (cd *CompilerDiagnostics) checkStringLiteralSecurity(value string, span position.Span, sourceFile string) {
 	lowerValue := strings.ToLower(value)
 
-	// Check for SQL injection patterns
+	// Check for SQL injection patterns.
 	sqlKeywords := []string{"select ", "insert ", "update ", "delete ", "drop ", "alter "}
 	for _, keyword := range sqlKeywords {
 		if strings.Contains(lowerValue, keyword) {
 			cd.SecurityIssue("Potential SQL injection vulnerability", span, sourceFile)
+
 			break
 		}
 	}
 }
 
-// Advanced Analysis Methods
+// Advanced Analysis Methods.
 
-// PerformDeadCodeAnalysis performs dead code analysis on a function
+// PerformDeadCodeAnalysis performs dead code analysis on a function.
 func (cd *CompilerDiagnostics) PerformDeadCodeAnalysis(fn *ast.FunctionDeclaration, sourceFile string) {
-	// This would require control flow graph analysis
-	// Placeholder implementation
+	// This would require control flow graph analysis.
+	// Placeholder implementation.
 	if fn.Body != nil {
 		cd.analyzeDeadCodeInBlock(fn.Body, sourceFile)
 	}
 }
 
-// analyzeDeadCodeInBlock checks for unreachable code in a block
+// analyzeDeadCodeInBlock checks for unreachable code in a block.
 func (cd *CompilerDiagnostics) analyzeDeadCodeInBlock(block *ast.BlockStatement, sourceFile string) {
 	hasReturn := false
 
 	for _, stmt := range block.Statements {
 		if hasReturn {
-			// Code after return is unreachable
+			// Code after return is unreachable.
 			cd.WarnIssue("Unreachable code", stmt.GetSpan(), sourceFile,
 				"Remove unreachable code after return statement")
 		}
@@ -662,7 +665,7 @@ func (cd *CompilerDiagnostics) analyzeDeadCodeInBlock(block *ast.BlockStatement,
 			hasReturn = true
 		}
 
-		// Check for empty blocks
+		// Check for empty blocks.
 		if blockStmt, ok := stmt.(*ast.BlockStatement); ok {
 			if len(blockStmt.Statements) == 0 {
 				cd.StyleIssue("Empty block", blockStmt.GetSpan(), sourceFile,
@@ -672,7 +675,7 @@ func (cd *CompilerDiagnostics) analyzeDeadCodeInBlock(block *ast.BlockStatement,
 	}
 }
 
-// PerformSecurityAnalysis performs security-related analysis
+// PerformSecurityAnalysis performs security-related analysis.
 func (cd *CompilerDiagnostics) PerformSecurityAnalysis(node ast.Node, sourceFile string) {
 	switch n := node.(type) {
 	case *ast.CallExpression:
@@ -686,7 +689,7 @@ func (cd *CompilerDiagnostics) PerformSecurityAnalysis(node ast.Node, sourceFile
 	}
 }
 
-// analyzeUnsafeCalls checks for potentially unsafe function calls
+// analyzeUnsafeCalls checks for potentially unsafe function calls.
 func (cd *CompilerDiagnostics) analyzeUnsafeCalls(call *ast.CallExpression, sourceFile string) {
 	if fn, ok := call.Function.(*ast.Identifier); ok {
 		unsafeFunctions := []string{"eval", "exec", "system", "shell"}
@@ -699,7 +702,7 @@ func (cd *CompilerDiagnostics) analyzeUnsafeCalls(call *ast.CallExpression, sour
 	}
 }
 
-// LexError reports a lexical error
+// LexError reports a lexical error.
 func (cd *CompilerDiagnostics) LexError(message string, span position.Span, sourceFile string) {
 	diagnostic := NewDiagnosticBuilder().
 		Error().
@@ -712,7 +715,7 @@ func (cd *CompilerDiagnostics) LexError(message string, span position.Span, sour
 	cd.manager.AddDiagnostic(diagnostic)
 }
 
-// MemoryIssue reports a memory-related issue
+// MemoryIssue reports a memory-related issue.
 func (cd *CompilerDiagnostics) MemoryIssue(message string, span position.Span, sourceFile string, help string) {
 	diagnostic := NewDiagnosticBuilder().
 		Warning().

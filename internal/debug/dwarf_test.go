@@ -8,10 +8,10 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// minimal stubs to construct a function decl with spans
+// minimal stubs to construct a function decl with spans.
 type dummyExpr struct {
-	id hir.NodeID
 	sp position.Span
+	id hir.NodeID
 }
 
 func (d dummyExpr) GetID() hir.NodeID                 { return d.id }
@@ -27,7 +27,7 @@ func (d dummyExpr) hirExpressionNode()                {}
 func TestEmitter_EmitAndSerialize(t *testing.T) {
 	p := hir.NewHIRProgram()
 	m := &hir.HIRModule{ID: 1, ModuleID: 1, Name: "main"}
-	// Fake function decl with parameters using current HIRFunctionDeclaration shape
+	// Fake function decl with parameters using current HIRFunctionDeclaration shape.
 	var i32 hir.HIRType = &hir.HIRBasicType{ID: 10, Kind: hir.TypeKindInteger, Name: "i32", Type: hir.TypeInfo{Name: "i32", Kind: hir.TypeKindInteger}}
 	pA := &hir.HIRParameter{ID: 20, Name: "a", Type: i32, Span: position.Span{Start: position.Position{Filename: "main.oriz", Line: 1, Column: 5, Offset: 4}, End: position.Position{Filename: "main.oriz", Line: 1, Column: 6, Offset: 5}}}
 	pB := &hir.HIRParameter{ID: 21, Name: "b", Type: i32}
@@ -42,18 +42,21 @@ func TestEmitter_EmitAndSerialize(t *testing.T) {
 	p.Modules[1] = m
 
 	em := NewEmitter()
+
 	info, err := em.Emit(p)
 	if err != nil {
 		t.Fatalf("emit failed: %v", err)
 	}
+
 	if len(info.Modules) != 1 || len(info.Modules[0].Functions) != 1 {
 		t.Fatalf("unexpected modules/functions")
 	}
+
 	out, err := Serialize(info)
 	if err != nil {
 		t.Fatalf("serialize failed: %v", err)
 	}
-	// Must be valid JSON
+	// Must be valid JSON.
 	var tmp map[string]any
 	if err := json.Unmarshal(out, &tmp); err != nil {
 		t.Fatalf("json invalid: %v", err)

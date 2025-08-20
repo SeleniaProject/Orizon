@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-// BuiltinFunctions contains the list of built-in functions available in Orizon
+// BuiltinFunctions contains the list of built-in functions available in Orizon.
 var BuiltinFunctions = map[string]BuiltinFunction{
 	"print": {
 		Name:       "print",
@@ -32,40 +32,42 @@ var BuiltinFunctions = map[string]BuiltinFunction{
 	},
 }
 
-// BuiltinFunction represents a built-in function definition
+// BuiltinFunction represents a built-in function definition.
 type BuiltinFunction struct {
 	Name         string
 	ReturnType   string
-	Parameters   []BuiltinParameter
 	AssemblyName string
+	Parameters   []BuiltinParameter
 }
 
-// BuiltinParameter represents a parameter of a built-in function
+// BuiltinParameter represents a parameter of a built-in function.
 type BuiltinParameter struct {
 	Name string
 	Type string
 }
 
-// IsBuiltinFunction checks if a function name is a built-in function
+// IsBuiltinFunction checks if a function name is a built-in function.
 func IsBuiltinFunction(name string) bool {
 	_, exists := BuiltinFunctions[name]
+
 	return exists
 }
 
-// GetBuiltinFunction returns the built-in function definition
+// GetBuiltinFunction returns the built-in function definition.
 func GetBuiltinFunction(name string) (BuiltinFunction, bool) {
 	fn, exists := BuiltinFunctions[name]
+
 	return fn, exists
 }
 
-// GenerateBuiltinAssembly generates assembly code for all built-in functions
+// GenerateBuiltinAssembly generates assembly code for all built-in functions.
 func GenerateBuiltinAssembly() string {
 	var b strings.Builder
 
 	b.WriteString("; Built-in functions for Orizon\n")
 	b.WriteString("; Windows x64 calling convention\n\n")
 
-	// print function
+	// print function.
 	b.WriteString("orizon_print:\n")
 	b.WriteString("  push rbp\n")
 	b.WriteString("  mov rbp, rsp\n")
@@ -89,7 +91,7 @@ func GenerateBuiltinAssembly() string {
 	b.WriteString("  pop rbp\n")
 	b.WriteString("  ret\n\n")
 
-	// println function
+	// println function.
 	b.WriteString("orizon_println:\n")
 	b.WriteString("  push rbp\n")
 	b.WriteString("  mov rbp, rsp\n")
@@ -103,7 +105,7 @@ func GenerateBuiltinAssembly() string {
 	b.WriteString("  pop rbp\n")
 	b.WriteString("  ret\n\n")
 
-	// exit function
+	// exit function.
 	b.WriteString("orizon_exit:\n")
 	b.WriteString("  push rbp\n")
 	b.WriteString("  mov rbp, rsp\n")
@@ -115,7 +117,7 @@ func GenerateBuiltinAssembly() string {
 	b.WriteString("  pop rbp\n")
 	b.WriteString("  ret\n\n")
 
-	// Data section
+	// Data section.
 	b.WriteString("section .data\n")
 	b.WriteString("newline_str db 10, 0  ; newline + null terminator\n\n")
 

@@ -181,12 +181,12 @@ func TestX64EmitWithRegisterAllocation(t *testing.T) {
 				t.Fatalf("Failed to emit assembly: %v", err)
 			}
 
-			// Verify assembly was generated
+			// Verify assembly was generated.
 			if asm == "" {
 				t.Fatal("No assembly generated")
 			}
 
-			// Check for proper function structure
+			// Check for proper function structure.
 			if !strings.Contains(asm, tt.function.Name+":") {
 				t.Errorf("Function label not found in assembly: %s", tt.function.Name)
 			}
@@ -203,32 +203,35 @@ func TestX64EmitWithRegisterAllocation(t *testing.T) {
 				t.Error("Return instruction missing")
 			}
 
-			// Check for register allocation summary
+			// Check for register allocation summary.
 			if !strings.Contains(asm, "Register Allocation Summary:") {
 				t.Error("Register allocation summary missing")
 			}
 
-			// Verify expected registers are used (basic check)
+			// Verify expected registers are used (basic check).
 			usedRegCount := 0
+
 			for _, reg := range tt.expectedRegs {
 				if strings.Contains(asm, reg) {
 					usedRegCount++
 				}
 			}
+
 			if usedRegCount < 2 { // At least 2 registers should be used in most tests
 				t.Errorf("Expected at least 2 registers to be used, found %d", usedRegCount)
 			}
 
-			// Check spill behavior
+			// Check spill behavior.
 			hasSpill := strings.Contains(asm, "[rbp-") && !strings.Contains(asm, "; unallocated")
 			if tt.expectSpill && !hasSpill {
 				t.Error("Expected spill code but none found")
 			}
+
 			if !tt.expectSpill && hasSpill {
 				t.Error("Unexpected spill code found")
 			}
 
-			// Print assembly for debugging (optional)
+			// Print assembly for debugging (optional).
 			if testing.Verbose() {
 				fmt.Printf("Generated assembly for %s:\n%s\n", tt.name, asm)
 			}
@@ -237,27 +240,27 @@ func TestX64EmitWithRegisterAllocation(t *testing.T) {
 }
 
 func TestRegisterAllocationIntegration(t *testing.T) {
-	// Test integration with existing MIR to LIR pipeline
+	// Test integration with existing MIR to LIR pipeline.
 	t.Run("integration_with_pipeline", func(t *testing.T) {
-		// Create a more complex function to test integration
+		// Create a more complex function to test integration.
 		function := &lir.Function{
 			Name: "complex_test",
 			Blocks: []*lir.BasicBlock{
 				{
 					Label: "entry",
 					Insns: []lir.Insn{
-						// Setup multiple variables
+						// Setup multiple variables.
 						lir.Mov{Src: "1", Dst: "%a"},
 						lir.Mov{Src: "2", Dst: "%b"},
 						lir.Mov{Src: "3", Dst: "%c"},
 						lir.Mov{Src: "4", Dst: "%d"},
 
-						// Arithmetic operations
+						// Arithmetic operations.
 						lir.Add{Dst: "%e", LHS: "%a", RHS: "%b"},
 						lir.Mul{Dst: "%f", LHS: "%c", RHS: "%d"},
 						lir.Sub{Dst: "%g", LHS: "%e", RHS: "%f"},
 
-						// Conditional logic
+						// Conditional logic.
 						lir.Cmp{Dst: "%h", LHS: "%g", RHS: "0", Pred: "sgt"},
 						lir.BrCond{Cond: "%h", True: "positive", False: "negative"},
 					},
@@ -295,7 +298,7 @@ func TestRegisterAllocationIntegration(t *testing.T) {
 			t.Fatalf("Integration test failed: %v", err)
 		}
 
-		// Verify proper structure
+		// Verify proper structure.
 		requiredStructures := []string{
 			"complex_test:",
 			"positive:",
@@ -312,13 +315,14 @@ func TestRegisterAllocationIntegration(t *testing.T) {
 			}
 		}
 
-		// Verify register allocation works across blocks
+		// Verify register allocation works across blocks.
 		if !strings.Contains(asm, "Register Allocation Summary:") {
 			t.Error("Register allocation summary missing in integration test")
 		}
 
-		// Check that we have reasonable register usage
+		// Check that we have reasonable register usage.
 		registerCount := 0
+
 		for _, reg := range []string{"rax", "rcx", "rdx", "rbx", "rsi", "rdi", "r8", "r9"} {
 			if strings.Contains(asm, reg) {
 				registerCount++
@@ -379,12 +383,12 @@ func TestFloatingPointRegisterAllocation(t *testing.T) {
 		t.Fatalf("Failed to emit floating point assembly: %v", err)
 	}
 
-	// Check for XMM register usage in calls
+	// Check for XMM register usage in calls.
 	if !strings.Contains(asm, "xmm") {
 		t.Error("No XMM registers found in floating point assembly")
 	}
 
-	// Check for floating point calling convention
+	// Check for floating point calling convention.
 	if !strings.Contains(asm, "movq") {
 		t.Error("No floating point move instructions found")
 	}
@@ -395,15 +399,15 @@ func TestFloatingPointRegisterAllocation(t *testing.T) {
 }
 
 func BenchmarkRegisterAllocation(b *testing.B) {
-	// Create a function with many variables to stress test register allocation
+	// Create a function with many variables to stress test register allocation.
 	var insns []lir.Insn
 
-	// Create many variables
+	// Create many variables.
 	for i := 1; i <= 50; i++ {
 		insns = append(insns, lir.Mov{Src: fmt.Sprintf("%d", i), Dst: fmt.Sprintf("%%v%d", i)})
 	}
 
-	// Use them in operations
+	// Use them in operations.
 	for i := 1; i <= 25; i++ {
 		insns = append(insns, lir.Add{
 			Dst: fmt.Sprintf("%%r%d", i),
@@ -412,7 +416,7 @@ func BenchmarkRegisterAllocation(b *testing.B) {
 		})
 	}
 
-	// Final result
+	// Final result.
 	insns = append(insns, lir.Ret{Src: "%r1"})
 
 	function := &lir.Function{
@@ -431,6 +435,7 @@ func BenchmarkRegisterAllocation(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, err := EmitX64WithRegisterAllocation(module)
 		if err != nil {

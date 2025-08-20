@@ -7,25 +7,18 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// ASTFormattingOptions controls AST-based formatting
+// ASTFormattingOptions controls AST-based formatting.
 type ASTFormattingOptions struct {
-	// IndentSize specifies the number of spaces for indentation
-	IndentSize int
-	// PreferTabs uses tabs instead of spaces for indentation
-	PreferTabs bool
-	// MaxLineLength is the preferred maximum line length
-	MaxLineLength int
-	// AlignFields aligns struct/enum fields vertically
-	AlignFields bool
-	// SpaceAroundOperators adds spaces around binary operators
-	SpaceAroundOperators bool
-	// TrailingComma adds trailing commas in lists
-	TrailingComma bool
-	// EmptyLineBetweenDeclarations adds empty lines between top-level declarations
+	IndentSize                   int
+	MaxLineLength                int
+	PreferTabs                   bool
+	AlignFields                  bool
+	SpaceAroundOperators         bool
+	TrailingComma                bool
 	EmptyLineBetweenDeclarations bool
 }
 
-// DefaultASTFormattingOptions returns default AST formatting options
+// DefaultASTFormattingOptions returns default AST formatting options.
 func DefaultASTFormattingOptions() ASTFormattingOptions {
 	return ASTFormattingOptions{
 		IndentSize:                   4,
@@ -38,14 +31,14 @@ func DefaultASTFormattingOptions() ASTFormattingOptions {
 	}
 }
 
-// ASTFormatter provides AST-based code formatting
+// ASTFormatter provides AST-based code formatting.
 type ASTFormatter struct {
+	buffer  strings.Builder
 	options ASTFormattingOptions
 	indent  int
-	buffer  strings.Builder
 }
 
-// NewASTFormatter creates a new AST formatter with the given options
+// NewASTFormatter creates a new AST formatter with the given options.
 func NewASTFormatter(options ASTFormattingOptions) *ASTFormatter {
 	return &ASTFormatter{
 		options: options,
@@ -53,7 +46,7 @@ func NewASTFormatter(options ASTFormattingOptions) *ASTFormatter {
 	}
 }
 
-// FormatAST formats an AST and returns the formatted source code
+// FormatAST formats an AST and returns the formatted source code.
 func (f *ASTFormatter) FormatAST(node ast.Node) string {
 	f.buffer.Reset()
 	f.indent = 0
@@ -65,22 +58,23 @@ func (f *ASTFormatter) FormatAST(node ast.Node) string {
 	return f.buffer.String()
 }
 
-// FormatSourceWithAST parses source code and formats it using AST
+// FormatSourceWithAST parses source code and formats it using AST.
 func FormatSourceWithAST(source string, options ASTFormattingOptions) (string, error) {
-	// For now, return a notice that AST formatting is not fully implemented
-	// This would be implemented once the parser interface is stabilized
-
-	// Try basic token-based formatting as a fallback
+	// For now, return a notice that AST formatting is not fully implemented.
+	// This would be implemented once the parser interface is stabilized.
+	// Try basic token-based formatting as a fallback.
 	formatted := formatBasedOnTokens(source, options)
+
 	return formatted, nil
 }
 
-// formatBasedOnTokens provides improved formatting using lexical analysis
+// formatBasedOnTokens provides improved formatting using lexical analysis.
 func formatBasedOnTokens(source string, options ASTFormattingOptions) string {
-	// Create lexer
+	// Create lexer.
 	l := lexer.New(source)
 
 	var result strings.Builder
+
 	currentIndent := 0
 	needNewline := false
 	lastTokenWasKeyword := false
@@ -91,21 +85,25 @@ func formatBasedOnTokens(source string, options ASTFormattingOptions) string {
 			break
 		}
 
-		// Handle indentation for specific tokens
+		// Handle indentation for specific tokens.
 		switch token.Type.String() {
 		case "LBRACE", "{":
 			if needNewline {
 				result.WriteString("\n")
 				writeIndentString(&result, currentIndent, options)
+
 				needNewline = false
 			}
+
 			if options.SpaceAroundOperators && result.Len() > 0 {
 				lastChar := result.String()[result.Len()-1]
 				if lastChar != ' ' && lastChar != '\n' && lastChar != '\t' {
 					result.WriteString(" ")
 				}
 			}
+
 			result.WriteString("{")
+
 			currentIndent++
 			needNewline = true
 
@@ -114,23 +112,28 @@ func formatBasedOnTokens(source string, options ASTFormattingOptions) string {
 			if currentIndent < 0 {
 				currentIndent = 0
 			}
+
 			result.WriteString("\n")
 			writeIndentString(&result, currentIndent, options)
 			result.WriteString("}")
+
 			needNewline = true
 
 		case "SEMICOLON", ";":
 			result.WriteString(";")
+
 			needNewline = true
 
 		case "COMMA", ",":
 			result.WriteString(",")
+
 			if options.SpaceAroundOperators {
 				result.WriteString(" ")
 			}
 
 		case "COLON", ":":
 			result.WriteString(":")
+
 			if options.SpaceAroundOperators {
 				result.WriteString(" ")
 			}
@@ -150,14 +153,15 @@ func formatBasedOnTokens(source string, options ASTFormattingOptions) string {
 			}
 
 		default:
-			// Handle newlines and indentation
+			// Handle newlines and indentation.
 			if needNewline {
 				result.WriteString("\n")
 				writeIndentString(&result, currentIndent, options)
+
 				needNewline = false
 			}
 
-			// Add space before keywords if needed
+			// Add space before keywords if needed.
 			if isKeyword(token.Literal) && !lastTokenWasKeyword && result.Len() > 0 {
 				lastChar := result.String()[result.Len()-1]
 				if lastChar != ' ' && lastChar != '\n' && lastChar != '\t' {
@@ -170,14 +174,14 @@ func formatBasedOnTokens(source string, options ASTFormattingOptions) string {
 		}
 	}
 
-	// Ensure single trailing newline
+	// Ensure single trailing newline.
 	formatted := result.String()
 	formatted = strings.TrimRight(formatted, " \t\r\n") + "\n"
 
 	return formatted
 }
 
-// writeIndentString writes indentation to the buffer
+// writeIndentString writes indentation to the buffer.
 func writeIndentString(buffer *strings.Builder, level int, options ASTFormattingOptions) {
 	if options.PreferTabs {
 		buffer.WriteString(strings.Repeat("\t", level))
@@ -186,7 +190,7 @@ func writeIndentString(buffer *strings.Builder, level int, options ASTFormatting
 	}
 }
 
-// isKeyword checks if a token is a keyword
+// isKeyword checks if a token is a keyword.
 func isKeyword(literal string) bool {
 	keywords := map[string]bool{
 		"fn":       true,
@@ -213,14 +217,14 @@ func isKeyword(literal string) bool {
 	return keywords[literal]
 }
 
-// formatNode formats a specific AST node (placeholder for future implementation)
+// formatNode formats a specific AST node (placeholder for future implementation).
 func (f *ASTFormatter) formatNode(node ast.Node) {
-	// This would be implemented once AST structure is stabilized
-	// For now, use string representation
+	// This would be implemented once AST structure is stabilized.
+	// For now, use string representation.
 	f.writeString(node.String())
 }
 
-// Writing helper functions
+// Writing helper functions.
 func (f *ASTFormatter) writeString(s string) {
 	f.buffer.WriteString(s)
 }
