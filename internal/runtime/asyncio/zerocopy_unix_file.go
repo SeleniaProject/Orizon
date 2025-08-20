@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build linux.
+// +build linux.
 
 package asyncio
 
@@ -16,7 +16,7 @@ import (
 
 // CopyFileToConn uses sendfile on Linux for zero-copy file->socket transfer.
 func CopyFileToConn(ctx context.Context, dst net.Conn, src *os.File) (int64, error) {
-	// obtain dst fd
+	// obtain dst fd.
 	var dfd int
 	if sc, ok := dst.(interface {
 		SyscallConn() (syscall.RawConn, error)

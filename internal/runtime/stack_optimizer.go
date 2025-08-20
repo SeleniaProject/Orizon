@@ -1,5 +1,5 @@
 // Phase 3.1.4: Stack Optimization Implementation
-// Simplified version for compilation compatibility
+// Simplified version for compilation compatibility.
 
 package runtime
 
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Stack optimizer manages stack allocation optimization
+// Stack optimizer manages stack allocation optimization.
 type StackOptimizer struct {
 	frames            map[string]*StackFrame               // Stack frames
 	functions         map[string]*StackFunction            // Function definitions
@@ -23,68 +23,68 @@ type StackOptimizer struct {
 	mutex             sync.RWMutex                         // Synchronization
 }
 
-// Stack frame representation
+// Stack frame representation.
 type StackFrame struct {
-	ID              string                     // Frame identifier
-	Function        string                     // Function name
-	Size            uint64                     // Frame size
-	Variables       map[string]*StackVariable  // Local variables
-	Parameters      []StackParameter           // Function parameters
-	ReturnAddress   uintptr                    // Return address
-	Allocations     []StackOptimizerAllocation // Local allocations
-	Optimized       bool                       // Optimization applied
-	CompactionRatio float64                    // Compaction ratio
-	CreateTime      time.Time                  // Creation time
+	CreateTime      time.Time
+	Variables       map[string]*StackVariable
+	ID              string
+	Function        string
+	Parameters      []StackParameter
+	Allocations     []StackOptimizerAllocation
+	Size            uint64
+	ReturnAddress   uintptr
+	CompactionRatio float64
+	Optimized       bool
 }
 
-// Stack allocation tracking
+// Stack allocation tracking.
 type StackOptimizerAllocation struct {
-	ID                string        // Allocation identifier
-	Type              string        // Allocation type
-	Size              uint64        // Allocation size
-	Offset            uint64        // Stack offset
-	Lifetime          StackLifetime // Allocation lifetime
-	EscapeScore       float64       // Escape analysis score
-	Optimizable       bool          // Can be optimized
-	RegisterCandidate bool          // Register promotion candidate
+	Lifetime          StackLifetime
+	ID                string
+	Type              string
+	Size              uint64
+	Offset            uint64
+	EscapeScore       float64
+	Optimizable       bool
+	RegisterCandidate bool
 }
 
-// Stack variable information
+// Stack variable information.
 type StackVariable struct {
-	Name       string             // Variable name
-	Type       string             // Variable type
-	Size       uint64             // Variable size
-	Offset     uint64             // Stack offset
-	Scope      string             // Variable scope
-	Usage      StackVariableUsage // Usage patterns
-	EscapeInfo *StackEscapeInfo   // Escape information
+	Usage      StackVariableUsage
+	EscapeInfo *StackEscapeInfo
+	Name       string
+	Type       string
+	Scope      string
+	Size       uint64
+	Offset     uint64
 }
 
-// Stack escape analyzer
+// Stack escape analyzer.
 type StackEscapeAnalyzer struct {
-	functions   map[string]*StackFunctionAnalysis // Function analysis
-	variables   map[string]*StackVariableAnalysis // Variable analysis
-	constraints []StackEscapeConstraint           // Escape constraints
-	graph       *StackEscapeGraph                 // Escape graph
-	config      StackEscapeConfig                 // Configuration
-	statistics  StackEscapeStatistics             // Statistics
-	enabled     bool                              // Analyzer enabled
-	mutex       sync.RWMutex                      // Synchronization
+	functions   map[string]*StackFunctionAnalysis
+	variables   map[string]*StackVariableAnalysis
+	graph       *StackEscapeGraph
+	constraints []StackEscapeConstraint
+	statistics  StackEscapeStatistics
+	config      StackEscapeConfig
+	mutex       sync.RWMutex
+	enabled     bool
 }
 
-// Stack frame optimizer
+// Stack frame optimizer.
 type StackFrameOptimizer struct {
-	layouts       map[string]*StackFrameLayout    // Frame layouts
-	optimizations []StackFrameOptimization        // Applied optimizations
-	cache         map[string]*StackOptimizedFrame // Optimization cache
-	strategies    []StackOptimizationStrategy     // Optimization strategies
-	config        StackFrameOptimizerConfig       // Configuration
-	statistics    StackFrameOptimizerStatistics   // Statistics
-	enabled       bool                            // Optimizer enabled
-	mutex         sync.RWMutex                    // Synchronization
+	layouts       map[string]*StackFrameLayout
+	cache         map[string]*StackOptimizedFrame
+	optimizations []StackFrameOptimization
+	strategies    []StackOptimizationStrategy
+	statistics    StackFrameOptimizerStatistics
+	mutex         sync.RWMutex
+	config        StackFrameOptimizerConfig
+	enabled       bool
 }
 
-// Stack tail call optimizer
+// Stack tail call optimizer.
 type StackTailCallOptimizer struct {
 	candidates    map[string]*StackTailCallCandidate // Tail call candidates
 	optimizations []StackTailCallOptimization        // Applied optimizations
@@ -95,30 +95,32 @@ type StackTailCallOptimizer struct {
 	mutex         sync.RWMutex                       // Synchronization
 }
 
-// Supporting types
+// Supporting types.
 
 type (
 	StackFunction struct {
 		Name       string
-		Parameters []StackParameter
 		ReturnType string
+		Parameters []StackParameter
 	}
 	StackParameter struct {
 		Name, Type string
 		Size       uint64
 	}
 	StackLifetime struct {
-		Start, End uint64
-		Scope      string
+		Scope string
+		Start uint64
+		End   uint64
 	}
 	StackVariableUsage struct {
-		ReadCount, WriteCount uint64
-		LastAccess            time.Time
+		LastAccess time.Time
+		ReadCount  uint64
+		WriteCount uint64
 	}
 	StackEscapeInfo struct {
-		Escapes bool
 		Reason  string
 		Score   float64
+		Escapes bool
 	}
 	StackFunctionAnalysis struct {
 		Name        string
@@ -126,9 +128,9 @@ type (
 		EscapeScore float64
 	}
 	StackVariableAnalysis struct {
-		Name       string
-		EscapeInfo *StackEscapeInfo
 		Usage      StackVariableUsage
+		EscapeInfo *StackEscapeInfo
+		Name       string
 	}
 	StackEscapeConstraint struct {
 		Variable, Constraint string
@@ -139,8 +141,9 @@ type (
 		Edges []StackEscapeEdge
 	}
 	StackEscapeNode struct {
-		ID, Type   string
 		Properties map[string]interface{}
+		ID         string
+		Type       string
 	}
 	StackEscapeEdge struct {
 		From, To string
@@ -166,9 +169,9 @@ type (
 		Optimizations []StackFrameOptimization
 	}
 	StackOptimizationStrategy struct {
+		Apply    func(*StackFrame) error
 		Name     string
 		Priority int
-		Apply    func(*StackFrame) error
 	}
 	StackTailCallCandidate struct {
 		Function    string
@@ -181,12 +184,12 @@ type (
 		StackSaved uint64
 	}
 	StackTailCallPattern struct {
-		Pattern     string
 		Recognition func(string) bool
+		Pattern     string
 	}
 )
 
-// Configuration types
+// Configuration types.
 
 type StackOptimizerConfig struct {
 	EnableEscapeAnalysis       bool   // Enable escape analysis
@@ -212,13 +215,13 @@ type StackFrameOptimizerConfig struct {
 }
 
 type StackTailCallConfig struct {
-	EnableRecursion       bool // Enable recursive tail calls
-	EnableMutualRecursion bool // Enable mutual recursion
-	MaxDepth              int  // Maximum call depth
-	PatternMatching       bool // Enable pattern matching
+	MaxDepth              int
+	EnableRecursion       bool
+	EnableMutualRecursion bool
+	PatternMatching       bool
 }
 
-// Statistics types
+// Statistics types.
 
 type StackOptimizerStatistics struct {
 	FramesOptimized      uint64        // Frames optimized
@@ -252,9 +255,9 @@ type StackTailCallStatistics struct {
 	StackFramesEliminated uint64 // Stack frames eliminated
 }
 
-// Constructor functions
+// Constructor functions.
 
-// NewStackOptimizer creates a new stack optimizer
+// NewStackOptimizer creates a new stack optimizer.
 func NewStackOptimizer(config StackOptimizerConfig) (*StackOptimizer, error) {
 	optimizer := &StackOptimizer{
 		frames:      make(map[string]*StackFrame),
@@ -264,7 +267,7 @@ func NewStackOptimizer(config StackOptimizerConfig) (*StackOptimizer, error) {
 		enabled:     true,
 	}
 
-	// Initialize components
+	// Initialize components.
 	if config.EnableEscapeAnalysis {
 		optimizer.escapeAnalyzer = NewStackEscapeAnalyzer(StackEscapeConfig{
 			AnalysisDepth:     5,
@@ -295,7 +298,7 @@ func NewStackOptimizer(config StackOptimizerConfig) (*StackOptimizer, error) {
 	return optimizer, nil
 }
 
-// NewStackEscapeAnalyzer creates a new escape analyzer
+// NewStackEscapeAnalyzer creates a new escape analyzer.
 func NewStackEscapeAnalyzer(config StackEscapeConfig) *StackEscapeAnalyzer {
 	return &StackEscapeAnalyzer{
 		functions:   make(map[string]*StackFunctionAnalysis),
@@ -306,7 +309,7 @@ func NewStackEscapeAnalyzer(config StackEscapeConfig) *StackEscapeAnalyzer {
 	}
 }
 
-// NewStackFrameOptimizer creates a new frame optimizer
+// NewStackFrameOptimizer creates a new frame optimizer.
 func NewStackFrameOptimizer(config StackFrameOptimizerConfig) *StackFrameOptimizer {
 	return &StackFrameOptimizer{
 		layouts:       make(map[string]*StackFrameLayout),
@@ -318,7 +321,7 @@ func NewStackFrameOptimizer(config StackFrameOptimizerConfig) *StackFrameOptimiz
 	}
 }
 
-// NewStackTailCallOptimizer creates a new tail call optimizer
+// NewStackTailCallOptimizer creates a new tail call optimizer.
 func NewStackTailCallOptimizer(config StackTailCallConfig) *StackTailCallOptimizer {
 	return &StackTailCallOptimizer{
 		candidates:    make(map[string]*StackTailCallCandidate),
@@ -329,9 +332,9 @@ func NewStackTailCallOptimizer(config StackTailCallConfig) *StackTailCallOptimiz
 	}
 }
 
-// Core optimization methods
+// Core optimization methods.
 
-// OptimizeFunction optimizes a function's stack usage
+// OptimizeFunction optimizes a function's stack usage.
 func (so *StackOptimizer) OptimizeFunction(functionName string) error {
 	so.mutex.Lock()
 	defer so.mutex.Unlock()
@@ -347,28 +350,28 @@ func (so *StackOptimizer) OptimizeFunction(functionName string) error {
 
 	startTime := time.Now()
 
-	// Perform escape analysis
+	// Perform escape analysis.
 	if so.escapeAnalyzer != nil {
 		if err := so.escapeAnalyzer.AnalyzeFunction(functionName); err != nil {
-			return fmt.Errorf("escape analysis failed: %v", err)
+			return fmt.Errorf("escape analysis failed: %w", err)
 		}
 	}
 
-	// Optimize stack frame
+	// Optimize stack frame.
 	if so.frameOptimizer != nil {
 		if err := so.frameOptimizer.OptimizeFrame(functionName); err != nil {
-			return fmt.Errorf("frame optimization failed: %v", err)
+			return fmt.Errorf("frame optimization failed: %w", err)
 		}
 	}
 
-	// Optimize tail calls
+	// Optimize tail calls.
 	if so.tailCallOptimizer != nil {
 		if err := so.tailCallOptimizer.OptimizeTailCalls(functionName); err != nil {
-			return fmt.Errorf("tail call optimization failed: %v", err)
+			return fmt.Errorf("tail call optimization failed: %w", err)
 		}
 	}
 
-	// Update statistics
+	// Update statistics.
 	so.statistics.FramesOptimized++
 	so.statistics.OptimizationTime += time.Since(startTime)
 
@@ -377,9 +380,9 @@ func (so *StackOptimizer) OptimizeFunction(functionName string) error {
 	return nil
 }
 
-// Component methods
+// Component methods.
 
-// AnalyzeFunction performs escape analysis on a function
+// AnalyzeFunction performs escape analysis on a function.
 func (sea *StackEscapeAnalyzer) AnalyzeFunction(functionName string) error {
 	sea.mutex.Lock()
 	defer sea.mutex.Unlock()
@@ -388,7 +391,7 @@ func (sea *StackEscapeAnalyzer) AnalyzeFunction(functionName string) error {
 		return fmt.Errorf("escape analyzer is disabled")
 	}
 
-	// Create function analysis
+	// Create function analysis.
 	analysis := &StackFunctionAnalysis{
 		Name:        functionName,
 		CallSites:   make([]string, 0),
@@ -401,7 +404,7 @@ func (sea *StackEscapeAnalyzer) AnalyzeFunction(functionName string) error {
 	return nil
 }
 
-// OptimizeFrame optimizes a stack frame
+// OptimizeFrame optimizes a stack frame.
 func (sfo *StackFrameOptimizer) OptimizeFrame(functionName string) error {
 	sfo.mutex.Lock()
 	defer sfo.mutex.Unlock()
@@ -410,7 +413,7 @@ func (sfo *StackFrameOptimizer) OptimizeFrame(functionName string) error {
 		return fmt.Errorf("frame optimizer is disabled")
 	}
 
-	// Create optimized frame layout
+	// Create optimized frame layout.
 	layout := &StackFrameLayout{
 		Variables: make([]StackVariableLayout, 0),
 		TotalSize: 0,
@@ -422,7 +425,7 @@ func (sfo *StackFrameOptimizer) OptimizeFrame(functionName string) error {
 	return nil
 }
 
-// OptimizeTailCalls optimizes tail calls for a function
+// OptimizeTailCalls optimizes tail calls for a function.
 func (stco *StackTailCallOptimizer) OptimizeTailCalls(functionName string) error {
 	stco.mutex.Lock()
 	defer stco.mutex.Unlock()
@@ -431,7 +434,7 @@ func (stco *StackTailCallOptimizer) OptimizeTailCalls(functionName string) error
 		return fmt.Errorf("tail call optimizer is disabled")
 	}
 
-	// Create tail call candidate
+	// Create tail call candidate.
 	candidate := &StackTailCallCandidate{
 		Function:    functionName,
 		CallSite:    functionName + "_self",
@@ -444,30 +447,31 @@ func (stco *StackTailCallOptimizer) OptimizeTailCalls(functionName string) error
 	return nil
 }
 
-// Utility methods
+// Utility methods.
 
-// GetStatistics returns optimizer statistics
+// GetStatistics returns optimizer statistics.
 func (so *StackOptimizer) GetStatistics() StackOptimizerStatistics {
 	so.mutex.RLock()
 	defer so.mutex.RUnlock()
+
 	return so.statistics
 }
 
-// Enable enables the stack optimizer
+// Enable enables the stack optimizer.
 func (so *StackOptimizer) Enable() {
 	so.mutex.Lock()
 	defer so.mutex.Unlock()
 	so.enabled = true
 }
 
-// Disable disables the stack optimizer
+// Disable disables the stack optimizer.
 func (so *StackOptimizer) Disable() {
 	so.mutex.Lock()
 	defer so.mutex.Unlock()
 	so.enabled = false
 }
 
-// Default configurations
+// Default configurations.
 var DefaultStackOptimizerConfig = StackOptimizerConfig{
 	EnableEscapeAnalysis:       true,
 	EnableFrameOptimization:    true,

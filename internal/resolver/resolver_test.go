@@ -1,5 +1,5 @@
-// Symbol resolution tests for the Orizon programming language
-// This file provides comprehensive tests for symbol resolution and scope management
+// Symbol resolution tests for the Orizon programming language.
+// This file provides comprehensive tests for symbol resolution and scope management.
 
 package resolver
 
@@ -11,7 +11,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// Test symbol table creation
+// Test symbol table creation.
 func TestSymbolTableCreation(t *testing.T) {
 	st := NewSymbolTable()
 
@@ -27,7 +27,7 @@ func TestSymbolTableCreation(t *testing.T) {
 		t.Error("Current scope should be root scope initially")
 	}
 
-	// Check root scope exists
+	// Check root scope exists.
 	rootScope, err := st.GetScope(st.rootScopeID)
 	if err != nil {
 		t.Fatalf("Failed to get root scope: %v", err)
@@ -42,7 +42,7 @@ func TestSymbolTableCreation(t *testing.T) {
 	}
 }
 
-// Test scope creation and management
+// Test scope creation and management.
 func TestScopeManagement(t *testing.T) {
 	st := NewSymbolTable()
 
@@ -51,14 +51,14 @@ func TestScopeManagement(t *testing.T) {
 		End:   position.Position{Line: 10, Column: 1},
 	}
 
-	// Create a function scope
+	// Create a function scope.
 	funcScope := st.CreateScope(ScopeKindFunction, "testFunc", span)
 
 	if funcScope == 0 {
 		t.Error("CreateScope should return non-zero scope ID")
 	}
 
-	// Enter the function scope
+	// Enter the function scope.
 	err := st.EnterScope(funcScope)
 	if err != nil {
 		t.Fatalf("Failed to enter scope: %v", err)
@@ -68,7 +68,7 @@ func TestScopeManagement(t *testing.T) {
 		t.Error("Current scope should be function scope")
 	}
 
-	// Create a block scope inside function
+	// Create a block scope inside function.
 	blockScope := st.CreateScope(ScopeKindBlock, "block", span)
 
 	err = st.EnterScope(blockScope)
@@ -76,7 +76,7 @@ func TestScopeManagement(t *testing.T) {
 		t.Fatalf("Failed to enter block scope: %v", err)
 	}
 
-	// Check scope hierarchy
+	// Check scope hierarchy.
 	blockScopeObj, err := st.GetScope(blockScope)
 	if err != nil {
 		t.Fatalf("Failed to get block scope: %v", err)
@@ -88,7 +88,7 @@ func TestScopeManagement(t *testing.T) {
 		t.Errorf("Block scope parent should be function scope (%d), got %d", funcScope, *blockScopeObj.ParentID)
 	}
 
-	// Exit scopes
+	// Exit scopes.
 	err = st.ExitScope()
 	if err != nil {
 		t.Fatalf("Failed to exit block scope: %v", err)
@@ -117,7 +117,7 @@ func TestSymbolDefinitionAndLookup(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 10},
 	}
 
-	// Define a variable symbol
+	// Define a variable symbol.
 	symbol := &Symbol{
 		Name:       "testVar",
 		Kind:       SymbolKindVariable,
@@ -132,7 +132,7 @@ func TestSymbolDefinitionAndLookup(t *testing.T) {
 		t.Fatalf("Failed to define symbol: %v", err)
 	}
 
-	// Look up the symbol
+	// Look up the symbol.
 	foundSymbol, err := st.LookupSymbol("testVar")
 	if err != nil {
 		t.Fatalf("Failed to lookup symbol: %v", err)
@@ -150,14 +150,14 @@ func TestSymbolDefinitionAndLookup(t *testing.T) {
 		t.Errorf("Expected type 'i32', got '%s'", foundSymbol.Type.Name)
 	}
 
-	// Test undefined symbol lookup
+	// Test undefined symbol lookup.
 	_, err = st.LookupSymbol("undefinedVar")
 	if err == nil {
 		t.Error("Lookup of undefined symbol should return error")
 	}
 }
 
-// Test symbol shadowing
+// Test symbol shadowing.
 func TestSymbolShadowing(t *testing.T) {
 	st := NewSymbolTable()
 	st.allowShadowing = true // Enable shadowing for this test
@@ -167,7 +167,7 @@ func TestSymbolShadowing(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 10},
 	}
 
-	// Define a variable in global scope
+	// Define a variable in global scope.
 	globalSymbol := &Symbol{
 		Name:       "x",
 		Kind:       SymbolKindVariable,
@@ -181,11 +181,11 @@ func TestSymbolShadowing(t *testing.T) {
 		t.Fatalf("Failed to define global symbol: %v", err)
 	}
 
-	// Create function scope
+	// Create function scope.
 	funcScope := st.CreateScope(ScopeKindFunction, "func", span)
 	st.EnterScope(funcScope)
 
-	// Define a variable with same name in function scope
+	// Define a variable with same name in function scope.
 	localSymbol := &Symbol{
 		Name:       "x",
 		Kind:       SymbolKindVariable,
@@ -199,10 +199,10 @@ func TestSymbolShadowing(t *testing.T) {
 		t.Fatalf("Failed to define local symbol: %v", err)
 	}
 
-	// Clear caches to ensure proper lookup
+	// Clear caches to ensure proper lookup.
 	st.invalidateCache("x")
 
-	// Lookup should find local symbol
+	// Lookup should find local symbol.
 	foundSymbol, err := st.LookupSymbol("x")
 	if err != nil {
 		t.Fatalf("Failed to lookup symbol: %v", err)
@@ -212,13 +212,13 @@ func TestSymbolShadowing(t *testing.T) {
 		t.Errorf("Expected local symbol (string), got %s", foundSymbol.Type.Name)
 	}
 
-	// Exit function scope
+	// Exit function scope.
 	st.ExitScope()
 
-	// Clear caches again
+	// Clear caches again.
 	st.invalidateCache("x")
 
-	// Lookup should now find global symbol
+	// Lookup should now find global symbol.
 	foundSymbol, err = st.LookupSymbol("x")
 	if err != nil {
 		t.Fatalf("Failed to lookup symbol after scope exit: %v", err)
@@ -249,15 +249,15 @@ func TestResolverCreation(t *testing.T) {
 	}
 }
 
-// Test HIR program resolution
+// Test HIR program resolution.
 func TestHIRProgramResolution(t *testing.T) {
 	st := NewSymbolTable()
 	resolver := NewResolver(st)
 
-	// Create a simple HIR program
+	// Create a simple HIR program.
 	program := hir.NewHIRProgram()
 
-	// Create main module
+	// Create main module.
 	mainModule := &hir.HIRModule{
 		ID:           hir.NodeID(1),
 		ModuleID:     1,
@@ -274,20 +274,20 @@ func TestHIRProgramResolution(t *testing.T) {
 
 	program.Modules[1] = mainModule
 
-	// Resolve the program
+	// Resolve the program.
 	err := resolver.ResolveProgram(program)
 	if err != nil {
 		t.Fatalf("Failed to resolve HIR program: %v", err)
 	}
 
-	// Check for any resolution errors
+	// Check for any resolution errors.
 	errors := st.GetErrors()
 	if len(errors) > 0 {
 		t.Errorf("Resolution had %d errors: %v", len(errors), errors)
 	}
 }
 
-// Test function resolution
+// Test function resolution.
 func TestFunctionResolution(t *testing.T) {
 	st := NewSymbolTable()
 	resolver := NewResolver(st)
@@ -297,7 +297,7 @@ func TestFunctionResolution(t *testing.T) {
 		End:   position.Position{Line: 5, Column: 1},
 	}
 
-	// Create function declaration
+	// Create function declaration.
 	funcDecl := &hir.HIRFunctionDeclaration{
 		ID:         hir.NodeID(1),
 		Name:       "testFunc",
@@ -324,7 +324,7 @@ func TestFunctionResolution(t *testing.T) {
 		Span:       span,
 	}
 
-	// Create module and add function
+	// Create module and add function.
 	module := &hir.HIRModule{
 		ID:           hir.NodeID(100),
 		ModuleID:     1,
@@ -338,19 +338,19 @@ func TestFunctionResolution(t *testing.T) {
 
 	resolver.currentModule = module
 
-	// Collect function symbol
+	// Collect function symbol.
 	err := resolver.collectFunctionSymbol(funcDecl)
 	if err != nil {
 		t.Fatalf("Failed to collect function symbol: %v", err)
 	}
 
-	// Resolve function declaration
+	// Resolve function declaration.
 	err = resolver.resolveFunctionDeclaration(funcDecl)
 	if err != nil {
 		t.Fatalf("Failed to resolve function declaration: %v", err)
 	}
 
-	// Check that function symbol was defined
+	// Check that function symbol was defined.
 	symbol, err := st.LookupSymbol("testFunc")
 	if err != nil {
 		t.Fatalf("Function symbol not found: %v", err)
@@ -365,7 +365,7 @@ func TestFunctionResolution(t *testing.T) {
 	}
 }
 
-// Test variable resolution
+// Test variable resolution.
 func TestVariableResolution(t *testing.T) {
 	st := NewSymbolTable()
 	resolver := NewResolver(st)
@@ -375,7 +375,7 @@ func TestVariableResolution(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 15},
 	}
 
-	// Create variable declaration
+	// Create variable declaration.
 	varDecl := &hir.HIRVariableDeclaration{
 		ID:   hir.NodeID(1),
 		Name: "testVar",
@@ -399,7 +399,7 @@ func TestVariableResolution(t *testing.T) {
 		Span:     span,
 	}
 
-	// Create module
+	// Create module.
 	module := &hir.HIRModule{
 		ID:       hir.NodeID(100),
 		ModuleID: 1,
@@ -409,19 +409,19 @@ func TestVariableResolution(t *testing.T) {
 
 	resolver.currentModule = module
 
-	// Collect variable symbol
+	// Collect variable symbol.
 	err := resolver.collectVariableSymbol(varDecl)
 	if err != nil {
 		t.Fatalf("Failed to collect variable symbol: %v", err)
 	}
 
-	// Resolve variable declaration
+	// Resolve variable declaration.
 	err = resolver.resolveVariableDeclaration(varDecl)
 	if err != nil {
 		t.Fatalf("Failed to resolve variable declaration: %v", err)
 	}
 
-	// Check that variable symbol was defined
+	// Check that variable symbol was defined.
 	symbol, err := st.LookupSymbol("testVar")
 	if err != nil {
 		t.Fatalf("Variable symbol not found: %v", err)
@@ -440,7 +440,7 @@ func TestVariableResolution(t *testing.T) {
 	}
 }
 
-// Test import resolution
+// Test import resolution.
 func TestImportResolution(t *testing.T) {
 	st := NewSymbolTable()
 	resolver := NewResolver(st)
@@ -450,7 +450,7 @@ func TestImportResolution(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 20},
 	}
 
-	// Create import info
+	// Create import info.
 	importInfo := &hir.ImportInfo{
 		ModuleName: "std.io",
 		Alias:      "io",
@@ -458,7 +458,7 @@ func TestImportResolution(t *testing.T) {
 		Span:       span,
 	}
 
-	// Create module
+	// Create module.
 	module := &hir.HIRModule{
 		ID:       hir.NodeID(100),
 		ModuleID: 1,
@@ -468,21 +468,23 @@ func TestImportResolution(t *testing.T) {
 
 	resolver.currentModule = module
 
-	// Resolve import
+	// Resolve import.
 	err := resolver.resolveImport(importInfo)
 	if err != nil {
 		t.Fatalf("Failed to resolve import: %v", err)
 	}
 
-	// Check that import was added
+	// Check that import was added.
 	if len(st.imports) == 0 {
 		t.Error("Import should have been added to symbol table")
 	}
 
 	importFound := false
+
 	for path := range st.imports {
 		if path == "std.io" {
 			importFound = true
+
 			break
 		}
 	}
@@ -492,7 +494,7 @@ func TestImportResolution(t *testing.T) {
 	}
 }
 
-// Test type inference
+// Test type inference.
 func TestTypeInference(t *testing.T) {
 	st := NewSymbolTable()
 	resolver := NewResolver(st)
@@ -502,7 +504,7 @@ func TestTypeInference(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 5},
 	}
 
-	// Test integer literal inference
+	// Test integer literal inference.
 	intLiteral := &hir.HIRLiteral{
 		ID:       hir.NodeID(1),
 		Value:    42,
@@ -520,7 +522,7 @@ func TestTypeInference(t *testing.T) {
 		t.Errorf("Expected integer type, got %s", inferredType.Kind)
 	}
 
-	// Test string literal inference
+	// Test string literal inference.
 	stringLiteral := &hir.HIRLiteral{
 		ID:       hir.NodeID(2),
 		Value:    "hello",
@@ -539,7 +541,7 @@ func TestTypeInference(t *testing.T) {
 	}
 }
 
-// Test symbol table statistics
+// Test symbol table statistics.
 func TestSymbolTableStatistics(t *testing.T) {
 	st := NewSymbolTable()
 
@@ -548,7 +550,7 @@ func TestSymbolTableStatistics(t *testing.T) {
 		End:   position.Position{Line: 1, Column: 10},
 	}
 
-	// Add some symbols
+	// Add some symbols.
 	for i := 0; i < 5; i++ {
 		symbol := &Symbol{
 			Name:       fmt.Sprintf("symbol%d", i),
@@ -560,12 +562,12 @@ func TestSymbolTableStatistics(t *testing.T) {
 		st.DefineSymbol(symbol)
 	}
 
-	// Perform some lookups
+	// Perform some lookups.
 	for i := 0; i < 3; i++ {
 		st.LookupSymbol(fmt.Sprintf("symbol%d", i))
 	}
 
-	// Get statistics
+	// Get statistics.
 	stats := st.GetStatistics()
 
 	if stats.TotalSymbols != 5 {
@@ -581,7 +583,7 @@ func TestSymbolTableStatistics(t *testing.T) {
 	}
 }
 
-// Benchmark symbol lookup
+// Benchmark symbol lookup.
 func BenchmarkSymbolLookup(b *testing.B) {
 	st := NewSymbolTable()
 
@@ -590,7 +592,7 @@ func BenchmarkSymbolLookup(b *testing.B) {
 		End:   position.Position{Line: 1, Column: 10},
 	}
 
-	// Add many symbols
+	// Add many symbols.
 	for i := 0; i < 1000; i++ {
 		symbol := &Symbol{
 			Name:       fmt.Sprintf("symbol%d", i),
@@ -610,7 +612,7 @@ func BenchmarkSymbolLookup(b *testing.B) {
 	}
 }
 
-// Benchmark scope management
+// Benchmark scope management.
 func BenchmarkScopeManagement(b *testing.B) {
 	st := NewSymbolTable()
 
@@ -622,13 +624,13 @@ func BenchmarkScopeManagement(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		// Create scope
+		// Create scope.
 		scopeID := st.CreateScope(ScopeKindFunction, fmt.Sprintf("func%d", i), span)
 
-		// Enter scope
+		// Enter scope.
 		st.EnterScope(scopeID)
 
-		// Exit scope
+		// Exit scope.
 		st.ExitScope()
 	}
 }

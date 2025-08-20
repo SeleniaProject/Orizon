@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -22,7 +22,7 @@ var (
 
 // CopyFileToConn on Windows attempts zero-copy via TransmitFile when possible.
 // It falls back to io.Copy if the socket handle cannot be obtained or the call fails.
-// Note: When TransmitFile succeeds, the returned byte count reflects the number of bytes
+// Note: When TransmitFile succeeds, the returned byte count reflects the number of bytes.
 // sent from the current file offset to the end of file (best-effort using file size and offset).
 func CopyFileToConn(ctx context.Context, dst net.Conn, src *os.File) (int64, error) {
 	if dst == nil || src == nil {
@@ -47,19 +47,19 @@ func CopyFileToConn(ctx context.Context, dst net.Conn, src *os.File) (int64, err
 
 	// Try TransmitFile only if we have a SOCKET handle and the proc is resolvable.
 	if s != 0 && procTransmitFile.Find() == nil {
-		// Perform the call:
-		// BOOL TransmitFile(
-		//   SOCKET hSocket,
-		//   HANDLE hFile,
+		// Perform the call:.
+		// BOOL TransmitFile(.
+		//   SOCKET hSocket,.
+		//   HANDLE hFile,.
 		//   DWORD nNumberOfBytesToWrite,        // 0 => entire file from current fp
 		//   DWORD nNumberOfBytesPerSend,        // 0 => system default chunking
 		//   LPOVERLAPPED lpOverlapped,          // NULL => synchronous completion
 		//   LPTRANSMIT_FILE_BUFFERS lpBuffers,  // NULL => no headers/trailers
 		//   DWORD dwFlags                        // 0 => default
-		// )
+		// ).
 		r1, _, callErr := procTransmitFile.Call(s, src.Fd(), 0, 0, 0, 0, 0)
 		if r1 != 0 {
-			// Compute best-effort number of bytes sent: size - current offset
+			// Compute best-effort number of bytes sent: size - current offset.
 			// We avoid moving the file pointer here; use Seek(0, Current) to read position.
 			var sent int64
 			if st, statErr := src.Stat(); statErr == nil {

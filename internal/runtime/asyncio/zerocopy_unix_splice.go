@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build linux.
+// +build linux.
 
 package asyncio
 
@@ -16,7 +16,7 @@ import (
 // SpliceConnToConn performs zero-copy transfer from src to dst using splice(2) via a pipe.
 // length <= 0 copies until EOF. Returns bytes transferred.
 func SpliceConnToConn(ctx context.Context, dst net.Conn, src net.Conn, length int64) (int64, error) {
-	// get fds
+	// get fds.
 	var sfd, dfd int
 	if sc, ok := src.(interface {
 		SyscallConn() (syscall.RawConn, error)
@@ -41,7 +41,7 @@ func SpliceConnToConn(ctx context.Context, dst net.Conn, src net.Conn, length in
 		return 0, io.ErrUnexpectedEOF
 	}
 
-	// Create pipe
+	// Create pipe.
 	p := make([]int, 2)
 	if err := unix.Pipe(p); err != nil {
 		return 0, err
@@ -50,7 +50,7 @@ func SpliceConnToConn(ctx context.Context, dst net.Conn, src net.Conn, length in
 	defer unix.Close(pr)
 	defer unix.Close(pw)
 
-	// optional deadline
+	// optional deadline.
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = dst.SetWriteDeadline(deadline)
 		_ = src.SetReadDeadline(deadline)
@@ -68,7 +68,7 @@ func SpliceConnToConn(ctx context.Context, dst net.Conn, src net.Conn, length in
 				toRead = remaining
 			}
 		}
-		// src -> pipe
+		// src -> pipe.
 		n1, err := unix.Splice(sfd, nil, pw, nil, int(toRead), unix.SPLICE_F_MOVE)
 		if n1 == 0 && err == nil { // EOF
 			break
@@ -79,7 +79,7 @@ func SpliceConnToConn(ctx context.Context, dst net.Conn, src net.Conn, length in
 			}
 			return transferred, err
 		}
-		// pipe -> dst
+		// pipe -> dst.
 		off := 0
 		for off < n1 {
 			n2, err2 := unix.Splice(pr, nil, dfd, nil, n1-off, unix.SPLICE_F_MOVE)

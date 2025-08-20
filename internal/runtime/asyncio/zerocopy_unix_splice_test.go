@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build linux.
+// +build linux.
 
 package asyncio
 
@@ -34,8 +34,8 @@ func TestSpliceConnToConn(t *testing.T) {
 	srv := <-serverReady
 	defer srv.Close()
 
-	// Create a loopback copier goroutine: splice client->server back to client would require echo; instead write from client and splice server->discard
-	// For test, create another loopback connection as destination
+	// Create a loopback copier goroutine: splice client->server back to client would require echo; instead write from client and splice server->discard.
+	// For test, create another loopback connection as destination.
 	ln2, _ := net.Listen("tcp", "127.0.0.1:0")
 	defer ln2.Close()
 	dstReady := make(chan net.Conn, 1)
@@ -50,7 +50,7 @@ func TestSpliceConnToConn(t *testing.T) {
 	dst := <-dstReady
 	defer dst.Close()
 
-	// write data on server side source connection
+	// write data on server side source connection.
 	go func() { _, _ = client.Write([]byte("hello")) }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

@@ -1,5 +1,5 @@
 // Package runtime provides region-based memory allocation system.
-// This module implements region allocator that avoids C standard library dependencies
+// This module implements region allocator that avoids C standard library dependencies.
 // by using direct system calls for complete GC-less runtime execution.
 package runtime
 
@@ -10,17 +10,17 @@ import (
 	"unsafe"
 )
 
-// RegionID represents a unique identifier for memory regions
+// RegionID represents a unique identifier for memory regions.
 type RegionID uint64
 
-// RegionSize represents memory region size in bytes
+// RegionSize represents memory region size in bytes.
 type RegionSize uintptr
 
-// RegionAlignment represents memory alignment requirements
+// RegionAlignment represents memory alignment requirements.
 type RegionAlignment uintptr
 
 const (
-	// Default configuration constants
+	// Default configuration constants.
 	DefaultRegionSize RegionSize      = 64 * 1024 * 1024   // 64MB default region
 	MinRegionSize     RegionSize      = 4 * 1024           // 4KB minimum region
 	MaxRegionSize     RegionSize      = 1024 * 1024 * 1024 // 1GB maximum region
@@ -28,7 +28,7 @@ const (
 	MaxAlignment      RegionAlignment = 4096               // 4KB maximum alignment
 	RegionHeaderSize  RegionSize      = 64                 // Header metadata size
 
-	// Region states
+	// Region states.
 	RegionUninitialized = 0
 	RegionActive        = 1
 	RegionFull          = 2
@@ -36,78 +36,78 @@ const (
 	RegionCorrupted     = 4
 )
 
-// RegionHeader contains metadata for each memory region
+// RegionHeader contains metadata for each memory region.
 type RegionHeader struct {
-	ID         RegionID        // Unique region identifier
-	Size       RegionSize      // Total region size
-	Used       RegionSize      // Currently used bytes
-	Free       RegionSize      // Available bytes
-	Alignment  RegionAlignment // Memory alignment
-	State      uint32          // Region state (atomic)
-	RefCount   int64           // Reference count (atomic)
-	AllocCount uint64          // Number of allocations
-	FreeCount  uint64          // Number of deallocations
-	CreatedAt  int64           // Creation timestamp
-	LastAccess int64           // Last access timestamp
-	Parent     *Region         // Parent region reference
-	Children   []*Region       // Child regions
-	FreeList   *FreeBlock      // Free block list
-	AllocList  *AllocBlock     // Allocation block list
-	Magic      uint64          // Header integrity check
-	Checksum   uint64          // Header checksum
+	Parent     *Region
+	AllocList  *AllocBlock
+	FreeList   *FreeBlock
+	Children   []*Region
+	Alignment  RegionAlignment
+	RefCount   int64
+	AllocCount uint64
+	FreeCount  uint64
+	CreatedAt  int64
+	LastAccess int64
+	ID         RegionID
+	Free       RegionSize
+	Used       RegionSize
+	Size       RegionSize
+	Magic      uint64
+	Checksum   uint64
+	State      uint32
 }
 
-// Region represents a memory region with lifecycle management
+// Region represents a memory region with lifecycle management.
 type Region struct {
-	Header    *RegionHeader    // Region metadata
-	Data      unsafe.Pointer   // Raw memory data
-	backing   []byte           // Backing slice to keep memory alive
-	Mutex     sync.RWMutex     // Thread-safe access
-	Stats     *RegionStats     // Performance statistics
-	Policy    *RegionPolicy    // Allocation policy
-	Observers []RegionObserver // Event observers
+	Header    *RegionHeader
+	Data      unsafe.Pointer
+	Stats     *RegionStats
+	Policy    *RegionPolicy
+	backing   []byte
+	Observers []RegionObserver
+	Mutex     sync.RWMutex
 }
 
-// FreeBlock represents a free memory block in the region
+// FreeBlock represents a free memory block in the region.
 type FreeBlock struct {
-	Size      RegionSize // Block size
-	Offset    uintptr    // Offset from region start
-	Next      *FreeBlock // Next free block
-	Prev      *FreeBlock // Previous free block
-	Coalesced bool       // Whether block was coalesced
+	Next      *FreeBlock
+	Prev      *FreeBlock
+	Size      RegionSize
+	Offset    uintptr
+	Coalesced bool
 }
 
-// AllocBlock represents an allocated memory block
+// AllocBlock represents an allocated memory block.
 type AllocBlock struct {
-	Size       RegionSize      // Allocated size
-	Offset     uintptr         // Offset from region start
-	Alignment  RegionAlignment // Block alignment
-	TypeInfo   *TypeInfo       // Type information
-	StackTrace []uintptr       // Allocation stack trace
-	Timestamp  int64           // Allocation timestamp
-	Next       *AllocBlock     // Next allocation
-	Prev       *AllocBlock     // Previous allocation
+	TypeInfo   *TypeInfo
+	Next       *AllocBlock
+	Prev       *AllocBlock
+	StackTrace []uintptr
+	Size       RegionSize
+	Offset     uintptr
+	Alignment  RegionAlignment
+	Timestamp  int64
 }
 
-// TypeInfo provides type metadata for allocated blocks
+// TypeInfo provides type metadata for allocated blocks.
 type TypeInfo struct {
-	ID          uint32       // Type identifier
-	Name        string       // Type name
-	Size        uintptr      // Type size
-	Alignment   uintptr      // Type alignment
-	HasPointers bool         // Type contains pointers
-	Fields      []FieldInfo  // Field information
-	Methods     []MethodInfo // Method information
+	Name        string
+	Fields      []FieldInfo
+	Methods     []MethodInfo
+	Size        uintptr
+	Alignment   uintptr
+	ID          uint32
+	HasPointers bool
 }
 
-// MethodInfo describes method information
+// MethodInfo describes method information.
 type MethodInfo struct {
 	Name      string  // Method name
 	Signature string  // Method signature
 	Address   uintptr // Method address
 }
 
-// RegionStats tracks region performance metrics
+// RegionStats tracks region performance metrics.
 type RegionStats struct {
 	TotalAllocations    uint64  // Total allocation count
 	TotalDeallocations  uint64  // Total deallocation count
@@ -124,19 +124,19 @@ type RegionStats struct {
 	CompactionCount     uint64  // Number of compactions
 }
 
-// RegionPolicy defines allocation policies and constraints
+// RegionPolicy defines allocation policies and constraints.
 type RegionPolicy struct {
-	MaxAllocations     uint64           // Maximum allocations
-	MaxMemoryUsage     RegionSize       // Maximum memory usage
-	AllocationStrategy AllocStrategy    // Allocation strategy
-	CompactionPolicy   CompactionPolicy // Compaction policy
-	ShrinkPolicy       ShrinkPolicy     // Shrink policy
-	GrowthPolicy       GrowthPolicy     // Growth policy
-	AlignmentPolicy    AlignmentPolicy  // Alignment policy
-	SecurityPolicy     SecurityPolicy   // Security policy
+	AlignmentPolicy    AlignmentPolicy
+	CompactionPolicy   CompactionPolicy
+	ShrinkPolicy       ShrinkPolicy
+	GrowthPolicy       GrowthPolicy
+	MaxAllocations     uint64
+	MaxMemoryUsage     RegionSize
+	AllocationStrategy AllocStrategy
+	SecurityPolicy     SecurityPolicy
 }
 
-// AllocStrategy defines allocation strategies
+// AllocStrategy defines allocation strategies.
 type AllocStrategy int
 
 const (
@@ -148,7 +148,7 @@ const (
 	BuddySystem                      // Buddy system strategy
 )
 
-// CompactionPolicy defines memory compaction behavior
+// CompactionPolicy defines memory compaction behavior.
 type CompactionPolicy struct {
 	Enabled           bool                   // Enable compaction
 	ThresholdRatio    float64                // Fragmentation threshold
@@ -157,7 +157,7 @@ type CompactionPolicy struct {
 	Strategy          CompactionStrategyType // Compaction strategy
 }
 
-// CompactionStrategyType defines compaction strategies
+// CompactionStrategyType defines compaction strategies.
 type CompactionStrategyType int
 
 const (
@@ -168,7 +168,7 @@ const (
 	ConcurrentGC                                 // Concurrent collection
 )
 
-// ShrinkPolicy defines region shrinking behavior
+// ShrinkPolicy defines region shrinking behavior.
 type ShrinkPolicy struct {
 	Enabled        bool       // Enable shrinking
 	ThresholdRatio float64    // Usage threshold for shrinking
@@ -176,7 +176,7 @@ type ShrinkPolicy struct {
 	ShrinkFactor   float64    // Shrink factor (0.0-1.0)
 }
 
-// GrowthPolicy defines region growth behavior
+// GrowthPolicy defines region growth behavior.
 type GrowthPolicy struct {
 	Enabled        bool           // Enable growth
 	GrowthFactor   float64        // Growth factor (>1.0)
@@ -184,7 +184,7 @@ type GrowthPolicy struct {
 	GrowthStrategy GrowthStrategy // Growth strategy
 }
 
-// GrowthStrategy defines growth strategies
+// GrowthStrategy defines growth strategies.
 type GrowthStrategy int
 
 const (
@@ -193,15 +193,15 @@ const (
 	AdaptiveGrowth                          // Adaptive growth
 )
 
-// AlignmentPolicy defines memory alignment policies
+// AlignmentPolicy defines memory alignment policies.
 type AlignmentPolicy struct {
-	DefaultAlignment RegionAlignment            // Default alignment
-	TypeAlignment    map[string]RegionAlignment // Type-specific alignment
-	MinAlignment     RegionAlignment            // Minimum alignment
-	MaxAlignment     RegionAlignment            // Maximum alignment
+	TypeAlignment    map[string]RegionAlignment
+	DefaultAlignment RegionAlignment
+	MinAlignment     RegionAlignment
+	MaxAlignment     RegionAlignment
 }
 
-// SecurityPolicy defines security constraints
+// SecurityPolicy defines security constraints.
 type SecurityPolicy struct {
 	EnableCanaries   bool // Enable stack canaries
 	EnableGuardPages bool // Enable guard pages
@@ -211,7 +211,7 @@ type SecurityPolicy struct {
 	EnableHeapSpray  bool // Enable heap spray detection
 }
 
-// RegionObserver interface for region event observation
+// RegionObserver interface for region event observation.
 type RegionObserver interface {
 	OnRegionCreated(region *Region)
 	OnRegionDestroyed(region *Region)
@@ -223,21 +223,21 @@ type RegionObserver interface {
 	OnError(region *Region, err error)
 }
 
-// RegionAllocator manages multiple memory regions
+// RegionAllocator manages multiple memory regions.
 type RegionAllocator struct {
-	regions       map[RegionID]*Region // Active regions
-	freeRegions   []*Region            // Free regions pool
-	stats         *AllocatorStats      // Global statistics
-	policy        *AllocatorPolicy     // Global policy
-	mutex         sync.RWMutex         // Thread-safe access
-	nextID        uint64               // Next region ID (atomic)
-	totalMemory   uint64               // Total allocated memory (atomic)
-	peakMemory    uint64               // Peak memory usage (atomic)
-	activeRegions int64                // Active region count (atomic)
-	observers     []AllocatorObserver  // Event observers
+	regions       map[RegionID]*Region
+	stats         *AllocatorStats
+	policy        *AllocatorPolicy
+	freeRegions   []*Region
+	observers     []AllocatorObserver
+	nextID        uint64
+	totalMemory   uint64
+	peakMemory    uint64
+	activeRegions int64
+	mutex         sync.RWMutex
 }
 
-// AllocatorStats tracks global allocator statistics
+// AllocatorStats tracks global allocator statistics.
 type AllocatorStats struct {
 	TotalRegions          uint64  // Total regions created
 	ActiveRegions         uint64  // Currently active regions
@@ -254,7 +254,7 @@ type AllocatorStats struct {
 	LoadFactor            float64 // System load factor
 }
 
-// AllocatorPolicy defines global allocator policies
+// AllocatorPolicy defines global allocator policies.
 type AllocatorPolicy struct {
 	MaxRegions              uint64           // Maximum number of regions
 	MaxTotalMemory          RegionSize       // Maximum total memory
@@ -266,7 +266,7 @@ type AllocatorPolicy struct {
 	PreallocationSize       RegionSize       // Preallocation size
 }
 
-// AllocatorObserver interface for allocator event observation
+// AllocatorObserver interface for allocator event observation.
 type AllocatorObserver interface {
 	OnRegionAllocated(allocator *RegionAllocator, region *Region)
 	OnRegionFreed(allocator *RegionAllocator, region *Region)
@@ -275,7 +275,7 @@ type AllocatorObserver interface {
 	OnPerformanceAlert(allocator *RegionAllocator, metric string, value float64)
 }
 
-// NewRegionAllocator creates a new region allocator
+// NewRegionAllocator creates a new region allocator.
 func NewRegionAllocator(policy *AllocatorPolicy) *RegionAllocator {
 	if policy == nil {
 		policy = DefaultAllocatorPolicy()
@@ -291,7 +291,7 @@ func NewRegionAllocator(policy *AllocatorPolicy) *RegionAllocator {
 	}
 }
 
-// DefaultAllocatorPolicy returns default allocator policy
+// DefaultAllocatorPolicy returns default allocator policy.
 func DefaultAllocatorPolicy() *AllocatorPolicy {
 	return &AllocatorPolicy{
 		MaxRegions:        1000,
@@ -311,25 +311,26 @@ func DefaultAllocatorPolicy() *AllocatorPolicy {
 	}
 }
 
-// NewAllocatorStats creates new allocator statistics
+// NewAllocatorStats creates new allocator statistics.
 func NewAllocatorStats() *AllocatorStats {
 	return &AllocatorStats{}
 }
 
-// AllocateRegion allocates a new memory region
+// AllocateRegion allocates a new memory region.
 func (ra *RegionAllocator) AllocateRegion(size RegionSize, policy *RegionPolicy) (*Region, error) {
 	ra.mutex.Lock()
 	defer ra.mutex.Unlock()
 
-	// Validate size constraints
+	// Validate size constraints.
 	if size < MinRegionSize {
 		return nil, fmt.Errorf("region size %d below minimum %d", size, MinRegionSize)
 	}
+
 	if size > MaxRegionSize {
 		return nil, fmt.Errorf("region size %d exceeds maximum %d", size, MaxRegionSize)
 	}
 
-	// Check global constraints
+	// Check global constraints.
 	if uint64(len(ra.regions)) >= ra.policy.MaxRegions {
 		return nil, fmt.Errorf("maximum regions %d exceeded", ra.policy.MaxRegions)
 	}
@@ -339,14 +340,14 @@ func (ra *RegionAllocator) AllocateRegion(size RegionSize, policy *RegionPolicy)
 		return nil, fmt.Errorf("total memory limit exceeded")
 	}
 
-	// Try to reuse free region
+	// Try to reuse free region.
 	if len(ra.freeRegions) > 0 {
 		for i, freeRegion := range ra.freeRegions {
 			if freeRegion.Header.Size >= size {
-				// Remove from free list
+				// Remove from free list.
 				ra.freeRegions = append(ra.freeRegions[:i], ra.freeRegions[i+1:]...)
 
-				// Reset and reuse region
+				// Reset and reuse region.
 				err := ra.resetRegion(freeRegion, size, policy)
 				if err != nil {
 					continue // Try next free region
@@ -355,7 +356,7 @@ func (ra *RegionAllocator) AllocateRegion(size RegionSize, policy *RegionPolicy)
 				ra.regions[freeRegion.Header.ID] = freeRegion
 				atomic.AddInt64(&ra.activeRegions, 1)
 
-				// Notify observers
+				// Notify observers.
 				for _, observer := range ra.observers {
 					observer.OnRegionAllocated(ra, freeRegion)
 				}
@@ -365,19 +366,20 @@ func (ra *RegionAllocator) AllocateRegion(size RegionSize, policy *RegionPolicy)
 		}
 	}
 
-	// Allocate new region
+	// Allocate new region.
 	region, err := ra.allocateNewRegion(size, policy)
 	if err != nil {
 		return nil, err
 	}
 
-	// Register region
+	// Register region.
 	ra.regions[region.Header.ID] = region
 	atomic.AddUint64(&ra.totalMemory, uint64(size))
 	atomic.AddInt64(&ra.activeRegions, 1)
 
-	// Update peak memory
+	// Update peak memory.
 	totalMem := atomic.LoadUint64(&ra.totalMemory)
+
 	for {
 		peak := atomic.LoadUint64(&ra.peakMemory)
 		if totalMem <= peak || atomic.CompareAndSwapUint64(&ra.peakMemory, peak, totalMem) {
@@ -385,11 +387,11 @@ func (ra *RegionAllocator) AllocateRegion(size RegionSize, policy *RegionPolicy)
 		}
 	}
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddUint64(&ra.stats.TotalRegions, 1)
 	atomic.AddUint64(&ra.stats.ActiveRegions, 1)
 
-	// Notify observers
+	// Notify observers.
 	for _, observer := range ra.observers {
 		observer.OnRegionAllocated(ra, region)
 	}
@@ -397,18 +399,18 @@ func (ra *RegionAllocator) AllocateRegion(size RegionSize, policy *RegionPolicy)
 	return region, nil
 }
 
-// allocateNewRegion allocates a new memory region using system calls
+// allocateNewRegion allocates a new memory region using system calls.
 func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPolicy) (*Region, error) {
-	// Generate unique region ID
+	// Generate unique region ID.
 	id := RegionID(atomic.AddUint64(&ra.nextID, 1))
 
-	// Allocate memory using direct system call (platform-specific)
+	// Allocate memory using direct system call (platform-specific).
 	backingSlice, offset, err := ra.allocateSystemMemory(size)
 	if err != nil {
-		return nil, fmt.Errorf("system memory allocation failed: %v", err)
+		return nil, fmt.Errorf("system memory allocation failed: %w", err)
 	}
 
-	// Initialize region header
+	// Initialize region header.
 	header := &RegionHeader{
 		ID:         id,
 		Size:       size,
@@ -422,7 +424,7 @@ func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPoli
 		Magic:      0xDEADBEEFCAFEBABE,
 	}
 
-	// Apply policy settings
+	// Apply policy settings.
 	if policy != nil {
 		if policy.AlignmentPolicy.DefaultAlignment > 0 {
 			header.Alignment = policy.AlignmentPolicy.DefaultAlignment
@@ -431,13 +433,13 @@ func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPoli
 		policy = ra.getDefaultRegionPolicy()
 	}
 
-	// Calculate header checksum
+	// Calculate header checksum.
 	header.Checksum = ra.calculateHeaderChecksum(header)
 
-	// Create region statistics
+	// Create region statistics.
 	stats := &RegionStats{}
 
-	// Initialize free list with single large block
+	// Initialize free list with single large block.
 	freeBlock := &FreeBlock{
 		Size:   size - RegionHeaderSize,
 		Offset: uintptr(RegionHeaderSize),
@@ -446,7 +448,7 @@ func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPoli
 	}
 	header.FreeList = freeBlock
 
-	// Create region
+	// Create region.
 	region := &Region{
 		Header:    header,
 		Data:      unsafe.Add(unsafe.Pointer(unsafe.SliceData(backingSlice)), int(offset)),
@@ -456,23 +458,23 @@ func (ra *RegionAllocator) allocateNewRegion(size RegionSize, policy *RegionPoli
 		Observers: make([]RegionObserver, 0),
 	}
 
-	// Set parent reference
+	// Set parent reference.
 	header.Parent = region
 
 	return region, nil
 }
 
-// resetRegion resets a free region for reuse
+// resetRegion resets a free region for reuse.
 func (ra *RegionAllocator) resetRegion(region *Region, size RegionSize, policy *RegionPolicy) error {
 	region.Mutex.Lock()
 	defer region.Mutex.Unlock()
 
-	// Verify region state
+	// Verify region state.
 	if atomic.LoadUint32(&region.Header.State) != RegionFreed {
 		return fmt.Errorf("region not in freed state")
 	}
 
-	// Reset header
+	// Reset header.
 	region.Header.Used = RegionHeaderSize
 	region.Header.Free = size - RegionHeaderSize
 	region.Header.AllocCount = 0
@@ -481,10 +483,10 @@ func (ra *RegionAllocator) resetRegion(region *Region, size RegionSize, policy *
 	atomic.StoreUint32(&region.Header.State, RegionActive)
 	atomic.StoreInt64(&region.Header.RefCount, 1)
 
-	// Reset statistics
+	// Reset statistics.
 	region.Stats = &RegionStats{}
 
-	// Reset free list
+	// Reset free list.
 	freeBlock := &FreeBlock{
 		Size:   size - RegionHeaderSize,
 		Offset: uintptr(RegionHeaderSize),
@@ -494,18 +496,18 @@ func (ra *RegionAllocator) resetRegion(region *Region, size RegionSize, policy *
 	region.Header.FreeList = freeBlock
 	region.Header.AllocList = nil
 
-	// Update policy
+	// Update policy.
 	if policy != nil {
 		region.Policy = policy
 	}
 
-	// Update checksum
+	// Update checksum.
 	region.Header.Checksum = ra.calculateHeaderChecksum(region.Header)
 
 	return nil
 }
 
-// getDefaultRegionPolicy returns default region policy
+// getDefaultRegionPolicy returns default region policy.
 func (ra *RegionAllocator) getDefaultRegionPolicy() *RegionPolicy {
 	return &RegionPolicy{
 		MaxAllocations:     10000,
@@ -541,9 +543,9 @@ func (ra *RegionAllocator) getDefaultRegionPolicy() *RegionPolicy {
 	}
 }
 
-// calculateHeaderChecksum calculates region header checksum
+// calculateHeaderChecksum calculates region header checksum.
 func (ra *RegionAllocator) calculateHeaderChecksum(header *RegionHeader) uint64 {
-	// Simple checksum calculation (XOR of all fields)
+	// Simple checksum calculation (XOR of all fields).
 	checksum := uint64(header.ID)
 	checksum ^= uint64(header.Size)
 	checksum ^= uint64(header.Used)
@@ -560,34 +562,34 @@ func (ra *RegionAllocator) calculateHeaderChecksum(header *RegionHeader) uint64 
 	return checksum
 }
 
-// getCurrentTimestamp returns current timestamp in nanoseconds
+// getCurrentTimestamp returns current timestamp in nanoseconds.
 func getCurrentTimestamp() int64 {
 	// Mock implementation - in real code, use time.Now().UnixNano()
 	return 1640995200000000000 // 2022-01-01 00:00:00 UTC
 }
 
-// allocateSystemMemory allocates memory using direct system calls
-// allocateSystemMemory allocates a backing byte slice and returns it along with an aligned offset
+// allocateSystemMemory allocates memory using direct system calls.
+// allocateSystemMemory allocates a backing byte slice and returns it along with an aligned offset.
 // into the slice where the usable region begins. The caller must keep the slice alive.
 func (ra *RegionAllocator) allocateSystemMemory(size RegionSize) ([]byte, uintptr, error) {
-	// Platform-specific implementation would go here
-	// For now, use Go's memory allocation as placeholder
-	// In production, this would use mmap() on Unix or VirtualAlloc() on Windows
-
-	// Allocate aligned memory
+	// Platform-specific implementation would go here.
+	// For now, use Go's memory allocation as placeholder.
+	// In production, this would use mmap() on Unix or VirtualAlloc() on Windows.
+	// Allocate aligned memory.
 	alignment := uintptr(4096) // Page alignment
 	actualSize := uintptr(size) + alignment
 
-	// Simulate system call allocation
+	// Simulate system call allocation.
 	mem := make([]byte, actualSize)
 	base := uintptr(unsafe.Pointer(unsafe.SliceData(mem)))
 
-	// Align pointer
+	// Align pointer.
 	aligned := (base + alignment - 1) &^ (alignment - 1)
+
 	return mem, aligned - base, nil
 }
 
-// FreeRegion frees a memory region
+// FreeRegion frees a memory region.
 func (ra *RegionAllocator) FreeRegion(id RegionID) error {
 	ra.mutex.Lock()
 	defer ra.mutex.Unlock()
@@ -597,24 +599,24 @@ func (ra *RegionAllocator) FreeRegion(id RegionID) error {
 		return fmt.Errorf("region %d not found", id)
 	}
 
-	// Decrease reference count
+	// Decrease reference count.
 	refCount := atomic.AddInt64(&region.Header.RefCount, -1)
 	if refCount > 0 {
 		return nil // Still referenced
 	}
 
-	// Mark as freed
+	// Mark as freed.
 	atomic.StoreUint32(&region.Header.State, RegionFreed)
 
-	// Remove from active regions
+	// Remove from active regions.
 	delete(ra.regions, id)
 	atomic.AddInt64(&ra.activeRegions, -1)
 	atomic.AddUint64(&ra.totalMemory, ^uint64(region.Header.Size-1))
 
-	// Add to free regions pool for reuse
+	// Add to free regions pool for reuse.
 	ra.freeRegions = append(ra.freeRegions, region)
 
-	// Notify observers
+	// Notify observers.
 	for _, observer := range ra.observers {
 		observer.OnRegionFreed(ra, region)
 	}
@@ -622,7 +624,7 @@ func (ra *RegionAllocator) FreeRegion(id RegionID) error {
 	return nil
 }
 
-// GetRegion retrieves a region by ID
+// GetRegion retrieves a region by ID.
 func (ra *RegionAllocator) GetRegion(id RegionID) (*Region, error) {
 	ra.mutex.RLock()
 	defer ra.mutex.RUnlock()
@@ -635,7 +637,7 @@ func (ra *RegionAllocator) GetRegion(id RegionID) (*Region, error) {
 	return region, nil
 }
 
-// GetStats returns allocator statistics
+// GetStats returns allocator statistics.
 func (ra *RegionAllocator) GetStats() *AllocatorStats {
 	ra.mutex.RLock()
 	defer ra.mutex.RUnlock()
@@ -648,7 +650,7 @@ func (ra *RegionAllocator) GetStats() *AllocatorStats {
 	return &stats
 }
 
-// AddObserver adds an allocator observer
+// AddObserver adds an allocator observer.
 func (ra *RegionAllocator) AddObserver(observer AllocatorObserver) {
 	ra.mutex.Lock()
 	defer ra.mutex.Unlock()
@@ -656,7 +658,7 @@ func (ra *RegionAllocator) AddObserver(observer AllocatorObserver) {
 	ra.observers = append(ra.observers, observer)
 }
 
-// RemoveObserver removes an allocator observer
+// RemoveObserver removes an allocator observer.
 func (ra *RegionAllocator) RemoveObserver(observer AllocatorObserver) {
 	ra.mutex.Lock()
 	defer ra.mutex.Unlock()
@@ -664,26 +666,27 @@ func (ra *RegionAllocator) RemoveObserver(observer AllocatorObserver) {
 	for i, obs := range ra.observers {
 		if obs == observer {
 			ra.observers = append(ra.observers[:i], ra.observers[i+1:]...)
+
 			break
 		}
 	}
 }
 
-// CreateRegion creates a new region with specified size and alignment
+// CreateRegion creates a new region with specified size and alignment.
 func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignment) (*Region, error) {
 	ra.mutex.Lock()
 	defer ra.mutex.Unlock()
 
-	// Generate unique region ID
+	// Generate unique region ID.
 	regionID := RegionID(atomic.AddUint64(&ra.nextID, 1))
 
-	// Allocate system memory
+	// Allocate system memory.
 	backingSlice, offset, err := ra.allocateSystemMemory(size)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create region header
+	// Create region header.
 	header := &RegionHeader{
 		ID:         regionID,
 		Size:       size,
@@ -704,7 +707,7 @@ func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignme
 		Checksum:   0,
 	}
 
-	// Create initial free block
+	// Create initial free block.
 	initialFreeBlock := &FreeBlock{
 		Size:   size,
 		Offset: 0,
@@ -713,7 +716,7 @@ func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignme
 	}
 	header.FreeList = initialFreeBlock
 
-	// Create region
+	// Create region.
 	region := &Region{
 		Header:    header,
 		Data:      unsafe.Add(unsafe.Pointer(unsafe.SliceData(backingSlice)), int(offset)),
@@ -723,7 +726,7 @@ func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignme
 		Observers: make([]RegionObserver, 0),
 	}
 
-	// Add to regions map
+	// Add to regions map.
 	ra.regions[regionID] = region
 	ra.stats.TotalRegions++
 	ra.stats.ActiveRegions++
@@ -731,7 +734,7 @@ func (ra *RegionAllocator) CreateRegion(size RegionSize, alignment RegionAlignme
 	return region, nil
 }
 
-// DestroyRegion destroys a region and frees its memory
+// DestroyRegion destroys a region and frees its memory.
 func (ra *RegionAllocator) DestroyRegion(regionID RegionID) error {
 	ra.mutex.Lock()
 	defer ra.mutex.Unlock()
@@ -741,22 +744,23 @@ func (ra *RegionAllocator) DestroyRegion(regionID RegionID) error {
 		return fmt.Errorf("region not found")
 	}
 
-	// Check if region has active allocations
+	// Check if region has active allocations.
 	if region.Header.AllocCount > region.Header.FreeCount {
 		return fmt.Errorf("region still has active allocations")
 	}
 
-	// Free system memory (mock implementation)
+	// Free system memory (mock implementation).
 	_, _, err := ra.allocateSystemMemory(0) // Mock call to satisfy vet; ignored result
 	if err != nil {
 		return err
 	}
 
-	// Remove from regions map
+	// Remove from regions map.
 	delete(ra.regions, regionID)
+
 	ra.stats.ActiveRegions--
 
-	// Update state
+	// Update state.
 	atomic.StoreUint32(&region.Header.State, 4) // Use RegionDestroyed value
 
 	return nil

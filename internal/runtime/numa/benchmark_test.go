@@ -14,9 +14,11 @@ func BenchmarkOptimizer_Allocate(b *testing.B) {
 	optimizer := NewOptimizer()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		size := uintptr(1024)
 		nodeHint := i % optimizer.topology.nodeCount
+
 		ptr := optimizer.Allocate(size, nodeHint)
 		if ptr == 0 {
 			b.Fatal("Allocation failed")
@@ -33,10 +35,12 @@ func BenchmarkOptimizer_AllocateParallel(b *testing.B) {
 		for pb.Next() {
 			size := uintptr(1024 + i%1024)
 			nodeHint := i % optimizer.topology.nodeCount
+
 			ptr := optimizer.Allocate(size, nodeHint)
 			if ptr == 0 {
 				b.Fatal("Allocation failed")
 			}
+
 			i++
 		}
 	})
@@ -50,8 +54,10 @@ func BenchmarkOptimizer_AllocateSizes(b *testing.B) {
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size%d", size), func(b *testing.B) {
 			b.ResetTimer()
+
 			for i := 0; i < b.N; i++ {
 				nodeHint := i % optimizer.topology.nodeCount
+
 				ptr := optimizer.Allocate(size, nodeHint)
 				if ptr == 0 {
 					b.Fatal("Allocation failed")
@@ -63,6 +69,7 @@ func BenchmarkOptimizer_AllocateSizes(b *testing.B) {
 
 func BenchmarkTopology_Discovery(b *testing.B) {
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		topology := NewTopology()
 		if topology.nodeCount == 0 {
@@ -77,6 +84,7 @@ func BenchmarkScheduler_TaskSubmission(b *testing.B) {
 	defer optimizer.Stop()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		task := &Task{
 			ID: uint64(i),
@@ -93,7 +101,7 @@ func BenchmarkScheduler_TaskSubmission(b *testing.B) {
 			b.Fatal("Task scheduling failed:", err)
 		}
 
-		// Wait for completion
+		// Wait for completion.
 		<-task.Result
 	}
 }
@@ -111,6 +119,7 @@ func BenchmarkScheduler_TaskSubmissionParallel(b *testing.B) {
 				ID: uint64(i),
 				Function: func() interface{} {
 					runtime.Gosched() // Simulate work
+
 					return i
 				},
 				NodeAffinity: i % optimizer.topology.nodeCount,
@@ -123,8 +132,9 @@ func BenchmarkScheduler_TaskSubmissionParallel(b *testing.B) {
 				b.Fatal("Task scheduling failed:", err)
 			}
 
-			// Wait for completion
+			// Wait for completion.
 			<-task.Result
+
 			i++
 		}
 	})
@@ -133,7 +143,7 @@ func BenchmarkScheduler_TaskSubmissionParallel(b *testing.B) {
 func BenchmarkLoadBalancer_Balance(b *testing.B) {
 	scheduler := NewScheduler()
 
-	// Create unbalanced workload
+	// Create unbalanced workload.
 	for i := 0; i < 100; i++ {
 		task := &Task{
 			ID:      uint64(i),
@@ -143,6 +153,7 @@ func BenchmarkLoadBalancer_Balance(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		scheduler.balancer.balance(scheduler)
 	}
@@ -153,6 +164,7 @@ func BenchmarkMetrics_Collection(b *testing.B) {
 	sampler := monitor.samplers[0]
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		sampler.collectMetrics()
 	}
@@ -162,8 +174,10 @@ func BenchmarkAffinityManager_SetCPUAffinity(b *testing.B) {
 	affinity := NewAffinityManager()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		mask := uint64(1 << (i % 8)) // Rotate through CPU cores
+
 		err := affinity.SetCPUAffinity(i%len(affinity.cpuMasks), mask)
 		if err != nil {
 			b.Fatal("SetCPUAffinity failed:", err)
@@ -175,11 +189,13 @@ func BenchmarkMemoryPool_AllocateFree(b *testing.B) {
 	pool := NewMemoryPool(0)
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		ptr := pool.Allocate(1024)
 		if ptr == 0 {
 			b.Fatal("Allocation failed")
 		}
+
 		pool.Free(ptr, 1024)
 	}
 }
@@ -190,36 +206,42 @@ func BenchmarkOptimizer_ConcurrentWorkload(b *testing.B) {
 	defer optimizer.Stop()
 
 	const numWorkers = 8
+
 	const tasksPerWorker = 100
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		var wg sync.WaitGroup
 
 		for w := 0; w < numWorkers; w++ {
 			wg.Add(1)
+
 			go func(workerID int) {
 				defer wg.Done()
 
 				for t := 0; t < tasksPerWorker; t++ {
-					// Mixed allocation and task scheduling
+					// Mixed allocation and task scheduling.
 					if t%2 == 0 {
 						size := uintptr(1024 + t*64)
 						nodeHint := workerID % optimizer.topology.nodeCount
+
 						ptr := optimizer.Allocate(size, nodeHint)
 						if ptr == 0 {
 							b.Error("Allocation failed")
+
 							return
 						}
 					} else {
 						task := &Task{
 							ID: uint64(workerID*tasksPerWorker + t),
 							Function: func() interface{} {
-								// Simulate CPU work
+								// Simulate CPU work.
 								sum := 0
 								for i := 0; i < 1000; i++ {
 									sum += i
 								}
+
 								return sum
 							},
 							NodeAffinity: workerID % optimizer.topology.nodeCount,
@@ -230,6 +252,7 @@ func BenchmarkOptimizer_ConcurrentWorkload(b *testing.B) {
 						err := optimizer.ScheduleTask(task)
 						if err != nil {
 							b.Error("Task scheduling failed:", err)
+
 							return
 						}
 
@@ -243,14 +266,16 @@ func BenchmarkOptimizer_ConcurrentWorkload(b *testing.B) {
 	}
 }
 
-// Benchmark comparison with and without NUMA optimization
+// Benchmark comparison with and without NUMA optimization.
 func BenchmarkComparison_WithNUMA(b *testing.B) {
 	optimizer := NewOptimizer()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		size := uintptr(1024)
 		nodeHint := i % optimizer.topology.nodeCount
+
 		ptr := optimizer.Allocate(size, nodeHint)
 		if ptr == 0 {
 			b.Fatal("Allocation failed")
@@ -263,9 +288,11 @@ func BenchmarkComparison_WithoutNUMA(b *testing.B) {
 	optimizer.Disable()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		size := uintptr(1024)
 		nodeHint := i % optimizer.topology.nodeCount
+
 		ptr := optimizer.Allocate(size, nodeHint)
 		if ptr == 0 {
 			b.Fatal("Allocation failed")
@@ -276,7 +303,7 @@ func BenchmarkComparison_WithoutNUMA(b *testing.B) {
 func BenchmarkScheduler_QueueOperations(b *testing.B) {
 	scheduler := NewScheduler()
 
-	// Pre-create tasks
+	// Pre-create tasks.
 	tasks := make([]*Task, b.N)
 	for i := range tasks {
 		tasks[i] = &Task{
@@ -286,8 +313,10 @@ func BenchmarkScheduler_QueueOperations(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		nodeID := i % len(scheduler.queues)
+
 		err := scheduler.EnqueueTask(nodeID, tasks[i])
 		if err != nil {
 			b.Fatal("Enqueue failed:", err)
@@ -299,9 +328,11 @@ func BenchmarkTopology_DistanceCalculation(b *testing.B) {
 	topology := NewTopology()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		from := i % topology.nodeCount
 		to := (i + 1) % topology.nodeCount
+
 		distance := topology.GetDistance(from, to)
 		if distance <= 0 {
 			b.Fatal("Invalid distance")
@@ -313,6 +344,7 @@ func BenchmarkNodeMemory_Update(b *testing.B) {
 	memory := NewNodeMemory()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		// Simulate memory allocation/deallocation
 		size := uint64(1024 + i%1024)
@@ -334,21 +366,24 @@ func BenchmarkSampler_FullCycle(b *testing.B) {
 	alerts := make(chan *Alert, 100)
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		sampler.collectMetrics()
 		sampler.checkAlerts(alerts)
 	}
 }
 
-// Memory usage benchmarks
+// Memory usage benchmarks.
 func BenchmarkOptimizer_MemoryFootprint(b *testing.B) {
 	var m1, m2 runtime.MemStats
+
 	runtime.GC()
 	runtime.ReadMemStats(&m1)
 
 	optimizers := make([]*Optimizer, b.N)
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		optimizers[i] = NewOptimizer()
 	}
@@ -359,16 +394,17 @@ func BenchmarkOptimizer_MemoryFootprint(b *testing.B) {
 	avgMemPerOptimizer := (m2.Alloc - m1.Alloc) / uint64(b.N)
 	b.Logf("Average memory per optimizer: %d bytes", avgMemPerOptimizer)
 
-	// Keep reference to prevent GC
+	// Keep reference to prevent GC.
 	_ = optimizers
 }
 
-// Latency distribution benchmark
+// Latency distribution benchmark.
 func BenchmarkOptimizer_LatencyDistribution(b *testing.B) {
 	optimizer := NewOptimizer()
 	latencies := make([]time.Duration, b.N)
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		start := time.Now()
 
@@ -383,7 +419,7 @@ func BenchmarkOptimizer_LatencyDistribution(b *testing.B) {
 		}
 	}
 
-	// Calculate percentiles
+	// Calculate percentiles.
 	sort.Slice(latencies, func(i, j int) bool {
 		return latencies[i] < latencies[j]
 	})
@@ -395,7 +431,7 @@ func BenchmarkOptimizer_LatencyDistribution(b *testing.B) {
 	b.Logf("Latency P50: %v, P95: %v, P99: %v", p50, p95, p99)
 }
 
-// Scalability benchmark
+// Scalability benchmark.
 func BenchmarkOptimizer_Scalability(b *testing.B) {
 	optimizer := NewOptimizer()
 
@@ -407,13 +443,16 @@ func BenchmarkOptimizer_Scalability(b *testing.B) {
 
 			b.RunParallel(func(pb *testing.PB) {
 				i := 0
+
 				for pb.Next() {
 					size := uintptr(1024)
 					nodeHint := i % optimizer.topology.nodeCount
+
 					ptr := optimizer.Allocate(size, nodeHint)
 					if ptr == 0 {
 						b.Fatal("Allocation failed")
 					}
+
 					i++
 				}
 			})

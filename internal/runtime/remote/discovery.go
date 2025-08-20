@@ -12,8 +12,8 @@ type Discovery interface {
 
 // StaticDiscovery is a simple in-memory discovery useful for tests or single-process clusters.
 type StaticDiscovery struct {
-	mu    sync.RWMutex
 	nodes map[string]string
+	mu    sync.RWMutex
 }
 
 func NewStaticDiscovery() *StaticDiscovery { return &StaticDiscovery{nodes: make(map[string]string)} }
@@ -22,6 +22,7 @@ func (d *StaticDiscovery) Register(nodeName, address string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.nodes[nodeName] = address
+
 	return nil
 }
 
@@ -35,15 +36,18 @@ func (d *StaticDiscovery) Resolve(nodeName string) (string, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	addr, ok := d.nodes[nodeName]
+
 	return addr, ok
 }
 
 func (d *StaticDiscovery) Members() map[string]string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
+
 	out := make(map[string]string, len(d.nodes))
 	for k, v := range d.nodes {
 		out[k] = v
 	}
+
 	return out
 }

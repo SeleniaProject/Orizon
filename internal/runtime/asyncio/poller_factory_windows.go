@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -7,11 +7,11 @@ import (
 	"os"
 )
 
-// NewOSPoller (Windows)
-// Selection priority:
-// 1) IOCP if explicitly requested and compiled in (ORIZON_WIN_IOCP=1)
-// 2) WSAPoll if requested (ORIZON_WIN_WSAPOLL=1)
-// 3) Portable goroutine-based poller (default)
+// NewOSPoller (Windows).
+// Selection priority:.
+// 1) IOCP if explicitly requested and compiled in (ORIZON_WIN_IOCP=1).
+// 2) WSAPoll if requested (ORIZON_WIN_WSAPOLL=1).
+// 3) Portable goroutine-based poller (default).
 func NewOSPoller() Poller {
 	// Prefer IOCP when explicitly requested and available (requires 'iocp' build tag).
 	if v := os.Getenv("ORIZON_WIN_IOCP"); v == "1" || v == "true" || v == "on" {

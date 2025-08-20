@@ -15,10 +15,12 @@ func ListenUDP(addr string) (*UDPEndpoint, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	c, err := net.ListenUDP("udp", a)
 	if err != nil {
 		return nil, err
 	}
+
 	return &UDPEndpoint{conn: c}, nil
 }
 
@@ -27,10 +29,12 @@ func DialUDP(addr string) (*UDPEndpoint, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	c, err := net.DialUDP("udp", nil, r)
 	if err != nil {
 		return nil, err
 	}
+
 	return &UDPEndpoint{conn: c}, nil
 }
 
@@ -41,6 +45,7 @@ func (e *UDPEndpoint) LocalAddr() string {
 	if e == nil || e.conn == nil {
 		return ""
 	}
+
 	return e.conn.LocalAddr().String()
 }
 
@@ -56,6 +61,7 @@ func (e *UDPEndpoint) Write(b []byte) (int, error) { return e.conn.Write(b) }
 
 func (e *UDPEndpoint) ReadFrom(b []byte) (int, *net.UDPAddr, error) {
 	n, addr, err := e.conn.ReadFromUDP(b)
+
 	return n, addr, err
 }
 

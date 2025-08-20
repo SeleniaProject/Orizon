@@ -6,8 +6,8 @@ import (
 	"unsafe"
 )
 
-// Built-in functions for Orizon runtime
-// These functions are compiled into the runtime and can be called from Orizon code
+// Built-in functions for Orizon runtime.
+// These functions are compiled into the runtime and can be called from Orizon code.
 
 //go:linkname OrizonPrint orizon.print
 func OrizonPrint(s string) {
@@ -24,11 +24,11 @@ func OrizonExit(code int) {
 	os.Exit(code)
 }
 
-// Use unsafe to satisfy import requirement
+// Use unsafe to satisfy import requirement.
 var _ = unsafe.Pointer(nil)
 
-// Assembly stubs for built-in functions
-// These will be linked with the generated assembly
+// Assembly stubs for built-in functions.
+// These will be linked with the generated assembly.
 
 var BuiltinFunctions = map[string]string{
 	"print": `

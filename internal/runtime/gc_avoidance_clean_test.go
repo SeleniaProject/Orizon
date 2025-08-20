@@ -37,13 +37,13 @@ func TestGCAvoidanceEngine_Creation(t *testing.T) {
 func TestGCAvoidanceEngine_Allocation(t *testing.T) {
 	engine := NewGCAvoidanceEngine()
 
-	// Test basic allocation
+	// Test basic allocation.
 	ptr := engine.Allocate(100, "test_function")
 	if ptr == 0 {
 		t.Error("Allocation should succeed")
 	}
 
-	// Check statistics
+	// Check statistics.
 	stats := engine.GetStatistics()
 	if stats["total_allocations"].(int64) != 1 {
 		t.Error("Total allocations should be 1")
@@ -53,14 +53,16 @@ func TestGCAvoidanceEngine_Allocation(t *testing.T) {
 func TestGCAvoidanceEngine_EnableDisable(t *testing.T) {
 	engine := NewGCAvoidanceEngine()
 
-	// Test disable
+	// Test disable.
 	engine.Disable()
+
 	if engine.enabled {
 		t.Error("Engine should be disabled")
 	}
 
-	// Test enable
+	// Test enable.
 	engine.Enable()
+
 	if !engine.enabled {
 		t.Error("Engine should be enabled")
 	}
@@ -69,7 +71,7 @@ func TestGCAvoidanceEngine_EnableDisable(t *testing.T) {
 func TestCleanLifetimeTracker_ScopeManagement(t *testing.T) {
 	tracker := NewCleanLifetimeTracker()
 
-	// Test push scope
+	// Test push scope.
 	scope1 := tracker.PushScope("function1")
 	if scope1 == nil {
 		t.Fatal("Failed to create scope")
@@ -83,7 +85,7 @@ func TestCleanLifetimeTracker_ScopeManagement(t *testing.T) {
 		t.Error("Current scope should be scope1")
 	}
 
-	// Test nested scope
+	// Test nested scope.
 	scope2 := tracker.PushScope("function2")
 	if scope2.Parent != scope1 {
 		t.Error("Scope2 parent should be scope1")
@@ -93,13 +95,15 @@ func TestCleanLifetimeTracker_ScopeManagement(t *testing.T) {
 		t.Error("Scope1 should have scope2 as child")
 	}
 
-	// Test pop scope
+	// Test pop scope.
 	tracker.PopScope()
+
 	if tracker.current != scope1 {
 		t.Error("Current scope should be scope1 after pop")
 	}
 
 	tracker.PopScope()
+
 	if tracker.current != nil {
 		t.Error("Current scope should be nil after popping all")
 	}
@@ -109,11 +113,11 @@ func TestCleanLifetimeTracker_AllocationTracking(t *testing.T) {
 	tracker := NewCleanLifetimeTracker()
 	scope := tracker.PushScope("test_function")
 
-	// Test allocation tracking
+	// Test allocation tracking.
 	ptr := uintptr(0x1000) // Dummy pointer
 	tracker.Track(ptr, 100, CleanStackAlloc)
 
-	// Check allocation was recorded
+	// Check allocation was recorded.
 	if len(tracker.allocations) != 1 {
 		t.Error("Should have 1 tracked allocation")
 	}
@@ -135,7 +139,7 @@ func TestCleanLifetimeTracker_AllocationTracking(t *testing.T) {
 		t.Error("Allocation scope mismatch")
 	}
 
-	// Check scope has allocation
+	// Check scope has allocation.
 	if len(scope.Allocations) != 1 || scope.Allocations[0] != ptr {
 		t.Error("Scope should track the allocation")
 	}
@@ -145,7 +149,7 @@ func TestCleanRefCounter_BasicOperations(t *testing.T) {
 	counter := NewCleanRefCounter()
 	ptr := uintptr(0x2000) // Dummy pointer
 
-	// Test tracking
+	// Test tracking.
 	counter.Track(ptr)
 
 	if len(counter.counters) != 1 {
@@ -161,22 +165,24 @@ func TestCleanRefCounter_BasicOperations(t *testing.T) {
 		t.Error("Initial count should be 1")
 	}
 
-	// Test increment
+	// Test increment.
 	counter.Increment(ptr)
+
 	if entry.Count != 2 {
 		t.Error("Count should be 2 after increment")
 	}
 
-	// Test decrement
+	// Test decrement.
 	counter.Decrement(ptr)
+
 	if entry.Count != 1 {
 		t.Error("Count should be 1 after decrement")
 	}
 
-	// Test decrement to zero
+	// Test decrement to zero.
 	counter.Decrement(ptr)
 
-	// Entry should be cleaned up
+	// Entry should be cleaned up.
 	_, exists = counter.counters[ptr]
 	if exists {
 		t.Error("Entry should be cleaned up when count reaches zero")
@@ -186,7 +192,7 @@ func TestCleanRefCounter_BasicOperations(t *testing.T) {
 func TestCleanStackManager_FrameManagement(t *testing.T) {
 	manager := NewCleanStackManager(10) // 10 frame limit
 
-	// Test initial state
+	// Test initial state.
 	if manager.depth != 0 {
 		t.Error("Initial depth should be 0")
 	}
@@ -195,7 +201,7 @@ func TestCleanStackManager_FrameManagement(t *testing.T) {
 		t.Error("Initial current frame should be nil")
 	}
 
-	// Test allocation (should create first frame)
+	// Test allocation (should create first frame).
 	ptr := manager.Allocate(100, "test_function")
 	if ptr == 0 {
 		t.Error("Allocation should succeed")
@@ -217,8 +223,9 @@ func TestCleanStackManager_FrameManagement(t *testing.T) {
 		t.Error("Frame used space should be 100")
 	}
 
-	// Test pop frame
+	// Test pop frame.
 	manager.PopFrame()
+
 	if manager.depth != 0 {
 		t.Error("Depth should be 0 after pop")
 	}
@@ -231,7 +238,7 @@ func TestCleanStackManager_FrameManagement(t *testing.T) {
 func TestCleanStackManager_LargeAllocation(t *testing.T) {
 	manager := NewCleanStackManager(10)
 
-	// Test large allocation that exceeds frame size
+	// Test large allocation that exceeds frame size.
 	ptr1 := manager.Allocate(4000, "function1") // Within 8KB limit
 	if ptr1 == 0 {
 		t.Error("First allocation should succeed")
@@ -250,17 +257,17 @@ func TestCleanStackManager_LargeAllocation(t *testing.T) {
 func TestCleanEscapeAnalyzer_Prediction(t *testing.T) {
 	analyzer := NewCleanEscapeAnalyzer()
 
-	// Test initial prediction (should be conservative)
+	// Test initial prediction (should be conservative).
 	if !analyzer.WillEscape("unknown_function") {
 		t.Error("Should predict escape for unknown function (conservative)")
 	}
 
-	// Test recording escape events
+	// Test recording escape events.
 	analyzer.RecordEscape("test_function", false) // No escape
 	analyzer.RecordEscape("test_function", false) // No escape
 	analyzer.RecordEscape("test_function", true)  // Escape
 
-	// Check pattern was created
+	// Check pattern was created.
 	if len(analyzer.patterns) != 1 {
 		t.Error("Should have 1 pattern recorded")
 	}
@@ -283,7 +290,7 @@ func TestCleanEscapeAnalyzer_Prediction(t *testing.T) {
 func TestCleanEscapeAnalyzer_ConfidenceBuilding(t *testing.T) {
 	analyzer := NewCleanEscapeAnalyzer()
 
-	// Record many non-escape events
+	// Record many non-escape events.
 	for i := 0; i < 20; i++ {
 		analyzer.RecordEscape("reliable_function", false)
 	}
@@ -297,7 +304,7 @@ func TestCleanEscapeAnalyzer_ConfidenceBuilding(t *testing.T) {
 		t.Error("Confidence should be reasonably high after many samples")
 	}
 
-	// Should predict no escape with high confidence
+	// Should predict no escape with high confidence.
 	if analyzer.WillEscape("reliable_function") {
 		t.Error("Should predict no escape for well-known non-escaping function")
 	}
@@ -306,13 +313,13 @@ func TestCleanEscapeAnalyzer_ConfidenceBuilding(t *testing.T) {
 func TestGCAvoidanceEngine_IntegratedWorkflow(t *testing.T) {
 	engine := NewGCAvoidanceEngine()
 
-	// Start scope
+	// Start scope.
 	scope := engine.lifetimeTracker.PushScope("main_function")
 	if scope == nil {
 		t.Fatal("Failed to create scope")
 	}
 
-	// Perform allocations
+	// Perform allocations.
 	ptr1 := engine.Allocate(100, "main_function")
 	ptr2 := engine.Allocate(200, "main_function")
 
@@ -320,16 +327,16 @@ func TestGCAvoidanceEngine_IntegratedWorkflow(t *testing.T) {
 		t.Error("Allocations should succeed")
 	}
 
-	// Check statistics
+	// Check statistics.
 	stats := engine.GetStatistics()
 	if stats["total_allocations"].(int64) != 2 {
 		t.Error("Should have 2 total allocations")
 	}
 
-	// End scope
+	// End scope.
 	engine.lifetimeTracker.PopScope()
 
-	// Verify the workflow completed successfully
+	// Verify the workflow completed successfully.
 	finalStats := engine.GetStatistics()
 	if finalStats["total_allocations"].(int64) != 2 {
 		t.Error("Total allocations should remain 2")
@@ -338,8 +345,8 @@ func TestGCAvoidanceEngine_IntegratedWorkflow(t *testing.T) {
 
 func TestAllocationType_String(t *testing.T) {
 	tests := []struct {
-		allocType CleanAllocType
 		expected  string
+		allocType CleanAllocType
 	}{
 		{CleanStackAlloc, "stack"},
 		{CleanRefCountAlloc, "refcount"},
@@ -356,13 +363,13 @@ func TestAllocationType_String(t *testing.T) {
 func TestGCAvoidanceEngine_Statistics(t *testing.T) {
 	engine := NewGCAvoidanceEngine()
 
-	// Perform some operations
+	// Perform some operations.
 	engine.Allocate(100, "test1")
 	engine.Allocate(200, "test2")
 
 	stats := engine.GetStatistics()
 
-	// Verify required fields exist
+	// Verify required fields exist.
 	requiredFields := []string{
 		"enabled", "total_allocations", "stack_allocations",
 		"refcount_allocations", "escaped_allocations",
@@ -375,7 +382,7 @@ func TestGCAvoidanceEngine_Statistics(t *testing.T) {
 		}
 	}
 
-	// Test string representation
+	// Test string representation.
 	str := engine.String()
 	if len(str) == 0 {
 		t.Error("String representation should not be empty")
@@ -385,7 +392,7 @@ func TestGCAvoidanceEngine_Statistics(t *testing.T) {
 func TestPerformanceBasics(t *testing.T) {
 	engine := NewGCAvoidanceEngine()
 
-	// Test performance of basic operations
+	// Test performance of basic operations.
 	start := time.Now()
 
 	for i := 0; i < 1000; i++ {

@@ -18,10 +18,12 @@ func GenerateSelfSignedTLS(hosts []string, validFor time.Duration) (*tls.Config,
 	if validFor <= 0 {
 		validFor = 24 * time.Hour
 	}
+
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
+
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().UnixNano()),
 		NotBefore:    time.Now().Add(-time.Hour),
@@ -29,6 +31,7 @@ func GenerateSelfSignedTLS(hosts []string, validFor time.Duration) (*tls.Config,
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
+
 	for _, h := range hosts {
 		if ip := net.ParseIP(h); ip != nil {
 			tmpl.IPAddresses = append(tmpl.IPAddresses, ip)
@@ -36,12 +39,15 @@ func GenerateSelfSignedTLS(hosts []string, validFor time.Duration) (*tls.Config,
 			tmpl.DNSNames = append(tmpl.DNSNames, h)
 		}
 	}
+
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {
 		return nil, err
 	}
+
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
 	pair, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		return nil, err
@@ -62,18 +68,20 @@ func LoadTLSConfig(certFile, keyFile string) (*tls.Config, error) {
 
 // WritePEM writes cert and key PEM to files for development use.
 func WritePEM(cert *tls.Certificate, certPath, keyPath string) error {
-	// Write leaf certificate
+	// Write leaf certificate.
 	if cert == nil || len(cert.Certificate) == 0 {
 		return os.ErrInvalid
 	}
+
 	if err := os.WriteFile(certPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Certificate[0]}), 0o644); err != nil {
 		return err
 	}
-	// Marshal private key if present
+	// Marshal private key if present.
 	switch k := cert.PrivateKey.(type) {
 	case *rsa.PrivateKey:
 		keyDER := x509.MarshalPKCS1PrivateKey(k)
 		keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDER})
+
 		return os.WriteFile(keyPath, keyPEM, 0o600)
 	default:
 		return errors.New("unsupported or missing private key for PEM export")

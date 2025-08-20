@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -48,7 +48,7 @@ func TestWSAPoll_NoEventsAfterDeregister_UnderTraffic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Start traffic generator on server side
+	// Start traffic generator on server side.
 	stop := make(chan struct{})
 	go func() {
 		payload := make([]byte, 1024)
@@ -63,10 +63,10 @@ func TestWSAPoll_NoEventsAfterDeregister_UnderTraffic(t *testing.T) {
 		}
 	}()
 
-	// Let events flow briefly
+	// Let events flow briefly.
 	time.Sleep(50 * time.Millisecond)
 
-	// Deregister and ensure no further events are observed
+	// Deregister and ensure no further events are observed.
 	if err := p.Deregister(cli); err != nil {
 		t.Fatal(err)
 	}

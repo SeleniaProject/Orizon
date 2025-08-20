@@ -1,5 +1,5 @@
 // Package runtime provides reference counting optimization for memory management.
-// This module implements sophisticated reference counting strategies to minimize
+// This module implements sophisticated reference counting strategies to minimize.
 // overhead while maintaining memory safety in a garbage collection-free environment.
 package runtime
 
@@ -11,43 +11,43 @@ import (
 	"unsafe"
 )
 
-// RefCountOptimizer manages reference counting optimizations
+// RefCountOptimizer manages reference counting optimizations.
 type RefCountOptimizer struct {
+	statistics       RefCountStatistics
+	lastOptimization time.Time
+	objects          map[ObjectID]*RefCountedObject
+	strategies       map[string]RefCountStrategy
+	cycles           map[CycleID]*ReferenceCycle
+	weakRefs         map[ObjectID][]*WeakRef
+	cycleBuster      *CycleBreaker
+	optimizer        *CountOptimizer
+	config           RefCountConfig
 	mutex            sync.RWMutex
-	objects          map[ObjectID]*RefCountedObject // Tracked objects
-	strategies       map[string]RefCountStrategy    // Available strategies
-	statistics       RefCountStatistics             // Optimization statistics
-	config           RefCountConfig                 // Configuration
-	cycles           map[CycleID]*ReferenceCycle    // Detected cycles
-	weakRefs         map[ObjectID][]*WeakRef        // Weak references
-	cycleBuster      *CycleBreaker                  // Cycle breaking system
-	optimizer        *CountOptimizer                // Count optimization engine
-	enabled          bool                           // Optimizer enabled
-	lastOptimization time.Time                      // Last optimization run
+	enabled          bool
 }
 
-// RefCountedObject represents an object with reference counting
+// RefCountedObject represents an object with reference counting.
 type RefCountedObject struct {
-	ID                ObjectID            // Unique identifier
-	Data              interface{}         // Object data
-	RefCount          int64               // Atomic reference count
-	WeakCount         int64               // Atomic weak reference count
-	Type              *TypeInfo           // Object type information
-	Size              uintptr             // Object size
-	CreatedAt         time.Time           // Creation timestamp
-	LastAccess        time.Time           // Last access timestamp
-	Strategy          RefCountStrategy    // Reference counting strategy
-	Flags             ObjectFlags         // Object flags
-	Children          []*RefCountedObject // Child objects
-	Parent            *RefCountedObject   // Parent object
-	CycleInfo         *CycleInfo          // Cycle detection info
-	OptimizationHints []OptimizationHint  // Optimization hints
-	AccessPattern     AccessPattern       // Access pattern analysis
-	Allocator         *RegionAllocator    // Allocator used
-	Region            *Region             // Containing region
+	CreatedAt         time.Time
+	LastAccess        time.Time
+	Data              interface{}
+	Strategy          RefCountStrategy
+	Type              *TypeInfo
+	Parent            *RefCountedObject
+	CycleInfo         *CycleInfo
+	Allocator         *RegionAllocator
+	Region            *Region
+	Children          []*RefCountedObject
+	OptimizationHints []OptimizationHint
+	AccessPattern     AccessPattern
+	Size              uintptr
+	ID                ObjectID
+	WeakCount         int64
+	RefCount          int64
+	Flags             ObjectFlags
 }
 
-// RefCountStrategy defines different reference counting strategies
+// RefCountStrategy defines different reference counting strategies.
 type RefCountStrategy interface {
 	GetName() string                                                // Strategy name
 	GetPriority() int                                               // Strategy priority
@@ -55,7 +55,7 @@ type RefCountStrategy interface {
 	Optimize(obj *RefCountedObject, hint OptimizationHint) error    // Apply optimization
 }
 
-// ObjectFlags represents flags for reference counted objects
+// ObjectFlags represents flags for reference counted objects.
 type ObjectFlags int64
 
 const (
@@ -73,96 +73,96 @@ const (
 	FlagDeferred         ObjectFlags = 1 << 10 // Deferred reference counting
 )
 
-// AccessPattern tracks object access patterns
+// AccessPattern tracks object access patterns.
 type AccessPattern struct {
-	ReadCount      int64     // Number of reads
-	WriteCount     int64     // Number of writes
-	RefIncrements  int64     // Reference increments
-	RefDecrements  int64     // Reference decrements
-	LastRead       time.Time // Last read timestamp
-	LastWrite      time.Time // Last write timestamp
-	LastRefChange  time.Time // Last reference change
-	HotPathAccess  bool      // Accessed in hot path
-	Frequency      float64   // Access frequency
-	Predictability float64   // Access predictability
-	CacheLocality  float64   // Cache locality score
+	LastRead       time.Time
+	LastWrite      time.Time
+	LastRefChange  time.Time
+	ReadCount      int64
+	WriteCount     int64
+	RefIncrements  int64
+	RefDecrements  int64
+	Frequency      float64
+	Predictability float64
+	CacheLocality  float64
+	HotPathAccess  bool
 }
 
-// ReferenceCycle represents a detected reference cycle
+// ReferenceCycle represents a detected reference cycle.
 type ReferenceCycle struct {
-	ID       CycleID             // Unique identifier
-	Objects  []*RefCountedObject // Objects in cycle
-	Edges    []*ReferenceEdge    // Reference edges
-	Strength float64             // Cycle strength
-	Detected time.Time           // Detection timestamp
-	Broken   bool                // Cycle has been broken
-	Strategy CycleBreakStrategy  // Breaking strategy
-	Cost     float64             // Breaking cost
+	Detected time.Time
+	Objects  []*RefCountedObject
+	Edges    []*ReferenceEdge
+	ID       CycleID
+	Strength float64
+	Strategy CycleBreakStrategy
+	Cost     float64
+	Broken   bool
 }
 
-// ReferenceEdge represents a reference between objects
+// ReferenceEdge represents a reference between objects.
 type ReferenceEdge struct {
-	ID       EdgeID            // Unique identifier
-	From     *RefCountedObject // Source object
-	To       *RefCountedObject // Target object
-	Type     ReferenceType     // Type of reference
-	Strength float64           // Reference strength
-	Weak     bool              // Is weak reference
-	Count    int64             // Reference count contribution
+	From     *RefCountedObject
+	To       *RefCountedObject
+	ID       EdgeID
+	Type     ReferenceType
+	Strength float64
+	Count    int64
+	Weak     bool
 }
 
-// WeakRef represents a weak reference to an object
+// WeakRef represents a weak reference to an object.
 type WeakRef struct {
-	ID       WeakRefID         // Unique identifier
-	Target   *RefCountedObject // Target object
-	Callback WeakRefCallback   // Callback when target is deallocated
-	Valid    bool              // Reference is still valid
-	Created  time.Time         // Creation timestamp
+	Created  time.Time
+	Target   *RefCountedObject
+	Callback WeakRefCallback
+	ID       WeakRefID
+	Valid    bool
 }
 
-// CycleInfo contains cycle detection information
+// CycleInfo contains cycle detection information.
 type CycleInfo struct {
-	InCycle        bool      // Object is part of a cycle
-	CycleID        CycleID   // Cycle identifier
-	CycleDepth     int       // Depth in cycle
-	LastCheck      time.Time // Last cycle check
-	CheckCount     int64     // Number of cycle checks
-	BreakCandidate bool      // Candidate for cycle breaking
+	LastCheck      time.Time
+	CycleID        CycleID
+	CycleDepth     int
+	CheckCount     int64
+	InCycle        bool
+	BreakCandidate bool
 }
 
-// OptimizationHint provides hints for optimization
+// OptimizationHint provides hints for optimization.
 type OptimizationHint struct {
-	Type       HintType    // Type of hint
-	Value      interface{} // Hint value
-	Confidence float64     // Confidence in hint
-	Source     string      // Source of hint
-	Applicable bool        // Hint is applicable
+	Value      interface{}
+	Source     string
+	Type       HintType
+	Confidence float64
+	Applicable bool
 }
 
-// CycleBreaker handles reference cycle detection and breaking
+// CycleBreaker handles reference cycle detection and breaking.
 type CycleBreaker struct {
+	lastDetection time.Time
+	cycles        map[CycleID]*ReferenceCycle
+	detector      *CycleDetector
+	strategies    []CycleBreakStrategy
+	statistics    CycleStatistics
+	config        CycleConfig
 	mutex         sync.RWMutex
-	cycles        map[CycleID]*ReferenceCycle // Detected cycles
-	strategies    []CycleBreakStrategy        // Breaking strategies
-	detector      *CycleDetector              // Cycle detection engine
-	statistics    CycleStatistics             // Cycle statistics
-	config        CycleConfig                 // Configuration
-	lastDetection time.Time                   // Last detection run
-	enabled       bool                        // Cycle breaking enabled
+	enabled       bool
 }
 
-// CountOptimizer optimizes reference counting operations
+// CountOptimizer optimizes reference counting operations.
 type CountOptimizer struct {
+	optimizations   map[ObjectID]*CountOptimization
+	deferredCounts  map[ObjectID]*DeferredCount
+	batchOperations *BatchOperations
+	statistics      OptimizationStatistics
+	config          OptimizationConfig
 	mutex           sync.RWMutex
-	optimizations   map[ObjectID]*CountOptimization // Applied optimizations
-	deferredCounts  map[ObjectID]*DeferredCount     // Deferred count operations
-	batchOperations *BatchOperations                // Batched operations
-	statistics      OptimizationStatistics          // Optimization statistics
-	config          OptimizationConfig              // Configuration
-	enabled         bool                            // Optimizer enabled
+	enabled         bool
 }
 
-// Type definitions
+// Type definitions.
 type (
 	ObjectID        uint64                  // Object identifier
 	CycleID         uint64                  // Cycle identifier
@@ -170,7 +170,7 @@ type (
 	WeakRefCallback func(*RefCountedObject) // Weak reference callback
 )
 
-// Reference counting types
+// Reference counting types.
 type RefReferenceType int
 
 const (
@@ -203,19 +203,19 @@ const (
 	StackAllocatableHint
 )
 
-// Statistics structures
+// Statistics structures.
 type RefCountStatistics struct {
-	TotalObjects      int64     // Total tracked objects
-	ActiveObjects     int64     // Currently active objects
-	TotalIncrements   int64     // Total reference increments
-	TotalDecrements   int64     // Total reference decrements
-	CyclesDetected    int64     // Cycles detected
-	CyclesBroken      int64     // Cycles broken
-	OptimizedObjects  int64     // Objects optimized
-	OverheadReduction float64   // Overhead reduction percentage
-	PerformanceGain   float64   // Performance gain percentage
-	MemoryReduction   float64   // Memory reduction percentage
-	LastUpdate        time.Time // Last statistics update
+	LastUpdate        time.Time
+	TotalObjects      int64
+	ActiveObjects     int64
+	TotalIncrements   int64
+	TotalDecrements   int64
+	CyclesDetected    int64
+	CyclesBroken      int64
+	OptimizedObjects  int64
+	OverheadReduction float64
+	PerformanceGain   float64
+	MemoryReduction   float64
 }
 
 type CycleStatistics struct {
@@ -238,67 +238,67 @@ type OptimizationStatistics struct {
 	OverheadReduction  float64       // Overhead reduction percentage
 }
 
-// Configuration structures
+// Configuration structures.
 type RefCountConfig struct {
-	EnableOptimization     bool          // Enable optimizations
-	EnableCycleDetection   bool          // Enable cycle detection
-	EnableWeakReferences   bool          // Enable weak references
-	MaxCycleDepth          int           // Maximum cycle detection depth
-	OptimizationInterval   time.Duration // Optimization interval
-	CycleDetectionInterval time.Duration // Cycle detection interval
-	DeferredCountThreshold int64         // Threshold for deferred counting
-	BatchSize              int           // Batch operation size
-	PerformanceMode        bool          // Prioritize performance over memory
-	DebugMode              bool          // Enable debug output
+	MaxCycleDepth          int
+	OptimizationInterval   time.Duration
+	CycleDetectionInterval time.Duration
+	DeferredCountThreshold int64
+	BatchSize              int
+	EnableOptimization     bool
+	EnableCycleDetection   bool
+	EnableWeakReferences   bool
+	PerformanceMode        bool
+	DebugMode              bool
 }
 
 type CycleConfig struct {
-	EnableDetection   bool               // Enable cycle detection
-	EnableBreaking    bool               // Enable cycle breaking
-	DetectionInterval time.Duration      // Detection interval
-	MaxCycleSize      int                // Maximum cycle size to handle
-	BreakingThreshold float64            // Threshold for breaking cycles
-	PreferredStrategy CycleBreakStrategy // Preferred breaking strategy
-	AllowWeakBreaking bool               // Allow breaking with weak references
-	MaxBreakingCost   float64            // Maximum cost for breaking
+	DetectionInterval time.Duration
+	MaxCycleSize      int
+	BreakingThreshold float64
+	PreferredStrategy CycleBreakStrategy
+	MaxBreakingCost   float64
+	EnableDetection   bool
+	EnableBreaking    bool
+	AllowWeakBreaking bool
 }
 
 type OptimizationConfig struct {
-	EnableDeferred      bool  // Enable deferred counting
-	EnableBatching      bool  // Enable batch operations
-	EnableInlining      bool  // Enable operation inlining
-	BatchSize           int   // Batch size
-	DeferralThreshold   int64 // Deferral threshold
-	OptimizationLevel   int   // Optimization aggressiveness
-	HotPathOptimization bool  // Optimize hot paths
-	CacheOptimization   bool  // Optimize for cache locality
+	BatchSize           int
+	DeferralThreshold   int64
+	OptimizationLevel   int
+	EnableDeferred      bool
+	EnableBatching      bool
+	EnableInlining      bool
+	HotPathOptimization bool
+	CacheOptimization   bool
 }
 
-// Operation structures
+// Operation structures.
 type CountOptimization struct {
-	Object      *RefCountedObject // Target object
-	Type        OptimizationType  // Optimization type
-	Applied     bool              // Has been applied
-	Benefit     float64           // Expected benefit
-	Cost        float64           // Implementation cost
-	Description string            // Optimization description
+	Object      *RefCountedObject
+	Description string
+	Type        OptimizationType
+	Benefit     float64
+	Cost        float64
+	Applied     bool
 }
 
 type DeferredCount struct {
-	Object            *RefCountedObject // Target object
-	PendingIncrements int64             // Pending increments
-	PendingDecrements int64             // Pending decrements
-	LastUpdate        time.Time         // Last update time
-	FlushThreshold    int64             // Flush threshold
+	LastUpdate        time.Time
+	Object            *RefCountedObject
+	PendingIncrements int64
+	PendingDecrements int64
+	FlushThreshold    int64
 }
 
 type BatchOperations struct {
+	lastFlush     time.Time
+	increments    map[ObjectID]int64
+	decrements    map[ObjectID]int64
+	batchSize     int
+	flushInterval time.Duration
 	mutex         sync.Mutex
-	increments    map[ObjectID]int64 // Batched increments
-	decrements    map[ObjectID]int64 // Batched decrements
-	batchSize     int                // Current batch size
-	lastFlush     time.Time          // Last flush time
-	flushInterval time.Duration      // Flush interval
 }
 
 type RefOptimizationType int
@@ -312,7 +312,7 @@ const (
 	CycleAvoidance
 )
 
-// Strategy implementations
+// Strategy implementations.
 type StandardRefCount struct {
 	name     string
 	priority int
@@ -323,6 +323,7 @@ func (s *StandardRefCount) GetPriority() int { return s.priority }
 func (s *StandardRefCount) CanOptimize(obj *RefCountedObject, pattern *AccessPattern) bool {
 	return true // Standard strategy always applicable
 }
+
 func (s *StandardRefCount) Optimize(obj *RefCountedObject, hint OptimizationHint) error {
 	return nil // Standard counting - no optimization needed
 }
@@ -338,8 +339,10 @@ func (d *DeferredRefCount) GetPriority() int { return d.priority }
 func (d *DeferredRefCount) CanOptimize(obj *RefCountedObject, pattern *AccessPattern) bool {
 	return pattern.WriteCount < d.threshold && pattern.ReadCount > pattern.WriteCount*2
 }
+
 func (d *DeferredRefCount) Optimize(obj *RefCountedObject, hint OptimizationHint) error {
 	obj.Flags |= FlagDeferred
+
 	return nil
 }
 
@@ -354,8 +357,10 @@ func (b *BatchedRefCount) GetPriority() int { return b.priority }
 func (b *BatchedRefCount) CanOptimize(obj *RefCountedObject, pattern *AccessPattern) bool {
 	return pattern.WriteCount > int64(b.batchSize)
 }
+
 func (b *BatchedRefCount) Optimize(obj *RefCountedObject, hint OptimizationHint) error {
 	obj.Flags |= FlagDeferred // Use FlagDeferred as batched flag
+
 	return nil
 }
 
@@ -369,21 +374,23 @@ func (w *WeakRefCount) GetPriority() int { return w.priority }
 func (w *WeakRefCount) CanOptimize(obj *RefCountedObject, pattern *AccessPattern) bool {
 	return obj.Flags&FlagCyclic != 0 // Apply to cyclic objects
 }
+
 func (w *WeakRefCount) Optimize(obj *RefCountedObject, hint OptimizationHint) error {
 	obj.Flags |= FlagWeak
+
 	return nil
 }
 
 type CycleDetector struct {
+	visited    map[ObjectID]bool
+	path       []*RefCountedObject
+	cycles     []*ReferenceCycle
+	statistics CycleStatistics
+	config     CycleConfig
 	mutex      sync.RWMutex
-	visited    map[ObjectID]bool   // Visited objects
-	path       []*RefCountedObject // Current path
-	cycles     []*ReferenceCycle   // Detected cycles
-	config     CycleConfig         // Configuration
-	statistics CycleStatistics     // Statistics
 }
 
-// Default configurations
+// Default configurations.
 var DefaultRefCountConfig = RefCountConfig{
 	EnableOptimization:     true,
 	EnableCycleDetection:   true,
@@ -419,7 +426,7 @@ var DefaultOptimizationConfig = OptimizationConfig{
 	CacheOptimization:   true,
 }
 
-// NewRefCountOptimizer creates a new reference count optimizer
+// NewRefCountOptimizer creates a new reference count optimizer.
 func NewRefCountOptimizer(config RefCountConfig) *RefCountOptimizer {
 	optimizer := &RefCountOptimizer{
 		objects:    make(map[ObjectID]*RefCountedObject),
@@ -430,20 +437,20 @@ func NewRefCountOptimizer(config RefCountConfig) *RefCountOptimizer {
 		enabled:    config.EnableOptimization,
 	}
 
-	// Register default strategies
+	// Register default strategies.
 	optimizer.registerStrategy(&StandardRefCount{name: "standard", priority: 100})
 	optimizer.registerStrategy(&DeferredRefCount{name: "deferred", priority: 90, threshold: config.DeferredCountThreshold})
 	optimizer.registerStrategy(&BatchedRefCount{name: "batched", priority: 80, batchSize: config.BatchSize})
 	optimizer.registerStrategy(&WeakRefCount{name: "weak", priority: 70})
 
-	// Initialize components
+	// Initialize components.
 	optimizer.cycleBuster = NewCycleBreaker(DefaultCycleConfig)
 	optimizer.optimizer = NewCountOptimizer(DefaultOptimizationConfig)
 
 	return optimizer
 }
 
-// RegisterObject registers an object for reference counting
+// RegisterObject registers an object for reference counting.
 func (rco *RefCountOptimizer) RegisterObject(obj *RefCountedObject) error {
 	if !rco.enabled {
 		return nil
@@ -452,16 +459,16 @@ func (rco *RefCountOptimizer) RegisterObject(obj *RefCountedObject) error {
 	rco.mutex.Lock()
 	defer rco.mutex.Unlock()
 
-	// Select optimal strategy
+	// Select optimal strategy.
 	strategy := rco.selectStrategy(obj)
 	obj.Strategy = strategy
 
-	// Initialize reference count
+	// Initialize reference count.
 	atomic.StoreInt64(&obj.RefCount, 1)
 	obj.CreatedAt = time.Now()
 	obj.LastAccess = time.Now()
 
-	// Register object
+	// Register object.
 	rco.objects[obj.ID] = obj
 	atomic.AddInt64(&rco.statistics.TotalObjects, 1)
 	atomic.AddInt64(&rco.statistics.ActiveObjects, 1)
@@ -469,7 +476,7 @@ func (rco *RefCountOptimizer) RegisterObject(obj *RefCountedObject) error {
 	return nil
 }
 
-// AddReference adds a reference to an object
+// AddReference adds a reference to an object.
 func (rco *RefCountOptimizer) AddReference(objectID ObjectID) error {
 	if !rco.enabled {
 		return fmt.Errorf("optimizer disabled")
@@ -483,17 +490,18 @@ func (rco *RefCountOptimizer) AddReference(objectID ObjectID) error {
 		return fmt.Errorf("object not found: %d", objectID)
 	}
 
-	// Use atomic operations for reference counting
+	// Use atomic operations for reference counting.
 	atomic.AddInt64(&obj.RefCount, 1)
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddInt64(&rco.statistics.TotalIncrements, 1)
+
 	obj.LastAccess = time.Now()
 
 	return nil
 }
 
-// RemoveReference removes a reference from an object
+// RemoveReference removes a reference from an object.
 func (rco *RefCountOptimizer) RemoveReference(objectID ObjectID) error {
 	if !rco.enabled {
 		return fmt.Errorf("optimizer disabled")
@@ -507,17 +515,18 @@ func (rco *RefCountOptimizer) RemoveReference(objectID ObjectID) error {
 		return fmt.Errorf("object not found: %d", objectID)
 	}
 
-	// Use atomic operations for reference counting
+	// Use atomic operations for reference counting.
 	count := atomic.AddInt64(&obj.RefCount, -1)
 	if count < 0 {
 		return fmt.Errorf("reference count went negative for object %d", obj.ID)
 	}
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddInt64(&rco.statistics.TotalDecrements, 1)
+
 	obj.LastAccess = time.Now()
 
-	// Check if object should be deallocated
+	// Check if object should be deallocated.
 	if count == 0 {
 		return rco.deallocateObject(obj)
 	}
@@ -525,7 +534,7 @@ func (rco *RefCountOptimizer) RemoveReference(objectID ObjectID) error {
 	return nil
 }
 
-// GetReferenceCount returns the current reference count
+// GetReferenceCount returns the current reference count.
 func (rco *RefCountOptimizer) GetReferenceCount(objectID ObjectID) (int64, error) {
 	rco.mutex.RLock()
 	obj, exists := rco.objects[objectID]
@@ -538,7 +547,7 @@ func (rco *RefCountOptimizer) GetReferenceCount(objectID ObjectID) (int64, error
 	return atomic.LoadInt64(&obj.RefCount), nil
 }
 
-// OptimizeObjects performs optimization on all registered objects
+// OptimizeObjects performs optimization on all registered objects.
 func (rco *RefCountOptimizer) OptimizeObjects() error {
 	if !rco.enabled {
 		return nil
@@ -546,7 +555,7 @@ func (rco *RefCountOptimizer) OptimizeObjects() error {
 
 	startTime := time.Now()
 
-	// Run cycle detection
+	// Run cycle detection.
 	if rco.config.EnableCycleDetection {
 		err := rco.cycleBuster.DetectCycles(rco.objects)
 		if err != nil {
@@ -554,13 +563,13 @@ func (rco *RefCountOptimizer) OptimizeObjects() error {
 		}
 	}
 
-	// Run count optimizations
+	// Run count optimizations.
 	err := rco.optimizer.OptimizeCounts(rco.objects)
 	if err != nil {
 		return fmt.Errorf("count optimization failed: %w", err)
 	}
 
-	// Update statistics
+	// Update statistics.
 	rco.statistics.LastUpdate = time.Now()
 	rco.lastOptimization = time.Now()
 
@@ -572,43 +581,43 @@ func (rco *RefCountOptimizer) OptimizeObjects() error {
 	return nil
 }
 
-// Helper methods
+// Helper methods.
 
-// selectStrategy selects the best reference counting strategy for an object
+// selectStrategy selects the best reference counting strategy for an object.
 func (rco *RefCountOptimizer) selectStrategy(obj *RefCountedObject) RefCountStrategy {
-	// Analyze object characteristics
+	// Analyze object characteristics.
 	if obj.Flags&FlagHotPath != 0 {
-		// Hot path objects benefit from deferred counting
+		// Hot path objects benefit from deferred counting.
 		return rco.strategies["deferred"]
 	}
 
 	if obj.Flags&FlagShared != 0 {
-		// Shared objects may benefit from batching
+		// Shared objects may benefit from batching.
 		return rco.strategies["batched"]
 	}
 
 	if obj.Flags&FlagImmutable != 0 {
-		// Immutable objects can use simplified counting
+		// Immutable objects can use simplified counting.
 		return rco.strategies["weak"]
 	}
 
-	// Default to standard counting
+	// Default to standard counting.
 	return rco.strategies["standard"]
 }
 
-// deallocateObject deallocates an object when its reference count reaches zero
+// deallocateObject deallocates an object when its reference count reaches zero.
 func (rco *RefCountOptimizer) deallocateObject(obj *RefCountedObject) error {
-	// Remove from tracking
+	// Remove from tracking.
 	rco.mutex.Lock()
 	delete(rco.objects, obj.ID)
 	rco.mutex.Unlock()
 
-	// Update statistics
+	// Update statistics.
 	atomic.AddInt64(&rco.statistics.ActiveObjects, -1)
 
-	// Deallocate from allocator
+	// Deallocate from allocator.
 	if obj.Allocator != nil && obj.Region != nil {
-		// Use region-based deallocation
+		// Use region-based deallocation.
 		if ptr, ok := obj.Data.(unsafe.Pointer); ok {
 			return obj.Region.Deallocate(ptr)
 		}
@@ -617,7 +626,7 @@ func (rco *RefCountOptimizer) deallocateObject(obj *RefCountedObject) error {
 	return nil
 }
 
-// registerStrategy registers a reference counting strategy
+// registerStrategy registers a reference counting strategy.
 func (rco *RefCountOptimizer) registerStrategy(strategy RefCountStrategy) {
 	rco.mutex.Lock()
 	defer rco.mutex.Unlock()
@@ -625,9 +634,9 @@ func (rco *RefCountOptimizer) registerStrategy(strategy RefCountStrategy) {
 	rco.strategies[strategy.GetName()] = strategy
 }
 
-// Component constructors
+// Component constructors.
 
-// NewCycleBreaker creates a new cycle breaker
+// NewCycleBreaker creates a new cycle breaker.
 func NewCycleBreaker(config CycleConfig) *CycleBreaker {
 	return &CycleBreaker{
 		cycles:     make(map[CycleID]*ReferenceCycle),
@@ -638,7 +647,7 @@ func NewCycleBreaker(config CycleConfig) *CycleBreaker {
 	}
 }
 
-// NewCountOptimizer creates a new count optimizer
+// NewCountOptimizer creates a new count optimizer.
 func NewCountOptimizer(config OptimizationConfig) *CountOptimizer {
 	return &CountOptimizer{
 		optimizations:  make(map[ObjectID]*CountOptimization),
@@ -654,7 +663,7 @@ func NewCountOptimizer(config OptimizationConfig) *CountOptimizer {
 	}
 }
 
-// NewCycleDetector creates a new cycle detector
+// NewCycleDetector creates a new cycle detector.
 func NewCycleDetector(config CycleConfig) *CycleDetector {
 	return &CycleDetector{
 		visited: make(map[ObjectID]bool),
@@ -664,13 +673,13 @@ func NewCycleDetector(config CycleConfig) *CycleDetector {
 	}
 }
 
-// DetectCycles detects reference cycles in the object graph
+// DetectCycles detects reference cycles in the object graph.
 func (cb *CycleBreaker) DetectCycles(objects map[ObjectID]*RefCountedObject) error {
 	if !cb.enabled {
 		return nil
 	}
 
-	// Use the cycle detector
+	// Use the cycle detector.
 	for _, obj := range objects {
 		if !cb.detector.visited[obj.ID] {
 			err := cb.detector.detectCycleFrom(obj)
@@ -683,20 +692,20 @@ func (cb *CycleBreaker) DetectCycles(objects map[ObjectID]*RefCountedObject) err
 	return nil
 }
 
-// OptimizeCounts optimizes reference counting operations
+// OptimizeCounts optimizes reference counting operations.
 func (co *CountOptimizer) OptimizeCounts(objects map[ObjectID]*RefCountedObject) error {
 	if !co.enabled {
 		return nil
 	}
 
-	// Apply deferred counting optimizations
+	// Apply deferred counting optimizations.
 	if co.config.EnableDeferred {
 		for _, obj := range objects {
 			co.applyDeferredCounting(obj)
 		}
 	}
 
-	// Apply batching optimizations
+	// Apply batching optimizations.
 	if co.config.EnableBatching {
 		co.flushBatchedOperations()
 	}
@@ -704,16 +713,16 @@ func (co *CountOptimizer) OptimizeCounts(objects map[ObjectID]*RefCountedObject)
 	return nil
 }
 
-// Placeholder implementations for complex methods
+// Placeholder implementations for complex methods.
 func (cd *CycleDetector) detectCycleFrom(obj *RefCountedObject) error {
-	// Complex cycle detection algorithm would go here
+	// Complex cycle detection algorithm would go here.
 	return nil
 }
 
 func (co *CountOptimizer) applyDeferredCounting(obj *RefCountedObject) {
-	// Complex deferred counting logic would go here
+	// Complex deferred counting logic would go here.
 }
 
 func (co *CountOptimizer) flushBatchedOperations() {
-	// Complex batch flushing logic would go here
+	// Complex batch flushing logic would go here.
 }

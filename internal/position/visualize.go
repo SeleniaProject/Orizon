@@ -1,4 +1,4 @@
-// Package position provides unified source code position tracking
+// Package position provides unified source code position tracking.
 // for the Orizon compiler. This system enables precise error reporting,
 // debugging support, and source map generation.
 //
@@ -11,20 +11,20 @@ import (
 	"unicode/utf8"
 )
 
-// SpanHighlighter provides tools for highlighting source code spans
+// SpanHighlighter provides tools for highlighting source code spans.
 type SpanHighlighter struct {
 	sourceMap *SourceMap
 }
 
-// NewSpanHighlighter creates a new span highlighter
+// NewSpanHighlighter creates a new span highlighter.
 func NewSpanHighlighter(sourceMap *SourceMap) *SpanHighlighter {
 	return &SpanHighlighter{
 		sourceMap: sourceMap,
 	}
 }
 
-// HighlightSpan returns a string representation of the source code
-// with the specified span highlighted using ASCII art
+// HighlightSpan returns a string representation of the source code.
+// with the specified span highlighted using ASCII art.
 func (sh *SpanHighlighter) HighlightSpan(span Span) string {
 	if !span.IsValid() {
 		return "Invalid span"
@@ -36,20 +36,21 @@ func (sh *SpanHighlighter) HighlightSpan(span Span) string {
 	}
 
 	var result strings.Builder
+
 	result.WriteString(fmt.Sprintf("File: %s\n", span.Start.Filename))
 	result.WriteString(fmt.Sprintf("Span: %s\n", span.String()))
 	result.WriteString("\n")
 
-	// Calculate range of lines to show (with context)
+	// Calculate range of lines to show (with context).
 	startLine := max(1, span.Start.Line-2)
 	endLine := min(len(file.Lines), span.End.Line+2)
 
-	// Add line numbers and content
+	// Add line numbers and content.
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {
 		line := file.GetLine(lineNum)
 		result.WriteString(fmt.Sprintf("%4d | %s\n", lineNum, line))
 
-		// Add highlighting for the current span
+		// Add highlighting for the current span.
 		if lineNum >= span.Start.Line && lineNum <= span.End.Line {
 			sh.addHighlighting(&result, lineNum, line, span)
 		}
@@ -58,32 +59,32 @@ func (sh *SpanHighlighter) HighlightSpan(span Span) string {
 	return result.String()
 }
 
-// addHighlighting adds ASCII highlighting under the relevant part of the line
+// addHighlighting adds ASCII highlighting under the relevant part of the line.
 func (sh *SpanHighlighter) addHighlighting(result *strings.Builder, lineNum int, line string, span Span) {
 	result.WriteString("     | ")
 
 	if lineNum == span.Start.Line && lineNum == span.End.Line {
-		// Single line span
+		// Single line span.
 		sh.addSingleLineHighlight(result, line, span.Start.Column, span.End.Column)
 	} else if lineNum == span.Start.Line {
-		// Start of multi-line span
+		// Start of multi-line span.
 		sh.addSingleLineHighlight(result, line, span.Start.Column, utf8.RuneCountInString(line)+1)
 	} else if lineNum == span.End.Line {
-		// End of multi-line span
+		// End of multi-line span.
 		sh.addSingleLineHighlight(result, line, 1, span.End.Column)
 	} else {
-		// Middle of multi-line span
+		// Middle of multi-line span.
 		sh.addSingleLineHighlight(result, line, 1, utf8.RuneCountInString(line)+1)
 	}
 
 	result.WriteString("\n")
 }
 
-// addSingleLineHighlight adds highlighting for a single line between given columns
+// addSingleLineHighlight adds highlighting for a single line between given columns.
 func (sh *SpanHighlighter) addSingleLineHighlight(result *strings.Builder, line string, startCol, endCol int) {
 	runes := []rune(line)
 
-	// Add spaces before the highlight
+	// Add spaces before the highlight.
 	for i := 1; i < startCol; i++ {
 		if i <= len(runes) && runes[i-1] == '\t' {
 			result.WriteString("\t")
@@ -92,20 +93,21 @@ func (sh *SpanHighlighter) addSingleLineHighlight(result *strings.Builder, line 
 		}
 	}
 
-	// Add the highlight
+	// Add the highlight.
 	highlightLen := endCol - startCol
 	if highlightLen > 0 {
 		result.WriteString(strings.Repeat("^", min(highlightLen, len(runes)-startCol+1)))
 	}
 }
 
-// HighlightMultipleSpans highlights multiple spans in the source code
+// HighlightMultipleSpans highlights multiple spans in the source code.
 func (sh *SpanHighlighter) HighlightMultipleSpans(spans []Span) string {
 	if len(spans) == 0 {
 		return "No spans to highlight"
 	}
 
 	var result strings.Builder
+
 	result.WriteString("Multiple Span Highlighting\n")
 	result.WriteString(strings.Repeat("=", 50) + "\n\n")
 
@@ -118,26 +120,26 @@ func (sh *SpanHighlighter) HighlightMultipleSpans(spans []Span) string {
 	return result.String()
 }
 
-// ErrorVisualizer provides visualization for compiler errors
+// ErrorVisualizer provides visualization for compiler errors.
 type ErrorVisualizer struct {
 	highlighter *SpanHighlighter
 }
 
-// NewErrorVisualizer creates a new error visualizer
+// NewErrorVisualizer creates a new error visualizer.
 func NewErrorVisualizer(sourceMap *SourceMap) *ErrorVisualizer {
 	return &ErrorVisualizer{
 		highlighter: NewSpanHighlighter(sourceMap),
 	}
 }
 
-// VisualizeError creates a visual representation of an error
+// VisualizeError creates a visual representation of an error.
 func (ev *ErrorVisualizer) VisualizeError(err Error) string {
 	var result strings.Builder
 
 	result.WriteString(fmt.Sprintf("Error: %s\n", err.String()))
 	result.WriteString(strings.Repeat("-", 50) + "\n")
 
-	// Create a single-character span at the error position
+	// Create a single-character span at the error position.
 	span := Span{
 		Start: err.Pos,
 		End: Position{
@@ -149,10 +151,11 @@ func (ev *ErrorVisualizer) VisualizeError(err Error) string {
 	}
 
 	result.WriteString(ev.highlighter.HighlightSpan(span))
+
 	return result.String()
 }
 
-// VisualizeDiagnostic creates a visual representation of a diagnostic
+// VisualizeDiagnostic creates a visual representation of a diagnostic.
 func (ev *ErrorVisualizer) VisualizeDiagnostic(diag *Diagnostic) string {
 	var result strings.Builder
 
@@ -176,7 +179,7 @@ func (ev *ErrorVisualizer) VisualizeDiagnostic(diag *Diagnostic) string {
 		for i, warning := range diag.Warnings {
 			result.WriteString(fmt.Sprintf("\nWarning %d: %s\n", i+1, warning.String()))
 
-			// Create a single-character span at the warning position
+			// Create a single-character span at the warning position.
 			span := Span{
 				Start: warning.Pos,
 				End: Position{
@@ -197,19 +200,19 @@ func (ev *ErrorVisualizer) VisualizeDiagnostic(diag *Diagnostic) string {
 	return result.String()
 }
 
-// CodeInspector provides detailed code inspection tools
+// CodeInspector provides detailed code inspection tools.
 type CodeInspector struct {
 	sourceMap *SourceMap
 }
 
-// NewCodeInspector creates a new code inspector
+// NewCodeInspector creates a new code inspector.
 func NewCodeInspector(sourceMap *SourceMap) *CodeInspector {
 	return &CodeInspector{
 		sourceMap: sourceMap,
 	}
 }
 
-// InspectFile provides a detailed view of a source file
+// InspectFile provides a detailed view of a source file.
 func (ci *CodeInspector) InspectFile(filename string) string {
 	file := ci.sourceMap.GetFile(filename)
 	if file == nil {
@@ -217,20 +220,22 @@ func (ci *CodeInspector) InspectFile(filename string) string {
 	}
 
 	var result strings.Builder
+
 	result.WriteString(fmt.Sprintf("File Inspection: %s\n", filename))
 	result.WriteString(strings.Repeat("=", 50) + "\n")
 	result.WriteString(fmt.Sprintf("Total lines: %d\n", len(file.Lines)))
 	result.WriteString(fmt.Sprintf("Total characters: %d\n", len(file.Content)))
 	result.WriteString("\n")
 
-	// Show line-by-line breakdown
+	// Show line-by-line breakdown.
 	for i, line := range file.Lines {
 		lineNum := i + 1
 		result.WriteString(fmt.Sprintf("%4d | %s\n", lineNum, line))
 
-		// Show character positions for first few lines as example
+		// Show character positions for first few lines as example.
 		if lineNum <= 3 && len(line) > 0 {
 			result.WriteString("     | ")
+
 			for j := 0; j < len(line) && j < 50; j++ {
 				if j%10 == 0 {
 					result.WriteString(fmt.Sprintf("%d", j/10))
@@ -238,11 +243,14 @@ func (ci *CodeInspector) InspectFile(filename string) string {
 					result.WriteString(" ")
 				}
 			}
+
 			result.WriteString("\n")
 			result.WriteString("     | ")
+
 			for j := 0; j < len(line) && j < 50; j++ {
 				result.WriteString(fmt.Sprintf("%d", j%10))
 			}
+
 			result.WriteString("\n")
 		}
 	}
@@ -250,7 +258,7 @@ func (ci *CodeInspector) InspectFile(filename string) string {
 	return result.String()
 }
 
-// GetFileStatistics returns statistics about a source file
+// GetFileStatistics returns statistics about a source file.
 func (ci *CodeInspector) GetFileStatistics(filename string) map[string]interface{} {
 	file := ci.sourceMap.GetFile(filename)
 	if file == nil {
@@ -302,11 +310,12 @@ func (ci *CodeInspector) GetFileStatistics(filename string) map[string]interface
 	return stats
 }
 
-// Helper functions
+// Helper functions.
 func min(a, b int) int {
 	if a < b {
 		return a
 	}
+
 	return b
 }
 
@@ -314,5 +323,6 @@ func max(a, b int) int {
 	if a > b {
 		return a
 	}
+
 	return b
 }

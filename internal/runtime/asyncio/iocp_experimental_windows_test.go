@@ -1,5 +1,5 @@
-//go:build windows && iocp
-// +build windows,iocp
+//go:build windows && iocp.
+// +build windows,iocp.
 
 package asyncio
 
@@ -21,7 +21,7 @@ func TestIOCPPoller_ErrorOnClose(t *testing.T) {
 }
 
 func TestIOCPPoller_Writable_Throttled(t *testing.T) {
-	// Reuse helper by registering Writable and counting events
+	// Reuse helper by registering Writable and counting events.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -66,12 +66,12 @@ func TestIOCPPoller_Writable_Throttled(t *testing.T) {
 
 	select {
 	case <-done:
-		// ok got first writable
+		// ok got first writable.
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for writable event")
 	}
 
-	// Deregister and ensure no more events accrue shortly after
+	// Deregister and ensure no more events accrue shortly after.
 	if err := p.Deregister(cli); err != nil {
 		t.Fatalf("deregister: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestIOCPPoller_Writable_Throttled(t *testing.T) {
 
 func TestIOCPPoller_RegisterDeregisterRace(t *testing.T) {
 	// This test exercises rapid register/deregister cycles to surface races.
-	// It does not assert specific events, only that no panics occur and no
+	// It does not assert specific events, only that no panics occur and no.
 	// events are delivered after deregistration.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -94,7 +94,7 @@ func TestIOCPPoller_RegisterDeregisterRace(t *testing.T) {
 	}
 	defer ln.Close()
 
-	// Accept loop
+	// Accept loop.
 	srvConnCh := make(chan net.Conn, 32)
 	go func() {
 		for {
@@ -118,23 +118,23 @@ func TestIOCPPoller_RegisterDeregisterRace(t *testing.T) {
 			t.Fatalf("dial: %v", er)
 		}
 		srv := <-srvConnCh
-		// Register readable; immediately deregister
+		// Register readable; immediately deregister.
 		gotPost := make(chan struct{}, 1)
 		if er := p.Register(cli, []EventType{Readable, Writable}, func(ev Event) {
-			// If we get events after deregister, flag
+			// If we get events after deregister, flag.
 			select {
 			case gotPost <- struct{}{}:
 			default:
 			}
 		}); er != nil {
-			// Allow already registered in pathological cases, but continue
+			// Allow already registered in pathological cases, but continue.
 		}
-		// Deregister quickly
+		// Deregister quickly.
 		_ = p.Deregister(cli)
-		// Close client and server
+		// Close client and server.
 		_ = cli.Close()
 		_ = srv.Close()
-		// Ensure no events arrive post deregistration in a short window
+		// Ensure no events arrive post deregistration in a short window.
 		select {
 		case <-gotPost:
 			t.Fatalf("unexpected event after deregister at iter %d", i)
@@ -144,7 +144,7 @@ func TestIOCPPoller_RegisterDeregisterRace(t *testing.T) {
 }
 
 func TestIOCPPoller_CancelZeroByteRecvOnDeregister(t *testing.T) {
-	// When a socket is deregistered, pending zero-byte receives should be canceled
+	// When a socket is deregistered, pending zero-byte receives should be canceled.
 	// and no further events delivered.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -176,7 +176,7 @@ func TestIOCPPoller_CancelZeroByteRecvOnDeregister(t *testing.T) {
 	if err := p.Register(cli, []EventType{Readable}, func(ev Event) { got <- ev }); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	// Immediately deregister
+	// Immediately deregister.
 	if err := p.Deregister(cli); err != nil {
 		t.Fatalf("deregister: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestIOCPPoller_CancelZeroByteRecvOnDeregister(t *testing.T) {
 	_ = cli.Close()
 	_ = srv.Close()
 
-	// Ensure no events delivered after deregister
+	// Ensure no events delivered after deregister.
 	select {
 	case ev := <-got:
 		t.Fatalf("unexpected event after deregister: %+v", ev)
@@ -204,7 +204,7 @@ func TestIOCPPoller_ReadEOFBoundary(t *testing.T) {
 	go func() {
 		c, er := ln.Accept()
 		if er == nil {
-			// Close immediately to trigger EOF on client
+			// Close immediately to trigger EOF on client.
 			_ = c.Close()
 			srvConnCh <- c
 		}
@@ -228,7 +228,7 @@ func TestIOCPPoller_ReadEOFBoundary(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	// Expect an Error with EOF in a short time window
+	// Expect an Error with EOF in a short time window.
 	select {
 	case ev := <-got:
 		if ev.Type != Error {

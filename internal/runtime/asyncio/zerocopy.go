@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// CopyPreferZeroCopy copies from src to dst preferring zero-copy paths provided
+// CopyPreferZeroCopy copies from src to dst preferring zero-copy paths provided.
 // by the standard library (ReaderFrom/WriterTo). It falls back automatically.
 func CopyPreferZeroCopy(dst io.Writer, src io.Reader) (int64, error) {
 	return io.Copy(dst, src)
@@ -22,7 +22,7 @@ func CopyConnToConn(ctx context.Context, dst net.Conn, src net.Conn) (int64, err
 		_ = src.SetReadDeadline(deadline)
 	}
 	n, err := io.Copy(dst, src)
-	// Clear deadlines after copy
+	// Clear deadlines after copy.
 	if ctx != nil {
 		_ = dst.SetWriteDeadline(time.Time{})
 		_ = src.SetReadDeadline(time.Time{})

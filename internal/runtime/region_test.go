@@ -1,5 +1,5 @@
 // Package runtime provides comprehensive testing for region allocator.
-// This module implements unit tests, integration tests, and benchmarks
+// This module implements unit tests, integration tests, and benchmarks.
 // for the region-based memory management system.
 package runtime
 
@@ -10,69 +10,69 @@ import (
 	"unsafe"
 )
 
-// TestAllocator provides a test harness for the region allocator
+// TestAllocator provides a test harness for the region allocator.
 type TestAllocator struct {
 	allocator   *RegionAllocator
 	regions     map[RegionID]*Region
 	allocations map[unsafe.Pointer]*AllocationInfo
-	mutex       sync.RWMutex
 	config      TestConfig
+	mutex       sync.RWMutex
 }
 
-// AllocationInfo tracks allocation details for testing
+// AllocationInfo tracks allocation details for testing.
 type AllocationInfo struct {
-	Size      RegionSize
-	Alignment RegionAlignment
+	Timestamp time.Time
 	TypeInfo  *TypeInfo
 	Region    *Region
-	Timestamp time.Time
+	Size      RegionSize
+	Alignment RegionAlignment
 }
 
-// TestConfig configures testing behavior
+// TestConfig configures testing behavior.
 type TestConfig struct {
-	EnableStressTest     bool              // Enable stress testing
-	EnableCorruptionTest bool              // Enable corruption detection tests
-	EnableLeakDetection  bool              // Enable memory leak detection
-	EnableRaceDetection  bool              // Enable race condition detection
-	MaxTestDuration      time.Duration     // Maximum test duration
-	MaxAllocations       int               // Maximum allocations per test
-	MaxRegions           int               // Maximum regions per test
-	StressThreads        int               // Number of stress test threads
-	AllocationSizes      []RegionSize      // Test allocation sizes
-	AlignmentValues      []RegionAlignment // Test alignment values
+	AllocationSizes      []RegionSize
+	AlignmentValues      []RegionAlignment
+	MaxTestDuration      time.Duration
+	MaxAllocations       int
+	MaxRegions           int
+	StressThreads        int
+	EnableStressTest     bool
+	EnableCorruptionTest bool
+	EnableLeakDetection  bool
+	EnableRaceDetection  bool
 }
 
-// TestResult contains test execution results
+// TestResult contains test execution results.
 type TestResult struct {
-	TestName           string           // Test name
-	Success            bool             // Test success
-	Duration           time.Duration    // Test duration
-	AllocationsCount   int              // Number of allocations performed
-	DeallocationsCount int              // Number of deallocations performed
-	RegionsCreated     int              // Number of regions created
-	RegionsDestroyed   int              // Number of regions destroyed
-	ErrorsDetected     []string         // Errors detected during test
-	MemoryLeaks        []LeakInfo       // Memory leaks detected
-	CorruptionEvents   []CorruptionInfo // Memory corruption events
-	Performance        PerformanceStats // Performance statistics
+	TestName           string
+	ErrorsDetected     []string
+	MemoryLeaks        []LeakInfo
+	CorruptionEvents   []CorruptionInfo
+	Performance        PerformanceStats
+	Duration           time.Duration
+	AllocationsCount   int
+	DeallocationsCount int
+	RegionsCreated     int
+	RegionsDestroyed   int
+	Success            bool
 }
 
-// LeakInfo contains information about a memory leak
+// LeakInfo contains information about a memory leak.
 type LeakInfo struct {
-	Address    unsafe.Pointer // Leaked memory address
-	Size       RegionSize     // Size of leaked memory
-	Allocation AllocationInfo // Original allocation info
+	Allocation AllocationInfo
+	Address    unsafe.Pointer
+	Size       RegionSize
 }
 
-// CorruptionInfo contains information about memory corruption
+// CorruptionInfo contains information about memory corruption.
 type CorruptionInfo struct {
-	Address       unsafe.Pointer // Corrupted memory address
-	ExpectedValue uint32         // Expected value
-	ActualValue   uint32         // Actual value
-	DetectionTime time.Time      // When corruption was detected
+	DetectionTime time.Time
+	Address       unsafe.Pointer
+	ExpectedValue uint32
+	ActualValue   uint32
 }
 
-// PerformanceStats contains performance metrics
+// PerformanceStats contains performance metrics.
 type PerformanceStats struct {
 	AvgAllocationTime   time.Duration // Average allocation time
 	AvgDeallocationTime time.Duration // Average deallocation time
@@ -82,7 +82,7 @@ type PerformanceStats struct {
 	FragmentationRatio  float64       // Average fragmentation ratio
 }
 
-// Default test configuration
+// Default test configuration.
 var DefaultTestConfig = TestConfig{
 	EnableStressTest:     true,
 	EnableCorruptionTest: true,
@@ -100,7 +100,7 @@ var DefaultTestConfig = TestConfig{
 	},
 }
 
-// NewTestAllocator creates a new test allocator
+// NewTestAllocator creates a new test allocator.
 func NewTestAllocator(config TestConfig, allocatorConfig *AllocatorPolicy) *TestAllocator {
 	allocator := NewRegionAllocator(allocatorConfig)
 
@@ -112,7 +112,7 @@ func NewTestAllocator(config TestConfig, allocatorConfig *AllocatorPolicy) *Test
 	}
 }
 
-// RunAllTests runs all allocator tests
+// RunAllTests runs all allocator tests.
 func (ta *TestAllocator) RunAllTests(t *testing.T) []*TestResult {
 	tests := []func(*testing.T) *TestResult{
 		ta.TestBasicAllocation,
@@ -137,7 +137,7 @@ func (ta *TestAllocator) RunAllTests(t *testing.T) []*TestResult {
 	return results
 }
 
-// TestBasicAllocation tests basic allocation functionality
+// TestBasicAllocation tests basic allocation functionality.
 func (ta *TestAllocator) TestBasicAllocation(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -145,11 +145,12 @@ func (ta *TestAllocator) TestBasicAllocation(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create a test region
+	// Create a test region.
 	region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 	if err != nil {
 		result.Success = false
 		result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 		return result
 	}
 
@@ -157,7 +158,7 @@ func (ta *TestAllocator) TestBasicAllocation(t *testing.T) *TestResult {
 	ta.regions[region.Header.ID] = region
 	ta.mutex.Unlock()
 
-	// Test various allocation sizes
+	// Test various allocation sizes.
 	for _, size := range ta.config.AllocationSizes {
 		if size > RegionSize(1024*512) { // Skip large allocations for basic test
 			continue
@@ -167,10 +168,11 @@ func (ta *TestAllocator) TestBasicAllocation(t *testing.T) *TestResult {
 		if err != nil {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 			continue
 		}
 
-		// Record allocation
+		// Record allocation.
 		ta.mutex.Lock()
 		ta.allocations[ptr] = &AllocationInfo{
 			Size:      size,
@@ -182,10 +184,10 @@ func (ta *TestAllocator) TestBasicAllocation(t *testing.T) *TestResult {
 
 		result.AllocationsCount++
 
-		// Test writing to allocated memory
+		// Test writing to allocated memory.
 		ta.writeTestPattern(ptr, size)
 
-		// Verify pattern
+		// Verify pattern.
 		if !ta.verifyTestPattern(ptr, size) {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, "memory corruption detected")
@@ -193,10 +195,11 @@ func (ta *TestAllocator) TestBasicAllocation(t *testing.T) *TestResult {
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestAllocationAlignment tests memory alignment
+// TestAllocationAlignment tests memory alignment.
 func (ta *TestAllocator) TestAllocationAlignment(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -204,24 +207,26 @@ func (ta *TestAllocator) TestAllocationAlignment(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create a test region
+	// Create a test region.
 	region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 	if err != nil {
 		result.Success = false
 		result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 		return result
 	}
 
-	// Test various alignments
+	// Test various alignments.
 	for _, alignment := range ta.config.AlignmentValues {
 		ptr, err := region.Allocate(RegionSize(256), alignment, nil)
 		if err != nil {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 			continue
 		}
 
-		// Verify alignment
+		// Verify alignment.
 		addr := uintptr(ptr)
 		if addr%uintptr(alignment) != 0 {
 			result.Success = false
@@ -232,10 +237,11 @@ func (ta *TestAllocator) TestAllocationAlignment(t *testing.T) *TestResult {
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestDeallocation tests memory deallocation
+// TestDeallocation tests memory deallocation.
 func (ta *TestAllocator) TestDeallocation(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -243,23 +249,26 @@ func (ta *TestAllocator) TestDeallocation(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create a test region
+	// Create a test region.
 	region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 	if err != nil {
 		result.Success = false
 		result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 		return result
 	}
 
 	allocations := make([]unsafe.Pointer, 0, 100)
 
-	// Allocate multiple blocks
+	// Allocate multiple blocks.
 	for i := 0; i < 100; i++ {
 		size := ta.config.AllocationSizes[i%len(ta.config.AllocationSizes)]
+
 		ptr, err := region.Allocate(size, RegionAlignment(8), nil)
 		if err != nil {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 			continue
 		}
 
@@ -267,12 +276,13 @@ func (ta *TestAllocator) TestDeallocation(t *testing.T) *TestResult {
 		result.AllocationsCount++
 	}
 
-	// Deallocate all blocks
+	// Deallocate all blocks.
 	for _, ptr := range allocations {
 		err := region.Deallocate(ptr)
 		if err != nil {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 			continue
 		}
 
@@ -280,10 +290,11 @@ func (ta *TestAllocator) TestDeallocation(t *testing.T) *TestResult {
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestFragmentation tests memory fragmentation handling
+// TestFragmentation tests memory fragmentation handling.
 func (ta *TestAllocator) TestFragmentation(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -291,19 +302,21 @@ func (ta *TestAllocator) TestFragmentation(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create a test region
+	// Create a test region.
 	region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 	if err != nil {
 		result.Success = false
 		result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 		return result
 	}
 
 	allocations := make([]unsafe.Pointer, 0, 1000)
 
-	// Create fragmentation by allocating and deallocating in a pattern
+	// Create fragmentation by allocating and deallocating in a pattern.
 	for i := 0; i < 1000; i++ {
 		size := RegionSize(64 + (i%7)*32) // Varying sizes
+
 		ptr, err := region.Allocate(size, RegionAlignment(8), nil)
 		if err != nil {
 			break // Region full
@@ -312,9 +325,10 @@ func (ta *TestAllocator) TestFragmentation(t *testing.T) *TestResult {
 		allocations = append(allocations, ptr)
 		result.AllocationsCount++
 
-		// Deallocate every third allocation to create holes
+		// Deallocate every third allocation to create holes.
 		if i%3 == 0 && len(allocations) > 0 {
 			idx := len(allocations) - 1
+
 			err := region.Deallocate(allocations[idx])
 			if err != nil {
 				result.Success = false
@@ -322,11 +336,12 @@ func (ta *TestAllocator) TestFragmentation(t *testing.T) *TestResult {
 			} else {
 				result.DeallocationsCount++
 			}
+
 			allocations = allocations[:idx]
 		}
 	}
 
-	// Check fragmentation ratio
+	// Check fragmentation ratio.
 	fragRatio := region.calculateFragmentationRatio()
 	result.Performance.FragmentationRatio = fragRatio
 
@@ -335,10 +350,11 @@ func (ta *TestAllocator) TestFragmentation(t *testing.T) *TestResult {
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestCompaction tests memory compaction
+// TestCompaction tests memory compaction.
 func (ta *TestAllocator) TestCompaction(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -346,37 +362,41 @@ func (ta *TestAllocator) TestCompaction(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create a test region
+	// Create a test region.
 	region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 	if err != nil {
 		result.Success = false
 		result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 		return result
 	}
 
-	// Create fragmentation
+	// Create fragmentation.
 	allocations := make([]unsafe.Pointer, 0, 100)
+
 	for i := 0; i < 100; i++ {
 		ptr, err := region.Allocate(RegionSize(1024), RegionAlignment(8), nil)
 		if err != nil {
 			break
 		}
+
 		allocations = append(allocations, ptr)
 
-		// Deallocate every other allocation
+		// Deallocate every other allocation.
 		if i%2 == 0 {
 			err := region.Deallocate(ptr)
 			if err != nil {
 				result.Success = false
 				result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
 			}
+
 			allocations[len(allocations)-1] = nil
 		}
 	}
 
 	fragBefore := region.calculateFragmentationRatio()
 
-	// Perform compaction
+	// Perform compaction.
 	err = region.compact()
 	if err != nil {
 		result.Success = false
@@ -385,16 +405,17 @@ func (ta *TestAllocator) TestCompaction(t *testing.T) *TestResult {
 
 	fragAfter := region.calculateFragmentationRatio()
 
-	// Verify compaction reduced fragmentation
+	// Verify compaction reduced fragmentation.
 	if fragAfter >= fragBefore {
 		result.ErrorsDetected = append(result.ErrorsDetected, "compaction did not reduce fragmentation")
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestConcurrentAccess tests concurrent allocation/deallocation
+// TestConcurrentAccess tests concurrent allocation/deallocation.
 func (ta *TestAllocator) TestConcurrentAccess(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -402,20 +423,23 @@ func (ta *TestAllocator) TestConcurrentAccess(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create a test region
+	// Create a test region.
 	region, err := ta.allocator.CreateRegion(RegionSize(1024*1024*10), RegionAlignment(16))
 	if err != nil {
 		result.Success = false
 		result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 		return result
 	}
 
 	// Run concurrent allocation/deallocation
 	var wg sync.WaitGroup
+
 	errors := make(chan string, ta.config.StressThreads*100)
 
 	for i := 0; i < ta.config.StressThreads; i++ {
 		wg.Add(1)
+
 		go func(threadID int) {
 			defer wg.Done()
 
@@ -423,29 +447,32 @@ func (ta *TestAllocator) TestConcurrentAccess(t *testing.T) *TestResult {
 
 			for j := 0; j < 100; j++ {
 				size := ta.config.AllocationSizes[j%len(ta.config.AllocationSizes)]
+
 				ptr, err := region.Allocate(size, RegionAlignment(8), nil)
 				if err != nil {
 					errors <- err.Error()
+
 					continue
 				}
 
 				allocations = append(allocations, ptr)
 
-				// Randomly deallocate some allocations
+				// Randomly deallocate some allocations.
 				if len(allocations) > 10 && j%5 == 0 {
 					idx := j % len(allocations)
+
 					err := region.Deallocate(allocations[idx])
 					if err != nil {
 						errors <- err.Error()
 					} else {
-						// Remove from slice
+						// Remove from slice.
 						allocations[idx] = allocations[len(allocations)-1]
 						allocations = allocations[:len(allocations)-1]
 					}
 				}
 			}
 
-			// Clean up remaining allocations
+			// Clean up remaining allocations.
 			for _, ptr := range allocations {
 				region.Deallocate(ptr)
 			}
@@ -455,17 +482,18 @@ func (ta *TestAllocator) TestConcurrentAccess(t *testing.T) *TestResult {
 	wg.Wait()
 	close(errors)
 
-	// Collect errors
+	// Collect errors.
 	for err := range errors {
 		result.ErrorsDetected = append(result.ErrorsDetected, err)
 		result.Success = false
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestStressAllocation performs stress testing
+// TestStressAllocation performs stress testing.
 func (ta *TestAllocator) TestStressAllocation(t *testing.T) *TestResult {
 	if !ta.config.EnableStressTest {
 		return &TestResult{
@@ -481,15 +509,18 @@ func (ta *TestAllocator) TestStressAllocation(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Create multiple regions
+	// Create multiple regions.
 	regions := make([]*Region, 0, ta.config.MaxRegions)
+
 	for i := 0; i < ta.config.MaxRegions && i < 10; i++ {
 		region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 		if err != nil {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 			continue
 		}
+
 		regions = append(regions, region)
 		result.RegionsCreated++
 	}
@@ -499,6 +530,7 @@ func (ta *TestAllocator) TestStressAllocation(t *testing.T) *TestResult {
 	for time.Now().Before(endTime) && result.AllocationsCount < ta.config.MaxAllocations {
 		for _, region := range regions {
 			size := ta.config.AllocationSizes[result.AllocationsCount%len(ta.config.AllocationSizes)]
+
 			ptr, err := region.Allocate(size, RegionAlignment(8), nil)
 			if err != nil {
 				continue // Region full
@@ -506,7 +538,7 @@ func (ta *TestAllocator) TestStressAllocation(t *testing.T) *TestResult {
 
 			result.AllocationsCount++
 
-			// Immediate deallocation for stress testing
+			// Immediate deallocation for stress testing.
 			err = region.Deallocate(ptr)
 			if err != nil {
 				result.Success = false
@@ -518,10 +550,11 @@ func (ta *TestAllocator) TestStressAllocation(t *testing.T) *TestResult {
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestMemoryLeakDetection tests memory leak detection
+// TestMemoryLeakDetection tests memory leak detection.
 func (ta *TestAllocator) TestMemoryLeakDetection(t *testing.T) *TestResult {
 	if !ta.config.EnableLeakDetection {
 		return &TestResult{
@@ -537,14 +570,15 @@ func (ta *TestAllocator) TestMemoryLeakDetection(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// This would implement actual leak detection logic
-	// For now, just return success
+	// This would implement actual leak detection logic.
+	// For now, just return success.
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestCorruptionDetection tests memory corruption detection
+// TestCorruptionDetection tests memory corruption detection.
 func (ta *TestAllocator) TestCorruptionDetection(t *testing.T) *TestResult {
 	if !ta.config.EnableCorruptionTest {
 		return &TestResult{
@@ -560,14 +594,15 @@ func (ta *TestAllocator) TestCorruptionDetection(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// This would implement actual corruption detection logic
-	// For now, just return success
+	// This would implement actual corruption detection logic.
+	// For now, just return success.
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// TestRegionManagement tests region creation and destruction
+// TestRegionManagement tests region creation and destruction.
 func (ta *TestAllocator) TestRegionManagement(t *testing.T) *TestResult {
 	startTime := time.Now()
 	result := &TestResult{
@@ -575,18 +610,19 @@ func (ta *TestAllocator) TestRegionManagement(t *testing.T) *TestResult {
 		Success:  true,
 	}
 
-	// Test region creation
+	// Test region creation.
 	for i := 0; i < 10; i++ {
 		region, err := ta.allocator.CreateRegion(RegionSize(1024*1024), RegionAlignment(16))
 		if err != nil {
 			result.Success = false
 			result.ErrorsDetected = append(result.ErrorsDetected, err.Error())
+
 			continue
 		}
 
 		result.RegionsCreated++
 
-		// Test region destruction
+		// Test region destruction.
 		err = ta.allocator.DestroyRegion(region.Header.ID)
 		if err != nil {
 			result.Success = false
@@ -597,12 +633,13 @@ func (ta *TestAllocator) TestRegionManagement(t *testing.T) *TestResult {
 	}
 
 	result.Duration = time.Since(startTime)
+
 	return result
 }
 
-// Helper methods
+// Helper methods.
 
-// writeTestPattern writes a test pattern to memory
+// writeTestPattern writes a test pattern to memory.
 func (ta *TestAllocator) writeTestPattern(ptr unsafe.Pointer, size RegionSize) {
 	slice := (*[1 << 30]byte)(ptr)[:size:size]
 	for i := range slice {
@@ -610,7 +647,7 @@ func (ta *TestAllocator) writeTestPattern(ptr unsafe.Pointer, size RegionSize) {
 	}
 }
 
-// verifyTestPattern verifies a test pattern in memory
+// verifyTestPattern verifies a test pattern in memory.
 func (ta *TestAllocator) verifyTestPattern(ptr unsafe.Pointer, size RegionSize) bool {
 	slice := (*[1 << 30]byte)(ptr)[:size:size]
 	for i := range slice {
@@ -618,28 +655,29 @@ func (ta *TestAllocator) verifyTestPattern(ptr unsafe.Pointer, size RegionSize) 
 			return false
 		}
 	}
+
 	return true
 }
 
-// Cleanup performs test cleanup
+// Cleanup performs test cleanup.
 func (ta *TestAllocator) Cleanup() {
 	ta.mutex.Lock()
 	defer ta.mutex.Unlock()
 
-	// Deallocate all remaining allocations
+	// Deallocate all remaining allocations.
 	for ptr := range ta.allocations {
-		// Find the region for this allocation
+		// Find the region for this allocation.
 		if info, exists := ta.allocations[ptr]; exists && info.Region != nil {
 			info.Region.Deallocate(ptr)
 		}
 	}
 
-	// Destroy all regions
+	// Destroy all regions.
 	for _, region := range ta.regions {
 		ta.allocator.DestroyRegion(region.Header.ID)
 	}
 
-	// Clear maps
+	// Clear maps.
 	ta.allocations = make(map[unsafe.Pointer]*AllocationInfo)
 	ta.regions = make(map[RegionID]*Region)
 }

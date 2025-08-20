@@ -1,4 +1,4 @@
-//go:build debug
+//go:build debug.
 
 package runtime
 
@@ -13,7 +13,7 @@ func debugPostAllocValidate(bm *BlockManager, userPtr unsafe.Pointer, size Regio
 	if userPtr == nil || size == 0 {
 		panic("debug: invalid allocation state")
 	}
-	// Verify header presence and map registration
+	// Verify header presence and map registration.
 	bm.mutex.RLock()
 	hdr, ok := bm.blockMap[userPtr]
 	bm.mutex.RUnlock()

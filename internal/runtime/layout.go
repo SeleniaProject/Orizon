@@ -1,5 +1,5 @@
 // Package runtime provides memory layout definitions for Orizon's core data structures.
-// This package defines the runtime representation of arrays, slices, strings, and other
+// This package defines the runtime representation of arrays, slices, strings, and other.
 // complex data types that require specific memory layouts for efficient code generation.
 package runtime
 
@@ -8,7 +8,7 @@ import (
 	"unsafe"
 )
 
-// LayoutKind represents different types of memory layouts
+// LayoutKind represents different types of memory layouts.
 type LayoutKind int
 
 const (
@@ -21,27 +21,27 @@ const (
 	LayoutReference
 )
 
-// MemoryLayout defines the memory layout of a data type
+// MemoryLayout defines the memory layout of a data type.
 type MemoryLayout struct {
+	Metadata    []byte
 	Kind        LayoutKind
-	Size        int64  // Total size in bytes
-	Alignment   int64  // Required alignment in bytes
-	ElementSize int64  // Size of individual elements (for arrays/slices)
-	Metadata    []byte // Additional layout metadata
+	Size        int64
+	Alignment   int64
+	ElementSize int64
 }
 
-// ArrayLayout represents the memory layout of a fixed-size array
+// ArrayLayout represents the memory layout of a fixed-size array.
 type ArrayLayout struct {
-	ElementType  string  // Type name of elements
-	ElementSize  int64   // Size of each element in bytes
-	ElementAlign int64   // Alignment requirement of elements
-	Length       int64   // Number of elements
-	TotalSize    int64   // Total array size (Length * ElementSize)
-	PaddingMap   []int64 // Padding offsets for alignment
+	ElementType  string
+	PaddingMap   []int64
+	ElementSize  int64
+	ElementAlign int64
+	Length       int64
+	TotalSize    int64
 }
 
-// SliceLayout represents the memory layout of a dynamic slice
-// Layout: [ptr: 8 bytes][len: 8 bytes][cap: 8 bytes] = 24 bytes total
+// SliceLayout represents the memory layout of a dynamic slice.
+// Layout: [ptr: 8 bytes][len: 8 bytes][cap: 8 bytes] = 24 bytes total.
 type SliceLayout struct {
 	ElementType  string // Type name of elements
 	ElementSize  int64  // Size of each element in bytes
@@ -52,24 +52,24 @@ type SliceLayout struct {
 	TotalSize    int64  // Total slice header size (24)
 }
 
-// StringLayout represents the memory layout of a string
-// Layout: [ptr: 8 bytes][len: 8 bytes] = 16 bytes total
+// StringLayout represents the memory layout of a string.
+// Layout: [ptr: 8 bytes][len: 8 bytes] = 16 bytes total.
 type StringLayout struct {
 	PtrOffset int64 // Offset of data pointer (0)
 	LenOffset int64 // Offset of length field (8)
 	TotalSize int64 // Total string header size (16)
 }
 
-// StructLayout represents the memory layout of a struct
+// StructLayout represents the memory layout of a struct.
 type StructLayout struct {
-	Name       string        // Struct name
-	Fields     []FieldInfo   // Field information
-	TotalSize  int64         // Total struct size including padding
-	Alignment  int64         // Required alignment
-	PaddingMap []PaddingInfo // Padding information
+	Name       string
+	Fields     []FieldInfo
+	PaddingMap []PaddingInfo
+	TotalSize  int64
+	Alignment  int64
 }
 
-// FieldInfo contains information about a struct field
+// FieldInfo contains information about a struct field.
 type FieldInfo struct {
 	Name      string // Field name
 	Type      string // Field type name
@@ -78,20 +78,20 @@ type FieldInfo struct {
 	Alignment int64  // Required alignment
 }
 
-// PaddingInfo represents padding bytes inserted for alignment
+// PaddingInfo represents padding bytes inserted for alignment.
 type PaddingInfo struct {
-	Offset int64  // Offset where padding starts
-	Size   int64  // Number of padding bytes
-	Reason string // Reason for padding (e.g., "field alignment", "struct alignment")
+	Reason string
+	Offset int64
+	Size   int64
 }
 
-// LayoutCalculator provides methods to calculate memory layouts
+// LayoutCalculator provides methods to calculate memory layouts.
 type LayoutCalculator struct {
 	TargetPointerSize int64 // Size of pointers on target architecture (8 for x64)
 	MaxAlignment      int64 // Maximum alignment supported by target
 }
 
-// NewLayoutCalculator creates a new layout calculator for x64 architecture
+// NewLayoutCalculator creates a new layout calculator for x64 architecture.
 func NewLayoutCalculator() *LayoutCalculator {
 	return &LayoutCalculator{
 		TargetPointerSize: 8,
@@ -99,27 +99,29 @@ func NewLayoutCalculator() *LayoutCalculator {
 	}
 }
 
-// CalculateArrayLayout calculates the memory layout for a fixed-size array
+// CalculateArrayLayout calculates the memory layout for a fixed-size array.
 func (lc *LayoutCalculator) CalculateArrayLayout(elementType string, elementSize, elementAlign, length int64) (*ArrayLayout, error) {
 	if length < 0 {
 		return nil, fmt.Errorf("array length cannot be negative: %d", length)
 	}
+
 	if elementSize <= 0 {
 		return nil, fmt.Errorf("element size must be positive: %d", elementSize)
 	}
+
 	if elementAlign <= 0 {
 		elementAlign = 1
 	}
 
-	// Ensure element alignment is power of 2
+	// Ensure element alignment is power of 2.
 	if !isPowerOfTwo(elementAlign) {
 		return nil, fmt.Errorf("element alignment must be power of 2: %d", elementAlign)
 	}
 
-	// Calculate total size with proper alignment
+	// Calculate total size with proper alignment.
 	totalSize := length * elementSize
 
-	// Add padding for overall array alignment if needed
+	// Add padding for overall array alignment if needed.
 	if totalSize%elementAlign != 0 {
 		totalSize = alignUp(totalSize, elementAlign)
 	}
@@ -136,11 +138,12 @@ func (lc *LayoutCalculator) CalculateArrayLayout(elementType string, elementSize
 	return layout, nil
 }
 
-// CalculateSliceLayout calculates the memory layout for a dynamic slice
+// CalculateSliceLayout calculates the memory layout for a dynamic slice.
 func (lc *LayoutCalculator) CalculateSliceLayout(elementType string, elementSize, elementAlign int64) (*SliceLayout, error) {
 	if elementSize <= 0 {
 		return nil, fmt.Errorf("element size must be positive: %d", elementSize)
 	}
+
 	if elementAlign <= 0 {
 		elementAlign = 1
 	}
@@ -158,7 +161,7 @@ func (lc *LayoutCalculator) CalculateSliceLayout(elementType string, elementSize
 	return layout, nil
 }
 
-// CalculateStringLayout calculates the memory layout for a string
+// CalculateStringLayout calculates the memory layout for a string.
 func (lc *LayoutCalculator) CalculateStringLayout() *StringLayout {
 	return &StringLayout{
 		PtrOffset: 0,
@@ -167,7 +170,7 @@ func (lc *LayoutCalculator) CalculateStringLayout() *StringLayout {
 	}
 }
 
-// CalculateStructLayout calculates the memory layout for a struct
+// CalculateStructLayout calculates the memory layout for a struct.
 func (lc *LayoutCalculator) CalculateStructLayout(name string, fields []FieldInfo) (*StructLayout, error) {
 	if len(fields) == 0 {
 		return &StructLayout{
@@ -180,7 +183,9 @@ func (lc *LayoutCalculator) CalculateStructLayout(name string, fields []FieldInf
 	}
 
 	var padding []PaddingInfo
+
 	var layoutFields []FieldInfo
+
 	currentOffset := int64(0)
 	maxAlignment := int64(1)
 
@@ -188,16 +193,17 @@ func (lc *LayoutCalculator) CalculateStructLayout(name string, fields []FieldInf
 		if field.Size <= 0 {
 			return nil, fmt.Errorf("field %s has invalid size: %d", field.Name, field.Size)
 		}
+
 		if field.Alignment <= 0 {
 			field.Alignment = 1
 		}
 
-		// Track maximum alignment requirement
+		// Track maximum alignment requirement.
 		if field.Alignment > maxAlignment {
 			maxAlignment = field.Alignment
 		}
 
-		// Add padding for field alignment
+		// Add padding for field alignment.
 		alignedOffset := alignUp(currentOffset, field.Alignment)
 		if alignedOffset > currentOffset {
 			padding = append(padding, PaddingInfo{
@@ -207,7 +213,7 @@ func (lc *LayoutCalculator) CalculateStructLayout(name string, fields []FieldInf
 			})
 		}
 
-		// Create field info with calculated offset
+		// Create field info with calculated offset.
 		layoutField := FieldInfo{
 			Name:      field.Name,
 			Type:      field.Type,
@@ -220,7 +226,7 @@ func (lc *LayoutCalculator) CalculateStructLayout(name string, fields []FieldInf
 		currentOffset = alignedOffset + field.Size
 	}
 
-	// Add final padding for struct alignment
+	// Add final padding for struct alignment.
 	totalSize := alignUp(currentOffset, maxAlignment)
 	if totalSize > currentOffset {
 		padding = append(padding, PaddingInfo{
@@ -241,7 +247,7 @@ func (lc *LayoutCalculator) CalculateStructLayout(name string, fields []FieldInf
 	return layout, nil
 }
 
-// GetMemoryLayout returns a generic MemoryLayout for any data type
+// GetMemoryLayout returns a generic MemoryLayout for any data type.
 func (lc *LayoutCalculator) GetMemoryLayout(kind LayoutKind, params map[string]interface{}) (*MemoryLayout, error) {
 	switch kind {
 	case LayoutArray:
@@ -281,6 +287,7 @@ func (lc *LayoutCalculator) GetMemoryLayout(kind LayoutKind, params map[string]i
 
 	case LayoutString:
 		stringLayout := lc.CalculateStringLayout()
+
 		return &MemoryLayout{
 			Kind:        LayoutString,
 			Size:        stringLayout.TotalSize,
@@ -301,43 +308,46 @@ func (lc *LayoutCalculator) GetMemoryLayout(kind LayoutKind, params map[string]i
 	}
 }
 
-// Utility functions
+// Utility functions.
 
-// isPowerOfTwo checks if a number is a power of 2
+// isPowerOfTwo checks if a number is a power of 2.
 func isPowerOfTwo(n int64) bool {
 	return n > 0 && (n&(n-1)) == 0
 }
 
-// alignUp rounds up to the next multiple of alignment
+// alignUp rounds up to the next multiple of alignment.
 func alignUp(value, alignment int64) int64 {
 	if alignment <= 1 {
 		return value
 	}
+
 	return (value + alignment - 1) & ^(alignment - 1)
 }
 
-// ABI-specific functions
+// ABI-specific functions.
 
-// GetFieldOffset returns the byte offset of a field within a struct
+// GetFieldOffset returns the byte offset of a field within a struct.
 func (sl *StructLayout) GetFieldOffset(fieldName string) (int64, bool) {
 	for _, field := range sl.Fields {
 		if field.Name == fieldName {
 			return field.Offset, true
 		}
 	}
+
 	return 0, false
 }
 
-// GetPaddingBytes returns the total number of padding bytes in the struct
+// GetPaddingBytes returns the total number of padding bytes in the struct.
 func (sl *StructLayout) GetPaddingBytes() int64 {
 	var total int64
 	for _, pad := range sl.PaddingMap {
 		total += pad.Size
 	}
+
 	return total
 }
 
-// GetEfficiencyRatio returns the ratio of useful data to total size
+// GetEfficiencyRatio returns the ratio of useful data to total size.
 func (sl *StructLayout) GetEfficiencyRatio() float64 {
 	if sl.TotalSize == 0 {
 		return 1.0
@@ -351,7 +361,7 @@ func (sl *StructLayout) GetEfficiencyRatio() float64 {
 	return float64(usefulBytes) / float64(sl.TotalSize)
 }
 
-// String representations for debugging
+// String representations for debugging.
 
 func (al *ArrayLayout) String() string {
 	return fmt.Sprintf("Array[%s; %d] (element: %d bytes, total: %d bytes, align: %d)",
@@ -372,57 +382,59 @@ func (sl *StructLayout) String() string {
 		sl.Name, len(sl.Fields), sl.TotalSize, sl.GetPaddingBytes(), sl.GetEfficiencyRatio()*100)
 }
 
-// Runtime type information helpers
+// Runtime type information helpers.
 
-// GetArrayElementAddress calculates the address of an array element
+// GetArrayElementAddress calculates the address of an array element.
 func (al *ArrayLayout) GetArrayElementAddress(baseAddr uintptr, index int64) uintptr {
 	if index < 0 || index >= al.Length {
 		return 0 // Invalid index
 	}
+
 	return baseAddr + uintptr(index*al.ElementSize)
 }
 
-// GetSliceElementAddress calculates the address of a slice element with enhanced safety checks
+// GetSliceElementAddress calculates the address of a slice element with enhanced safety checks.
 func (sl *SliceLayout) GetSliceElementAddress(sliceHeaderAddr uintptr, index int64) uintptr {
-	// Validate input parameters for safety
+	// Validate input parameters for safety.
 	if sliceHeaderAddr == 0 || index < 0 {
 		return 0 // Invalid input - return null pointer
 	}
 
-	// Read the data pointer from the slice header with bounds checking
+	// Read the data pointer from the slice header with bounds checking.
 	ptrOffset := uintptr(sl.PtrOffset)
 	if ptrOffset >= unsafe.Sizeof(uintptr(0))*3 { // Standard slice header size
 		return 0 // Invalid offset
 	}
 
-	// Create a proper pointer conversion using uintptr arithmetic
+	// Create a proper pointer conversion using uintptr arithmetic.
 	headerPtr := unsafe.Pointer(sliceHeaderAddr)
 	dataPtrAddr := uintptr(headerPtr) + ptrOffset
 	dataPtr := *(*uintptr)(unsafe.Pointer(dataPtrAddr))
 
-	// Calculate element address with overflow protection
+	// Calculate element address with overflow protection.
 	elementOffset := uintptr(index * sl.ElementSize)
+
 	return dataPtr + elementOffset
 }
 
-// GetStringByteAddress calculates the address of a string byte with enhanced safety checks
+// GetStringByteAddress calculates the address of a string byte with enhanced safety checks.
 func (stl *StringLayout) GetStringByteAddress(stringHeaderAddr uintptr, index int64) uintptr {
-	// Validate input parameters for safety
+	// Validate input parameters for safety.
 	if stringHeaderAddr == 0 || index < 0 {
 		return 0 // Invalid input - return null pointer
 	}
 
-	// Read the data pointer from the string header with bounds checking
+	// Read the data pointer from the string header with bounds checking.
 	ptrOffset := uintptr(stl.PtrOffset)
 	if ptrOffset >= unsafe.Sizeof(uintptr(0))*2 { // Standard string header size
 		return 0 // Invalid offset
 	}
 
-	// Create a proper pointer conversion using uintptr arithmetic
+	// Create a proper pointer conversion using uintptr arithmetic.
 	headerPtr := unsafe.Pointer(stringHeaderAddr)
 	dataPtrAddr := uintptr(headerPtr) + ptrOffset
 	dataPtr := *(*uintptr)(unsafe.Pointer(dataPtrAddr))
 
-	// Calculate byte address with overflow protection
+	// Calculate byte address with overflow protection.
 	return dataPtr + uintptr(index)
 }

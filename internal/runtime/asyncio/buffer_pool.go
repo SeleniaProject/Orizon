@@ -63,7 +63,7 @@ func (bp *BytePool) Get(n int) []byte {
 	return buf[:0]
 }
 
-// Put returns a buffer to the pool if its capacity matches a known bucket and
+// Put returns a buffer to the pool if its capacity matches a known bucket and.
 // the approximate per-bucket retention limit has not been exceeded.
 func (bp *BytePool) Put(buf []byte) {
 	capn := cap(buf)
@@ -72,11 +72,11 @@ func (bp *BytePool) Put(buf []byte) {
 	}
 	idx := bp.findBucket(capn)
 	if idx < 0 || bp.buckets[idx].size != capn {
-		// not a managed size; drop
+		// not a managed size; drop.
 		return
 	}
 	b := bp.buckets[idx]
-	// decrement inuse; if above limit, drop the buffer instead of returning
+	// decrement inuse; if above limit, drop the buffer instead of returning.
 	if cur := atomic.AddInt64(&b.inuse, -1); cur >= b.limit {
 		return
 	}

@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -18,7 +18,7 @@ type winNotifier interface {
 }
 
 // winRegLite carries the minimal fields a notifier needs.
-// It intentionally mirrors a subset of fields from windows-specific regs
+// It intentionally mirrors a subset of fields from windows-specific regs.
 // without importing full structs to keep the boundary narrow.
 
 type winRegLite struct {

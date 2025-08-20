@@ -26,36 +26,41 @@ type MetricFunc func() map[string]float64
 func StartMetricsServer(addr string, collectors map[string]MetricFunc) (string, func(ctx context.Context) error, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		// Text format exposition; keep it simple and deterministic
+		// Text format exposition; keep it simple and deterministic.
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		// Stable iteration by collector name
+		// Stable iteration by collector name.
 		names := make([]string, 0, len(collectors))
 		for name := range collectors {
 			names = append(names, name)
 		}
+
 		sort.Strings(names)
+
 		for _, name := range names {
 			fn := collectors[name]
 			if fn == nil {
 				continue
 			}
-			// Stable order of metrics within a collector
+			// Stable order of metrics within a collector.
 			snapshot := fn()
 			keys := make([]string, 0, len(snapshot))
+
 			for k := range snapshot {
 				keys = append(keys, k)
 			}
+
 			sort.Strings(keys)
+
 			for _, k := range keys {
 				v := snapshot[k]
-				// Sanitize names into prometheus-like tokens
+				// Sanitize names into prometheus-like tokens.
 				metricName := sanitizeMetricToken(name + "_" + k)
-				// Example line: runtime_tcp_accept_temp_errors 12
+				// Example line: runtime_tcp_accept_temp_errors 12.
 				fmt.Fprintf(w, "%s %g\n", metricName, v)
 			}
 		}
 		// Append actor system I/O statistics when available
-		// Expose under collector "actor_system" with stable keys
+		// Expose under collector "actor_system" with stable keys.
 		if sys := findGlobalActorSystem(); sys != nil {
 			st := sys.GetStatistics()
 			ioMetrics := map[string]float64{
@@ -67,10 +72,13 @@ func StartMetricsServer(addr string, collectors map[string]MetricFunc) (string, 
 				"io_resumes_write":      float64(st.IOResumesWrite),
 			}
 			keys := make([]string, 0, len(ioMetrics))
+
 			for k := range ioMetrics {
 				keys = append(keys, k)
 			}
+
 			sort.Strings(keys)
+
 			for _, k := range keys {
 				metricName := sanitizeMetricToken("actor_system_" + k)
 				fmt.Fprintf(w, "%s %g\n", metricName, ioMetrics[k])
@@ -79,21 +87,26 @@ func StartMetricsServer(addr string, collectors map[string]MetricFunc) (string, 
 	})
 
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 3 * time.Second}
+
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", nil, err
 	}
+
 	bound := ln.Addr().String()
+
 	go func() {
 		_ = srv.Serve(ln)
 	}()
+
 	stop := func(ctx context.Context) error {
 		return srv.Shutdown(ctx)
 	}
+
 	return bound, stop, nil
 }
 
-// StartMetricsTLSServer starts a TLS-enabled metrics server using the provided
+// StartMetricsTLSServer starts a TLS-enabled metrics server using the provided.
 // TLS listener wrapper. This strengthens exposure for environments where
 // plaintext endpoints are not acceptable. The handler and collectors are the
 // same as StartMetricsServer.
@@ -101,22 +114,29 @@ func StartMetricsTLSServer(addr string, collectors map[string]MetricFunc, tlsCfg
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
 		names := make([]string, 0, len(collectors))
 		for name := range collectors {
 			names = append(names, name)
 		}
+
 		sort.Strings(names)
+
 		for _, name := range names {
 			fn := collectors[name]
 			if fn == nil {
 				continue
 			}
+
 			snapshot := fn()
 			keys := make([]string, 0, len(snapshot))
+
 			for k := range snapshot {
 				keys = append(keys, k)
 			}
+
 			sort.Strings(keys)
+
 			for _, k := range keys {
 				v := snapshot[k]
 				metricName := sanitizeMetricToken(name + "_" + k)
@@ -126,15 +146,19 @@ func StartMetricsTLSServer(addr string, collectors map[string]MetricFunc, tlsCfg
 	})
 
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 3 * time.Second}
+
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", nil, err
 	}
-	// Wrap listener with TLS using hardened defaults from netstack
+	// Wrap listener with TLS using hardened defaults from netstack.
 	tlsLn := netstack.TLSServer(ln, tlsCfg)
 	bound := tlsLn.Addr().String()
+
 	go func() { _ = srv.Serve(tlsLn) }()
+
 	stop := func(ctx context.Context) error { return srv.Shutdown(ctx) }
+
 	return bound, stop, nil
 }
 
@@ -144,22 +168,29 @@ func StartMetricsServerWithAuth(addr string, collectors map[string]MetricFunc, t
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
 		names := make([]string, 0, len(collectors))
 		for name := range collectors {
 			names = append(names, name)
 		}
+
 		sort.Strings(names)
+
 		for _, name := range names {
 			fn := collectors[name]
 			if fn == nil {
 				continue
 			}
+
 			snapshot := fn()
 			keys := make([]string, 0, len(snapshot))
+
 			for k := range snapshot {
 				keys = append(keys, k)
 			}
+
 			sort.Strings(keys)
+
 			for _, k := range keys {
 				v := snapshot[k]
 				metricName := sanitizeMetricToken(name + "_" + k)
@@ -167,18 +198,25 @@ func StartMetricsServerWithAuth(addr string, collectors map[string]MetricFunc, t
 			}
 		}
 	})
+
 	handler := http.Handler(mux)
 	if token != "" {
 		handler = bearerAuthMiddleware(token, handler)
 	}
+
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 3 * time.Second}
+
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", nil, err
 	}
+
 	bound := ln.Addr().String()
+
 	go func() { _ = srv.Serve(ln) }()
+
 	stop := func(ctx context.Context) error { return srv.Shutdown(ctx) }
+
 	return bound, stop, nil
 }
 
@@ -188,22 +226,29 @@ func StartMetricsTLSServerWithAuth(addr string, collectors map[string]MetricFunc
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
 		names := make([]string, 0, len(collectors))
 		for name := range collectors {
 			names = append(names, name)
 		}
+
 		sort.Strings(names)
+
 		for _, name := range names {
 			fn := collectors[name]
 			if fn == nil {
 				continue
 			}
+
 			snapshot := fn()
 			keys := make([]string, 0, len(snapshot))
+
 			for k := range snapshot {
 				keys = append(keys, k)
 			}
+
 			sort.Strings(keys)
+
 			for _, k := range keys {
 				v := snapshot[k]
 				metricName := sanitizeMetricToken(name + "_" + k)
@@ -211,19 +256,26 @@ func StartMetricsTLSServerWithAuth(addr string, collectors map[string]MetricFunc
 			}
 		}
 	})
+
 	handler := http.Handler(mux)
 	if token != "" {
 		handler = bearerAuthMiddleware(token, handler)
 	}
+
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 3 * time.Second}
+
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return "", nil, err
 	}
+
 	tlsLn := netstack.TLSServer(ln, tlsCfg)
 	bound := tlsLn.Addr().String()
+
 	go func() { _ = srv.Serve(tlsLn) }()
+
 	stop := func(ctx context.Context) error { return srv.Shutdown(ctx) }
+
 	return bound, stop, nil
 }
 
@@ -231,27 +283,35 @@ func StartMetricsTLSServerWithAuth(addr string, collectors map[string]MetricFunc
 // It accepts token via Authorization: Bearer <token> or query parameter access_token=<token>.
 func bearerAuthMiddleware(token string, next http.Handler) http.Handler {
 	const scheme = "Bearer "
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if token == "" {
 			next.ServeHTTP(w, r)
+
 			return
 		}
+
 		if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, scheme) && strings.TrimPrefix(auth, scheme) == token {
 			next.ServeHTTP(w, r)
+
 			return
 		}
+
 		if r.URL.Query().Get("access_token") == token {
 			next.ServeHTTP(w, r)
+
 			return
 		}
+
 		w.Header().Set("WWW-Authenticate", "Bearer")
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 }
 
 func sanitizeMetricToken(s string) string {
-	// Replace unsupported chars with '_'
+	// Replace unsupported chars with '_'.
 	b := make([]byte, len(s))
+
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == ':' {
@@ -260,11 +320,12 @@ func sanitizeMetricToken(s string) string {
 			b[i] = '_'
 		}
 	}
-	// Avoid leading digits per Prometheus best practice by prefixing underscore
+	// Avoid leading digits per Prometheus best practice by prefixing underscore.
 	if len(b) > 0 && b[0] >= '0' && b[0] <= '9' {
 		return "_" + string(b)
 	}
-	// Collapse repeated underscores for readability
+	// Collapse repeated underscores for readability.
 	out := strings.ReplaceAll(string(b), "__", "_")
+
 	return out
 }

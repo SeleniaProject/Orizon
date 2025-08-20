@@ -28,22 +28,27 @@ func (w *SimpleWatcher) Close() error {
 	if w.stop != nil {
 		w.stop()
 	}
+
 	close(w.evCh)
+
 	return nil
 }
 
 // StartPolling begins a naive timestamp-based change poll at given interval.
 func (w *SimpleWatcher) StartPolling(ctx context.Context, path string, interval time.Duration) error {
 	if ctx == nil {
-		// Derive a cancelable context for safety when caller passes nil
+		// Derive a cancelable context for safety when caller passes nil.
 		c, cancel := context.WithCancel(context.Background())
 		ctx = c
 		w.stop = cancel
 	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	w.stop = cancel
+
 	go func() {
 		var lastMod time.Time
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -52,8 +57,10 @@ func (w *SimpleWatcher) StartPolling(ctx context.Context, path string, interval 
 				info, err := w.fs.Stat(path)
 				if err != nil {
 					w.erCh <- err
+
 					continue
 				}
+
 				if info.ModTime().After(lastMod) {
 					lastMod = info.ModTime()
 					w.evCh <- Event{Path: path, Op: OpWrite, Time: time.Now()}
@@ -61,5 +68,6 @@ func (w *SimpleWatcher) StartPolling(ctx context.Context, path string, interval 
 			}
 		}
 	}()
+
 	return nil
 }

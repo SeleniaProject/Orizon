@@ -1,6 +1,6 @@
 // Package numa implements Phase 3.1.3 NUMA-aware optimization for Orizon
-// This package provides distributed memory architecture optimization through
-// NUMA locality awareness, memory affinity control, and dynamic load balancing
+// This package provides distributed memory architecture optimization through.
+// NUMA locality awareness, memory affinity control, and dynamic load balancing.
 // to maximize performance on multi-socket and distributed memory systems.
 package numa
 
@@ -13,22 +13,18 @@ import (
 	"unsafe"
 )
 
-// Optimizer is the main NUMA optimization engine
+// Optimizer is the main NUMA optimization engine.
 type Optimizer struct {
-	enabled bool
-	mutex   sync.RWMutex
-
-	// Core components
 	topology  *Topology
 	scheduler *Scheduler
 	allocator *Allocator
 	monitor   *Monitor
-
-	// Statistics
-	stats Stats
+	stats     Stats
+	mutex     sync.RWMutex
+	enabled   bool
 }
 
-// Stats tracks NUMA optimization performance
+// Stats tracks NUMA optimization performance.
 type Stats struct {
 	LocalAllocations  int64
 	RemoteAllocations int64
@@ -38,7 +34,7 @@ type Stats struct {
 	PerformanceGain   int64
 }
 
-// Topology represents the NUMA topology of the system
+// Topology represents the NUMA topology of the system.
 type Topology struct {
 	nodes         []*Node
 	distances     [][]int
@@ -48,19 +44,19 @@ type Topology struct {
 	mutex         sync.RWMutex
 }
 
-// Node represents a NUMA node
+// Node represents a NUMA node.
 type Node struct {
-	ID          int
-	CPUs        []int
+	LastUpdate  time.Time
 	Memory      *NodeMemory
+	CPUs        []int
+	ID          int
 	LoadAverage float64
 	Allocations int64
 	Migrations  int64
 	IsOnline    bool
-	LastUpdate  time.Time
 }
 
-// NodeMemory represents memory information for a NUMA node
+// NodeMemory represents memory information for a NUMA node.
 type NodeMemory struct {
 	Total     uint64
 	Available uint64
@@ -70,60 +66,60 @@ type NodeMemory struct {
 	mutex     sync.RWMutex
 }
 
-// Scheduler manages NUMA-aware task scheduling
+// Scheduler manages NUMA-aware task scheduling.
 type Scheduler struct {
-	queues    []*TaskQueue
-	workers   []*Worker
 	balancer  *LoadBalancer
 	affinity  *AffinityManager
-	isRunning bool
+	queues    []*TaskQueue
+	workers   []*Worker
 	mutex     sync.Mutex
+	isRunning bool
 }
 
-// TaskQueue represents a per-node task queue
+// TaskQueue represents a per-node task queue.
 type TaskQueue struct {
-	nodeID    int
 	tasks     chan *Task
+	nodeID    int
 	priority  int
 	length    int64
 	processed int64
 	mutex     sync.Mutex
 }
 
-// Task represents a schedulable unit of work
+// Task represents a schedulable unit of work.
 type Task struct {
-	ID           uint64
+	Created      time.Time
+	Deadline     time.Time
 	Function     func() interface{}
 	Data         unsafe.Pointer
+	Result       chan interface{}
+	ID           uint64
 	Size         uintptr
 	NodeAffinity int
 	Priority     int
-	Created      time.Time
-	Deadline     time.Time
-	Result       chan interface{}
 }
 
-// Worker represents a NUMA-aware worker thread
+// Worker represents a NUMA-aware worker thread.
 type Worker struct {
+	LastTask  time.Time
+	Queue     *TaskQueue
 	ID        int
 	NodeID    int
-	Queue     *TaskQueue
-	IsActive  bool
 	Processed int64
-	LastTask  time.Time
+	IsActive  bool
 }
 
-// LoadBalancer manages dynamic load distribution
+// LoadBalancer manages dynamic load distribution.
 type LoadBalancer struct {
+	lastBalance time.Time
 	strategy    BalanceStrategy
 	threshold   float64
 	interval    time.Duration
-	lastBalance time.Time
 	migrations  int64
 	mutex       sync.Mutex
 }
 
-// BalanceStrategy defines load balancing strategies
+// BalanceStrategy defines load balancing strategies.
 type BalanceStrategy int
 
 const (
@@ -133,7 +129,7 @@ const (
 	BalanceAdaptive
 )
 
-// AffinityManager controls CPU and memory affinity
+// AffinityManager controls CPU and memory affinity.
 type AffinityManager struct {
 	cpuMasks    map[int]uint64
 	memoryMasks map[int]uint64
@@ -141,7 +137,7 @@ type AffinityManager struct {
 	mutex       sync.RWMutex
 }
 
-// AffinityPolicy defines affinity control policies
+// AffinityPolicy defines affinity control policies.
 type AffinityPolicy struct {
 	CPUStrict    bool
 	MemoryStrict bool
@@ -149,38 +145,38 @@ type AffinityPolicy struct {
 	Interleaving bool
 }
 
-// Allocator provides NUMA-aware memory allocation
+// Allocator provides NUMA-aware memory allocation.
 type Allocator struct {
-	pools       []*MemoryPool
 	policies    map[int]AllocationPolicy
+	pools       []*MemoryPool
+	stats       AllocatorStats
 	localRatio  float64
 	remoteRatio float64
-	stats       AllocatorStats
 	mutex       sync.RWMutex
 }
 
-// MemoryPool represents a per-node memory pool
+// MemoryPool represents a per-node memory pool.
 type MemoryPool struct {
-	nodeID        int
 	chunks        []*MemoryChunk
 	freeList      []*MemoryChunk
+	nodeID        int
 	totalSize     uint64
 	usedSize      uint64
 	fragmentation float64
 	mutex         sync.Mutex
 }
 
-// MemoryChunk represents a memory allocation unit
+// MemoryChunk represents a memory allocation unit.
 type MemoryChunk struct {
+	timestamp time.Time
+	next      *MemoryChunk
 	ptr       uintptr
 	size      uintptr
 	nodeID    int
 	allocated bool
-	timestamp time.Time
-	next      *MemoryChunk
 }
 
-// AllocationPolicy defines memory allocation policies
+// AllocationPolicy defines memory allocation policies.
 type AllocationPolicy struct {
 	PreferLocal    bool
 	AllowRemote    bool
@@ -189,7 +185,7 @@ type AllocationPolicy struct {
 	MigrateOnFault bool
 }
 
-// AllocatorStats tracks allocation performance
+// AllocatorStats tracks allocation performance.
 type AllocatorStats struct {
 	LocalHits      int64
 	RemoteHits     int64
@@ -198,27 +194,27 @@ type AllocatorStats struct {
 	Compactions    int64
 }
 
-// Monitor tracks NUMA system performance
+// Monitor tracks NUMA system performance.
 type Monitor struct {
-	samplers  []*Sampler
 	metrics   *Metrics
 	alerts    chan *Alert
-	isRunning bool
+	samplers  []*Sampler
 	interval  time.Duration
 	mutex     sync.Mutex
+	isRunning bool
 }
 
-// Sampler collects NUMA performance data
+// Sampler collects NUMA performance data.
 type Sampler struct {
-	nodeID     int
-	sampleRate time.Duration
 	lastSample time.Time
 	cpu        CPUMetrics
 	memory     MemoryMetrics
 	network    NetworkMetrics
+	nodeID     int
+	sampleRate time.Duration
 }
 
-// CPUMetrics tracks CPU performance per node
+// CPUMetrics tracks CPU performance per node.
 type CPUMetrics struct {
 	Utilization   float64
 	IdleTime      time.Duration
@@ -228,7 +224,7 @@ type CPUMetrics struct {
 	Temperature   float64
 }
 
-// MemoryMetrics tracks memory performance per node
+// MemoryMetrics tracks memory performance per node.
 type MemoryMetrics struct {
 	Bandwidth   float64
 	Latency     time.Duration
@@ -238,7 +234,7 @@ type MemoryMetrics struct {
 	Swapping    int64
 }
 
-// NetworkMetrics tracks inter-node communication
+// NetworkMetrics tracks inter-node communication.
 type NetworkMetrics struct {
 	Bandwidth   float64
 	Latency     time.Duration
@@ -247,26 +243,26 @@ type NetworkMetrics struct {
 	Throughput  float64
 }
 
-// Metrics aggregates system-wide NUMA metrics
+// Metrics aggregates system-wide NUMA metrics.
 type Metrics struct {
 	nodes       map[int]*NodeMetrics
-	global      GlobalMetrics
 	trends      []*TrendData
 	predictions []*PredictionData
+	global      GlobalMetrics
 	mutex       sync.RWMutex
 }
 
-// NodeMetrics represents per-node performance metrics
+// NodeMetrics represents per-node performance metrics.
 type NodeMetrics struct {
+	LastUpdate time.Time
 	CPU        CPUMetrics
 	Memory     MemoryMetrics
 	Network    NetworkMetrics
 	Load       float64
 	Efficiency float64
-	LastUpdate time.Time
 }
 
-// GlobalMetrics represents system-wide metrics
+// GlobalMetrics represents system-wide metrics.
 type GlobalMetrics struct {
 	TotalNodes      int
 	ActiveNodes     int
@@ -277,38 +273,38 @@ type GlobalMetrics struct {
 	Imbalance       float64
 }
 
-// TrendData represents performance trends
+// TrendData represents performance trends.
 type TrendData struct {
 	Timestamp  time.Time
-	NodeID     int
 	Metric     string
+	NodeID     int
 	Value      float64
 	Trend      float64
 	Confidence float64
 }
 
-// PredictionData represents performance predictions
+// PredictionData represents performance predictions.
 type PredictionData struct {
 	Timestamp  time.Time
-	NodeID     int
 	Metric     string
+	NodeID     int
 	Predicted  float64
 	Confidence float64
 	Horizon    time.Duration
 }
 
-// Alert represents a NUMA system alert
+// Alert represents a NUMA system alert.
 type Alert struct {
 	Timestamp time.Time
-	NodeID    int
-	Level     AlertLevel
 	Message   string
 	Metric    string
+	NodeID    int
+	Level     AlertLevel
 	Value     float64
 	Threshold float64
 }
 
-// AlertLevel defines alert severity levels
+// AlertLevel defines alert severity levels.
 type AlertLevel int
 
 const (
@@ -318,7 +314,7 @@ const (
 	AlertCritical
 )
 
-// NewOptimizer creates a new NUMA optimizer
+// NewOptimizer creates a new NUMA optimizer.
 func NewOptimizer() *Optimizer {
 	return &Optimizer{
 		enabled:   true,
@@ -329,7 +325,7 @@ func NewOptimizer() *Optimizer {
 	}
 }
 
-// NewTopology creates and discovers NUMA topology
+// NewTopology creates and discovers NUMA topology.
 func NewTopology() *Topology {
 	topo := &Topology{
 		nodes:        make([]*Node, 0),
@@ -337,14 +333,14 @@ func NewTopology() *Topology {
 		coresPerNode: 4,
 	}
 
-	// Discover topology (simplified)
+	// Discover topology (simplified).
 	topo.discoverNodes()
 	topo.measureDistances()
 
 	return topo
 }
 
-// discoverNodes discovers available NUMA nodes
+// discoverNodes discovers available NUMA nodes.
 func (t *Topology) discoverNodes() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -359,7 +355,7 @@ func (t *Topology) discoverNodes() {
 			LastUpdate:  time.Now(),
 		}
 
-		// Assign CPUs to node
+		// Assign CPUs to node.
 		for j := 0; j < t.coresPerNode; j++ {
 			node.CPUs[j] = i*t.coresPerNode + j
 		}
@@ -368,7 +364,7 @@ func (t *Topology) discoverNodes() {
 	}
 }
 
-// measureDistances measures inter-node distances
+// measureDistances measures inter-node distances.
 func (t *Topology) measureDistances() {
 	t.distances = make([][]int, t.nodeCount)
 	for i := range t.distances {
@@ -383,15 +379,16 @@ func (t *Topology) measureDistances() {
 	}
 }
 
-// GetDistance returns the distance between two nodes
+// GetDistance returns the distance between two nodes.
 func (t *Topology) GetDistance(from, to int) int {
 	if from < 0 || from >= t.nodeCount || to < 0 || to >= t.nodeCount {
 		return -1 // Invalid nodes
 	}
+
 	return t.distances[from][to]
 }
 
-// NewNodeMemory creates a new node memory structure
+// NewNodeMemory creates a new node memory structure.
 func NewNodeMemory() *NodeMemory {
 	return &NodeMemory{
 		Total:     8 << 30, // 8GB default
@@ -400,7 +397,7 @@ func NewNodeMemory() *NodeMemory {
 	}
 }
 
-// NewScheduler creates a new NUMA scheduler
+// NewScheduler creates a new NUMA scheduler.
 func NewScheduler() *Scheduler {
 	nodeCount := runtime.NumCPU() / 4
 	scheduler := &Scheduler{
@@ -411,7 +408,7 @@ func NewScheduler() *Scheduler {
 		isRunning: false,
 	}
 
-	// Initialize per-node queues
+	// Initialize per-node queues.
 	for i := 0; i < nodeCount; i++ {
 		scheduler.queues[i] = &TaskQueue{
 			nodeID: i,
@@ -422,7 +419,7 @@ func NewScheduler() *Scheduler {
 	return scheduler
 }
 
-// NewLoadBalancer creates a new load balancer
+// NewLoadBalancer creates a new load balancer.
 func NewLoadBalancer() *LoadBalancer {
 	return &LoadBalancer{
 		strategy:  BalanceAdaptive,
@@ -431,7 +428,7 @@ func NewLoadBalancer() *LoadBalancer {
 	}
 }
 
-// NewAffinityManager creates a new affinity manager
+// NewAffinityManager creates a new affinity manager.
 func NewAffinityManager() *AffinityManager {
 	return &AffinityManager{
 		cpuMasks:    make(map[int]uint64),
@@ -440,17 +437,18 @@ func NewAffinityManager() *AffinityManager {
 	}
 }
 
-// SetCPUAffinity sets CPU affinity for a node
+// SetCPUAffinity sets CPU affinity for a node.
 func (am *AffinityManager) SetCPUAffinity(nodeID int, mask uint64) error {
 	if nodeID < 0 {
 		return fmt.Errorf("invalid node ID: %d", nodeID)
 	}
 
 	am.cpuMasks[nodeID] = mask
+
 	return nil
 }
 
-// NewAllocator creates a new NUMA allocator
+// NewAllocator creates a new NUMA allocator.
 func NewAllocator() *Allocator {
 	nodeCount := runtime.NumCPU() / 4
 	allocator := &Allocator{
@@ -460,7 +458,7 @@ func NewAllocator() *Allocator {
 		remoteRatio: 0.2, // Allow 20% remote allocations
 	}
 
-	// Initialize per-node pools
+	// Initialize per-node pools.
 	for i := 0; i < nodeCount; i++ {
 		allocator.pools[i] = NewMemoryPool(i)
 	}
@@ -468,7 +466,7 @@ func NewAllocator() *Allocator {
 	return allocator
 }
 
-// NewMemoryPool creates a new memory pool for a node
+// NewMemoryPool creates a new memory pool for a node.
 func NewMemoryPool(nodeID int) *MemoryPool {
 	return &MemoryPool{
 		nodeID:    nodeID,
@@ -478,7 +476,7 @@ func NewMemoryPool(nodeID int) *MemoryPool {
 	}
 }
 
-// NewMonitor creates a new NUMA monitor
+// NewMonitor creates a new NUMA monitor.
 func NewMonitor() *Monitor {
 	nodeCount := runtime.NumCPU() / 4
 	monitor := &Monitor{
@@ -489,7 +487,7 @@ func NewMonitor() *Monitor {
 		isRunning: false,
 	}
 
-	// Initialize per-node samplers
+	// Initialize per-node samplers.
 	for i := 0; i < nodeCount; i++ {
 		monitor.samplers[i] = &Sampler{
 			nodeID:     i,
@@ -500,7 +498,7 @@ func NewMonitor() *Monitor {
 	return monitor
 }
 
-// NewMetrics creates a new metrics collector
+// NewMetrics creates a new metrics collector.
 func NewMetrics() *Metrics {
 	return &Metrics{
 		nodes:       make(map[int]*NodeMetrics),
@@ -509,7 +507,7 @@ func NewMetrics() *Metrics {
 	}
 }
 
-// Start starts the NUMA optimizer
+// Start starts the NUMA optimizer.
 func (o *Optimizer) Start() error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -518,7 +516,7 @@ func (o *Optimizer) Start() error {
 		return fmt.Errorf("NUMA optimizer is disabled")
 	}
 
-	// Start components
+	// Start components.
 	if err := o.scheduler.Start(); err != nil {
 		return fmt.Errorf("failed to start scheduler: %w", err)
 	}
@@ -530,7 +528,7 @@ func (o *Optimizer) Start() error {
 	return nil
 }
 
-// Stop stops the NUMA optimizer
+// Stop stops the NUMA optimizer.
 func (o *Optimizer) Stop() error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -541,7 +539,7 @@ func (o *Optimizer) Stop() error {
 	return nil
 }
 
-// Allocate performs NUMA-aware memory allocation
+// Allocate performs NUMA-aware memory allocation.
 func (o *Optimizer) Allocate(size uintptr, nodeHint int) uintptr {
 	if !o.enabled {
 		return o.fallbackAllocate(size)
@@ -549,23 +547,25 @@ func (o *Optimizer) Allocate(size uintptr, nodeHint int) uintptr {
 
 	atomic.AddInt64(&o.stats.LocalAllocations, 1)
 
-	// Try local allocation first
+	// Try local allocation first.
 	if ptr := o.allocator.AllocateLocal(size, nodeHint); ptr != 0 {
 		return ptr
 	}
 
-	// Fall back to remote allocation
+	// Fall back to remote allocation.
 	atomic.AddInt64(&o.stats.RemoteAllocations, 1)
+
 	return o.allocator.AllocateRemote(size, nodeHint)
 }
 
-// fallbackAllocate provides fallback allocation
+// fallbackAllocate provides fallback allocation.
 func (o *Optimizer) fallbackAllocate(size uintptr) uintptr {
 	data := make([]byte, size)
+
 	return uintptr(unsafe.Pointer(&data[0]))
 }
 
-// AllocateLocal attempts local node allocation
+// AllocateLocal attempts local node allocation.
 func (a *Allocator) AllocateLocal(size uintptr, nodeID int) uintptr {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
@@ -575,15 +575,16 @@ func (a *Allocator) AllocateLocal(size uintptr, nodeID int) uintptr {
 	}
 
 	pool := a.pools[nodeID]
+
 	return pool.Allocate(size)
 }
 
-// AllocateRemote attempts remote node allocation
+// AllocateRemote attempts remote node allocation.
 func (a *Allocator) AllocateRemote(size uintptr, excludeNode int) uintptr {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	// Try all other nodes
+	// Try all other nodes.
 	for i, pool := range a.pools {
 		if i != excludeNode {
 			if ptr := pool.Allocate(size); ptr != 0 {
@@ -595,24 +596,25 @@ func (a *Allocator) AllocateRemote(size uintptr, excludeNode int) uintptr {
 	return 0
 }
 
-// Allocate allocates memory from the pool
+// Allocate allocates memory from the pool.
 func (p *MemoryPool) Allocate(size uintptr) uintptr {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// Check free list first
+	// Check free list first.
 	for i, chunk := range p.freeList {
 		if chunk.size >= size {
-			// Remove from free list
+			// Remove from free list.
 			p.freeList = append(p.freeList[:i], p.freeList[i+1:]...)
 			chunk.allocated = true
 			chunk.timestamp = time.Now()
 			p.usedSize += uint64(chunk.size)
+
 			return chunk.ptr
 		}
 	}
 
-	// Allocate new chunk
+	// Allocate new chunk.
 	data := make([]byte, size)
 	ptr := uintptr(unsafe.Pointer(&data[0]))
 
@@ -630,43 +632,46 @@ func (p *MemoryPool) Allocate(size uintptr) uintptr {
 	return ptr
 }
 
-// Free deallocates memory from the pool
+// Free deallocates memory from the pool.
 func (p *MemoryPool) Free(ptr uintptr, size uintptr) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// Find the chunk to free
+	// Find the chunk to free.
 	for _, chunk := range p.chunks {
 		if chunk.ptr == ptr && chunk.allocated {
 			chunk.allocated = false
 			chunk.timestamp = time.Now()
+
 			p.freeList = append(p.freeList, chunk)
 			if uint64(size) <= p.usedSize {
 				p.usedSize -= uint64(size)
 			}
+
 			return
 		}
 	}
 }
 
-// ScheduleTask schedules a task on the optimal node
+// ScheduleTask schedules a task on the optimal node.
 func (o *Optimizer) ScheduleTask(task *Task) error {
 	if !o.enabled {
 		return fmt.Errorf("NUMA optimizer is disabled")
 	}
 
 	nodeID := o.scheduler.SelectOptimalNode(task)
+
 	return o.scheduler.EnqueueTask(nodeID, task)
 }
 
-// SelectOptimalNode selects the best node for a task
+// SelectOptimalNode selects the best node for a task.
 func (s *Scheduler) SelectOptimalNode(task *Task) int {
-	// Use affinity hint if provided
+	// Use affinity hint if provided.
 	if task.NodeAffinity >= 0 && task.NodeAffinity < len(s.queues) {
 		return task.NodeAffinity
 	}
 
-	// Select node with lowest load
+	// Select node with lowest load.
 	minLoad := int64(^uint64(0) >> 1) // Max int64
 	selectedNode := 0
 
@@ -681,7 +686,7 @@ func (s *Scheduler) SelectOptimalNode(task *Task) int {
 	return selectedNode
 }
 
-// EnqueueTask enqueues a task to a specific node
+// EnqueueTask enqueues a task to a specific node.
 func (s *Scheduler) EnqueueTask(nodeID int, task *Task) error {
 	if nodeID < 0 || nodeID >= len(s.queues) {
 		return fmt.Errorf("invalid node ID: %d", nodeID)
@@ -691,13 +696,14 @@ func (s *Scheduler) EnqueueTask(nodeID int, task *Task) error {
 	select {
 	case queue.tasks <- task:
 		atomic.AddInt64(&queue.length, 1)
+
 		return nil
 	default:
 		return fmt.Errorf("queue full for node %d", nodeID)
 	}
 }
 
-// Start starts the scheduler
+// Start starts the scheduler.
 func (s *Scheduler) Start() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -706,7 +712,7 @@ func (s *Scheduler) Start() error {
 		return fmt.Errorf("scheduler already running")
 	}
 
-	// Start workers for each node
+	// Start workers for each node.
 	for i, queue := range s.queues {
 		worker := &Worker{
 			ID:     i,
@@ -714,30 +720,32 @@ func (s *Scheduler) Start() error {
 			Queue:  queue,
 		}
 		s.workers = append(s.workers, worker)
+
 		go worker.Run()
 	}
 
-	// Start load balancer
+	// Start load balancer.
 	go s.balancer.Run(s)
 
 	s.isRunning = true
+
 	return nil
 }
 
-// Stop stops the scheduler
+// Stop stops the scheduler.
 func (s *Scheduler) Stop() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	s.isRunning = false
 
-	// Stop workers
+	// Stop workers.
 	for _, worker := range s.workers {
 		worker.IsActive = false
 	}
 }
 
-// Run runs the worker main loop
+// Run runs the worker main loop.
 func (w *Worker) Run() {
 	w.IsActive = true
 
@@ -746,12 +754,12 @@ func (w *Worker) Run() {
 		case task := <-w.Queue.tasks:
 			w.processTask(task)
 		case <-time.After(time.Millisecond * 100):
-			// Timeout to check IsActive
+			// Timeout to check IsActive.
 		}
 	}
 }
 
-// processTask processes a single task
+// processTask processes a single task.
 func (w *Worker) processTask(task *Task) {
 	defer func() {
 		atomic.AddInt64(&w.Queue.length, -1)
@@ -760,7 +768,7 @@ func (w *Worker) processTask(task *Task) {
 		w.LastTask = time.Now()
 	}()
 
-	// Execute task
+	// Execute task.
 	if task.Function != nil {
 		result := task.Function()
 		if task.Result != nil {
@@ -769,7 +777,7 @@ func (w *Worker) processTask(task *Task) {
 	}
 }
 
-// Run runs the load balancer
+// Run runs the load balancer.
 func (lb *LoadBalancer) Run(scheduler *Scheduler) {
 	for {
 		time.Sleep(lb.interval)
@@ -781,12 +789,12 @@ func (lb *LoadBalancer) Run(scheduler *Scheduler) {
 	}
 }
 
-// balance performs load balancing
+// balance performs load balancing.
 func (lb *LoadBalancer) balance(scheduler *Scheduler) {
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()
 
-	// Find highest and lowest loaded nodes
+	// Find highest and lowest loaded nodes.
 	maxLoad := int64(0)
 	minLoad := int64(^uint64(0) >> 1)
 	maxNode := -1
@@ -798,20 +806,21 @@ func (lb *LoadBalancer) balance(scheduler *Scheduler) {
 			maxLoad = load
 			maxNode = i
 		}
+
 		if load < minLoad {
 			minLoad = load
 			minNode = i
 		}
 	}
 
-	// Balance if imbalance exceeds threshold
+	// Balance if imbalance exceeds threshold.
 	if maxNode != -1 && minNode != -1 && maxLoad > minLoad+1 {
 		lb.migrateTasks(scheduler.queues[maxNode], scheduler.queues[minNode])
 		atomic.AddInt64(&lb.migrations, 1)
 	}
 }
 
-// migrateTasks migrates tasks between nodes
+// migrateTasks migrates tasks between nodes.
 func (lb *LoadBalancer) migrateTasks(from, to *TaskQueue) {
 	select {
 	case task := <-from.tasks:
@@ -820,15 +829,15 @@ func (lb *LoadBalancer) migrateTasks(from, to *TaskQueue) {
 			atomic.AddInt64(&from.length, -1)
 			atomic.AddInt64(&to.length, 1)
 		default:
-			// Put back if destination is full
+			// Put back if destination is full.
 			from.tasks <- task
 		}
 	default:
-		// No tasks to migrate
+		// No tasks to migrate.
 	}
 }
 
-// Start starts the monitor
+// Start starts the monitor.
 func (m *Monitor) Start() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -837,19 +846,20 @@ func (m *Monitor) Start() error {
 		return fmt.Errorf("monitor already running")
 	}
 
-	// Start samplers
+	// Start samplers.
 	for _, sampler := range m.samplers {
 		go sampler.Run(m.metrics, m.alerts)
 	}
 
-	// Start metrics aggregator
+	// Start metrics aggregator.
 	go m.runAggregator()
 
 	m.isRunning = true
+
 	return nil
 }
 
-// Stop stops the monitor
+// Stop stops the monitor.
 func (m *Monitor) Stop() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -857,7 +867,7 @@ func (m *Monitor) Stop() {
 	m.isRunning = false
 }
 
-// Run runs the sampler main loop
+// Run runs the sampler main loop.
 func (s *Sampler) Run(metrics *Metrics, alerts chan<- *Alert) {
 	for {
 		time.Sleep(s.sampleRate)
@@ -870,15 +880,15 @@ func (s *Sampler) Run(metrics *Metrics, alerts chan<- *Alert) {
 	}
 }
 
-// collectMetrics collects performance metrics
+// collectMetrics collects performance metrics.
 func (s *Sampler) collectMetrics() {
-	// Simulate metric collection
+	// Simulate metric collection.
 	s.cpu.Utilization = float64(s.nodeID*10+50) / 100.0
 	s.memory.Utilization = float64(s.nodeID*5+60) / 100.0
 	s.network.Latency = time.Duration(s.nodeID+1) * time.Microsecond
 }
 
-// updateMetrics updates the global metrics
+// updateMetrics updates the global metrics.
 func (s *Sampler) updateMetrics(metrics *Metrics) {
 	metrics.mutex.Lock()
 	defer metrics.mutex.Unlock()
@@ -895,7 +905,7 @@ func (s *Sampler) updateMetrics(metrics *Metrics) {
 	metrics.nodes[s.nodeID] = nodeMetrics
 }
 
-// checkAlerts checks for alert conditions
+// checkAlerts checks for alert conditions.
 func (s *Sampler) checkAlerts(alerts chan<- *Alert) {
 	if s.cpu.Utilization > 0.9 {
 		alert := &Alert{
@@ -915,7 +925,7 @@ func (s *Sampler) checkAlerts(alerts chan<- *Alert) {
 	}
 }
 
-// runAggregator runs the metrics aggregator
+// runAggregator runs the metrics aggregator.
 func (m *Monitor) runAggregator() {
 	for {
 		time.Sleep(time.Second * 5)
@@ -923,7 +933,7 @@ func (m *Monitor) runAggregator() {
 	}
 }
 
-// aggregateMetrics aggregates system-wide metrics
+// aggregateMetrics aggregates system-wide metrics.
 func (m *Monitor) aggregateMetrics() {
 	m.metrics.mutex.Lock()
 	defer m.metrics.mutex.Unlock()
@@ -936,6 +946,7 @@ func (m *Monitor) aggregateMetrics() {
 		if time.Since(node.LastUpdate) < time.Minute {
 			activeNodes++
 		}
+
 		totalLoad += node.Load
 	}
 
@@ -949,7 +960,7 @@ func (m *Monitor) aggregateMetrics() {
 	}
 }
 
-// GetStatistics returns comprehensive NUMA statistics
+// GetStatistics returns comprehensive NUMA statistics.
 func (o *Optimizer) GetStatistics() map[string]interface{} {
 	o.mutex.RLock()
 	defer o.mutex.RUnlock()
@@ -963,39 +974,41 @@ func (o *Optimizer) GetStatistics() map[string]interface{} {
 	stats["topology_changes"] = atomic.LoadInt64(&o.stats.TopologyChanges)
 	stats["performance_gain"] = atomic.LoadInt64(&o.stats.PerformanceGain)
 
-	// Add topology information
+	// Add topology information.
 	stats["node_count"] = o.topology.nodeCount
 	stats["cores_per_node"] = o.topology.coresPerNode
 
 	return stats
 }
 
-// Enable enables the NUMA optimizer
+// Enable enables the NUMA optimizer.
 func (o *Optimizer) Enable() {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	o.enabled = true
 }
 
-// Disable disables the NUMA optimizer
+// Disable disables the NUMA optimizer.
 func (o *Optimizer) Disable() {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	o.enabled = false
 }
 
-// String returns string representation
+// String returns string representation.
 func (o *Optimizer) String() string {
 	stats := o.GetStatistics()
+
 	return fmt.Sprintf("NUMAOptimizer{enabled: %v, nodes: %d, local: %d, remote: %d, migrations: %d}",
 		stats["enabled"], stats["node_count"], stats["local_allocations"],
 		stats["remote_allocations"], stats["migrations"])
 }
 
-// Helper function
+// Helper function.
 func abs(x int) int {
 	if x < 0 {
 		return -x
 	}
+
 	return x
 }

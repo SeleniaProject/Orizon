@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -23,7 +23,7 @@ func TestNewOSPoller_DefaultsToPortableOnWindows(t *testing.T) {
 	if p == nil {
 		t.Fatal("NewOSPoller returned nil")
 	}
-	// By default on Windows we pick the portability-first goroutine poller unless env forces otherwise
+	// By default on Windows we pick the portability-first goroutine poller unless env forces otherwise.
 	if _, ok := p.(*goPoller); !ok {
 		t.Fatalf("expected *goPoller by default, got %T", p)
 	}
@@ -54,14 +54,14 @@ func TestNewOSPoller_ForcedWSAPoll(t *testing.T) {
 }
 
 func TestNewOSPoller_ForcedIOCPFallsBackWhenUnavailable(t *testing.T) {
-	// Without the 'iocp' build tag, newIOCPIfAvailable returns nil and factory should fall back to WSAPoll
+	// Without the 'iocp' build tag, newIOCPIfAvailable returns nil and factory should fall back to WSAPoll.
 	t.Setenv("ORIZON_WIN_IOCP", "on")
 	defer resetEnv("ORIZON_WIN_IOCP")
 	p := NewOSPoller()
 	if p == nil {
 		t.Fatal("NewOSPoller returned nil")
 	}
-	// With explicit IOCP request but unavailable, we choose WSAPoll-based poller
+	// With explicit IOCP request but unavailable, we choose WSAPoll-based poller.
 	if _, ok := p.(*windowsPoller); !ok {
 		t.Fatalf("expected fallback to *windowsPoller when IOCP unavailable, got %T", p)
 	}

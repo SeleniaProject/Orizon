@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -14,11 +14,11 @@ import (
 	"time"
 )
 
-// TestCopyFileToConn_TransmitFilePath verifies that CopyFileToConn can stream a file
+// TestCopyFileToConn_TransmitFilePath verifies that CopyFileToConn can stream a file.
 // over a TCP connection on Windows. It does not assert that TransmitFile is used
 // (that depends on environment), but it ensures correctness and deadline handling.
 func TestCopyFileToConn_TransmitFilePath(t *testing.T) {
-	// Prepare temp file with random content
+	// Prepare temp file with random content.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "payload.bin")
 	const payloadSize = 256 * 1024 // 256 KiB
@@ -35,7 +35,7 @@ func TestCopyFileToConn_TransmitFilePath(t *testing.T) {
 	}
 	defer f.Close()
 
-	// Start TCP server to receive bytes
+	// Start TCP server to receive bytes.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -49,7 +49,7 @@ func TestCopyFileToConn_TransmitFilePath(t *testing.T) {
 			return
 		}
 		defer c.Close()
-		// Read exactly payloadSize bytes
+		// Read exactly payloadSize bytes.
 		var got int64
 		buf := make([]byte, 32*1024)
 		deadline := time.Now().Add(5 * time.Second)
@@ -70,7 +70,7 @@ func TestCopyFileToConn_TransmitFilePath(t *testing.T) {
 		recvDone <- got
 	}()
 
-	// Dial client and send the file using CopyFileToConn
+	// Dial client and send the file using CopyFileToConn.
 	client, err := net.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		t.Fatalf("dial: %v", err)
@@ -84,13 +84,13 @@ func TestCopyFileToConn_TransmitFilePath(t *testing.T) {
 		t.Fatalf("CopyFileToConn failed: %v", err)
 	}
 
-	// Wait for server side to finish
+	// Wait for server side to finish.
 	select {
 	case got := <-recvDone:
 		if got != int64(payloadSize) {
 			t.Fatalf("server received %d bytes; want %d", got, payloadSize)
 		}
-		// sent may be payloadSize or 0 depending on code path; allow >=0 and <=payloadSize
+		// sent may be payloadSize or 0 depending on code path; allow >=0 and <=payloadSize.
 		if sent < 0 || sent > int64(payloadSize) {
 			t.Fatalf("reported sent bytes %d out of range (0..%d)", sent, payloadSize)
 		}

@@ -1,5 +1,5 @@
 // Package runtime provides memory block management and pointer operations.
-// This module implements block tracking, pointer validation, and memory
+// This module implements block tracking, pointer validation, and memory.
 // layout management for region-based allocation.
 package runtime
 
@@ -9,19 +9,19 @@ import (
 	"unsafe"
 )
 
-// BlockHeader represents metadata for allocated memory blocks
+// BlockHeader represents metadata for allocated memory blocks.
 type BlockHeader struct {
-	Magic    uint32       // Magic number for corruption detection
-	Size     uint32       // Size of user data (excluding header)
-	TypeID   uint32       // Type identifier
-	RefCount uint32       // Reference count
-	Flags    BlockFlag    // Block flags
-	Prev     *BlockHeader // Previous block in allocation order
-	Next     *BlockHeader // Next block in allocation order
-	Guard    uint32       // Guard value for overflow detection
+	Prev     *BlockHeader
+	Next     *BlockHeader
+	Magic    uint32
+	Size     uint32
+	TypeID   uint32
+	RefCount uint32
+	Flags    BlockFlag
+	Guard    uint32
 }
 
-// BlockFlag represents flags for memory blocks
+// BlockFlag represents flags for memory blocks.
 type BlockFlag uint32
 
 const (
@@ -36,18 +36,18 @@ const (
 	BlockFlagRelocated   BlockFlag = 1 << 7 // Block has been relocated
 )
 
-// BlockManager manages memory blocks within regions
+// BlockManager manages memory blocks within regions.
 type BlockManager struct {
+	blockMap     map[unsafe.Pointer]*BlockHeader
+	freeBlocks   map[RegionSize][]*BlockHeader
+	largeBlocks  []*BlockHeader
+	pinnedBlocks []*BlockHeader
+	statistics   BlockStatistics
+	policy       BlockPolicy
 	mutex        sync.RWMutex
-	blockMap     map[unsafe.Pointer]*BlockHeader // Map pointers to headers
-	freeBlocks   map[RegionSize][]*BlockHeader   // Free blocks by size
-	largeBlocks  []*BlockHeader                  // Large object blocks
-	pinnedBlocks []*BlockHeader                  // Pinned blocks
-	statistics   BlockStatistics                 // Block statistics
-	policy       BlockPolicy                     // Block management policy
 }
 
-// BlockStatistics tracks memory block usage statistics
+// BlockStatistics tracks memory block usage statistics.
 type BlockStatistics struct {
 	TotalBlocks      uint64 // Total number of blocks
 	AllocatedBlocks  uint64 // Currently allocated blocks
@@ -62,38 +62,38 @@ type BlockStatistics struct {
 	OverheadMemory   uint64 // Memory overhead from headers
 }
 
-// BlockPolicy defines block management policies
+// BlockPolicy defines block management policies.
 type BlockPolicy struct {
-	MaxBlockSize       RegionSize // Maximum block size
-	MinBlockSize       RegionSize // Minimum block size
-	LargeObjectSize    RegionSize // Threshold for large objects
-	MaxFragmentation   float64    // Maximum fragmentation ratio
-	EnableCoalescing   bool       // Enable block coalescing
-	EnableSplitting    bool       // Enable block splitting
-	EnableCompaction   bool       // Enable memory compaction
-	EnableGuardPages   bool       // Enable guard pages
-	EnableCanaries     bool       // Enable canary values
-	EnableStackTrace   bool       // Enable stack trace capture
-	MaxStackDepth      int        // Maximum stack trace depth
-	RefCountingEnabled bool       // Enable reference counting
-	FinalizersEnabled  bool       // Enable finalizers
+	MaxBlockSize       RegionSize
+	MinBlockSize       RegionSize
+	LargeObjectSize    RegionSize
+	MaxFragmentation   float64
+	MaxStackDepth      int
+	EnableCompaction   bool
+	EnableSplitting    bool
+	EnableGuardPages   bool
+	EnableCanaries     bool
+	EnableStackTrace   bool
+	EnableCoalescing   bool
+	RefCountingEnabled bool
+	FinalizersEnabled  bool
 }
 
-// PointerInfo contains information about a pointer
+// PointerInfo contains information about a pointer.
 type PointerInfo struct {
-	Address     unsafe.Pointer // Pointer address
-	Size        RegionSize     // Allocated size
-	TypeInfo    *TypeInfo      // Type information
-	RefCount    uint32         // Reference count
-	IsValid     bool           // Pointer is valid
-	IsAllocated bool           // Pointer is allocated
-	IsPinned    bool           // Pointer is pinned
-	IsLocked    bool           // Pointer is locked
-	Region      *Region        // Owning region
-	Block       *BlockHeader   // Block header
+	Address     unsafe.Pointer
+	TypeInfo    *TypeInfo
+	Region      *Region
+	Block       *BlockHeader
+	Size        RegionSize
+	RefCount    uint32
+	IsValid     bool
+	IsAllocated bool
+	IsPinned    bool
+	IsLocked    bool
 }
 
-// Constants for block management
+// Constants for block management.
 const (
 	BlockHeaderSize      = unsafe.Sizeof(BlockHeader{})
 	BlockMagicValue      = 0xDEADBEEF
@@ -103,7 +103,7 @@ const (
 	LargeObjectThreshold = 8192
 )
 
-// NewBlockManager creates a new block manager
+// NewBlockManager creates a new block manager.
 func NewBlockManager(policy BlockPolicy) *BlockManager {
 	return &BlockManager{
 		blockMap:     make(map[unsafe.Pointer]*BlockHeader),
@@ -114,33 +114,33 @@ func NewBlockManager(policy BlockPolicy) *BlockManager {
 	}
 }
 
-// AllocateBlock allocates a new memory block
+// AllocateBlock allocates a new memory block.
 func (bm *BlockManager) AllocateBlock(region *Region, size RegionSize, alignment RegionAlignment, typeInfo *TypeInfo) (unsafe.Pointer, error) {
 	bm.mutex.Lock()
 	defer bm.mutex.Unlock()
 
-	// Calculate total size including header
+	// Calculate total size including header.
 	headerSize := RegionSize(BlockHeaderSize)
 	totalSize := headerSize + size
 
-	// Align total size
+	// Align total size.
 	if alignment > 0 {
 		totalSize = RegionSize(alignUp(int64(totalSize), int64(alignment)))
 	}
 
-	// Check if this is a large object allocation
+	// Check if this is a large object allocation.
 	isLarge := size >= bm.policy.LargeObjectSize
 
-	// Try to find a suitable free block first
+	// Try to find a suitable free block first.
 	header := bm.findFreeBlock(totalSize, isLarge)
 	if header == nil {
-		// Allocate new memory from region
+		// Allocate new memory from region.
 		ptr, err := region.allocateMemory(totalSize, alignment)
 		if err != nil {
 			return nil, err
 		}
 
-		// Initialize block header
+		// Initialize block header.
 		header = (*BlockHeader)(ptr)
 		header.Magic = BlockMagicValue
 		header.Size = uint32(size)
@@ -155,15 +155,15 @@ func (bm *BlockManager) AllocateBlock(region *Region, size RegionSize, alignment
 			header.Flags |= BlockFlagLarge
 		}
 	} else {
-		// Reuse existing free block
+		// Reuse existing free block.
 		bm.removeFreeBlock(header)
 
-		// Split block if necessary
+		// Split block if necessary.
 		if bm.policy.EnableSplitting {
 			bm.splitBlock(header, size)
 		}
 
-		// Reset header
+		// Reset header.
 		header.Size = uint32(size)
 		header.RefCount = 1
 		header.Flags = BlockFlagNone
@@ -173,57 +173,57 @@ func (bm *BlockManager) AllocateBlock(region *Region, size RegionSize, alignment
 		}
 	}
 
-	// Set type information
+	// Set type information.
 	if typeInfo != nil {
 		header.TypeID = typeInfo.ID
 
-		// Set atomic flag if type contains no pointers
+		// Set atomic flag if type contains no pointers.
 		if !typeInfo.HasPointers {
 			header.Flags |= BlockFlagAtomic
 		}
 	}
 
-	// Calculate user data pointer
+	// Calculate user data pointer.
 	userPtr := unsafe.Pointer(uintptr(unsafe.Pointer(header)) + uintptr(headerSize))
 
-	// Register block
+	// Register block.
 	bm.blockMap[userPtr] = header
 
-	// Add to appropriate lists
+	// Add to appropriate lists.
 	if isLarge {
 		bm.largeBlocks = append(bm.largeBlocks, header)
 		bm.statistics.LargeBlocks++
 	}
 
-	// Update statistics
+	// Update statistics.
 	bm.statistics.TotalBlocks++
 	bm.statistics.AllocatedBlocks++
 	bm.statistics.TotalBlockMemory += uint64(totalSize)
 	bm.updateStatistics()
 
-	// Initialize memory if needed
+	// Initialize memory if needed.
 	if bm.policy.EnableCanaries {
 		bm.writeCanaries(userPtr, size)
 	}
-	// Debug-build validation and strict canary check
+	// Debug-build validation and strict canary check.
 	debugPostAllocValidate(bm, userPtr, size)
 	debugStrictCanaryCheck(bm, userPtr, size)
 
 	return userPtr, nil
 }
 
-// DeallocateBlock deallocates a memory block
+// DeallocateBlock deallocates a memory block.
 func (bm *BlockManager) DeallocateBlock(ptr unsafe.Pointer) error {
 	bm.mutex.Lock()
 	defer bm.mutex.Unlock()
 
-	// Find block header
+	// Find block header.
 	header, exists := bm.blockMap[ptr]
 	if !exists {
 		return fmt.Errorf("invalid pointer: %p", ptr)
 	}
 
-	// Validate block header
+	// Validate block header.
 	if header.Magic != BlockMagicValue {
 		return fmt.Errorf("corrupted block header at %p", ptr)
 	}
@@ -232,45 +232,49 @@ func (bm *BlockManager) DeallocateBlock(ptr unsafe.Pointer) error {
 		return fmt.Errorf("buffer overflow detected at %p", ptr)
 	}
 
-	// Check canaries if enabled (and enforce in debug)
+	// Check canaries if enabled (and enforce in debug).
 	if bm.policy.EnableCanaries {
 		if !bm.validateCanaries(ptr, RegionSize(header.Size)) {
 			return fmt.Errorf("buffer overflow detected via canaries at %p", ptr)
 		}
 	}
+
 	debugStrictCanaryCheck(bm, ptr, RegionSize(header.Size))
 
-	// Check reference count
+	// Check reference count.
 	if bm.policy.RefCountingEnabled {
 		if header.RefCount > 1 {
 			header.RefCount--
+
 			return nil // Block still has references
 		}
 	}
 
-	// Remove from block map
+	// Remove from block map.
 	delete(bm.blockMap, ptr)
 
-	// Remove from special lists
+	// Remove from special lists.
 	if header.Flags&BlockFlagLarge != 0 {
 		bm.removeLargeBlock(header)
+
 		bm.statistics.LargeBlocks--
 	}
 
 	if header.Flags&BlockFlagPinned != 0 {
 		bm.removePinnedBlock(header)
+
 		bm.statistics.PinnedBlocks--
 	}
 
-	// Add to free list
+	// Add to free list.
 	bm.addFreeBlock(header)
 
-	// Try to coalesce with adjacent free blocks
+	// Try to coalesce with adjacent free blocks.
 	if bm.policy.EnableCoalescing {
 		bm.coalesceBlocks(header)
 	}
 
-	// Update statistics
+	// Update statistics.
 	bm.statistics.AllocatedBlocks--
 	bm.statistics.FreeBlocks++
 	bm.statistics.TotalBlockMemory -= uint64(RegionSize(header.Size) + RegionSize(BlockHeaderSize))
@@ -279,7 +283,7 @@ func (bm *BlockManager) DeallocateBlock(ptr unsafe.Pointer) error {
 	return nil
 }
 
-// GetPointerInfo returns information about a pointer
+// GetPointerInfo returns information about a pointer.
 func (bm *BlockManager) GetPointerInfo(ptr unsafe.Pointer) *PointerInfo {
 	bm.mutex.RLock()
 	defer bm.mutex.RUnlock()
@@ -288,20 +292,22 @@ func (bm *BlockManager) GetPointerInfo(ptr unsafe.Pointer) *PointerInfo {
 		Address: ptr,
 	}
 
-	// Find block header
+	// Find block header.
 	header, exists := bm.blockMap[ptr]
 	if !exists {
 		info.IsValid = false
+
 		return info
 	}
 
-	// Validate block
+	// Validate block.
 	if header.Magic != BlockMagicValue {
 		info.IsValid = false
+
 		return info
 	}
 
-	// Fill in information
+	// Fill in information.
 	info.IsValid = true
 	info.IsAllocated = true
 	info.Size = RegionSize(header.Size)
@@ -313,7 +319,7 @@ func (bm *BlockManager) GetPointerInfo(ptr unsafe.Pointer) *PointerInfo {
 	return info
 }
 
-// PinBlock pins a block in memory
+// PinBlock pins a block in memory.
 func (bm *BlockManager) PinBlock(ptr unsafe.Pointer) error {
 	bm.mutex.Lock()
 	defer bm.mutex.Unlock()
@@ -332,7 +338,7 @@ func (bm *BlockManager) PinBlock(ptr unsafe.Pointer) error {
 	return nil
 }
 
-// UnpinBlock unpins a block
+// UnpinBlock unpins a block.
 func (bm *BlockManager) UnpinBlock(ptr unsafe.Pointer) error {
 	bm.mutex.Lock()
 	defer bm.mutex.Unlock()
@@ -345,13 +351,14 @@ func (bm *BlockManager) UnpinBlock(ptr unsafe.Pointer) error {
 	if header.Flags&BlockFlagPinned != 0 {
 		header.Flags &^= BlockFlagPinned
 		bm.removePinnedBlock(header)
+
 		bm.statistics.PinnedBlocks--
 	}
 
 	return nil
 }
 
-// AddReference adds a reference to a block
+// AddReference adds a reference to a block.
 func (bm *BlockManager) AddReference(ptr unsafe.Pointer) error {
 	if !bm.policy.RefCountingEnabled {
 		return nil
@@ -366,10 +373,11 @@ func (bm *BlockManager) AddReference(ptr unsafe.Pointer) error {
 	}
 
 	header.RefCount++
+
 	return nil
 }
 
-// RemoveReference removes a reference from a block
+// RemoveReference removes a reference from a block.
 func (bm *BlockManager) RemoveReference(ptr unsafe.Pointer) error {
 	if !bm.policy.RefCountingEnabled {
 		return nil
@@ -386,11 +394,12 @@ func (bm *BlockManager) RemoveReference(ptr unsafe.Pointer) error {
 	if header.RefCount > 0 {
 		header.RefCount--
 
-		// Deallocate if no references remain
+		// Deallocate if no references remain.
 		if header.RefCount == 0 {
-			// Convert to user pointer for deallocation
+			// Convert to user pointer for deallocation.
 			userPtr := unsafe.Pointer(uintptr(unsafe.Pointer(header)) + uintptr(BlockHeaderSize))
 			bm.mutex.Unlock() // Unlock before calling DeallocateBlock
+
 			return bm.DeallocateBlock(userPtr)
 		}
 	}
@@ -398,7 +407,7 @@ func (bm *BlockManager) RemoveReference(ptr unsafe.Pointer) error {
 	return nil
 }
 
-// ValidatePointer validates a pointer
+// ValidatePointer validates a pointer.
 func (bm *BlockManager) ValidatePointer(ptr unsafe.Pointer) error {
 	bm.mutex.RLock()
 	defer bm.mutex.RUnlock()
@@ -425,7 +434,7 @@ func (bm *BlockManager) ValidatePointer(ptr unsafe.Pointer) error {
 	return nil
 }
 
-// GetStatistics returns current block statistics
+// GetStatistics returns current block statistics.
 func (bm *BlockManager) GetStatistics() BlockStatistics {
 	bm.mutex.RLock()
 	defer bm.mutex.RUnlock()
@@ -433,12 +442,12 @@ func (bm *BlockManager) GetStatistics() BlockStatistics {
 	return bm.statistics
 }
 
-// Helper methods
+// Helper methods.
 
-// findFreeBlock finds a suitable free block
+// findFreeBlock finds a suitable free block.
 func (bm *BlockManager) findFreeBlock(size RegionSize, isLarge bool) *BlockHeader {
 	if isLarge {
-		// Search large blocks first
+		// Search large blocks first.
 		for _, header := range bm.largeBlocks {
 			if RegionSize(header.Size) >= size {
 				return header
@@ -446,7 +455,7 @@ func (bm *BlockManager) findFreeBlock(size RegionSize, isLarge bool) *BlockHeade
 		}
 	}
 
-	// Search free blocks by size
+	// Search free blocks by size.
 	for blockSize, blocks := range bm.freeBlocks {
 		if blockSize >= size && len(blocks) > 0 {
 			return blocks[0]
@@ -456,103 +465,107 @@ func (bm *BlockManager) findFreeBlock(size RegionSize, isLarge bool) *BlockHeade
 	return nil
 }
 
-// addFreeBlock adds a block to the free list
+// addFreeBlock adds a block to the free list.
 func (bm *BlockManager) addFreeBlock(header *BlockHeader) {
 	size := RegionSize(header.Size)
 	bm.freeBlocks[size] = append(bm.freeBlocks[size], header)
 }
 
-// removeFreeBlock removes a block from the free list
+// removeFreeBlock removes a block from the free list.
 func (bm *BlockManager) removeFreeBlock(header *BlockHeader) {
 	size := RegionSize(header.Size)
 	blocks := bm.freeBlocks[size]
 
 	for i, block := range blocks {
 		if block == header {
-			// Remove by swapping with last element
+			// Remove by swapping with last element.
 			blocks[i] = blocks[len(blocks)-1]
 			bm.freeBlocks[size] = blocks[:len(blocks)-1]
+
 			break
 		}
 	}
 }
 
-// removeLargeBlock removes a block from the large blocks list
+// removeLargeBlock removes a block from the large blocks list.
 func (bm *BlockManager) removeLargeBlock(header *BlockHeader) {
 	for i, block := range bm.largeBlocks {
 		if block == header {
 			bm.largeBlocks[i] = bm.largeBlocks[len(bm.largeBlocks)-1]
 			bm.largeBlocks = bm.largeBlocks[:len(bm.largeBlocks)-1]
+
 			break
 		}
 	}
 }
 
-// removePinnedBlock removes a block from the pinned blocks list
+// removePinnedBlock removes a block from the pinned blocks list.
 func (bm *BlockManager) removePinnedBlock(header *BlockHeader) {
 	for i, block := range bm.pinnedBlocks {
 		if block == header {
 			bm.pinnedBlocks[i] = bm.pinnedBlocks[len(bm.pinnedBlocks)-1]
 			bm.pinnedBlocks = bm.pinnedBlocks[:len(bm.pinnedBlocks)-1]
+
 			break
 		}
 	}
 }
 
-// splitBlock splits a block if it's significantly larger than needed
+// splitBlock splits a block if it's significantly larger than needed.
 func (bm *BlockManager) splitBlock(header *BlockHeader, requestedSize RegionSize) {
 	currentSize := RegionSize(header.Size)
 	if currentSize >= requestedSize+MinBlockSize+RegionSize(BlockHeaderSize) {
-		// Calculate split point
+		// Calculate split point.
 		splitOffset := RegionSize(BlockHeaderSize) + requestedSize
 
-		// Create new header for the second part
+		// Create new header for the second part.
 		newHeaderPtr := unsafe.Pointer(uintptr(unsafe.Pointer(header)) + uintptr(splitOffset))
 		newHeader := (*BlockHeader)(newHeaderPtr)
 
-		// Initialize new header
+		// Initialize new header.
 		newHeader.Magic = BlockMagicValue
 		newHeader.Size = uint32(currentSize - splitOffset)
 		newHeader.Guard = BlockGuardValue
 		newHeader.RefCount = 0
 		newHeader.Flags = BlockFlagNone
 
-		// Update original header
+		// Update original header.
 		header.Size = uint32(requestedSize)
 
-		// Add new block to free list
+		// Add new block to free list.
 		bm.addFreeBlock(newHeader)
+
 		bm.statistics.FreeBlocks++
 	}
 }
 
-// coalesceBlocks coalesces adjacent free blocks
+// coalesceBlocks coalesces adjacent free blocks.
 func (bm *BlockManager) coalesceBlocks(header *BlockHeader) {
-	// This would require maintaining a doubly-linked list of all blocks
-	// For now, we'll implement a simplified version
-	// In a real implementation, you'd walk adjacent blocks and merge them
+	// This would require maintaining a doubly-linked list of all blocks.
+	// For now, we'll implement a simplified version.
+	// In a real implementation, you'd walk adjacent blocks and merge them.
 }
 
-// writeCanaries writes canary values around a block
+// writeCanaries writes canary values around a block.
 func (bm *BlockManager) writeCanaries(ptr unsafe.Pointer, size RegionSize) {
-	// Write canary before data
+	// Write canary before data.
 	canaryPtr := unsafe.Pointer(uintptr(ptr) - 4)
 	*(*uint32)(canaryPtr) = 0xCAFEBABE
 
-	// Write canary after data
+	// Write canary after data.
 	canaryPtr = unsafe.Pointer(uintptr(ptr) + uintptr(size))
 	*(*uint32)(canaryPtr) = 0xDEADBEEF
 }
 
-// validateCanaries validates canary values
+// validateCanaries validates canary values.
 func (bm *BlockManager) validateCanaries(ptr unsafe.Pointer, size RegionSize) bool {
-	// Check canary before data
+	// Check canary before data.
 	canaryPtr := unsafe.Pointer(uintptr(ptr) - 4)
 	if *(*uint32)(canaryPtr) != 0xCAFEBABE {
 		return false
 	}
 
-	// Check canary after data
+	// Check canary after data.
 	canaryPtr = unsafe.Pointer(uintptr(ptr) + uintptr(size))
 	if *(*uint32)(canaryPtr) != 0xDEADBEEF {
 		return false
@@ -561,29 +574,29 @@ func (bm *BlockManager) validateCanaries(ptr unsafe.Pointer, size RegionSize) bo
 	return true
 }
 
-// updateStatistics updates block statistics
+// updateStatistics updates block statistics.
 func (bm *BlockManager) updateStatistics() {
 	if bm.statistics.TotalBlocks > 0 {
 		bm.statistics.AverageBlockSize = bm.statistics.TotalBlockMemory / bm.statistics.TotalBlocks
 	}
 
-	// Calculate overhead
+	// Calculate overhead.
 	headerOverhead := bm.statistics.TotalBlocks * uint64(BlockHeaderSize)
 	bm.statistics.OverheadMemory = headerOverhead
 
-	// Calculate fragmentation (simplified)
+	// Calculate fragmentation (simplified).
 	if bm.statistics.FreeBlocks > 0 && bm.statistics.TotalBlockMemory > 0 {
-		// This is a simplified fragmentation calculation
-		// Real implementation would be more sophisticated
+		// This is a simplified fragmentation calculation.
+		// Real implementation would be more sophisticated.
 		fragmented := bm.statistics.FreeBlocks * uint64(MinBlockSize)
 		bm.statistics.FragmentedMemory = fragmented
 	}
 }
 
-// allocateMemory is a placeholder for region memory allocation
-// This should be implemented in the Region type
+// allocateMemory is a placeholder for region memory allocation.
+// This should be implemented in the Region type.
 func (r *Region) allocateMemory(size RegionSize, alignment RegionAlignment) (unsafe.Pointer, error) {
-	// This would use the actual region allocation logic
-	// For now, return a mock implementation
+	// This would use the actual region allocation logic.
+	// For now, return a mock implementation.
 	return nil, fmt.Errorf("region allocation not implemented")
 }

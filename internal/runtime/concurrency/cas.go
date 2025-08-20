@@ -15,6 +15,6 @@ func CASUint32(addr *uint32, old, new uint32) bool {
 // CASInt64 performs an atomic compare-and-swap on an int64 variable.
 func CASInt64(addr *int64, old, new int64) bool { return atomic.CompareAndSwapInt64(addr, old, new) }
 
-// Load/Store helpers
+// Load/Store helpers.
 func LoadUint64(addr *uint64) uint64     { return atomic.LoadUint64(addr) }
 func StoreUint64(addr *uint64, v uint64) { atomic.StoreUint64(addr, v) }

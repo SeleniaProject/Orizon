@@ -1,5 +1,5 @@
-//go:build windows && iocp
-// +build windows,iocp
+//go:build windows && iocp.
+// +build windows,iocp.
 
 package asyncio
 
@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Explicitly cancel the pending zero-byte WSARecv using CancelIoEx and
+// Explicitly cancel the pending zero-byte WSARecv using CancelIoEx and.
 // verify that no spurious events are delivered by the poller.
 func TestIOCP_CancelIoEx_NoEventDelivered(t *testing.T) {
 	p := NewIOCPPoller()
@@ -56,7 +56,7 @@ func TestIOCP_CancelIoEx_NoEventDelivered(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Extract socket handle
+	// Extract socket handle.
 	type sc interface {
 		SyscallConn() (syscall.RawConn, error)
 	}
@@ -70,12 +70,12 @@ func TestIOCP_CancelIoEx_NoEventDelivered(t *testing.T) {
 	}
 	sh := windows.Handle(s)
 
-	// Give a tiny window to ensure zero-byte recv was posted
+	// Give a tiny window to ensure zero-byte recv was posted.
 	time.Sleep(10 * time.Millisecond)
 
 	// Cancel any pending I/O on the socket
 	if err := windows.CancelIoEx(sh, nil); err != nil {
-		// ERROR_NOT_FOUND means nothing pending yet; allow a retry once
+		// ERROR_NOT_FOUND means nothing pending yet; allow a retry once.
 		if errno, ok := err.(syscall.Errno); ok && errno == syscall.ERROR_NOT_FOUND {
 			time.Sleep(10 * time.Millisecond)
 			_ = windows.CancelIoEx(sh, nil)
@@ -84,7 +84,7 @@ func TestIOCP_CancelIoEx_NoEventDelivered(t *testing.T) {
 		}
 	}
 
-	// Ensure no events delivered in a short window
+	// Ensure no events delivered in a short window.
 	select {
 	case <-got:
 		t.Fatal("unexpected event delivered after CancelIoEx")

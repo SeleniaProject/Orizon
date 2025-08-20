@@ -38,14 +38,16 @@ func TestOptimizer_Creation(t *testing.T) {
 func TestOptimizer_EnableDisable(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Test disable
+	// Test disable.
 	optimizer.Disable()
+
 	if optimizer.enabled {
 		t.Error("Optimizer should be disabled")
 	}
 
-	// Test enable
+	// Test enable.
 	optimizer.Enable()
+
 	if !optimizer.enabled {
 		t.Error("Optimizer should be enabled")
 	}
@@ -62,7 +64,7 @@ func TestTopology_Discovery(t *testing.T) {
 		t.Error("Node count mismatch")
 	}
 
-	// Check nodes are properly initialized
+	// Check nodes are properly initialized.
 	for i, node := range topology.nodes {
 		if node.ID != i {
 			t.Errorf("Node ID mismatch: expected %d, got %d", i, node.ID)
@@ -95,12 +97,12 @@ func TestTopology_Distances(t *testing.T) {
 			t.Errorf("Distance matrix row %d size mismatch", i)
 		}
 
-		// Check diagonal (local access)
+		// Check diagonal (local access).
 		if topology.distances[i][i] != 10 {
 			t.Errorf("Local access cost should be 10, got %d", topology.distances[i][i])
 		}
 
-		// Check symmetry
+		// Check symmetry.
 		for j := 0; j < topology.nodeCount; j++ {
 			if topology.distances[i][j] != topology.distances[j][i] {
 				t.Errorf("Distance matrix not symmetric at [%d][%d]", i, j)
@@ -132,7 +134,7 @@ func TestNodeMemory_Initialization(t *testing.T) {
 func TestAllocator_LocalAllocation(t *testing.T) {
 	allocator := NewAllocator()
 
-	// Test allocation on each node
+	// Test allocation on each node.
 	for i := 0; i < len(allocator.pools); i++ {
 		ptr := allocator.AllocateLocal(1024, i)
 		if ptr == 0 {
@@ -144,7 +146,7 @@ func TestAllocator_LocalAllocation(t *testing.T) {
 func TestAllocator_RemoteAllocation(t *testing.T) {
 	allocator := NewAllocator()
 
-	// Test remote allocation
+	// Test remote allocation.
 	ptr := allocator.AllocateRemote(1024, 0) // Exclude node 0
 	if ptr == 0 && len(allocator.pools) > 1 {
 		t.Error("Remote allocation should succeed when multiple nodes available")
@@ -154,7 +156,7 @@ func TestAllocator_RemoteAllocation(t *testing.T) {
 func TestMemoryPool_Allocation(t *testing.T) {
 	pool := NewMemoryPool(0)
 
-	// Test basic allocation
+	// Test basic allocation.
 	ptr1 := pool.Allocate(1024)
 	if ptr1 == 0 {
 		t.Error("Basic allocation should succeed")
@@ -169,7 +171,7 @@ func TestMemoryPool_Allocation(t *testing.T) {
 		t.Error("Different allocations should return different pointers")
 	}
 
-	// Check used size tracking
+	// Check used size tracking.
 	expectedUsed := uint64(1024 + 2048)
 	if pool.usedSize != expectedUsed {
 		t.Errorf("Used size mismatch: expected %d, got %d", expectedUsed, pool.usedSize)
@@ -199,7 +201,7 @@ func TestScheduler_Creation(t *testing.T) {
 func TestScheduler_NodeSelection(t *testing.T) {
 	scheduler := NewScheduler()
 
-	// Test task with affinity hint
+	// Test task with affinity hint.
 	task := &Task{
 		ID:           1,
 		NodeAffinity: 0,
@@ -212,8 +214,9 @@ func TestScheduler_NodeSelection(t *testing.T) {
 		t.Errorf("Should select hinted node 0, got %d", selectedNode)
 	}
 
-	// Test task without affinity hint
+	// Test task without affinity hint.
 	task.NodeAffinity = -1
+
 	selectedNode = scheduler.SelectOptimalNode(task)
 	if selectedNode < 0 || selectedNode >= len(scheduler.queues) {
 		t.Errorf("Selected node %d out of range", selectedNode)
@@ -234,12 +237,12 @@ func TestScheduler_TaskEnqueue(t *testing.T) {
 		t.Errorf("Task enqueue failed: %v", err)
 	}
 
-	// Check queue length
+	// Check queue length.
 	if scheduler.queues[0].length != 1 {
 		t.Error("Queue length should be 1 after enqueue")
 	}
 
-	// Test invalid node
+	// Test invalid node.
 	err = scheduler.EnqueueTask(-1, task)
 	if err == nil {
 		t.Error("Should fail for invalid node ID")
@@ -338,13 +341,13 @@ func TestSampler_MetricCollection(t *testing.T) {
 func TestOptimizer_Allocation(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Test basic allocation
+	// Test basic allocation.
 	ptr := optimizer.Allocate(1024, 0)
 	if ptr == 0 {
 		t.Error("Allocation should succeed")
 	}
 
-	// Test allocation with different node hints
+	// Test allocation with different node hints.
 	for i := 0; i < optimizer.topology.nodeCount; i++ {
 		ptr := optimizer.Allocate(512, i)
 		if ptr == 0 {
@@ -356,19 +359,20 @@ func TestOptimizer_Allocation(t *testing.T) {
 func TestOptimizer_TaskScheduling(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Start the optimizer
+	// Start the optimizer.
 	err := optimizer.Start()
 	if err != nil {
 		t.Fatalf("Failed to start optimizer: %v", err)
 	}
 	defer optimizer.Stop()
 
-	// Create and schedule a task
+	// Create and schedule a task.
 	executed := false
 	task := &Task{
 		ID: 1,
 		Function: func() interface{} {
 			executed = true
+
 			return "success"
 		},
 		NodeAffinity: 0,
@@ -381,7 +385,7 @@ func TestOptimizer_TaskScheduling(t *testing.T) {
 		t.Errorf("Task scheduling failed: %v", err)
 	}
 
-	// Wait for execution
+	// Wait for execution.
 	select {
 	case result := <-task.Result:
 		if result != "success" {
@@ -399,13 +403,13 @@ func TestOptimizer_TaskScheduling(t *testing.T) {
 func TestOptimizer_Statistics(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Perform some operations
+	// Perform some operations.
 	optimizer.Allocate(1024, 0)
 	optimizer.Allocate(2048, 1)
 
 	stats := optimizer.GetStatistics()
 
-	// Verify required fields exist
+	// Verify required fields exist.
 	requiredFields := []string{
 		"enabled", "local_allocations", "remote_allocations",
 		"migrations", "balance_operations", "topology_changes",
@@ -418,7 +422,7 @@ func TestOptimizer_Statistics(t *testing.T) {
 		}
 	}
 
-	// Test string representation
+	// Test string representation.
 	str := optimizer.String()
 	if len(str) == 0 {
 		t.Error("String representation should not be empty")
@@ -429,19 +433,24 @@ func TestOptimizer_ConcurrentAllocation(t *testing.T) {
 	optimizer := NewOptimizer()
 
 	const numGoroutines = 10
+
 	const allocsPerGoroutine = 100
 
 	var wg sync.WaitGroup
+
 	successCount := int64(0)
+
 	var mutex sync.Mutex
 
-	// Launch concurrent allocations
+	// Launch concurrent allocations.
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
+
 		go func(goroutineID int) {
 			defer wg.Done()
 
 			localSuccess := 0
+
 			for j := 0; j < allocsPerGoroutine; j++ {
 				size := uintptr(64 + j*8)
 				nodeHint := goroutineID % optimizer.topology.nodeCount
@@ -466,6 +475,7 @@ func TestOptimizer_ConcurrentAllocation(t *testing.T) {
 	}
 
 	stats := optimizer.GetStatistics()
+
 	totalAllocs := stats["local_allocations"].(int64) + stats["remote_allocations"].(int64)
 	if totalAllocs != expectedTotal {
 		t.Errorf("Statistics mismatch: expected %d, got %d", expectedTotal, totalAllocs)
@@ -475,19 +485,19 @@ func TestOptimizer_ConcurrentAllocation(t *testing.T) {
 func TestOptimizer_StartStop(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Test start
+	// Test start.
 	err := optimizer.Start()
 	if err != nil {
 		t.Errorf("Start failed: %v", err)
 	}
 
-	// Test double start
+	// Test double start.
 	err = optimizer.Start()
 	if err == nil {
 		t.Error("Second start should fail")
 	}
 
-	// Test stop
+	// Test stop.
 	err = optimizer.Stop()
 	if err != nil {
 		t.Errorf("Stop failed: %v", err)
@@ -498,19 +508,19 @@ func TestOptimizer_DisabledMode(t *testing.T) {
 	optimizer := NewOptimizer()
 	optimizer.Disable()
 
-	// Test allocation in disabled mode
+	// Test allocation in disabled mode.
 	ptr := optimizer.Allocate(1024, 0)
 	if ptr == 0 {
 		t.Error("Fallback allocation should succeed when disabled")
 	}
 
-	// Test start in disabled mode
+	// Test start in disabled mode.
 	err := optimizer.Start()
 	if err == nil {
 		t.Error("Start should fail when disabled")
 	}
 
-	// Test task scheduling in disabled mode
+	// Test task scheduling in disabled mode.
 	task := &Task{
 		ID: 1,
 		Function: func() interface{} {
@@ -527,7 +537,7 @@ func TestOptimizer_DisabledMode(t *testing.T) {
 func TestLoadBalancer_Migration(t *testing.T) {
 	scheduler := NewScheduler()
 
-	// Create unbalanced queues
+	// Create unbalanced queues.
 	for i := 0; i < 5; i++ {
 		task := &Task{
 			ID:      uint64(i),
@@ -536,10 +546,10 @@ func TestLoadBalancer_Migration(t *testing.T) {
 		scheduler.EnqueueTask(0, task) // All tasks on node 0
 	}
 
-	// Perform load balancing
+	// Perform load balancing.
 	scheduler.balancer.balance(scheduler)
 
-	// Check if some tasks were migrated
+	// Check if some tasks were migrated.
 	queue0Length := scheduler.queues[0].length
 	if queue0Length >= 5 {
 		t.Error("Load balancer should have migrated some tasks")
@@ -629,8 +639,9 @@ func TestAffinityPolicy_Configuration(t *testing.T) {
 func TestPerformanceOptimization(t *testing.T) {
 	optimizer := NewOptimizer()
 
-	// Test large allocation performance
+	// Test large allocation performance.
 	const numAllocs = 1000
+
 	start := time.Now()
 
 	for i := 0; i < numAllocs; i++ {

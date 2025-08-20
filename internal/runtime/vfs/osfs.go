@@ -29,6 +29,7 @@ func (fsys *OSFS) Walk(root string, fn func(fullPath string, d fs.DirEntry, err 
 	if fn == nil {
 		return errors.New("nil walk fn")
 	}
+
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		return fn(p, d, err)
 	})

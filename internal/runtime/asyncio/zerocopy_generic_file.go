@@ -1,5 +1,5 @@
-//go:build freebsd || netbsd || openbsd
-// +build freebsd netbsd openbsd
+//go:build freebsd || netbsd || openbsd.
+// +build freebsd netbsd openbsd.
 
 package asyncio
 

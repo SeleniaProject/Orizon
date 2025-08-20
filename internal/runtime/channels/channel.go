@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-// Channel is a thin, type-safe wrapper that provides convenience APIs
+// Channel is a thin, type-safe wrapper that provides convenience APIs.
 // around Go's native channels, including non-blocking ops and multi-recv select.
 type Channel[T any] struct {
 	ch     chan T
@@ -19,6 +19,7 @@ func New[T any](capacity int) *Channel[T] {
 	if capacity < 0 {
 		capacity = 0
 	}
+
 	return &Channel[T]{ch: make(chan T, capacity)}
 }
 
@@ -30,10 +31,12 @@ func (c *Channel[T]) Send(ctx context.Context, v T) error {
 	if c.closed.Load() {
 		return ErrClosed
 	}
+
 	if ctx == nil {
-		// Derive a cancelable context to avoid unbounded blocking when caller passes nil
+		// Derive a cancelable context to avoid unbounded blocking when caller passes nil.
 		c, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		ctx = c
 	}
 	select {
@@ -63,6 +66,7 @@ func (c *Channel[T]) Recv(ctx context.Context) (val T, ok bool, err error) {
 	if ctx == nil {
 		c, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		ctx = c
 	}
 	select {
@@ -70,6 +74,7 @@ func (c *Channel[T]) Recv(ctx context.Context) (val T, ok bool, err error) {
 		return v, ok2, nil
 	case <-ctx.Done():
 		var zero T
+
 		return zero, false, ctx.Err()
 	}
 }
@@ -81,6 +86,7 @@ func (c *Channel[T]) TryRecv() (val T, ok bool) {
 		return v, ok2
 	default:
 		var zero T
+
 		return zero, false
 	}
 }
@@ -106,31 +112,35 @@ func SelectRecv[T any](ctx context.Context, chans ...*Channel[T]) (T, int, bool,
 	if len(chans) == 0 {
 		return zero, -1, false, errors.New("channel: no channels")
 	}
+
 	if ctx == nil {
 		c, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		ctx = c
 	}
 	// Use reflect.Select to avoid active polling across many channels.
 	// Build select cases including a context cancellation case.
 	cases := make([]reflect.SelectCase, 0, len(chans)+1)
-	// Context case
+	// Context case.
 	doneCh := ctx.Done()
 	cases = append(cases, reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(doneCh)})
-	// Channel cases
+	// Channel cases.
 	for _, ch := range chans {
 		cases = append(cases, reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch.ch)})
 	}
+
 	chosen, recv, ok := reflect.Select(cases)
 	if chosen == 0 {
-		// Context canceled
+		// Context canceled.
 		return zero, -1, false, ctx.Err()
 	}
-	// Adjust index since 0 is the context case
+	// Adjust index since 0 is the context case.
 	val := recv.Interface()
+
 	if !ok {
 		return zero, chosen - 1, false, nil
 	}
-	// Type assertion is safe because underlying channel type is T
+	// Type assertion is safe because underlying channel type is T.
 	return val.(T), chosen - 1, true, nil
 }

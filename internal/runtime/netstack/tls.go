@@ -16,24 +16,28 @@ func TLSDial(network, addr string, cfg *tls.Config) (net.Conn, error) {
 		cfg = cfg.Clone()
 		cfg.MinVersion = tls.VersionTLS13
 	}
+
 	if cfg.ServerName == "" {
 		// Derive SNI from addr if host:port format is provided.
 		host := addr
 		if idx := strings.LastIndexByte(addr, ':'); idx > 0 {
 			host = addr[:idx]
 		}
-		// IPv6 literals in brackets like [::1]:443 → strip brackets
+		// IPv6 literals in brackets like [::1]:443 → strip brackets.
 		host = strings.TrimPrefix(host, "[")
 		host = strings.TrimSuffix(host, "]")
+
 		if host != "" {
 			if cfg == nil {
 				cfg = &tls.Config{}
 			} else {
 				cfg = cfg.Clone()
 			}
+
 			cfg.ServerName = host
 		}
 	}
+
 	return tls.Dial(network, addr, cfg)
 }
 
@@ -47,5 +51,6 @@ func TLSServer(ln net.Listener, cfg *tls.Config) net.Listener {
 		c.MinVersion = tls.VersionTLS13
 		cfg = c
 	}
+
 	return tls.NewListener(ln, cfg)
 }

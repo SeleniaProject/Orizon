@@ -1,5 +1,5 @@
-//go:build windows && iocp
-// +build windows,iocp
+//go:build windows && iocp.
+// +build windows,iocp.
 
 package asyncio
 

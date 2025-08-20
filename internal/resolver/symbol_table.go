@@ -1,9 +1,10 @@
-// Symbol resolution and scope management for the Orizon programming language
-// This package provides comprehensive name resolution capabilities for the HIR
+// Symbol resolution and scope management for the Orizon programming language.
+// This package provides comprehensive name resolution capabilities for the HIR.
 
 package resolver
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/position"
 )
 
-// SymbolKind represents the kind of symbol
+// SymbolKind represents the kind of symbol.
 type SymbolKind int
 
 const (
@@ -27,7 +28,7 @@ const (
 	SymbolKindGeneric
 )
 
-// String returns the string representation of SymbolKind
+// String returns the string representation of SymbolKind.
 func (sk SymbolKind) String() string {
 	switch sk {
 	case SymbolKindVariable:
@@ -55,7 +56,7 @@ func (sk SymbolKind) String() string {
 	}
 }
 
-// Visibility represents symbol visibility
+// Visibility represents symbol visibility.
 type Visibility int
 
 const (
@@ -66,7 +67,7 @@ const (
 	VisibilityReadonly
 )
 
-// String returns the string representation of Visibility
+// String returns the string representation of Visibility.
 func (v Visibility) String() string {
 	switch v {
 	case VisibilityPrivate:
@@ -84,52 +85,37 @@ func (v Visibility) String() string {
 	}
 }
 
-// Symbol represents a named entity in the program
+// Symbol represents a named entity in the program.
 type Symbol struct {
-	// Basic information
-	Name       string
-	Kind       SymbolKind
-	Type       hir.TypeInfo
-	Visibility Visibility
-
-	// Source location
-	DeclSpan position.Span
-
-	// Scope and module information
-	ScopeID  ScopeID
-	ModuleID hir.NodeID
-
-	// HIR node reference
-	HIRNode hir.HIRNode
-
-	// Attributes and flags
-	IsMutable    bool
-	IsGeneric    bool
-	IsExported   bool
-	IsDeprecated bool
-
-	// Generic type parameters (if applicable)
+	HIRNode        hir.HIRNode
+	Type           hir.TypeInfo
+	Documentation  string
+	Name           string
+	Dependencies   []string
 	TypeParameters []GenericParameter
-
-	// Documentation
-	Documentation string
-
-	// Metadata for analysis
-	UsageCount   int
-	LastUsedSpan position.Span
-	Dependencies []string
+	DeclSpan       position.Span
+	LastUsedSpan   position.Span
+	ModuleID       hir.NodeID
+	ScopeID        ScopeID
+	Visibility     Visibility
+	UsageCount     int
+	Kind           SymbolKind
+	IsMutable      bool
+	IsGeneric      bool
+	IsExported     bool
+	IsDeprecated   bool
 }
 
-// GenericParameter represents a generic type parameter
+// GenericParameter represents a generic type parameter.
 type GenericParameter struct {
+	DefaultType *hir.TypeInfo
 	Name        string
 	Constraints []hir.TypeInfo
-	DefaultType *hir.TypeInfo
-	Variance    Variance
 	Span        position.Span
+	Variance    Variance
 }
 
-// Variance represents generic parameter variance
+// Variance represents generic parameter variance.
 type Variance int
 
 const (
@@ -138,37 +124,28 @@ const (
 	VarianceContravariant
 )
 
-// ScopeID represents a unique scope identifier
+// ScopeID represents a unique scope identifier.
 type ScopeID uint64
 
-// Scope represents a lexical scope
+// Scope represents a lexical scope.
 type Scope struct {
-	// Basic information
-	ID       ScopeID
-	Kind     ScopeKind
-	Name     string
-	ParentID *ScopeID
-
-	// Source location
-	Span position.Span
-
-	// Symbol management
 	Symbols         map[string]*Symbol
-	Children        []ScopeID
 	ImportedSymbols map[string]*ImportedSymbol
-
-	// Scope-specific properties
-	ModuleID    hir.NodeID
-	IsGeneric   bool
-	AccessRules []AccessRule
-
-	// Metadata
-	Depth        int
-	SymbolCount  int
-	LastAccessed position.Span
+	ParentID        *ScopeID
+	Name            string
+	Children        []ScopeID
+	AccessRules     []AccessRule
+	Span            position.Span
+	LastAccessed    position.Span
+	ID              ScopeID
+	Kind            ScopeKind
+	ModuleID        hir.NodeID
+	Depth           int
+	SymbolCount     int
+	IsGeneric       bool
 }
 
-// ScopeKind represents the kind of scope
+// ScopeKind represents the kind of scope.
 type ScopeKind int
 
 const (
@@ -185,7 +162,7 @@ const (
 	ScopeKindConditional
 )
 
-// String returns the string representation of ScopeKind
+// String returns the string representation of ScopeKind.
 func (sk ScopeKind) String() string {
 	switch sk {
 	case ScopeKindGlobal:
@@ -215,79 +192,68 @@ func (sk ScopeKind) String() string {
 	}
 }
 
-// ImportedSymbol represents a symbol imported from another module
+// ImportedSymbol represents a symbol imported from another module.
 type ImportedSymbol struct {
 	Symbol     *Symbol
 	ImportPath string
 	Alias      string
-	IsWildcard bool
 	ImportSpan position.Span
+	IsWildcard bool
 }
 
-// AccessRule represents visibility access rules
+// AccessRule represents visibility access rules.
 type AccessRule struct {
+	Condition  AccessCondition
 	Pattern    string
 	Visibility Visibility
-	Condition  AccessCondition
 }
 
-// AccessCondition represents conditions for access rules
+// AccessCondition represents conditions for access rules.
 type AccessCondition struct {
 	RequiredTrait string
 	ModulePattern string
 	ContextType   string
 }
 
-// SymbolTable manages symbol resolution and scopes
+// SymbolTable manages symbol resolution and scopes.
 type SymbolTable struct {
-	// Scope management
-	scopes       map[ScopeID]*Scope
-	rootScopeID  ScopeID
-	currentScope ScopeID
-	scopeCounter ScopeID
-
-	// Symbol lookup optimization
-	symbolCache   map[string][]*Symbol
-	quickLookup   map[string]*Symbol
-	moduleSymbols map[hir.NodeID]map[string]*Symbol
-
-	// Import management
-	imports     map[string]*ImportInfo
-	importGraph *ImportGraph
-
-	// Error tracking
-	errors   []ResolutionError
-	warnings []ResolutionWarning
-
-	// Configuration
+	importGraph    *ImportGraph
+	moduleSymbols  map[hir.NodeID]map[string]*Symbol
+	scopes         map[ScopeID]*Scope
+	imports        map[string]*ImportInfo
+	symbolCache    map[string][]*Symbol
+	quickLookup    map[string]*Symbol
+	errors         []ResolutionError
+	warnings       []ResolutionWarning
+	scopeCounter   ScopeID
+	rootScopeID    ScopeID
+	currentScope   ScopeID
+	totalSymbols   int
+	lookupCount    int
+	cacheHitCount  int
 	strictMode     bool
 	allowShadowing bool
 	caseSensitive  bool
-
-	// Statistics
-	totalSymbols  int
-	lookupCount   int
-	cacheHitCount int
 }
 
-// ImportInfo represents module import information
+// ImportInfo represents module import information.
 type ImportInfo struct {
+	ImportedSymbols map[string]string
 	ModulePath      string
 	Alias           string
-	ImportedSymbols map[string]string // local name -> original name
-	IsWildcard      bool
 	ImportSpan      position.Span
 	ModuleID        hir.NodeID
+	IsWildcard      bool
 }
 
-// ImportGraph represents the module dependency graph
+// ImportGraph represents the module dependency graph.
 type ImportGraph struct {
 	nodes    map[string]*ImportNode
 	edges    map[string][]string
 	hasCycle bool
 }
 
-// ImportNode represents a node in the import graph
+// ImportNode represents a node in the import graph.
 type ImportNode struct {
 	ModulePath   string
 	Dependencies []string
@@ -295,16 +261,16 @@ type ImportNode struct {
 	IsProcessed  bool
 }
 
-// ResolutionError represents a symbol resolution error
+// ResolutionError represents a symbol resolution error.
 type ResolutionError struct {
-	Kind    ResolutionErrorKind
 	Message string
-	Span    position.Span
 	Symbol  string
 	Related []RelatedInformation
+	Span    position.Span
+	Kind    ResolutionErrorKind
 }
 
-// ResolutionErrorKind represents the kind of resolution error
+// ResolutionErrorKind represents the kind of resolution error.
 type ResolutionErrorKind int
 
 const (
@@ -320,15 +286,15 @@ const (
 	ErrorKindInvalidImport
 )
 
-// ResolutionWarning represents a symbol resolution warning
+// ResolutionWarning represents a symbol resolution warning.
 type ResolutionWarning struct {
-	Kind    ResolutionWarningKind
 	Message string
-	Span    position.Span
 	Symbol  string
+	Span    position.Span
+	Kind    ResolutionWarningKind
 }
 
-// ResolutionWarningKind represents the kind of resolution warning
+// ResolutionWarningKind represents the kind of resolution warning.
 type ResolutionWarningKind int
 
 const (
@@ -340,13 +306,13 @@ const (
 	WarningKindNamingConvention
 )
 
-// RelatedInformation provides additional context for errors
+// RelatedInformation provides additional context for errors.
 type RelatedInformation struct {
-	Span    position.Span
 	Message string
+	Span    position.Span
 }
 
-// NewSymbolTable creates a new symbol table
+// NewSymbolTable creates a new symbol table.
 func NewSymbolTable() *SymbolTable {
 	st := &SymbolTable{
 		scopes:         make(map[ScopeID]*Scope),
@@ -363,14 +329,14 @@ func NewSymbolTable() *SymbolTable {
 		scopeCounter:   0, // Start from 0 so first scope has ID 1
 	}
 
-	// Create global scope
+	// Create global scope.
 	st.rootScopeID = st.createScope(ScopeKindGlobal, "global", nil, position.Span{})
 	st.currentScope = st.rootScopeID
 
 	return st
 }
 
-// NewImportGraph creates a new import graph
+// NewImportGraph creates a new import graph.
 func NewImportGraph() *ImportGraph {
 	return &ImportGraph{
 		nodes: make(map[string]*ImportNode),
@@ -378,13 +344,14 @@ func NewImportGraph() *ImportGraph {
 	}
 }
 
-// CreateScope creates a new scope
+// CreateScope creates a new scope.
 func (st *SymbolTable) CreateScope(kind ScopeKind, name string, span position.Span) ScopeID {
 	currentScopeID := st.currentScope
+
 	return st.createScope(kind, name, &currentScopeID, span)
 }
 
-// createScope is the internal scope creation method
+// createScope is the internal scope creation method.
 func (st *SymbolTable) createScope(kind ScopeKind, name string, parentID *ScopeID, span position.Span) ScopeID {
 	st.scopeCounter++
 	scopeID := st.scopeCounter
@@ -401,7 +368,7 @@ func (st *SymbolTable) createScope(kind ScopeKind, name string, parentID *ScopeI
 		AccessRules:     []AccessRule{},
 	}
 
-	// Set depth based on parent
+	// Set depth based on parent.
 	if parentID != nil {
 		if parent, exists := st.scopes[*parentID]; exists {
 			scope.Depth = parent.Depth + 1
@@ -410,102 +377,113 @@ func (st *SymbolTable) createScope(kind ScopeKind, name string, parentID *ScopeI
 	}
 
 	st.scopes[scopeID] = scope
+
 	return scopeID
 }
 
-// EnterScope changes the current scope
+// EnterScope changes the current scope.
 func (st *SymbolTable) EnterScope(scopeID ScopeID) error {
 	if _, exists := st.scopes[scopeID]; !exists {
 		return fmt.Errorf("scope %d does not exist", scopeID)
 	}
+
 	st.currentScope = scopeID
-	// Clear caches when entering new scope
+	// Clear caches when entering new scope.
 	st.quickLookup = make(map[string]*Symbol)
+
 	return nil
 }
 
-// ExitScope returns to the parent scope
+// ExitScope returns to the parent scope.
 func (st *SymbolTable) ExitScope() error {
 	currentScope := st.scopes[st.currentScope]
 	if currentScope.ParentID == nil {
 		return fmt.Errorf("cannot exit root scope")
 	}
+
 	st.currentScope = *currentScope.ParentID
-	// Clear caches when exiting scope
+	// Clear caches when exiting scope.
 	st.quickLookup = make(map[string]*Symbol)
+
 	return nil
 }
 
-// DefineSymbol adds a new symbol to the current scope
+// DefineSymbol adds a new symbol to the current scope.
 func (st *SymbolTable) DefineSymbol(symbol *Symbol) error {
 	currentScope := st.scopes[st.currentScope]
 
-	// Check for duplicate symbols
+	// Check for duplicate symbols.
 	if existing, exists := currentScope.Symbols[symbol.Name]; exists {
 		if !st.allowShadowing {
 			return st.createDuplicateSymbolError(symbol, existing)
 		}
 	}
 
-	// Set scope information
+	// Set scope information.
 	symbol.ScopeID = st.currentScope
 	symbol.ModuleID = currentScope.ModuleID
 
-	// Add to scope
+	// Add to scope.
 	currentScope.Symbols[symbol.Name] = symbol
 	currentScope.SymbolCount++
 	st.totalSymbols++
 
-	// Update caches
+	// Update caches.
 	st.invalidateCache(symbol.Name)
 
-	// Add to module symbols
+	// Add to module symbols.
 	if st.moduleSymbols[symbol.ModuleID] == nil {
 		st.moduleSymbols[symbol.ModuleID] = make(map[string]*Symbol)
 	}
+
 	st.moduleSymbols[symbol.ModuleID][symbol.Name] = symbol
 
 	return nil
 }
 
-// LookupSymbol searches for a symbol by name
+// LookupSymbol searches for a symbol by name.
 func (st *SymbolTable) LookupSymbol(name string) (*Symbol, error) {
 	st.lookupCount++
 
-	// Check quick lookup cache first
+	// Check quick lookup cache first.
 	if symbol, exists := st.quickLookup[name]; exists {
 		st.cacheHitCount++
+
 		return symbol, nil
 	}
 
-	// Search from current scope upward
+	// Search from current scope upward.
 	scopeID := st.currentScope
+
 	for {
 		scope := st.scopes[scopeID]
 
-		// Check local symbols
+		// Check local symbols.
 		if symbol, exists := scope.Symbols[name]; exists {
 			st.quickLookup[name] = symbol
+
 			return symbol, nil
 		}
 
-		// Check imported symbols
+		// Check imported symbols.
 		if imported, exists := scope.ImportedSymbols[name]; exists {
 			st.quickLookup[name] = imported.Symbol
+
 			return imported.Symbol, nil
 		}
 
-		// Move to parent scope
+		// Move to parent scope.
 		if scope.ParentID == nil {
 			break
 		}
+
 		scopeID = *scope.ParentID
 	}
 
 	return nil, st.createUndefinedSymbolError(name, st.getCurrentSpan())
 }
 
-// LookupSymbolInScope searches for a symbol in a specific scope
+// LookupSymbolInScope searches for a symbol in a specific scope.
 func (st *SymbolTable) LookupSymbolInScope(name string, scopeID ScopeID) (*Symbol, error) {
 	scope, exists := st.scopes[scopeID]
 	if !exists {
@@ -519,21 +497,22 @@ func (st *SymbolTable) LookupSymbolInScope(name string, scopeID ScopeID) (*Symbo
 	return nil, st.createUndefinedSymbolError(name, scope.Span)
 }
 
-// GetCurrentScope returns the current scope ID
+// GetCurrentScope returns the current scope ID.
 func (st *SymbolTable) GetCurrentScope() ScopeID {
 	return st.currentScope
 }
 
-// GetScope returns a scope by ID
+// GetScope returns a scope by ID.
 func (st *SymbolTable) GetScope(scopeID ScopeID) (*Scope, error) {
 	scope, exists := st.scopes[scopeID]
 	if !exists {
 		return nil, fmt.Errorf("scope %d does not exist", scopeID)
 	}
+
 	return scope, nil
 }
 
-// GetScopePath returns the path from root to the given scope
+// GetScopePath returns the path from root to the given scope.
 func (st *SymbolTable) GetScopePath(scopeID ScopeID) ([]ScopeID, error) {
 	path := []ScopeID{}
 	current := scopeID
@@ -549,53 +528,55 @@ func (st *SymbolTable) GetScopePath(scopeID ScopeID) ([]ScopeID, error) {
 		if scope.ParentID == nil {
 			break
 		}
+
 		current = *scope.ParentID
 	}
 
 	return path, nil
 }
 
-// AddImport adds an import to the current scope
+// AddImport adds an import to the current scope.
 func (st *SymbolTable) AddImport(importInfo *ImportInfo) error {
 	currentScope := st.scopes[st.currentScope]
 
-	// Add to import graph
+	// Add to import graph.
 	st.importGraph.AddImport(importInfo.ModulePath, currentScope.Name)
 
-	// Check for circular imports
+	// Check for circular imports.
 	if st.importGraph.HasCycle() {
 		return st.createCircularImportError(importInfo)
 	}
 
-	// Store import info
+	// Store import info.
 	st.imports[importInfo.ModulePath] = importInfo
 
 	return nil
 }
 
-// ResolveHIRProgram performs symbol resolution on an HIR program
+// ResolveHIRProgram performs symbol resolution on an HIR program.
 func (st *SymbolTable) ResolveHIRProgram(program *hir.HIRProgram) error {
 	resolver := NewResolver(st)
+
 	return resolver.ResolveProgram(program)
 }
 
-// GetErrors returns all resolution errors
+// GetErrors returns all resolution errors.
 func (st *SymbolTable) GetErrors() []ResolutionError {
 	return st.errors
 }
 
-// GetWarnings returns all resolution warnings
+// GetWarnings returns all resolution warnings.
 func (st *SymbolTable) GetWarnings() []ResolutionWarning {
 	return st.warnings
 }
 
-// ClearErrors clears all errors and warnings
+// ClearErrors clears all errors and warnings.
 func (st *SymbolTable) ClearErrors() {
 	st.errors = []ResolutionError{}
 	st.warnings = []ResolutionWarning{}
 }
 
-// GetStatistics returns symbol table statistics
+// GetStatistics returns symbol table statistics.
 func (st *SymbolTable) GetStatistics() SymbolTableStatistics {
 	return SymbolTableStatistics{
 		TotalSymbols:  st.totalSymbols,
@@ -608,7 +589,7 @@ func (st *SymbolTable) GetStatistics() SymbolTableStatistics {
 	}
 }
 
-// SymbolTableStatistics contains symbol table performance statistics
+// SymbolTableStatistics contains symbol table performance statistics.
 type SymbolTableStatistics struct {
 	TotalSymbols  int
 	TotalScopes   int
@@ -619,7 +600,7 @@ type SymbolTableStatistics struct {
 	WarningCount  int
 }
 
-// Helper methods for error creation
+// Helper methods for error creation.
 func (st *SymbolTable) createDuplicateSymbolError(new, existing *Symbol) error {
 	err := ResolutionError{
 		Kind:    ErrorKindDuplicateSymbol,
@@ -634,7 +615,8 @@ func (st *SymbolTable) createDuplicateSymbolError(new, existing *Symbol) error {
 		},
 	}
 	st.errors = append(st.errors, err)
-	return fmt.Errorf(err.Message)
+
+	return errors.New(err.Message)
 }
 
 func (st *SymbolTable) createUndefinedSymbolError(name string, span position.Span) error {
@@ -645,7 +627,8 @@ func (st *SymbolTable) createUndefinedSymbolError(name string, span position.Spa
 		Symbol:  name,
 	}
 	st.errors = append(st.errors, err)
-	return fmt.Errorf(err.Message)
+
+	return errors.New(err.Message)
 }
 
 func (st *SymbolTable) createCircularImportError(importInfo *ImportInfo) error {
@@ -656,10 +639,11 @@ func (st *SymbolTable) createCircularImportError(importInfo *ImportInfo) error {
 		Symbol:  importInfo.ModulePath,
 	}
 	st.errors = append(st.errors, err)
-	return fmt.Errorf(err.Message)
+
+	return errors.New(err.Message)
 }
 
-// Helper methods for cache management
+// Helper methods for cache management.
 func (st *SymbolTable) invalidateCache(symbolName string) {
 	delete(st.quickLookup, symbolName)
 	delete(st.symbolCache, symbolName)
@@ -669,10 +653,11 @@ func (st *SymbolTable) getCurrentSpan() position.Span {
 	if scope, exists := st.scopes[st.currentScope]; exists {
 		return scope.LastAccessed
 	}
+
 	return position.Span{}
 }
 
-// Import graph methods
+// Import graph methods.
 func (ig *ImportGraph) AddImport(from, to string) {
 	if ig.nodes[from] == nil {
 		ig.nodes[from] = &ImportNode{
@@ -703,12 +688,14 @@ func (ig *ImportGraph) HasCycle() bool {
 		if !visited[node] {
 			if ig.detectCycleDFS(node, visited, recStack) {
 				ig.hasCycle = true
+
 				return true
 			}
 		}
 	}
 
 	ig.hasCycle = false
+
 	return false
 }
 
@@ -727,10 +714,11 @@ func (ig *ImportGraph) detectCycleDFS(node string, visited, recStack map[string]
 	}
 
 	recStack[node] = false
+
 	return false
 }
 
-// String methods for debugging
+// String methods for debugging.
 func (s *Symbol) String() string {
 	var parts []string
 	parts = append(parts, fmt.Sprintf("Symbol{%s", s.Name))
@@ -741,9 +729,11 @@ func (s *Symbol) String() string {
 	if s.IsMutable {
 		parts = append(parts, "mutable")
 	}
+
 	if s.IsGeneric {
 		parts = append(parts, "generic")
 	}
+
 	if s.IsExported {
 		parts = append(parts, "exported")
 	}

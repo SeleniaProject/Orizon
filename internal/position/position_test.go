@@ -7,9 +7,9 @@ import (
 func TestPosition(t *testing.T) {
 	tests := []struct {
 		name     string
+		expected string
 		pos      Position
 		isValid  bool
-		expected string
 	}{
 		{
 			name: "Valid position with filename",
@@ -97,10 +97,10 @@ func TestPositionComparison(t *testing.T) {
 func TestSpan(t *testing.T) {
 	tests := []struct {
 		name     string
-		span     Span
-		isValid  bool
 		expected string
+		span     Span
 		length   int
+		isValid  bool
 	}{
 		{
 			name: "Valid span same line",
@@ -322,8 +322,8 @@ func TestSourceFilePositionConversion(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		offset   int
 		expected Position
+		offset   int
 	}{
 		{
 			name:   "Start of file",
@@ -364,7 +364,7 @@ func TestSourceFilePositionConversion(t *testing.T) {
 				t.Errorf("PositionFromOffset(%d) = %v, want %v", tt.offset, pos, tt.expected)
 			}
 
-			// Test round trip conversion
+			// Test round trip conversion.
 			offset := file.OffsetFromPosition(pos)
 			if offset != tt.offset {
 				t.Errorf("OffsetFromPosition(%v) = %d, want %d", pos, offset, tt.offset)
@@ -399,7 +399,7 @@ func TestSourceMap(t *testing.T) {
 	file1 := sm.AddFile("main.oriz", content1)
 	file2 := sm.AddFile("user.oriz", content2)
 
-	// Test file retrieval
+	// Test file retrieval.
 	if got := sm.GetFile("main.oriz"); got != file1 {
 		t.Error("GetFile returned wrong file")
 	}
@@ -408,7 +408,7 @@ func TestSourceMap(t *testing.T) {
 		t.Error("GetFile returned wrong file")
 	}
 
-	// Test span text retrieval
+	// Test span text retrieval.
 	span := Span{
 		Start: Position{Filename: "main.oriz", Line: 1, Column: 1, Offset: 0},
 		End:   Position{Filename: "main.oriz", Line: 1, Column: 5, Offset: 4},
@@ -421,7 +421,7 @@ func TestSourceMap(t *testing.T) {
 		t.Errorf("GetSpanText() = %v, want %v", text, expected)
 	}
 
-	// Test line retrieval
+	// Test line retrieval.
 	pos := Position{Filename: "user.oriz", Line: 1, Column: 1, Offset: 0}
 	line := sm.GetLine(pos)
 	expected = "type User struct {}"
@@ -430,7 +430,7 @@ func TestSourceMap(t *testing.T) {
 		t.Errorf("GetLine() = %v, want %v", line, expected)
 	}
 
-	// Test file listing
+	// Test file listing.
 	files := sm.GetFiles()
 	if len(files) != 2 {
 		t.Errorf("GetFiles() returned %d files, want 2", len(files))
@@ -443,7 +443,7 @@ func TestDiagnostic(t *testing.T) {
 	pos1 := Position{Filename: "test.oriz", Line: 1, Column: 5, Offset: 4}
 	pos2 := Position{Filename: "test.oriz", Line: 2, Column: 10, Offset: 20}
 
-	// Test initial state
+	// Test initial state.
 	if diag.HasErrors() {
 		t.Error("New diagnostic should not have errors")
 	}
@@ -452,7 +452,7 @@ func TestDiagnostic(t *testing.T) {
 		t.Error("New diagnostic should not have warnings")
 	}
 
-	// Add error
+	// Add error.
 	diag.AddError(pos1, "syntax", "unexpected token")
 
 	if !diag.HasErrors() {
@@ -463,7 +463,7 @@ func TestDiagnostic(t *testing.T) {
 		t.Errorf("ErrorCount() = %d, want 1", diag.ErrorCount())
 	}
 
-	// Add warning
+	// Add warning.
 	diag.AddWarning(pos2, "unused", "variable not used")
 
 	if !diag.HasWarnings() {
@@ -474,21 +474,23 @@ func TestDiagnostic(t *testing.T) {
 		t.Errorf("WarningCount() = %d, want 1", diag.WarningCount())
 	}
 
-	// Test error formatting
+	// Test error formatting.
 	error := diag.Errors[0]
 	expected := "test.oriz:1:5: syntax: unexpected token"
+
 	if error.String() != expected {
 		t.Errorf("Error.String() = %v, want %v", error.String(), expected)
 	}
 
-	// Test warning formatting
+	// Test warning formatting.
 	warning := diag.Warnings[0]
 	expected = "test.oriz:2:10: warning: unused: variable not used"
+
 	if warning.String() != expected {
 		t.Errorf("Warning.String() = %v, want %v", warning.String(), expected)
 	}
 
-	// Test clear
+	// Test clear.
 	diag.Clear()
 
 	if diag.HasErrors() || diag.HasWarnings() {
@@ -501,13 +503,13 @@ func TestDiagnostic(t *testing.T) {
 }
 
 func TestInvalidPositions(t *testing.T) {
-	// Test invalid position handling
+	// Test invalid position handling.
 	invalidPos := Position{Line: 0, Column: 1, Offset: 0}
 	if invalidPos.IsValid() {
 		t.Error("Invalid position should not be valid")
 	}
 
-	// Test invalid span handling
+	// Test invalid span handling.
 	invalidSpan := Span{
 		Start: invalidPos,
 		End:   Position{Line: 1, Column: 1, Offset: 0},
@@ -516,7 +518,7 @@ func TestInvalidPositions(t *testing.T) {
 		t.Error("Invalid span should not be valid")
 	}
 
-	// Test operations on invalid spans
+	// Test operations on invalid spans.
 	if invalidSpan.Length() != 0 {
 		t.Error("Invalid span length should be 0")
 	}

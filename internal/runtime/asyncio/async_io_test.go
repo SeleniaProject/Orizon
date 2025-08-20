@@ -28,7 +28,7 @@ func testPoller_Stress_RapidRegDereg(t *testing.T, makePoller func() Poller) {
 	}
 	defer ln.Close()
 
-	// acceptor
+	// acceptor.
 	srvCh := make(chan net.Conn, n)
 	go func() {
 		for i := 0; i < n; i++ {
@@ -41,7 +41,7 @@ func testPoller_Stress_RapidRegDereg(t *testing.T, makePoller func() Poller) {
 		}
 	}()
 
-	// dials
+	// dials.
 	clients := make([]net.Conn, 0, n)
 	for i := 0; i < n; i++ {
 		c, er := net.Dial("tcp", ln.Addr().String())
@@ -82,7 +82,7 @@ func testPoller_Stress_RapidRegDereg(t *testing.T, makePoller func() Poller) {
 		_ = p.Deregister(s)
 	}
 
-	// Small observation window: expect no events
+	// Small observation window: expect no events.
 	if _, ok := waitEvent(t, evCh, 250*time.Millisecond); ok {
 		t.Fatalf("unexpected event observed in rapid reg/dereg stress")
 	}
@@ -137,7 +137,7 @@ func benchmarkPoller_WritableRate(b *testing.B, makePoller func() Poller) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// single iteration observes events for ~10ms
+		// single iteration observes events for ~10ms.
 		time.Sleep(10 * time.Millisecond)
 	}
 	b.StopTimer()
@@ -150,7 +150,7 @@ func BenchmarkDefaultPoller_WritableRate(b *testing.B) {
 func BenchmarkOSPoller_WritableRate(b *testing.B) { benchmarkPoller_WritableRate(b, NewOSPoller) }
 
 func testPollerReadableAndDeregister(t *testing.T, makePoller func() Poller) {
-	// Setup TCP loopback pair
+	// Setup TCP loopback pair.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -185,29 +185,29 @@ func testPollerReadableAndDeregister(t *testing.T, makePoller func() Poller) {
 		t.Fatalf("register: %v", err)
 	}
 
-	// Trigger readability by writing from client
+	// Trigger readability by writing from client.
 	if _, err := cli.Write([]byte("hello")); err != nil {
 		t.Fatalf("client write: %v", err)
 	}
 
-	// Expect a Readable event
+	// Expect a Readable event.
 	if ev, ok := waitEvent(t, evCh, 2*time.Second); !ok || ev.Type != Readable {
 		t.Fatalf("expected Readable event, got: %+v (ok=%v)", ev, ok)
 	}
 
-	// Deregister and ensure no further events are delivered
+	// Deregister and ensure no further events are delivered.
 	if err := p.Deregister(srv); err != nil {
 		t.Fatalf("deregister: %v", err)
 	}
 
-	// Drain any events that might have been queued just before deregistration
+	// Drain any events that might have been queued just before deregistration.
 	drainDeadline := time.Now().Add(100 * time.Millisecond)
 	for {
 		select {
 		case <-evCh:
-			// keep draining
+			// keep draining.
 		default:
-			// small wait loop to catch stragglers within the drain window
+			// small wait loop to catch stragglers within the drain window.
 			if time.Now().After(drainDeadline) {
 				goto drained
 			}
@@ -216,7 +216,7 @@ func testPollerReadableAndDeregister(t *testing.T, makePoller func() Poller) {
 	}
 drained:
 
-	// Try to trigger more events after deregister
+	// Try to trigger more events after deregister.
 	_, _ = cli.Write([]byte("more"))
 
 	if _, ok := waitEvent(t, evCh, 250*time.Millisecond); ok {
@@ -330,7 +330,7 @@ func testPollerWritableThrottled(t *testing.T, makePoller func() Poller) {
 		t.Fatal(err)
 	}
 
-	// Observe for 200ms; expect at most ~5 notifications if throttled at 50ms
+	// Observe for 200ms; expect at most ~5 notifications if throttled at 50ms.
 	time.Sleep(200 * time.Millisecond)
 	c := atomic.LoadInt32(&count)
 	if c > 6 { // allow slight jitter
@@ -378,7 +378,7 @@ func testPollerRegisterIdempotent(t *testing.T, makePoller func() Poller) {
 
 	var firstCount int32
 	var secondCount int32
-	// First registration
+	// First registration.
 	if err := p.Register(srv, []EventType{Readable}, func(ev Event) {
 		if ev.Type == Readable {
 			atomic.AddInt32(&firstCount, 1)
@@ -395,7 +395,7 @@ func testPollerRegisterIdempotent(t *testing.T, makePoller func() Poller) {
 		t.Fatalf("second register (idempotent) failed: %v", err)
 	}
 
-	// Trigger readability
+	// Trigger readability.
 	if _, err := cli.Write([]byte("X")); err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +452,7 @@ func testPollerRegisterIdempotent_UpdateKinds(t *testing.T, makePoller func() Po
 	gotReadable := atomic.Bool{}
 	gotWritable := atomic.Bool{}
 
-	// First: Readable only
+	// First: Readable only.
 	if err := p.Register(srv, []EventType{Readable}, func(ev Event) {
 		if ev.Type == Readable {
 			gotReadable.Store(true)
@@ -461,7 +461,7 @@ func testPollerRegisterIdempotent_UpdateKinds(t *testing.T, makePoller func() Po
 		t.Fatalf("register: %v", err)
 	}
 
-	// Immediately re-register: Writable only
+	// Immediately re-register: Writable only.
 	if err := p.Register(srv, []EventType{Writable}, func(ev Event) {
 		if ev.Type == Writable {
 			gotWritable.Store(true)
@@ -470,7 +470,7 @@ func testPollerRegisterIdempotent_UpdateKinds(t *testing.T, makePoller func() Po
 		t.Fatalf("reregister(writable): %v", err)
 	}
 
-	// Wait a bit to allow writable probe
+	// Wait a bit to allow writable probe.
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) && !gotWritable.Load() {
 		time.Sleep(5 * time.Millisecond)
@@ -525,12 +525,12 @@ func testPollerDeregisterIdempotent(t *testing.T, makePoller func() Poller) {
 	if err := p.Register(srv, []EventType{Readable, Writable}, func(ev Event) { evCh <- ev }); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	// trigger an event then deregister twice
+	// trigger an event then deregister twice.
 	_, _ = cli.Write([]byte("ping"))
 	_ = p.Deregister(srv)
 	_ = p.Deregister(srv)
 
-	// ensure no further events after small grace period
+	// ensure no further events after small grace period.
 	if _, ok := waitEvent(t, evCh, 200*time.Millisecond); ok {
 		t.Fatalf("unexpected event after double deregister")
 	}
@@ -575,7 +575,7 @@ func testPollerDeregisterAfterClose(t *testing.T, makePoller func() Poller) {
 	if err := p.Register(srv, []EventType{Readable}, func(ev Event) {}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	// Close both sides, then Deregister should not hang or panic
+	// Close both sides, then Deregister should not hang or panic.
 	_ = cli.Close()
 	_ = srv.Close()
 	_ = p.Deregister(srv)
@@ -624,18 +624,18 @@ func testPoller_NoEvents_AfterDeregister_UnderTraffic(t *testing.T, makePoller f
 		t.Fatalf("register: %v", err)
 	}
 
-	// Deregister immediately
+	// Deregister immediately.
 	if err := p.Deregister(srv); err != nil {
 		t.Fatalf("deregister: %v", err)
 	}
 
-	// Flood traffic after deregister
+	// Flood traffic after deregister.
 	for i := 0; i < 50; i++ {
 		_, _ = cli.Write([]byte("spam"))
 		time.Sleep(2 * time.Millisecond)
 	}
 
-	// Ensure no events within the observation window
+	// Ensure no events within the observation window.
 	if _, ok := waitEvent(t, evCh, 300*time.Millisecond); ok {
 		t.Fatalf("unexpected event after deregister under traffic")
 	}
@@ -680,7 +680,7 @@ func testPoller_NoStrayEvents_OnDeregisterRace(t *testing.T, makePoller func() P
 			t.Fatalf("register: %v", err)
 		}
 
-		// writer goroutine floods a bit
+		// writer goroutine floods a bit.
 		doneW := make(chan struct{})
 		go func() {
 			defer close(doneW)
@@ -690,15 +690,15 @@ func testPoller_NoStrayEvents_OnDeregisterRace(t *testing.T, makePoller func() P
 			}
 		}()
 
-		// race: deregister asap
+		// race: deregister asap.
 		_ = p.Deregister(srv)
 
-		// observation window: should not receive any events
+		// observation window: should not receive any events.
 		if _, ok := waitEvent(t, evCh, 200*time.Millisecond); ok {
 			t.Fatalf("stray event observed on iteration %d", n)
 		}
 
-		// cleanup
+		// cleanup.
 		<-doneW
 		_ = cli.Close()
 		_ = srv.Close()
@@ -746,11 +746,11 @@ func testPoller_NoEvents_OnEOF_AfterDeregister(t *testing.T, makePoller func() P
 		t.Fatalf("register: %v", err)
 	}
 
-	// Deregister then close the peer immediately to cause EOF
+	// Deregister then close the peer immediately to cause EOF.
 	_ = p.Deregister(srv)
 	_ = cli.Close()
 
-	// No events should be observed after Deregister
+	// No events should be observed after Deregister.
 	if _, ok := waitEvent(t, evCh, 200*time.Millisecond); ok {
 		t.Fatalf("unexpected event after deregister with immediate EOF")
 	}
@@ -815,7 +815,7 @@ func TestAsyncIO_Echo_Ready(t *testing.T) {
 
 	select {
 	case <-gotReadable:
-		// ok
+		// ok.
 	case <-time.After(time.Second):
 		t.Fatal("timeout waiting for readability")
 	}

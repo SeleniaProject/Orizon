@@ -9,16 +9,16 @@ import (
 	"unsafe"
 )
 
-// AllocationError represents allocation-related errors
+// AllocationError represents allocation-related errors.
 type AllocationError struct {
+	Region    *Region
 	Message   string
 	Code      ErrorCode
-	Region    *Region
 	Size      RegionSize
 	Alignment RegionAlignment
 }
 
-// ErrorCode represents allocation error types
+// ErrorCode represents allocation error types.
 type ErrorCode int
 
 const (
@@ -34,18 +34,18 @@ const (
 	ErrorPermissionDenied                  // Permission denied
 )
 
-// String returns string representation of allocation error
+// String returns string representation of allocation error.
 func (ae *AllocationError) String() string {
 	return fmt.Sprintf("AllocationError[%s]: %s (region=%d, size=%d, align=%d)",
 		ae.Code.String(), ae.Message, ae.Region.Header.ID, ae.Size, ae.Alignment)
 }
 
-// Error implements error interface
+// Error implements error interface.
 func (ae *AllocationError) Error() string {
 	return ae.String()
 }
 
-// String returns string representation of error code
+// String returns string representation of error code.
 func (ec ErrorCode) String() string {
 	switch ec {
 	case ErrorOutOfMemory:
@@ -73,12 +73,12 @@ func (ec ErrorCode) String() string {
 	}
 }
 
-// Allocate allocates memory block within the region
+// Allocate allocates memory block within the region.
 func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *TypeInfo) (unsafe.Pointer, error) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
 
-	// Validate region state
+	// Validate region state.
 	if atomic.LoadUint32(&r.Header.State) != RegionActive {
 		return nil, &AllocationError{
 			Message:   "region not active",
@@ -89,7 +89,7 @@ func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *
 		}
 	}
 
-	// Validate allocation parameters
+	// Validate allocation parameters.
 	if size == 0 {
 		return nil, &AllocationError{
 			Message:   "zero size allocation",
@@ -114,7 +114,7 @@ func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *
 		}
 	}
 
-	// Check policy constraints
+	// Check policy constraints.
 	if r.Policy != nil {
 		if r.Header.AllocCount >= r.Policy.MaxAllocations {
 			return nil, &AllocationError{
@@ -137,17 +137,17 @@ func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *
 		}
 	}
 
-	// Find suitable free block
+	// Find suitable free block.
 	block, err := r.findFreeBlock(size, alignment)
 	if err != nil {
-		// Try compaction if enabled
+		// Try compaction if enabled.
 		if r.Policy != nil && r.Policy.CompactionPolicy.Enabled {
 			err = r.compact()
 			if err != nil {
 				return nil, err
 			}
 
-			// Retry allocation after compaction
+			// Retry allocation after compaction.
 			block, err = r.findFreeBlock(size, alignment)
 			if err != nil {
 				return nil, err
@@ -157,28 +157,29 @@ func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *
 		}
 	}
 
-	// Allocate from free block
+	// Allocate from free block.
 	ptr, allocBlock, err := r.allocateFromBlock(block, size, alignment, typeInfo)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update region statistics
+	// Update region statistics.
 	r.Header.AllocCount++
 	r.Header.Used += size
 	r.Header.Free -= size
 	r.Header.LastAccess = getCurrentTimestamp()
 
 	r.Stats.TotalAllocations++
+
 	r.Stats.TotalBytesAllocated += uint64(size)
 	if r.Header.Used > RegionSize(r.Stats.PeakUsage) {
 		r.Stats.PeakUsage = uint64(r.Header.Used)
 	}
 
-	// Update fragmentation ratio
+	// Update fragmentation ratio.
 	r.updateFragmentationRatio()
 
-	// Notify observers
+	// Notify observers.
 	for _, observer := range r.Observers {
 		observer.OnAllocation(r, allocBlock)
 	}
@@ -186,7 +187,7 @@ func (r *Region) Allocate(size RegionSize, alignment RegionAlignment, typeInfo *
 	return ptr, nil
 }
 
-// findFreeBlock finds a suitable free block using allocation strategy
+// findFreeBlock finds a suitable free block using allocation strategy.
 func (r *Region) findFreeBlock(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
 	strategy := BestFit
 	if r.Policy != nil {
@@ -211,7 +212,7 @@ func (r *Region) findFreeBlock(size RegionSize, alignment RegionAlignment) (*Fre
 	}
 }
 
-// findFirstFit implements first fit allocation strategy
+// findFirstFit implements first fit allocation strategy.
 func (r *Region) findFirstFit(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
 	current := r.Header.FreeList
 
@@ -235,9 +236,10 @@ func (r *Region) findFirstFit(size RegionSize, alignment RegionAlignment) (*Free
 	}
 }
 
-// findBestFit implements best fit allocation strategy
+// findBestFit implements best fit allocation strategy.
 func (r *Region) findBestFit(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
 	var bestBlock *FreeBlock
+
 	var bestWaste RegionSize = RegionSize(^uint64(0)) // Max value
 
 	current := r.Header.FreeList
@@ -270,9 +272,10 @@ func (r *Region) findBestFit(size RegionSize, alignment RegionAlignment) (*FreeB
 	return bestBlock, nil
 }
 
-// findWorstFit implements worst fit allocation strategy
+// findWorstFit implements worst fit allocation strategy.
 func (r *Region) findWorstFit(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
 	var worstBlock *FreeBlock
+
 	var worstWaste RegionSize = 0
 
 	current := r.Header.FreeList
@@ -305,29 +308,29 @@ func (r *Region) findWorstFit(size RegionSize, alignment RegionAlignment) (*Free
 	return worstBlock, nil
 }
 
-// findNextFit implements next fit allocation strategy
+// findNextFit implements next fit allocation strategy.
 func (r *Region) findNextFit(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
-	// Start from last allocation point (simplified - using first fit for now)
+	// Start from last allocation point (simplified - using first fit for now).
 	return r.findFirstFit(size, alignment)
 }
 
-// findQuickFit implements quick fit allocation strategy
+// findQuickFit implements quick fit allocation strategy.
 func (r *Region) findQuickFit(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
-	// Quick fit uses segregated free lists for common sizes
-	// Simplified implementation using best fit
+	// Quick fit uses segregated free lists for common sizes.
+	// Simplified implementation using best fit.
 	return r.findBestFit(size, alignment)
 }
 
-// findBuddyFit implements buddy system allocation strategy
+// findBuddyFit implements buddy system allocation strategy.
 func (r *Region) findBuddyFit(size RegionSize, alignment RegionAlignment) (*FreeBlock, error) {
-	// Buddy system implementation would require more complex data structures
-	// Simplified implementation using best fit
+	// Buddy system implementation would require more complex data structures.
+	// Simplified implementation using best fit.
 	return r.findBestFit(size, alignment)
 }
 
-// allocateFromBlock allocates memory from a free block
+// allocateFromBlock allocates memory from a free block.
 func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignment RegionAlignment, typeInfo *TypeInfo) (unsafe.Pointer, *AllocBlock, error) {
-	// Calculate aligned offset
+	// Calculate aligned offset.
 	alignedOffset := alignUp(int64(freeBlock.Offset), int64(alignment))
 	alignmentPadding := RegionSize(uintptr(alignedOffset) - freeBlock.Offset)
 	totalSize := alignmentPadding + size
@@ -342,7 +345,7 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 		}
 	}
 
-	// Create allocation block
+	// Create allocation block.
 	allocBlock := &AllocBlock{
 		Size:       size,
 		Offset:     uintptr(alignedOffset),
@@ -354,16 +357,17 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 		Prev:       nil,
 	}
 
-	// Link into allocation list
+	// Link into allocation list.
 	if r.Header.AllocList != nil {
 		r.Header.AllocList.Prev = allocBlock
 	}
+
 	r.Header.AllocList = allocBlock
 
-	// Update free block
+	// Update free block.
 	remainingSize := freeBlock.Size - totalSize
 	if remainingSize > 0 {
-		// Split block
+		// Split block.
 		newFreeBlock := &FreeBlock{
 			Size:   remainingSize,
 			Offset: uintptr(alignedOffset) + uintptr(size),
@@ -371,7 +375,7 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 			Prev:   freeBlock.Prev,
 		}
 
-		// Update linked list
+		// Update linked list.
 		if freeBlock.Prev != nil {
 			freeBlock.Prev.Next = newFreeBlock
 		} else {
@@ -382,7 +386,7 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 			freeBlock.Next.Prev = newFreeBlock
 		}
 	} else {
-		// Remove entire block
+		// Remove entire block.
 		if freeBlock.Prev != nil {
 			freeBlock.Prev.Next = freeBlock.Next
 		} else {
@@ -394,10 +398,10 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 		}
 	}
 
-	// Calculate memory address
+	// Calculate memory address.
 	ptr := unsafe.Pointer(uintptr(r.Data) + uintptr(alignedOffset))
 
-	// Initialize memory if required by security policy
+	// Initialize memory if required by security policy.
 	if r.Policy != nil && r.Policy.SecurityPolicy.EnableZeroOnFree {
 		clearMemory(ptr, int(size))
 	}
@@ -405,12 +409,12 @@ func (r *Region) allocateFromBlock(freeBlock *FreeBlock, size RegionSize, alignm
 	return ptr, allocBlock, nil
 }
 
-// Deallocate frees a previously allocated memory block
+// Deallocate frees a previously allocated memory block.
 func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
 
-	// Validate region state
+	// Validate region state.
 	if atomic.LoadUint32(&r.Header.State) != RegionActive {
 		return &AllocationError{
 			Message: "region not active",
@@ -419,7 +423,7 @@ func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 		}
 	}
 
-	// Find allocation block
+	// Find allocation block.
 	allocBlock := r.findAllocBlock(ptr)
 	if allocBlock == nil {
 		return &AllocationError{
@@ -429,7 +433,7 @@ func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 		}
 	}
 
-	// Remove from allocation list
+	// Remove from allocation list.
 	if allocBlock.Prev != nil {
 		allocBlock.Prev.Next = allocBlock.Next
 	} else {
@@ -440,12 +444,12 @@ func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 		allocBlock.Next.Prev = allocBlock.Prev
 	}
 
-	// Zero memory if required by security policy
+	// Zero memory if required by security policy.
 	if r.Policy != nil && r.Policy.SecurityPolicy.EnableZeroOnFree {
 		clearMemory(ptr, int(allocBlock.Size))
 	}
 
-	// Create free block
+	// Create free block.
 	freeBlock := &FreeBlock{
 		Size:   allocBlock.Size,
 		Offset: allocBlock.Offset,
@@ -453,11 +457,11 @@ func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 		Prev:   nil,
 	}
 
-	// Insert into free list and coalesce
+	// Insert into free list and coalesce.
 	r.insertFreeBlock(freeBlock)
 	r.coalesceFreeBlocks(freeBlock)
 
-	// Update statistics
+	// Update statistics.
 	r.Header.FreeCount++
 	r.Header.Used -= allocBlock.Size
 	r.Header.Free += allocBlock.Size
@@ -466,10 +470,10 @@ func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 	r.Stats.TotalDeallocations++
 	r.Stats.TotalBytesFreed += uint64(allocBlock.Size)
 
-	// Update fragmentation ratio
+	// Update fragmentation ratio.
 	r.updateFragmentationRatio()
 
-	// Notify observers
+	// Notify observers.
 	for _, observer := range r.Observers {
 		observer.OnDeallocation(r, allocBlock)
 	}
@@ -477,7 +481,7 @@ func (r *Region) Deallocate(ptr unsafe.Pointer) error {
 	return nil
 }
 
-// findAllocBlock finds an allocation block by pointer
+// findAllocBlock finds an allocation block by pointer.
 func (r *Region) findAllocBlock(ptr unsafe.Pointer) *AllocBlock {
 	offset := uintptr(ptr) - uintptr(r.Data)
 
@@ -486,21 +490,24 @@ func (r *Region) findAllocBlock(ptr unsafe.Pointer) *AllocBlock {
 		if current.Offset == offset {
 			return current
 		}
+
 		current = current.Next
 	}
 
 	return nil
 }
 
-// insertFreeBlock inserts a free block into the free list (sorted by offset)
+// insertFreeBlock inserts a free block into the free list (sorted by offset).
 func (r *Region) insertFreeBlock(block *FreeBlock) {
 	if r.Header.FreeList == nil {
 		r.Header.FreeList = block
+
 		return
 	}
 
-	// Find insertion point
+	// Find insertion point.
 	current := r.Header.FreeList
+
 	var prev *FreeBlock
 
 	for current != nil && current.Offset < block.Offset {
@@ -508,7 +515,7 @@ func (r *Region) insertFreeBlock(block *FreeBlock) {
 		current = current.Next
 	}
 
-	// Insert block
+	// Insert block.
 	block.Next = current
 	block.Prev = prev
 
@@ -523,44 +530,48 @@ func (r *Region) insertFreeBlock(block *FreeBlock) {
 	}
 }
 
-// coalesceFreeBlocks coalesces adjacent free blocks
+// coalesceFreeBlocks coalesces adjacent free blocks.
 func (r *Region) coalesceFreeBlocks(block *FreeBlock) {
-	// Coalesce with next block
+	// Coalesce with next block.
 	if block.Next != nil && block.Offset+uintptr(block.Size) == block.Next.Offset {
 		next := block.Next
 		block.Size += next.Size
 		block.Next = next.Next
+
 		if next.Next != nil {
 			next.Next.Prev = block
 		}
+
 		next.Coalesced = true
 	}
 
-	// Coalesce with previous block
+	// Coalesce with previous block.
 	if block.Prev != nil && block.Prev.Offset+uintptr(block.Prev.Size) == block.Offset {
 		prev := block.Prev
 		prev.Size += block.Size
 		prev.Next = block.Next
+
 		if block.Next != nil {
 			block.Next.Prev = prev
 		}
+
 		block.Coalesced = true
 	}
 }
 
-// compact performs memory compaction
+// compact performs memory compaction.
 func (r *Region) compact() error {
 	if r.Policy == nil || !r.Policy.CompactionPolicy.Enabled {
 		return fmt.Errorf("compaction disabled")
 	}
 
-	// Calculate current fragmentation ratio
+	// Calculate current fragmentation ratio.
 	fragRatio := r.calculateFragmentationRatio()
 	if fragRatio < r.Policy.CompactionPolicy.ThresholdRatio {
 		return nil // No compaction needed
 	}
 
-	// Count free blocks
+	// Count free blocks.
 	freeBlockCount := r.countFreeBlocks()
 	if freeBlockCount < r.Policy.CompactionPolicy.MinFreeBlocks {
 		return nil // Not enough fragmentation
@@ -569,8 +580,9 @@ func (r *Region) compact() error {
 	startTime := getCurrentTimestamp()
 	beforeStats := *r.Stats
 
-	// Perform compaction based on strategy
+	// Perform compaction based on strategy.
 	var err error
+
 	switch r.Policy.CompactionPolicy.Strategy {
 	case MarkAndSweep:
 		err = r.markAndSweepCompact()
@@ -593,16 +605,16 @@ func (r *Region) compact() error {
 		return err
 	}
 
-	// Check time limit
+	// Check time limit.
 	if compactionTime > r.Policy.CompactionPolicy.MaxCompactionTime {
 		return fmt.Errorf("compaction exceeded time limit")
 	}
 
-	// Update statistics
+	// Update statistics.
 	r.Stats.LastCompaction = endTime
 	r.Stats.CompactionCount++
 
-	// Notify observers
+	// Notify observers.
 	for _, observer := range r.Observers {
 		observer.OnCompaction(r, &beforeStats, r.Stats)
 	}
@@ -610,13 +622,12 @@ func (r *Region) compact() error {
 	return nil
 }
 
-// markAndSweepCompact implements mark and sweep compaction
+// markAndSweepCompact implements mark and sweep compaction.
 func (r *Region) markAndSweepCompact() error {
-	// Mark phase: mark all reachable allocations
-	// Sweep phase: move marked allocations to beginning of region
-	// This is a simplified implementation
-
-	// Coalesce all free blocks first
+	// Mark phase: mark all reachable allocations.
+	// Sweep phase: move marked allocations to beginning of region.
+	// This is a simplified implementation.
+	// Coalesce all free blocks first.
 	current := r.Header.FreeList
 	for current != nil {
 		r.coalesceFreeBlocks(current)
@@ -626,53 +637,53 @@ func (r *Region) markAndSweepCompact() error {
 	return nil
 }
 
-// copyingCompact implements copying compaction
+// copyingCompact implements copying compaction.
 func (r *Region) copyingCompact() error {
-	// Copy all live objects to new location
-	// This requires updating all pointers (complex)
+	// Copy all live objects to new location.
+	// This requires updating all pointers (complex).
 	return r.markAndSweepCompact() // Fallback to mark and sweep
 }
 
-// generationalCompact implements generational compaction
+// generationalCompact implements generational compaction.
 func (r *Region) generationalCompact() error {
-	// Compact based on object generations
+	// Compact based on object generations.
 	return r.markAndSweepCompact() // Fallback to mark and sweep
 }
 
-// incrementalCompact implements incremental compaction
+// incrementalCompact implements incremental compaction.
 func (r *Region) incrementalCompact() error {
-	// Compact in small increments
+	// Compact in small increments.
 	return r.markAndSweepCompact() // Fallback to mark and sweep
 }
 
-// concurrentCompact implements concurrent compaction
+// concurrentCompact implements concurrent compaction.
 func (r *Region) concurrentCompact() error {
-	// Compact concurrently with allocation
+	// Compact concurrently with allocation.
 	return r.markAndSweepCompact() // Fallback to mark and sweep
 }
 
-// Helper functions
-// clearMemory zeros out memory block
+// Helper functions.
+// clearMemory zeros out memory block.
 func clearMemory(ptr unsafe.Pointer, size int) {
-	// Clear memory by setting all bytes to zero
+	// Clear memory by setting all bytes to zero.
 	slice := (*[1 << 30]byte)(ptr)[:size:size]
 	for i := range slice {
 		slice[i] = 0
 	}
 }
 
-// getStackTrace captures current stack trace
+// getStackTrace captures current stack trace.
 func getStackTrace() []uintptr {
 	// Mock implementation - in real code, use runtime.Callers()
 	return []uintptr{0x1000, 0x2000, 0x3000}
 }
 
-// updateFragmentationRatio updates the fragmentation ratio
+// updateFragmentationRatio updates the fragmentation ratio.
 func (r *Region) updateFragmentationRatio() {
 	r.Stats.FragmentationRatio = r.calculateFragmentationRatio()
 }
 
-// calculateFragmentationRatio calculates current fragmentation ratio
+// calculateFragmentationRatio calculates current fragmentation ratio.
 func (r *Region) calculateFragmentationRatio() float64 {
 	if r.Header.Free == 0 {
 		return 0.0
@@ -683,7 +694,7 @@ func (r *Region) calculateFragmentationRatio() float64 {
 		return 0.0
 	}
 
-	// Calculate external fragmentation
+	// Calculate external fragmentation.
 	largestFreeBlock := r.findLargestFreeBlock()
 	if largestFreeBlock == 0 {
 		return 1.0
@@ -692,26 +703,30 @@ func (r *Region) calculateFragmentationRatio() float64 {
 	return 1.0 - float64(largestFreeBlock)/float64(r.Header.Free)
 }
 
-// countFreeBlocks counts the number of free blocks
+// countFreeBlocks counts the number of free blocks.
 func (r *Region) countFreeBlocks() int {
 	count := 0
 	current := r.Header.FreeList
+
 	for current != nil {
 		count++
 		current = current.Next
 	}
+
 	return count
 }
 
-// findLargestFreeBlock finds the size of the largest free block
+// findLargestFreeBlock finds the size of the largest free block.
 func (r *Region) findLargestFreeBlock() RegionSize {
 	var largest RegionSize = 0
+
 	current := r.Header.FreeList
 
 	for current != nil {
 		if current.Size > largest {
 			largest = current.Size
 		}
+
 		current = current.Next
 	}
 

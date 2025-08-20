@@ -93,11 +93,13 @@ func TestArrayLayout(t *testing.T) {
 				if err == nil {
 					t.Errorf("Expected error for test %s, but got none", tt.name)
 				}
+
 				return
 			}
 
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", tt.name, err)
+
 				return
 			}
 
@@ -164,27 +166,31 @@ func TestSliceLayout(t *testing.T) {
 				if err == nil {
 					t.Errorf("Expected error for test %s, but got none", tt.name)
 				}
+
 				return
 			}
 
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", tt.name, err)
+
 				return
 			}
 
-			// All slices should have the same header size
+			// All slices should have the same header size.
 			expectedSize := int64(24) // ptr(8) + len(8) + cap(8)
 			if layout.TotalSize != expectedSize {
 				t.Errorf("Expected slice header size %d, got %d", expectedSize, layout.TotalSize)
 			}
 
-			// Check field offsets
+			// Check field offsets.
 			if layout.PtrOffset != 0 {
 				t.Errorf("Expected ptr offset 0, got %d", layout.PtrOffset)
 			}
+
 			if layout.LenOffset != 8 {
 				t.Errorf("Expected len offset 8, got %d", layout.LenOffset)
 			}
+
 			if layout.CapOffset != 16 {
 				t.Errorf("Expected cap offset 16, got %d", layout.CapOffset)
 			}
@@ -208,6 +214,7 @@ func TestStringLayout(t *testing.T) {
 	if layout.PtrOffset != 0 {
 		t.Errorf("Expected ptr offset 0, got %d", layout.PtrOffset)
 	}
+
 	if layout.LenOffset != 8 {
 		t.Errorf("Expected len offset 8, got %d", layout.LenOffset)
 	}
@@ -280,11 +287,13 @@ func TestStructLayout(t *testing.T) {
 				if err == nil {
 					t.Errorf("Expected error for test %s, but got none", tt.name)
 				}
+
 				return
 			}
 
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", tt.name, err)
+
 				return
 			}
 
@@ -296,7 +305,7 @@ func TestStructLayout(t *testing.T) {
 				t.Errorf("Expected alignment %d, got %d for test %s", tt.expectedAlign, layout.Alignment, tt.name)
 			}
 
-			// Verify field offsets are correctly aligned
+			// Verify field offsets are correctly aligned.
 			for i, field := range layout.Fields {
 				expectedOffset := alignUp(getPreviousFieldsSize(layout.Fields, i), field.Alignment)
 				if field.Offset != expectedOffset {
@@ -311,10 +320,10 @@ func TestMemoryLayout(t *testing.T) {
 	lc := NewLayoutCalculator()
 
 	tests := []struct {
-		name     string
-		kind     LayoutKind
 		params   map[string]interface{}
 		expected *MemoryLayout
+		name     string
+		kind     LayoutKind
 		hasError bool
 	}{
 		{
@@ -384,23 +393,28 @@ func TestMemoryLayout(t *testing.T) {
 				if err == nil {
 					t.Errorf("Expected error for test %s, but got none", tt.name)
 				}
+
 				return
 			}
 
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", tt.name, err)
+
 				return
 			}
 
 			if layout.Kind != tt.expected.Kind {
 				t.Errorf("Expected kind %v, got %v", tt.expected.Kind, layout.Kind)
 			}
+
 			if layout.Size != tt.expected.Size {
 				t.Errorf("Expected size %d, got %d", tt.expected.Size, layout.Size)
 			}
+
 			if layout.Alignment != tt.expected.Alignment {
 				t.Errorf("Expected alignment %d, got %d", tt.expected.Alignment, layout.Alignment)
 			}
+
 			if layout.ElementSize != tt.expected.ElementSize {
 				t.Errorf("Expected element size %d, got %d", tt.expected.ElementSize, layout.ElementSize)
 			}
@@ -422,7 +436,7 @@ func TestStructLayoutUtilities(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Test GetFieldOffset
+	// Test GetFieldOffset.
 	offsetA, foundA := layout.GetFieldOffset("a")
 	if !foundA || offsetA != 0 {
 		t.Errorf("Expected field 'a' at offset 0, got %d (found: %v)", offsetA, foundA)
@@ -438,29 +452,31 @@ func TestStructLayoutUtilities(t *testing.T) {
 		t.Errorf("Expected field 'c' at offset 8, got %d (found: %v)", offsetC, foundC)
 	}
 
-	// Test non-existent field
+	// Test non-existent field.
 	_, foundD := layout.GetFieldOffset("d")
 	if foundD {
 		t.Error("Should not find non-existent field 'd'")
 	}
 
-	// Test GetPaddingBytes
+	// Test GetPaddingBytes.
 	paddingBytes := layout.GetPaddingBytes()
 	expectedPadding := int64(6) // 3 bytes after 'a', 3 bytes after 'c'
+
 	if paddingBytes != expectedPadding {
 		t.Errorf("Expected %d padding bytes, got %d", expectedPadding, paddingBytes)
 	}
 
-	// Test GetEfficiencyRatio
+	// Test GetEfficiencyRatio.
 	ratio := layout.GetEfficiencyRatio()
 	expectedRatio := float64(6) / float64(12) // 6 useful bytes out of 12 total
+
 	if ratio != expectedRatio {
 		t.Errorf("Expected efficiency ratio %.2f, got %.2f", expectedRatio, ratio)
 	}
 }
 
 func TestUtilityFunctions(t *testing.T) {
-	// Test isPowerOfTwo
+	// Test isPowerOfTwo.
 	tests := []struct {
 		input    int64
 		expected bool
@@ -484,7 +500,7 @@ func TestUtilityFunctions(t *testing.T) {
 		}
 	}
 
-	// Test alignUp
+	// Test alignUp.
 	alignTests := []struct {
 		value     int64
 		alignment int64
@@ -514,6 +530,7 @@ func TestStringRepresentations(t *testing.T) {
 	arrayLayout, _ := lc.CalculateArrayLayout("i32", 4, 4, 10)
 	arrayStr := arrayLayout.String()
 	expected := "Array[i32; 10] (element: 4 bytes, total: 40 bytes, align: 4)"
+
 	if arrayStr != expected {
 		t.Errorf("ArrayLayout.String(): expected %q, got %q", expected, arrayStr)
 	}
@@ -522,6 +539,7 @@ func TestStringRepresentations(t *testing.T) {
 	sliceLayout, _ := lc.CalculateSliceLayout("i64", 8, 8)
 	sliceStr := sliceLayout.String()
 	expected = "Slice<i64> (element: 8 bytes, header: 24 bytes, align: 8)"
+
 	if sliceStr != expected {
 		t.Errorf("SliceLayout.String(): expected %q, got %q", expected, sliceStr)
 	}
@@ -530,6 +548,7 @@ func TestStringRepresentations(t *testing.T) {
 	stringLayout := lc.CalculateStringLayout()
 	stringStr := stringLayout.String()
 	expected = "String (header: 16 bytes)"
+
 	if stringStr != expected {
 		t.Errorf("StringLayout.String(): expected %q, got %q", expected, stringStr)
 	}
@@ -538,11 +557,11 @@ func TestStringRepresentations(t *testing.T) {
 func TestRuntimeAddressCalculation(t *testing.T) {
 	lc := NewLayoutCalculator()
 
-	// Test array element address calculation
+	// Test array element address calculation.
 	arrayLayout, _ := lc.CalculateArrayLayout("i32", 4, 4, 10)
 	baseAddr := uintptr(0x1000)
 
-	// Valid indices
+	// Valid indices.
 	addr0 := arrayLayout.GetArrayElementAddress(baseAddr, 0)
 	if addr0 != baseAddr {
 		t.Errorf("Expected element 0 at 0x%x, got 0x%x", baseAddr, addr0)
@@ -550,11 +569,12 @@ func TestRuntimeAddressCalculation(t *testing.T) {
 
 	addr5 := arrayLayout.GetArrayElementAddress(baseAddr, 5)
 	expected := baseAddr + uintptr(5*4)
+
 	if addr5 != expected {
 		t.Errorf("Expected element 5 at 0x%x, got 0x%x", expected, addr5)
 	}
 
-	// Invalid indices
+	// Invalid indices.
 	addrNeg := arrayLayout.GetArrayElementAddress(baseAddr, -1)
 	if addrNeg != 0 {
 		t.Errorf("Expected 0 for negative index, got 0x%x", addrNeg)
@@ -566,19 +586,21 @@ func TestRuntimeAddressCalculation(t *testing.T) {
 	}
 }
 
-// Helper function for struct layout tests
+// Helper function for struct layout tests.
 func getPreviousFieldsSize(fields []FieldInfo, currentIndex int) int64 {
 	if currentIndex == 0 {
 		return 0
 	}
 
 	var size int64
+
 	for i := 0; i < currentIndex; i++ {
 		fieldEnd := fields[i].Offset + fields[i].Size
 		if fieldEnd > size {
 			size = fieldEnd
 		}
 	}
+
 	return size
 }
 
@@ -586,6 +608,7 @@ func BenchmarkArrayLayoutCalculation(b *testing.B) {
 	lc := NewLayoutCalculator()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = lc.CalculateArrayLayout("i32", 4, 4, 1000)
 	}
@@ -603,20 +626,21 @@ func BenchmarkStructLayoutCalculation(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = lc.CalculateStructLayout("BenchStruct", fields)
 	}
 }
 
-// Integration test with actual memory representation
+// Integration test with actual memory representation.
 func TestLayoutIntegration(t *testing.T) {
 	lc := NewLayoutCalculator()
 
-	// Create a struct that matches Go's struct layout for comparison
+	// Create a struct that matches Go's struct layout for comparison.
 	type TestStruct struct {
-		A int8  // 1 byte + 3 padding
-		B int32 // 4 bytes
-		C int8  // 1 byte + 3 padding
+		B int32
+		A int8
+		C int8
 	}
 
 	fields := []FieldInfo{
@@ -630,13 +654,13 @@ func TestLayoutIntegration(t *testing.T) {
 		t.Fatalf("Failed to calculate layout: %v", err)
 	}
 
-	// Compare with Go's actual struct size
+	// Compare with Go's actual struct size.
 	goSize := unsafe.Sizeof(TestStruct{})
 	if layout.TotalSize != int64(goSize) {
 		t.Errorf("Layout size %d doesn't match Go struct size %d", layout.TotalSize, goSize)
 	}
 
-	// Check field offsets match Go's offsets
+	// Check field offsets match Go's offsets.
 	var ts TestStruct
 	offsetA := unsafe.Offsetof(ts.A)
 	offsetB := unsafe.Offsetof(ts.B)
@@ -649,9 +673,11 @@ func TestLayoutIntegration(t *testing.T) {
 	if layoutOffsetA != int64(offsetA) {
 		t.Errorf("Field A offset: expected %d, got %d", offsetA, layoutOffsetA)
 	}
+
 	if layoutOffsetB != int64(offsetB) {
 		t.Errorf("Field B offset: expected %d, got %d", offsetB, layoutOffsetB)
 	}
+
 	if layoutOffsetC != int64(offsetC) {
 		t.Errorf("Field C offset: expected %d, got %d", offsetC, layoutOffsetC)
 	}

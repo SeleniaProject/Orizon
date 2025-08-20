@@ -26,6 +26,6 @@ func TestBytePool_Oversize(t *testing.T) {
 	if cap(buf) < (1 << 20) {
 		t.Fatalf("cap too small: %d", cap(buf))
 	}
-	// Put should drop oversize without panic
+	// Put should drop oversize without panic.
 	bp.Put(buf)
 }

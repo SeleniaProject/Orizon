@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build linux.
+// +build linux.
 
 package asyncio
 
@@ -161,5 +161,5 @@ func getFD(conn net.Conn) (int, error) {
 	return fd, ctrlErr
 }
 
-// NewOSPoller (linux) returns epoll-based poller
+// NewOSPoller (linux) returns epoll-based poller.
 func NewOSPoller() Poller { return newEpollPoller() }

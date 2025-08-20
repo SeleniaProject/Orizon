@@ -1,5 +1,5 @@
-//go:build !linux && !darwin && !freebsd && !netbsd && !openbsd && !windows
-// +build !linux,!darwin,!freebsd,!netbsd,!openbsd,!windows
+//go:build !linux && !darwin && !freebsd && !netbsd && !openbsd && !windows.
+// +build !linux,!darwin,!freebsd,!netbsd,!openbsd,!windows.
 
 package asyncio
 

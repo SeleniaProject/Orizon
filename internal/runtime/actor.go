@@ -1,6 +1,6 @@
 package runtime
 
-// Actor facade and Green-thread style API
+// Actor facade and Green-thread style API.
 
 // ActorRef is a lightweight reference to an actor in an ActorSystem.
 type ActorRef struct {
@@ -15,6 +15,7 @@ func (as *ActorSystem) Spawn(name string, behavior ActorBehavior, cfg ActorConfi
 	if err != nil {
 		return nil, err
 	}
+
 	return &ActorRef{System: as, ID: actor.ID}, nil
 }
 
@@ -23,5 +24,6 @@ func (ref *ActorRef) Tell(msgType MessageType, payload interface{}) error {
 	if ref == nil || ref.System == nil {
 		return nil
 	}
+
 	return ref.System.SendMessage(0, ref.ID, msgType, payload)
 }

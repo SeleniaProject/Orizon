@@ -40,7 +40,7 @@ type Poller interface {
 	Deregister(conn net.Conn) error
 }
 
-// goPoller is a goroutine-driven poller that spawns per-connection loops to
+// goPoller is a goroutine-driven poller that spawns per-connection loops to.
 // detect readiness by non-blocking operations with deadlines. This is a
 // portability-first baseline; OS-specific pollers can implement Poller too.
 type goPoller struct {
@@ -105,7 +105,7 @@ func (p *goPoller) Register(conn net.Conn, kinds []EventType, h Handler) error {
 	p.conns[conn] = reg
 	p.mu.Unlock()
 
-	// spawn watcher
+	// spawn watcher.
 	go p.watch(ctx, conn, reg)
 	return nil
 }
@@ -113,7 +113,7 @@ func (p *goPoller) Register(conn net.Conn, kinds []EventType, h Handler) error {
 func (p *goPoller) Deregister(conn net.Conn) error {
 	p.mu.Lock()
 	if reg, ok := p.conns[conn]; ok {
-		// Mark as disabled before stopping to avoid racing handler delivery
+		// Mark as disabled before stopping to avoid racing handler delivery.
 		atomic.StoreUint32(&reg.disabled, 1)
 		if reg.stop != nil {
 			reg.stop()
@@ -131,10 +131,10 @@ func (p *goPoller) Deregister(conn net.Conn) error {
 }
 
 func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) {
-	// Use small peek attempts for readability detection
+	// Use small peek attempts for readability detection.
 	reader := bufio.NewReader(conn)
 	// Adaptive polling interval to reduce CPU under load. Starts at 5ms and
-	// increases up to 50ms when repeated idle polls are observed, and shrinks
+	// increases up to 50ms when repeated idle polls are observed, and shrinks.
 	// back when activity is detected.
 	interval := 5 * time.Millisecond
 	idleCount := 0
@@ -160,7 +160,7 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 			kinds := reg.kinds
 			handler := reg.handler
 			reg.mu.RUnlock()
-			// Readable
+			// Readable.
 			if contains(kinds, Readable) {
 				_ = conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
 				if b, err := reader.Peek(1); err == nil && len(b) > 0 {
@@ -187,7 +187,7 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 					}
 				}
 			}
-			// Writable: throttle notifications to reduce CPU usage under idle
+			// Writable: throttle notifications to reduce CPU usage under idle.
 			if contains(kinds, Writable) {
 				now := time.Now()
 				if reg.lastWritableAt.IsZero() || now.Sub(reg.lastWritableAt) >= getWritableInterval() {
@@ -198,7 +198,7 @@ func (p *goPoller) watch(ctx context.Context, conn net.Conn, reg *registration) 
 					activity = true
 				}
 			}
-			// Adapt interval based on activity
+			// Adapt interval based on activity.
 			if activity {
 				idleCount = 0
 				atomic.AddUint64(&activityCount, 1)

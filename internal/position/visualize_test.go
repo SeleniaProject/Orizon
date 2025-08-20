@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestSpanHighlighterBasic tests basic span highlighting functionality
+// TestSpanHighlighterBasic tests basic span highlighting functionality.
 func TestSpanHighlighterBasic(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n\treturn 0\n}"
@@ -13,7 +13,7 @@ func TestSpanHighlighterBasic(t *testing.T) {
 
 	highlighter := NewSpanHighlighter(sourceMap)
 
-	// Test single line highlighting
+	// Test single line highlighting.
 	span := Span{
 		Start: Position{Filename: "test.oriz", Line: 1, Column: 1, Offset: 0},
 		End:   Position{Filename: "test.oriz", Line: 1, Column: 5, Offset: 4},
@@ -35,7 +35,7 @@ func TestSpanHighlighterBasic(t *testing.T) {
 	}
 }
 
-// TestSpanHighlighterMultiLine tests multi-line span highlighting
+// TestSpanHighlighterMultiLine tests multi-line span highlighting.
 func TestSpanHighlighterMultiLine(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n\treturn 0\n}"
@@ -43,7 +43,7 @@ func TestSpanHighlighterMultiLine(t *testing.T) {
 
 	highlighter := NewSpanHighlighter(sourceMap)
 
-	// Test multi-line highlighting
+	// Test multi-line highlighting.
 	span := Span{
 		Start: Position{Filename: "test.oriz", Line: 1, Column: 6, Offset: 5},
 		End:   Position{Filename: "test.oriz", Line: 2, Column: 10, Offset: 22},
@@ -51,7 +51,7 @@ func TestSpanHighlighterMultiLine(t *testing.T) {
 
 	result := highlighter.HighlightSpan(span)
 
-	// Check basic structure
+	// Check basic structure.
 	if !strings.Contains(result, "File: test.oriz") {
 		t.Error("Result should contain filename")
 	}
@@ -65,12 +65,12 @@ func TestSpanHighlighterMultiLine(t *testing.T) {
 	}
 }
 
-// TestSpanHighlighterInvalidSpan tests handling of invalid spans
+// TestSpanHighlighterInvalidSpan tests handling of invalid spans.
 func TestSpanHighlighterInvalidSpan(t *testing.T) {
 	sourceMap := NewSourceMap()
 	highlighter := NewSpanHighlighter(sourceMap)
 
-	// Test invalid span
+	// Test invalid span.
 	invalidSpan := Span{}
 	result := highlighter.HighlightSpan(invalidSpan)
 
@@ -79,12 +79,12 @@ func TestSpanHighlighterInvalidSpan(t *testing.T) {
 	}
 }
 
-// TestSpanHighlighterMissingFile tests handling of missing files
+// TestSpanHighlighterMissingFile tests handling of missing files.
 func TestSpanHighlighterMissingFile(t *testing.T) {
 	sourceMap := NewSourceMap()
 	highlighter := NewSpanHighlighter(sourceMap)
 
-	// Test span for missing file
+	// Test span for missing file.
 	span := Span{
 		Start: Position{Filename: "missing.oriz", Line: 1, Column: 1, Offset: 0},
 		End:   Position{Filename: "missing.oriz", Line: 1, Column: 5, Offset: 4},
@@ -98,7 +98,7 @@ func TestSpanHighlighterMissingFile(t *testing.T) {
 	}
 }
 
-// TestHighlightMultipleSpans tests highlighting of multiple spans
+// TestHighlightMultipleSpans tests highlighting of multiple spans.
 func TestHighlightMultipleSpans(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n}"
@@ -134,7 +134,7 @@ func TestHighlightMultipleSpans(t *testing.T) {
 	}
 }
 
-// TestHighlightMultipleSpansEmpty tests empty span list handling
+// TestHighlightMultipleSpansEmpty tests empty span list handling.
 func TestHighlightMultipleSpansEmpty(t *testing.T) {
 	sourceMap := NewSourceMap()
 	highlighter := NewSpanHighlighter(sourceMap)
@@ -147,7 +147,7 @@ func TestHighlightMultipleSpansEmpty(t *testing.T) {
 	}
 }
 
-// TestErrorVisualizer tests error visualization functionality
+// TestErrorVisualizer tests error visualization functionality.
 func TestErrorVisualizer(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n}"
@@ -181,7 +181,7 @@ func TestErrorVisualizer(t *testing.T) {
 	}
 }
 
-// TestVisualizeDiagnosticWithErrorsAndWarnings tests complete diagnostic visualization
+// TestVisualizeDiagnosticWithErrorsAndWarnings tests complete diagnostic visualization.
 func TestVisualizeDiagnosticWithErrorsAndWarnings(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n}"
@@ -215,7 +215,7 @@ func TestVisualizeDiagnosticWithErrorsAndWarnings(t *testing.T) {
 	}
 }
 
-// TestVisualizeDiagnosticEmpty tests empty diagnostic visualization
+// TestVisualizeDiagnosticEmpty tests empty diagnostic visualization.
 func TestVisualizeDiagnosticEmpty(t *testing.T) {
 	sourceMap := NewSourceMap()
 	visualizer := NewErrorVisualizer(sourceMap)
@@ -228,7 +228,7 @@ func TestVisualizeDiagnosticEmpty(t *testing.T) {
 	}
 }
 
-// TestVisualizeDiagnosticOnlyErrors tests diagnostic with only errors
+// TestVisualizeDiagnosticOnlyErrors tests diagnostic with only errors.
 func TestVisualizeDiagnosticOnlyErrors(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n}"
@@ -255,13 +255,13 @@ func TestVisualizeDiagnosticOnlyErrors(t *testing.T) {
 		}
 	}
 
-	// Should not contain warnings section
+	// Should not contain warnings section.
 	if strings.Contains(result, "Warnings") {
 		t.Error("Result should not contain warnings section when there are no warnings")
 	}
 }
 
-// TestVisualizeDiagnosticOnlyWarnings tests diagnostic with only warnings
+// TestVisualizeDiagnosticOnlyWarnings tests diagnostic with only warnings.
 func TestVisualizeDiagnosticOnlyWarnings(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n}"
@@ -288,13 +288,13 @@ func TestVisualizeDiagnosticOnlyWarnings(t *testing.T) {
 		}
 	}
 
-	// Should not contain errors section
+	// Should not contain errors section.
 	if strings.Contains(result, "Errors") {
 		t.Error("Result should not contain errors section when there are no errors")
 	}
 }
 
-// TestCodeInspectorBasic tests basic code inspection functionality
+// TestCodeInspectorBasic tests basic code inspection functionality.
 func TestCodeInspectorBasic(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n\treturn 0\n}"
@@ -319,7 +319,7 @@ func TestCodeInspectorBasic(t *testing.T) {
 	}
 }
 
-// TestCodeInspectorMissingFile tests handling of missing files
+// TestCodeInspectorMissingFile tests handling of missing files.
 func TestCodeInspectorMissingFile(t *testing.T) {
 	sourceMap := NewSourceMap()
 	inspector := NewCodeInspector(sourceMap)
@@ -332,7 +332,7 @@ func TestCodeInspectorMissingFile(t *testing.T) {
 	}
 }
 
-// TestCodeInspectorWithPositionMarkers tests position marker display
+// TestCodeInspectorWithPositionMarkers tests position marker display.
 func TestCodeInspectorWithPositionMarkers(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello\")\n}"
@@ -341,7 +341,7 @@ func TestCodeInspectorWithPositionMarkers(t *testing.T) {
 	inspector := NewCodeInspector(sourceMap)
 	result := inspector.InspectFile("test.oriz")
 
-	// Should show line numbers and character positions for first few lines
+	// Should show line numbers and character positions for first few lines.
 	if !strings.Contains(result, "func main() {") {
 		t.Error("Should contain source content")
 	}
@@ -351,7 +351,7 @@ func TestCodeInspectorWithPositionMarkers(t *testing.T) {
 	}
 }
 
-// TestGetFileStatisticsComplete tests comprehensive file statistics
+// TestGetFileStatisticsComplete tests comprehensive file statistics.
 func TestGetFileStatisticsComplete(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n\n\treturn 0\n}"
@@ -372,7 +372,7 @@ func TestGetFileStatisticsComplete(t *testing.T) {
 		}
 	}
 
-	// Check specific values
+	// Check specific values.
 	if stats["filename"] != "test.oriz" {
 		t.Errorf("Expected filename 'test.oriz', got '%v'", stats["filename"])
 	}
@@ -398,7 +398,7 @@ func TestGetFileStatisticsComplete(t *testing.T) {
 	}
 }
 
-// TestGetFileStatisticsMissingFile tests statistics for missing files
+// TestGetFileStatisticsMissingFile tests statistics for missing files.
 func TestGetFileStatisticsMissingFile(t *testing.T) {
 	sourceMap := NewSourceMap()
 	inspector := NewCodeInspector(sourceMap)
@@ -412,7 +412,7 @@ func TestGetFileStatisticsMissingFile(t *testing.T) {
 	}
 }
 
-// TestGetFileStatisticsEmptyFile tests statistics for empty files
+// TestGetFileStatisticsEmptyFile tests statistics for empty files.
 func TestGetFileStatisticsEmptyFile(t *testing.T) {
 	sourceMap := NewSourceMap()
 	sourceMap.AddFile("empty.oriz", "")
@@ -433,7 +433,7 @@ func TestGetFileStatisticsEmptyFile(t *testing.T) {
 	}
 }
 
-// TestGetFileStatisticsSingleLine tests statistics for single-line files
+// TestGetFileStatisticsSingleLine tests statistics for single-line files.
 func TestGetFileStatisticsSingleLine(t *testing.T) {
 	sourceMap := NewSourceMap()
 	sourceMap.AddFile("single.oriz", "func main() {}")
@@ -454,9 +454,9 @@ func TestGetFileStatisticsSingleLine(t *testing.T) {
 	}
 }
 
-// TestHelperFunctions tests the utility functions
+// TestHelperFunctions tests the utility functions.
 func TestHelperFunctions(t *testing.T) {
-	// Test min function with various inputs
+	// Test min function with various inputs.
 	testCases := []struct {
 		a, b, expected int
 	}{
@@ -473,7 +473,7 @@ func TestHelperFunctions(t *testing.T) {
 		}
 	}
 
-	// Test max function with various inputs
+	// Test max function with various inputs.
 	maxTestCases := []struct {
 		a, b, expected int
 	}{
@@ -491,7 +491,7 @@ func TestHelperFunctions(t *testing.T) {
 	}
 }
 
-// TestSpanHighlighterEdgeCases tests edge cases in span highlighting
+// TestSpanHighlighterEdgeCases tests edge cases in span highlighting.
 func TestSpanHighlighterEdgeCases(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "a\n\nb"
@@ -499,7 +499,7 @@ func TestSpanHighlighterEdgeCases(t *testing.T) {
 
 	highlighter := NewSpanHighlighter(sourceMap)
 
-	// Test span at very end of file
+	// Test span at very end of file.
 	span := Span{
 		Start: Position{Filename: "edge.oriz", Line: 3, Column: 1, Offset: 3},
 		End:   Position{Filename: "edge.oriz", Line: 3, Column: 2, Offset: 4},
@@ -510,7 +510,7 @@ func TestSpanHighlighterEdgeCases(t *testing.T) {
 		t.Error("Should handle span at end of file")
 	}
 
-	// Test span on empty line
+	// Test span on empty line.
 	emptyLineSpan := Span{
 		Start: Position{Filename: "edge.oriz", Line: 2, Column: 1, Offset: 2},
 		End:   Position{Filename: "edge.oriz", Line: 2, Column: 1, Offset: 2},
@@ -522,7 +522,7 @@ func TestSpanHighlighterEdgeCases(t *testing.T) {
 	}
 }
 
-// TestErrorVisualizerEdgeCases tests error visualizer edge cases
+// TestErrorVisualizerEdgeCases tests error visualizer edge cases.
 func TestErrorVisualizerEdgeCases(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := "func main() {\n\tprintln(\"Hello, World!\")\n}"
@@ -530,7 +530,7 @@ func TestErrorVisualizerEdgeCases(t *testing.T) {
 
 	visualizer := NewErrorVisualizer(sourceMap)
 
-	// Test error at end of line
+	// Test error at end of line.
 	err := Error{
 		Pos: Position{
 			Filename: "test.oriz",
@@ -547,7 +547,7 @@ func TestErrorVisualizerEdgeCases(t *testing.T) {
 		t.Error("Should handle error at end of line")
 	}
 
-	// Test error with very long message
+	// Test error with very long message.
 	longErr := Error{
 		Pos: Position{
 			Filename: "test.oriz",

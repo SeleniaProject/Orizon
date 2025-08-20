@@ -1,5 +1,5 @@
-//go:build windows && iocp
-// +build windows,iocp
+//go:build windows && iocp.
+// +build windows,iocp.
 
 package asyncio
 
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// BenchmarkIOCPPoller_SingleConn measures the overhead of IOCP poller delivering
+// BenchmarkIOCPPoller_SingleConn measures the overhead of IOCP poller delivering.
 // a small number of Readable events on a single TCP connection.
 func BenchmarkIOCPPoller_SingleConn(b *testing.B) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -56,7 +56,7 @@ func BenchmarkIOCPPoller_SingleConn(b *testing.B) {
 		b.Fatalf("register: %v", err)
 	}
 
-	// Warmup
+	// Warmup.
 	_, _ = cli.Write([]byte{1})
 	select {
 	case <-ready:
@@ -67,7 +67,7 @@ func BenchmarkIOCPPoller_SingleConn(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		// Clear any pending
+		// Clear any pending.
 		select {
 		case <-ready:
 		default:
@@ -76,14 +76,14 @@ func BenchmarkIOCPPoller_SingleConn(b *testing.B) {
 		_, _ = cli.Write([]byte{1})
 		select {
 		case <-ready:
-			// ok
+			// ok.
 		case <-time.After(2 * time.Second):
 			b.Fatalf("timeout at iter=%d", i)
 		}
 	}
 }
 
-// BenchmarkIOCPPoller_MultiConn exercises multiple concurrent connections delivering
+// BenchmarkIOCPPoller_MultiConn exercises multiple concurrent connections delivering.
 // small Readable events to evaluate scalability.
 func BenchmarkIOCPPoller_MultiConn(b *testing.B) {
 	const numConns = 32
@@ -150,7 +150,7 @@ func BenchmarkIOCPPoller_MultiConn(b *testing.B) {
 		}
 	}
 
-	// Warmup
+	// Warmup.
 	for i, c := range clients {
 		_, _ = c.Write([]byte{1})
 		select {
@@ -164,7 +164,7 @@ func BenchmarkIOCPPoller_MultiConn(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		idx := i % numConns
 		b.StopTimer()
-		// drain
+		// drain.
 		select {
 		case <-ready[idx]:
 		default:
@@ -221,7 +221,7 @@ func BenchmarkIOCPPoller_Writable(b *testing.B) {
 		b.Fatalf("register: %v", err)
 	}
 
-	// Wait one tick
+	// Wait one tick.
 	select {
 	case <-tick:
 	case <-time.After(2 * time.Second):

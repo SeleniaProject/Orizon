@@ -1,5 +1,5 @@
 // Package runtime provides compile-time lifetime analysis for garbage collection avoidance.
-// This module implements sophisticated lifetime tracking, escape analysis, and memory
+// This module implements sophisticated lifetime tracking, escape analysis, and memory.
 // layout optimization to achieve deterministic memory management without GC.
 package runtime
 
@@ -10,132 +10,132 @@ import (
 	"time"
 )
 
-// LifetimeAnalyzer performs compile-time lifetime analysis
+// LifetimeAnalyzer performs compile-time lifetime analysis.
 type LifetimeAnalyzer struct {
+	variables       map[VariableID]*Variable
+	scopes          map[ScopeID]*Scope
+	functions       map[FunctionID]*Function
+	references      map[ReferenceID]*Reference
+	escapeGraph     *EscapeGraph
+	lifetimeGraph   *LifetimeGraph
+	allocationSites map[AllocationID]*Allocation
+	optimizations   []LifetimeOptimization
+	statistics      LifetimeStatistics
+	config          LifetimeConfig
 	mutex           sync.RWMutex
-	variables       map[VariableID]*Variable     // All variables
-	scopes          map[ScopeID]*Scope           // All scopes
-	functions       map[FunctionID]*Function     // All functions
-	references      map[ReferenceID]*Reference   // All references
-	escapeGraph     *EscapeGraph                 // Escape analysis graph
-	lifetimeGraph   *LifetimeGraph               // Lifetime dependency graph
-	allocationSites map[AllocationID]*Allocation // Allocation sites
-	statistics      LifetimeStatistics           // Analysis statistics
-	config          LifetimeConfig               // Configuration
-	optimizations   []LifetimeOptimization       // Applied optimizations
 }
 
-// Variable represents a program variable with lifetime information
+// Variable represents a program variable with lifetime information.
 type Variable struct {
-	ID              VariableID     // Unique identifier
-	Name            string         // Variable name
-	Type            *TypeInfo      // Type information
-	Scope           *Scope         // Containing scope
-	DeclarationSite SourceLocation // Declaration location
-	LifetimeStart   LifetimePoint  // Lifetime start point
-	LifetimeEnd     LifetimePoint  // Lifetime end point
-	References      []*Reference   // All references to this variable
-	Escaped         bool           // Variable escapes to heap
-	Borrowed        bool           // Variable is borrowed
-	Moved           bool           // Variable has been moved
-	StackAllocated  bool           // Can be stack allocated
-	RegionAllocated bool           // Should be region allocated
-	RefCount        int32          // Reference count
-	UsagePattern    UsagePattern   // Usage pattern analysis
-	Constraints     []Constraint   // Lifetime constraints
+	Type            *TypeInfo
+	Scope           *Scope
+	DeclarationSite SourceLocation
+	Name            string
+	References      []*Reference
+	Constraints     []Constraint
+	UsagePattern    UsagePattern
+	LifetimeStart   LifetimePoint
+	LifetimeEnd     LifetimePoint
+	ID              VariableID
+	RefCount        int32
+	Escaped         bool
+	RegionAllocated bool
+	StackAllocated  bool
+	Moved           bool
+	Borrowed        bool
 }
 
-// Scope represents a lexical scope with lifetime bounds
+// Scope represents a lexical scope with lifetime bounds.
 type Scope struct {
-	ID         ScopeID       // Unique identifier
-	Name       string        // Scope name
-	Parent     *Scope        // Parent scope
-	Children   []*Scope      // Child scopes
-	Variables  []*Variable   // Variables declared in scope
-	StartPoint LifetimePoint // Scope start point
-	EndPoint   LifetimePoint // Scope end point
-	ScopeType  ScopeType     // Type of scope
-	CanEscape  bool          // Variables can escape this scope
-	IsFunction bool          // Function scope
-	IsLoop     bool          // Loop scope
-	IsAsync    bool          // Async scope
-	Depth      int           // Nesting depth
+	Parent     *Scope
+	Name       string
+	Variables  []*Variable
+	Children   []*Scope
+	EndPoint   LifetimePoint
+	StartPoint LifetimePoint
+	ID         ScopeID
+	ScopeType  ScopeType
+	Depth      int
+	CanEscape  bool
+	IsFunction bool
+	IsLoop     bool
+	IsAsync    bool
 }
 
-// Function represents a function with lifetime analysis
+// Function represents a function with lifetime analysis.
 type Function struct {
-	ID          FunctionID        // Unique identifier
-	Name        string            // Function name
-	Signature   *TypeInfo         // Function signature (reuse existing TypeInfo)
-	Body        *Scope            // Function body scope
-	Parameters  []*Variable       // Function parameters
-	Returns     []*Variable       // Return variables
-	LocalVars   []*Variable       // Local variables
-	Allocations []*Allocation     // Allocations in function
-	CallSites   []*CallSite       // Call sites within function
-	EscapeInfo  EscapeInfo        // Escape analysis results
-	Complexity  int               // Lifetime complexity score
-	OptLevel    OptimizationLevel // Optimization level
+	Signature   *TypeInfo
+	Body        *Scope
+	Name        string
+	Parameters  []*Variable
+	Returns     []*Variable
+	LocalVars   []*Variable
+	Allocations []*Allocation
+	CallSites   []*CallSite
+	EscapeInfo  EscapeInfo
+	ID          FunctionID
+	Complexity  int
+	OptLevel    OptimizationLevel
 }
 
-// Reference represents a reference to a variable
+// Reference represents a reference to a variable.
 type Reference struct {
-	ID        ReferenceID    // Unique identifier
-	Variable  *Variable      // Referenced variable
-	Location  SourceLocation // Reference location
-	RefType   ReferenceType  // Type of reference
-	Scope     *Scope         // Scope of reference
-	LifeSpan  LifetimeSpan   // Lifetime span of reference
-	IsBorrow  bool           // Is a borrow reference
-	IsMove    bool           // Is a move reference
-	IsRead    bool           // Is a read reference
-	IsWrite   bool           // Is a write reference
-	IsMutable bool           // Is a mutable reference
-	Weight    float64        // Reference weight for analysis
+	Variable  *Variable
+	Scope     *Scope
+	Location  SourceLocation
+	LifeSpan  LifetimeSpan
+	ID        ReferenceID
+	RefType   ReferenceType
+	Weight    float64
+	IsBorrow  bool
+	IsMove    bool
+	IsRead    bool
+	IsWrite   bool
+	IsMutable bool
 }
 
-// EscapeGraph tracks escape relationships between variables
+// EscapeGraph tracks escape relationships between variables.
 type EscapeGraph struct {
+	nodes   map[VariableID]*EscapeNode
+	edges   map[EdgeID]*EscapeEdge
+	roots   []*EscapeNode
+	escaped []*EscapeNode
+	summary EscapeSummary
 	mutex   sync.RWMutex
-	nodes   map[VariableID]*EscapeNode // Graph nodes
-	edges   map[EdgeID]*EscapeEdge     // Graph edges
-	roots   []*EscapeNode              // Root nodes (never escape)
-	escaped []*EscapeNode              // Escaped nodes
-	summary EscapeSummary              // Escape analysis summary
 }
 
-// EscapeNode represents a node in the escape graph
+// EscapeNode represents a node in the escape graph.
 type EscapeNode struct {
-	Variable    *Variable      // Associated variable
-	Edges       []*EscapeEdge  // Outgoing edges
-	InEdges     []*EscapeEdge  // Incoming edges
-	EscapeState EscapeState    // Current escape state
-	EscapeLevel int            // Escape level (0 = never escapes)
-	Reasons     []EscapeReason // Reasons for escaping
-	CanOptimize bool           // Can be optimized
+	Variable    *Variable
+	Edges       []*EscapeEdge
+	InEdges     []*EscapeEdge
+	Reasons     []EscapeReason
+	EscapeState EscapeState
+	EscapeLevel int
+	CanOptimize bool
 }
 
-// EscapeEdge represents an edge in the escape graph
+// EscapeEdge represents an edge in the escape graph.
 type EscapeEdge struct {
-	ID       EdgeID         // Unique identifier
-	From     *EscapeNode    // Source node
-	To       *EscapeNode    // Target node
-	EdgeType EscapeEdgeType // Type of edge
-	Weight   float64        // Edge weight
-	Context  string         // Context information
+	From     *EscapeNode
+	To       *EscapeNode
+	Context  string
+	ID       EdgeID
+	EdgeType EscapeEdgeType
+	Weight   float64
 }
 
-// LifetimeGraph tracks lifetime dependencies
+// LifetimeGraph tracks lifetime dependencies.
 type LifetimeGraph struct {
+	nodes       map[VariableID]*LifetimeNode
+	solutions   map[VariableID]LifetimeSolution
+	constraints []*LifetimeConstraintInfo
+	conflicts   []*LifetimeConflict
+	optimizable []*OptimizationOpportunity
 	mutex       sync.RWMutex
-	nodes       map[VariableID]*LifetimeNode    // Graph nodes
-	constraints []*LifetimeConstraintInfo       // Lifetime constraints
-	solutions   map[VariableID]LifetimeSolution // Solved lifetimes
-	conflicts   []*LifetimeConflict             // Detected conflicts
-	optimizable []*OptimizationOpportunity      // Optimization opportunities
 }
 
-// LifetimeNode represents a node in the lifetime graph
+// LifetimeNode represents a node in the lifetime graph.
 type LifetimeNode struct {
 	Variable     *Variable             // Associated variable
 	Dependencies []*LifetimeDependency // Lifetime dependencies
@@ -146,26 +146,26 @@ type LifetimeNode struct {
 	Flexibility  float64               // Lifetime flexibility score
 }
 
-// Allocation represents a memory allocation site
+// Allocation represents a memory allocation site.
 type Allocation struct {
-	ID         AllocationID       // Unique identifier
-	Location   SourceLocation     // Allocation location
-	Type       *TypeInfo          // Allocated type
-	Size       uintptr            // Allocation size
-	Alignment  uintptr            // Required alignment
-	Function   *Function          // Containing function
-	Scope      *Scope             // Containing scope
-	Variable   *Variable          // Target variable (if any)
-	AllocType  AllocationType     // Type of allocation
-	Strategy   AllocationStrategy // Allocation strategy
-	Lifetime   LifetimeSpan       // Expected lifetime
-	Frequency  int64              // Allocation frequency
-	Escaped    bool               // Allocation escapes
-	Optimized  bool               // Has been optimized
-	RefCounted bool               // Uses reference counting
+	Scope      *Scope
+	Type       *TypeInfo
+	Variable   *Variable
+	Function   *Function
+	Location   SourceLocation
+	Lifetime   LifetimeSpan
+	Size       uintptr
+	Alignment  uintptr
+	AllocType  AllocationType
+	Strategy   AllocationStrategy
+	ID         AllocationID
+	Frequency  int64
+	Escaped    bool
+	Optimized  bool
+	RefCounted bool
 }
 
-// Type definitions
+// Type definitions.
 type (
 	VariableID    uint64   // Variable identifier
 	ScopeID       uint64   // Scope identifier
@@ -180,7 +180,7 @@ type (
 	}
 )
 
-// Enumeration types
+// Enumeration types.
 type ScopeType int
 
 const (
@@ -255,29 +255,29 @@ const (
 	MaxOptimization
 )
 
-// Analysis structures
+// Analysis structures.
 type UsagePattern struct {
-	ReadCount     int64         // Number of reads
-	WriteCount    int64         // Number of writes
-	LastAccess    LifetimePoint // Last access point
-	AccessPattern []AccessInfo  // Access pattern details
-	IsHotPath     bool          // Used in hot code path
-	Frequency     float64       // Usage frequency
+	AccessPattern []AccessInfo
+	ReadCount     int64
+	WriteCount    int64
+	LastAccess    LifetimePoint
+	Frequency     float64
+	IsHotPath     bool
 }
 
 type AccessInfo struct {
-	Point   LifetimePoint // Access point
-	Type    ReferenceType // Type of access
-	Context string        // Context information
-	Weight  float64       // Access weight
+	Context string
+	Point   LifetimePoint
+	Type    ReferenceType
+	Weight  float64
 }
 
 type Constraint struct {
-	Type        ConstraintType     // Type of constraint
-	Variables   []*Variable        // Constrained variables
-	Relation    ConstraintRelation // Constraint relation
-	Strength    float64            // Constraint strength
-	Description string             // Human-readable description
+	Description string
+	Variables   []*Variable
+	Type        ConstraintType
+	Relation    ConstraintRelation
+	Strength    float64
 }
 
 type ConstraintType int
@@ -301,10 +301,10 @@ const (
 )
 
 type EscapeReason struct {
-	Type        EscapeReasonType // Reason type
-	Location    SourceLocation   // Where escape occurs
-	Description string           // Detailed description
-	Severity    float64          // Severity score
+	Location    SourceLocation
+	Description string
+	Type        EscapeReasonType
+	Severity    float64
 }
 
 type EscapeReasonType int
@@ -320,11 +320,11 @@ const (
 )
 
 type EscapeInfo struct {
-	CanEscape     bool           // Can any variable escape
-	EscapedVars   []*Variable    // Variables that escape
-	EscapeReasons []EscapeReason // Reasons for escaping
-	EscapeLevel   int            // Maximum escape level
-	Optimizable   bool           // Can be optimized
+	EscapedVars   []*Variable
+	EscapeReasons []EscapeReason
+	EscapeLevel   int
+	CanEscape     bool
+	Optimizable   bool
 }
 
 type EscapeSummary struct {
@@ -336,10 +336,10 @@ type EscapeSummary struct {
 }
 
 type LifetimeDependency struct {
-	Variable *Variable      // Dependent variable
-	Type     DependencyType // Type of dependency
-	Strength float64        // Dependency strength
-	Context  string         // Context information
+	Variable *Variable
+	Context  string
+	Type     DependencyType
+	Strength float64
 }
 
 type DependencyType int
@@ -353,11 +353,11 @@ const (
 )
 
 type LifetimeConstraintInfo struct {
-	Variables []*Variable        // Constrained variables
-	Type      ConstraintType     // Constraint type
-	Relation  ConstraintRelation // Constraint relation
-	Location  SourceLocation     // Constraint source
-	Strength  float64            // Constraint strength
+	Location  SourceLocation
+	Variables []*Variable
+	Type      ConstraintType
+	Relation  ConstraintRelation
+	Strength  float64
 }
 
 type LifetimeSolution struct {
@@ -369,11 +369,11 @@ type LifetimeSolution struct {
 }
 
 type LifetimeConflict struct {
-	Variables  []*Variable    // Conflicting variables
-	Type       ConflictType   // Type of conflict
-	Location   SourceLocation // Conflict location
-	Severity   float64        // Conflict severity
-	Resolution string         // Suggested resolution
+	Location   SourceLocation
+	Resolution string
+	Variables  []*Variable
+	Type       ConflictType
+	Severity   float64
 }
 
 type ConflictType int
@@ -386,12 +386,12 @@ const (
 )
 
 type OptimizationOpportunity struct {
-	Type        OptimizationType // Type of optimization
-	Variables   []*Variable      // Target variables
-	Benefit     float64          // Expected benefit
-	Cost        float64          // Implementation cost
-	Description string           // Optimization description
-	Applicable  bool             // Can be applied
+	Description string
+	Variables   []*Variable
+	Type        OptimizationType
+	Benefit     float64
+	Cost        float64
+	Applicable  bool
 }
 
 type OptimizationType int
@@ -406,11 +406,11 @@ const (
 )
 
 type LifetimeOptimization struct {
-	Type        OptimizationType // Optimization type
-	Variables   []*Variable      // Optimized variables
-	Applied     bool             // Has been applied
-	Benefit     float64          // Actual benefit
-	Description string           // Optimization description
+	Description string
+	Variables   []*Variable
+	Type        OptimizationType
+	Benefit     float64
+	Applied     bool
 }
 
 type LifetimeStatistics struct {
@@ -427,24 +427,24 @@ type LifetimeStatistics struct {
 }
 
 type LifetimeConfig struct {
-	EnableEscapeAnalysis   bool              // Enable escape analysis
-	EnableLifetimeAnalysis bool              // Enable lifetime analysis
-	EnableOptimization     bool              // Enable optimizations
-	MaxEscapeDepth         int               // Maximum escape analysis depth
-	MaxLifetimeComplexity  int               // Maximum lifetime complexity
-	OptimizationLevel      OptimizationLevel // Optimization aggressiveness
-	StackPreference        float64           // Preference for stack allocation
-	RegionPreference       float64           // Preference for region allocation
-	RefCountingThreshold   int               // Threshold for reference counting
-	EnableStatistics       bool              // Enable statistics collection
-	EnableDebugging        bool              // Enable debug output
+	MaxEscapeDepth         int
+	MaxLifetimeComplexity  int
+	OptimizationLevel      OptimizationLevel
+	StackPreference        float64
+	RegionPreference       float64
+	RefCountingThreshold   int
+	EnableEscapeAnalysis   bool
+	EnableLifetimeAnalysis bool
+	EnableOptimization     bool
+	EnableStatistics       bool
+	EnableDebugging        bool
 }
 
 type SourceLocation struct {
-	File     string // Source file
-	Line     int    // Line number
-	Column   int    // Column number
-	Function string // Function name
+	File     string
+	Function string
+	Line     int
+	Column   int
 }
 
 type CallSite struct {
@@ -455,7 +455,7 @@ type CallSite struct {
 	EscapeInfo EscapeInfo     // Escape information
 }
 
-// Default configuration
+// Default configuration.
 var DefaultLifetimeConfig = LifetimeConfig{
 	EnableEscapeAnalysis:   true,
 	EnableLifetimeAnalysis: true,
@@ -470,7 +470,7 @@ var DefaultLifetimeConfig = LifetimeConfig{
 	EnableDebugging:        false,
 }
 
-// NewLifetimeAnalyzer creates a new lifetime analyzer
+// NewLifetimeAnalyzer creates a new lifetime analyzer.
 func NewLifetimeAnalyzer(config LifetimeConfig) *LifetimeAnalyzer {
 	return &LifetimeAnalyzer{
 		variables:       make(map[VariableID]*Variable),
@@ -485,17 +485,17 @@ func NewLifetimeAnalyzer(config LifetimeConfig) *LifetimeAnalyzer {
 	}
 }
 
-// AnalyzeProgram performs comprehensive lifetime analysis on a program
+// AnalyzeProgram performs comprehensive lifetime analysis on a program.
 func (la *LifetimeAnalyzer) AnalyzeProgram(program *Program) (*AnalysisResult, error) {
 	startTime := time.Now()
 
-	// Phase 1: Build initial representations
+	// Phase 1: Build initial representations.
 	err := la.buildRepresentation(program)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build representation: %w", err)
 	}
 
-	// Phase 2: Perform escape analysis
+	// Phase 2: Perform escape analysis.
 	if la.config.EnableEscapeAnalysis {
 		err = la.performEscapeAnalysis()
 		if err != nil {
@@ -503,7 +503,7 @@ func (la *LifetimeAnalyzer) AnalyzeProgram(program *Program) (*AnalysisResult, e
 		}
 	}
 
-	// Phase 3: Perform lifetime analysis
+	// Phase 3: Perform lifetime analysis.
 	if la.config.EnableLifetimeAnalysis {
 		err = la.performLifetimeAnalysis()
 		if err != nil {
@@ -511,7 +511,7 @@ func (la *LifetimeAnalyzer) AnalyzeProgram(program *Program) (*AnalysisResult, e
 		}
 	}
 
-	// Phase 4: Apply optimizations
+	// Phase 4: Apply optimizations.
 	if la.config.EnableOptimization {
 		err = la.applyOptimizations()
 		if err != nil {
@@ -522,7 +522,7 @@ func (la *LifetimeAnalyzer) AnalyzeProgram(program *Program) (*AnalysisResult, e
 	analysisTime := time.Since(startTime)
 	la.statistics.AnalysisTime = analysisTime
 
-	// Generate results
+	// Generate results.
 	result := &AnalysisResult{
 		Variables:     la.variables,
 		Functions:     la.functions,
@@ -538,36 +538,36 @@ func (la *LifetimeAnalyzer) AnalyzeProgram(program *Program) (*AnalysisResult, e
 	return result, nil
 }
 
-// buildRepresentation builds initial program representation
+// buildRepresentation builds initial program representation.
 func (la *LifetimeAnalyzer) buildRepresentation(program *Program) error {
 	la.mutex.Lock()
 	defer la.mutex.Unlock()
 
-	// Build scopes hierarchy
+	// Build scopes hierarchy.
 	err := la.buildScopes(program)
 	if err != nil {
 		return err
 	}
 
-	// Build function representations
+	// Build function representations.
 	err = la.buildFunctions(program)
 	if err != nil {
 		return err
 	}
 
-	// Build variable representations
+	// Build variable representations.
 	err = la.buildVariables(program)
 	if err != nil {
 		return err
 	}
 
-	// Build reference tracking
+	// Build reference tracking.
 	err = la.buildReferences(program)
 	if err != nil {
 		return err
 	}
 
-	// Build allocation sites
+	// Build allocation sites.
 	err = la.buildAllocationSites(program)
 	if err != nil {
 		return err
@@ -576,60 +576,60 @@ func (la *LifetimeAnalyzer) buildRepresentation(program *Program) error {
 	return nil
 }
 
-// performEscapeAnalysis performs escape analysis on all variables
+// performEscapeAnalysis performs escape analysis on all variables.
 func (la *LifetimeAnalyzer) performEscapeAnalysis() error {
-	// Build escape graph
+	// Build escape graph.
 	err := la.buildEscapeGraph()
 	if err != nil {
 		return err
 	}
 
-	// Propagate escape information
+	// Propagate escape information.
 	err = la.propagateEscapeInfo()
 	if err != nil {
 		return err
 	}
 
-	// Classify variables by escape behavior
+	// Classify variables by escape behavior.
 	la.classifyEscapeBehavior()
 
 	return nil
 }
 
-// performLifetimeAnalysis performs lifetime analysis on all variables
+// performLifetimeAnalysis performs lifetime analysis on all variables.
 func (la *LifetimeAnalyzer) performLifetimeAnalysis() error {
-	// Build lifetime dependency graph
+	// Build lifetime dependency graph.
 	err := la.buildLifetimeGraph()
 	if err != nil {
 		return err
 	}
 
-	// Solve lifetime constraints
+	// Solve lifetime constraints.
 	err = la.solveLifetimeConstraints()
 	if err != nil {
 		return err
 	}
 
-	// Detect lifetime conflicts
+	// Detect lifetime conflicts.
 	la.detectLifetimeConflicts()
 
-	// Identify optimization opportunities
+	// Identify optimization opportunities.
 	la.identifyOptimizationOpportunities()
 
 	return nil
 }
 
-// applyOptimizations applies discovered optimizations
+// applyOptimizations applies discovered optimizations.
 func (la *LifetimeAnalyzer) applyOptimizations() error {
 	optimizationStart := time.Now()
 
-	// Sort optimizations by benefit
+	// Sort optimizations by benefit.
 	opportunities := la.lifetimeGraph.optimizable
 	sort.Slice(opportunities, func(i, j int) bool {
 		return opportunities[i].Benefit > opportunities[j].Benefit
 	})
 
-	// Apply optimizations in order of benefit
+	// Apply optimizations in order of benefit.
 	for _, opportunity := range opportunities {
 		if opportunity.Applicable {
 			err := la.applyOptimization(opportunity)
@@ -640,10 +640,11 @@ func (la *LifetimeAnalyzer) applyOptimizations() error {
 	}
 
 	la.statistics.OptimizationTime = time.Since(optimizationStart)
+
 	return nil
 }
 
-// NewEscapeGraph creates a new escape graph
+// NewEscapeGraph creates a new escape graph.
 func NewEscapeGraph() *EscapeGraph {
 	return &EscapeGraph{
 		nodes:   make(map[VariableID]*EscapeNode),
@@ -653,7 +654,7 @@ func NewEscapeGraph() *EscapeGraph {
 	}
 }
 
-// NewLifetimeGraph creates a new lifetime graph
+// NewLifetimeGraph creates a new lifetime graph.
 func NewLifetimeGraph() *LifetimeGraph {
 	return &LifetimeGraph{
 		nodes:       make(map[VariableID]*LifetimeNode),
@@ -664,7 +665,7 @@ func NewLifetimeGraph() *LifetimeGraph {
 	}
 }
 
-// Program represents the program being analyzed (placeholder)
+// Program represents the program being analyzed (placeholder).
 type Program struct {
 	Functions []*FunctionNode
 	Variables []*VariableNode
@@ -672,25 +673,25 @@ type Program struct {
 }
 
 type FunctionNode struct {
-	ID   FunctionID
-	Name string
 	Body interface{}
+	Name string
+	ID   FunctionID
 }
 
 type VariableNode struct {
-	ID   VariableID
-	Name string
 	Type interface{}
+	Name string
+	ID   VariableID
 }
 
 type ScopeNode struct {
-	ID       ScopeID
-	Name     string
 	Parent   *ScopeNode
+	Name     string
 	Children []*ScopeNode
+	ID       ScopeID
 }
 
-// AnalysisResult contains the results of lifetime analysis
+// AnalysisResult contains the results of lifetime analysis.
 type AnalysisResult struct {
 	Variables     map[VariableID]*Variable
 	Functions     map[FunctionID]*Function
@@ -703,65 +704,65 @@ type AnalysisResult struct {
 	AnalysisTime  time.Duration
 }
 
-// Placeholder implementations for complex methods
+// Placeholder implementations for complex methods.
 func (la *LifetimeAnalyzer) buildScopes(program *Program) error {
-	// Complex implementation would parse AST and build scope hierarchy
+	// Complex implementation would parse AST and build scope hierarchy.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) buildFunctions(program *Program) error {
-	// Complex implementation would analyze function definitions
+	// Complex implementation would analyze function definitions.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) buildVariables(program *Program) error {
-	// Complex implementation would track all variable declarations
+	// Complex implementation would track all variable declarations.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) buildReferences(program *Program) error {
-	// Complex implementation would track all variable references
+	// Complex implementation would track all variable references.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) buildAllocationSites(program *Program) error {
-	// Complex implementation would identify all allocation expressions
+	// Complex implementation would identify all allocation expressions.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) buildEscapeGraph() error {
-	// Complex implementation would build escape dependency graph
+	// Complex implementation would build escape dependency graph.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) propagateEscapeInfo() error {
-	// Complex implementation would propagate escape information
+	// Complex implementation would propagate escape information.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) classifyEscapeBehavior() {
-	// Complex implementation would classify variables by escape behavior
+	// Complex implementation would classify variables by escape behavior.
 }
 
 func (la *LifetimeAnalyzer) buildLifetimeGraph() error {
-	// Complex implementation would build lifetime dependency graph
+	// Complex implementation would build lifetime dependency graph.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) solveLifetimeConstraints() error {
-	// Complex implementation would solve lifetime constraint system
+	// Complex implementation would solve lifetime constraint system.
 	return nil
 }
 
 func (la *LifetimeAnalyzer) detectLifetimeConflicts() {
-	// Complex implementation would detect lifetime conflicts
+	// Complex implementation would detect lifetime conflicts.
 }
 
 func (la *LifetimeAnalyzer) identifyOptimizationOpportunities() {
-	// Complex implementation would identify optimization opportunities
+	// Complex implementation would identify optimization opportunities.
 }
 
 func (la *LifetimeAnalyzer) applyOptimization(opportunity *OptimizationOpportunity) error {
-	// Complex implementation would apply specific optimization
+	// Complex implementation would apply specific optimization.
 	return nil
 }

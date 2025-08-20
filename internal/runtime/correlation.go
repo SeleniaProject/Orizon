@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-// NewCorrelationID returns a cryptographically-strong random correlation id
+// NewCorrelationID returns a cryptographically-strong random correlation id.
 // encoded as a 32-hex-character string. This id can be used to link related
 // messages across actors for causal tracing and debugging.
 func NewCorrelationID() string {
@@ -16,8 +16,10 @@ func NewCorrelationID() string {
 		// Fallback to zero bytes in the extremely unlikely event of failure.
 		// This preserves determinism of the API without panicking.
 	}
+
 	dst := make([]byte, 32)
 	hex.Encode(dst, b[:])
+
 	return string(dst)
 }
 
@@ -30,32 +32,36 @@ func (ctx *ActorContext) SetCorrelationID(id string) {
 	}
 }
 
-// GetCorrelationID returns the current correlation id on the actor context, or
+// GetCorrelationID returns the current correlation id on the actor context, or.
 // an empty string when not set.
 func (ctx *ActorContext) GetCorrelationID() string {
 	if ctx == nil || ctx.Props == nil {
 		return ""
 	}
+
 	if v, ok := ctx.Props["correlationID"].(string); ok {
 		return v
 	}
+
 	return ""
 }
 
-// WithCorrelation sets the correlation id on the context and returns a restore
+// WithCorrelation sets the correlation id on the context and returns a restore.
 // function that can be deferred to reset the previous value.
 func (ctx *ActorContext) WithCorrelation(id string) (restore func()) {
 	prev := ctx.GetCorrelationID()
 	ctx.SetCorrelationID(id)
+
 	return func() { ctx.SetCorrelationID(prev) }
 }
 
-// Tell sends a message to the receiver using the current correlation id from
+// Tell sends a message to the receiver using the current correlation id from.
 // the actor context, if any.
 func (ctx *ActorContext) Tell(receiver ActorID, messageType MessageType, payload interface{}) error {
 	if ctx == nil || ctx.System == nil {
 		return nil
 	}
+
 	return ctx.System.SendMessageWithCorrelation(ctx.ActorID, receiver, messageType, payload, ctx.GetCorrelationID())
 }
 
@@ -64,6 +70,7 @@ func (ctx *ActorContext) TellWithPriority(receiver ActorID, messageType MessageT
 	if ctx == nil || ctx.System == nil {
 		return nil
 	}
+
 	return ctx.System.SendMessageWithCorrelationPriority(ctx.ActorID, receiver, messageType, payload, prio, ctx.GetCorrelationID())
 }
 
@@ -78,6 +85,7 @@ func (as *ActorSystem) SendMessageWithCorrelationPriority(senderID, receiverID A
 	if !as.running {
 		return fmt.Errorf("actor system is not running")
 	}
+
 	message := Message{
 		ID:            MessageID(atomic.AddUint64(&globalMessageID, 1)),
 		Type:          messageType,
@@ -87,5 +95,6 @@ func (as *ActorSystem) SendMessageWithCorrelationPriority(senderID, receiverID A
 		Priority:      prio,
 		CorrelationID: correlationID,
 	}
+
 	return as.deliverMessage(message)
 }

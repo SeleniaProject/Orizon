@@ -22,7 +22,7 @@ func TestAsyncIO_ConcurrentDeregisterAndStop(t *testing.T) {
 	}
 	defer client.Close()
 
-	// Accept and immediately close to create a quick lifecycle
+	// Accept and immediately close to create a quick lifecycle.
 	go func() {
 		c, _ := ln.Accept()
 		if c != nil {
@@ -49,24 +49,24 @@ func TestAsyncIO_ConcurrentDeregisterAndStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Run Deregister and Stop concurrently
+	// Run Deregister and Stop concurrently.
 	done := make(chan struct{})
 	go func() {
 		_ = p.Deregister(client)
 		close(done)
 	}()
-	// Give a tiny slice to interleave
+	// Give a tiny slice to interleave.
 	time.Sleep(10 * time.Millisecond)
 	_ = p.Stop()
 
 	select {
 	case <-done:
-		// ok
+		// ok.
 	case <-time.After(time.Second):
 		t.Fatal("timeout waiting for deregister to complete")
 	}
-	// Ensure handler goroutine had a chance to run at least once or was safely canceled
-	// Use Wait with timeout to avoid flakes across OSes
+	// Ensure handler goroutine had a chance to run at least once or was safely canceled.
+	// Use Wait with timeout to avoid flakes across OSes.
 	c := make(chan struct{})
 	go func() { wg.Wait(); close(c) }()
 	select {

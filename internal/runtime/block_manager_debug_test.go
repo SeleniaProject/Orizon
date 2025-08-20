@@ -1,4 +1,4 @@
-//go:build debug
+//go:build debug.
 
 package runtime
 
@@ -7,7 +7,7 @@ import (
 	"unsafe"
 )
 
-// This test verifies that debugPostAllocValidate detects unregistered pointers
+// This test verifies that debugPostAllocValidate detects unregistered pointers.
 // and panics in debug builds, helping catch allocation path inconsistencies early.
 func TestDebugPostAllocValidate_PanicsOnUnregistered(t *testing.T) {
 	bm := NewBlockManager(BlockPolicy{})

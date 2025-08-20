@@ -1,5 +1,5 @@
 // Package runtime provides memory compaction and optimization algorithms.
-// This module implements various compaction strategies, defragmentation,
+// This module implements various compaction strategies, defragmentation,.
 // and memory layout optimization for region-based memory management.
 package runtime
 
@@ -10,19 +10,19 @@ import (
 	"unsafe"
 )
 
-// CompactionEngine manages memory compaction operations
+// CompactionEngine manages memory compaction operations.
 type CompactionEngine struct {
+	statistics CompactionStatistics
+	regions    map[RegionID]*Region
+	strategies map[string]CompactionStrategy
+	scheduler  *CompactionScheduler
+	config     CompactionConfig
 	mutex      sync.RWMutex
-	regions    map[RegionID]*Region          // Registered regions
-	strategies map[string]CompactionStrategy // Available strategies
-	scheduler  *CompactionScheduler          // Compaction scheduler
-	statistics CompactionStatistics          // Compaction statistics
-	config     CompactionConfig              // Configuration
-	enabled    bool                          // Compaction enabled
-	running    bool                          // Compaction in progress
+	enabled    bool
+	running    bool
 }
 
-// CompactionStrategy defines interface for compaction algorithms
+// CompactionStrategy defines interface for compaction algorithms.
 type CompactionStrategy interface {
 	Name() string                                      // Strategy name
 	Compact(region *Region) (*CompactionResult, error) // Perform compaction
@@ -31,23 +31,23 @@ type CompactionStrategy interface {
 	Priority() int                                     // Strategy priority
 }
 
-// CompactionResult contains results of a compaction operation
+// CompactionResult contains results of a compaction operation.
 type CompactionResult struct {
-	Strategy            string        // Strategy used
-	StartTime           time.Time     // Compaction start time
-	EndTime             time.Time     // Compaction end time
-	Duration            time.Duration // Total compaction time
-	BytesCompacted      uint64        // Bytes involved in compaction
-	BytesReclaimed      uint64        // Bytes reclaimed
-	BlocksMoved         uint64        // Number of blocks moved
-	BlocksCoalesced     uint64        // Number of blocks coalesced
-	FragmentationBefore float64       // Fragmentation before compaction
-	FragmentationAfter  float64       // Fragmentation after compaction
-	Success             bool          // Compaction successful
-	Error               error         // Error if unsuccessful
+	StartTime           time.Time
+	EndTime             time.Time
+	Error               error
+	Strategy            string
+	Duration            time.Duration
+	BytesCompacted      uint64
+	BytesReclaimed      uint64
+	BlocksMoved         uint64
+	BlocksCoalesced     uint64
+	FragmentationBefore float64
+	FragmentationAfter  float64
+	Success             bool
 }
 
-// CompactionGain estimates benefits of compaction
+// CompactionGain estimates benefits of compaction.
 type CompactionGain struct {
 	ExpectedReclaimed uint64        // Expected bytes to reclaim
 	ExpectedReduction float64       // Expected fragmentation reduction
@@ -56,29 +56,29 @@ type CompactionGain struct {
 	RecommendCompact  bool          // Recommendation to compact
 }
 
-// CompactionScheduler manages automatic compaction scheduling
+// CompactionScheduler manages automatic compaction scheduling.
 type CompactionScheduler struct {
-	mutex    sync.Mutex
-	enabled  bool
-	interval time.Duration
 	lastRun  time.Time
 	nextRun  time.Time
-	triggers []CompactionTrigger
 	stopChan chan struct{}
+	triggers []CompactionTrigger
+	interval time.Duration
+	mutex    sync.Mutex
+	enabled  bool
 	running  bool
 }
 
-// CompactionTrigger defines conditions that trigger compaction
+// CompactionTrigger defines conditions that trigger compaction.
 type CompactionTrigger struct {
-	Name          string        // Trigger name
-	Type          TriggerType   // Trigger type
-	Threshold     float64       // Threshold value
-	MinInterval   time.Duration // Minimum interval between triggers
-	LastTriggered time.Time     // Last trigger time
-	Enabled       bool          // Trigger enabled
+	LastTriggered time.Time
+	Name          string
+	Type          TriggerType
+	Threshold     float64
+	MinInterval   time.Duration
+	Enabled       bool
 }
 
-// TriggerType defines types of compaction triggers
+// TriggerType defines types of compaction triggers.
 type TriggerType int
 
 const (
@@ -89,47 +89,47 @@ const (
 	TriggerManual                               // Manual trigger
 )
 
-// CompactionStatistics tracks compaction performance
+// CompactionStatistics tracks compaction performance.
 type CompactionStatistics struct {
-	TotalCompactions      uint64            // Total compactions performed
-	SuccessfulCompactions uint64            // Successful compactions
-	FailedCompactions     uint64            // Failed compactions
-	TotalTimeSpent        time.Duration     // Total time spent compacting
-	AverageCompactionTime time.Duration     // Average compaction time
-	TotalBytesCompacted   uint64            // Total bytes compacted
-	TotalBytesReclaimed   uint64            // Total bytes reclaimed
-	AverageFragReduction  float64           // Average fragmentation reduction
-	LastCompactionTime    time.Time         // Last compaction time
-	CompactionsByStrategy map[string]uint64 // Compactions by strategy
+	LastCompactionTime    time.Time
+	CompactionsByStrategy map[string]uint64
+	TotalCompactions      uint64
+	SuccessfulCompactions uint64
+	FailedCompactions     uint64
+	TotalTimeSpent        time.Duration
+	AverageCompactionTime time.Duration
+	TotalBytesCompacted   uint64
+	TotalBytesReclaimed   uint64
+	AverageFragReduction  float64
 }
 
-// CompactionConfig configures compaction behavior
+// CompactionConfig configures compaction behavior.
 type CompactionConfig struct {
-	Enabled                 bool          // Enable compaction
-	AutomaticEnabled        bool          // Enable automatic compaction
-	SchedulerInterval       time.Duration // Scheduler check interval
-	MaxCompactionTime       time.Duration // Maximum compaction duration
-	FragmentationThreshold  float64       // Fragmentation threshold for compaction
-	MemoryPressureThreshold float64       // Memory pressure threshold
-	MinFreeBlocks           int           // Minimum free blocks to trigger
-	ConcurrentCompactions   int           // Maximum concurrent compactions
-	PreferredStrategy       string        // Preferred compaction strategy
-	AdaptiveStrategy        bool          // Use adaptive strategy selection
+	PreferredStrategy       string
+	SchedulerInterval       time.Duration
+	MaxCompactionTime       time.Duration
+	FragmentationThreshold  float64
+	MemoryPressureThreshold float64
+	MinFreeBlocks           int
+	ConcurrentCompactions   int
+	Enabled                 bool
+	AutomaticEnabled        bool
+	AdaptiveStrategy        bool
 }
 
-// MarkAndSweepCompactor implements mark-and-sweep compaction
+// MarkAndSweepCompactor implements mark-and-sweep compaction.
 type MarkAndSweepCompactor struct {
 	name     string
 	priority int
 }
 
-// CopyingCompactor implements copying garbage collection
+// CopyingCompactor implements copying garbage collection.
 type CopyingCompactor struct {
 	name     string
 	priority int
 }
 
-// IncrementalCompactor implements incremental compaction
+// IncrementalCompactor implements incremental compaction.
 type IncrementalCompactor struct {
 	name        string
 	priority    int
@@ -137,19 +137,19 @@ type IncrementalCompactor struct {
 	maxDuration time.Duration // Maximum time per chunk
 }
 
-// SlidingCompactor implements sliding compaction
+// SlidingCompactor implements sliding compaction.
 type SlidingCompactor struct {
 	name     string
 	priority int
 }
 
-// TwoPassCompactor implements two-pass compaction
+// TwoPassCompactor implements two-pass compaction.
 type TwoPassCompactor struct {
 	name     string
 	priority int
 }
 
-// CompactionBlock represents a block during compaction
+// CompactionBlock represents a block during compaction.
 type CompactionBlock struct {
 	Header    *BlockHeader   // Block header
 	Data      unsafe.Pointer // Block data
@@ -159,7 +159,7 @@ type CompactionBlock struct {
 	Visited   bool           // Block has been visited
 }
 
-// Default configuration values
+// Default configuration values.
 const (
 	DefaultSchedulerInterval       = time.Minute * 5
 	DefaultMaxCompactionTime       = time.Second * 30
@@ -169,7 +169,7 @@ const (
 	DefaultConcurrentCompactions   = 1
 )
 
-// NewCompactionEngine creates a new compaction engine
+// NewCompactionEngine creates a new compaction engine.
 func NewCompactionEngine(config CompactionConfig) *CompactionEngine {
 	engine := &CompactionEngine{
 		regions:    make(map[RegionID]*Region),
@@ -179,7 +179,7 @@ func NewCompactionEngine(config CompactionConfig) *CompactionEngine {
 		enabled:    config.Enabled,
 	}
 
-	// Register built-in strategies
+	// Register built-in strategies.
 	engine.registerStrategy(&MarkAndSweepCompactor{
 		name:     "mark-and-sweep",
 		priority: 100,
@@ -207,13 +207,13 @@ func NewCompactionEngine(config CompactionConfig) *CompactionEngine {
 		priority: 60,
 	})
 
-	// Initialize statistics
+	// Initialize statistics.
 	engine.statistics.CompactionsByStrategy = make(map[string]uint64)
 
 	return engine
 }
 
-// RegisterRegion registers a region for compaction
+// RegisterRegion registers a region for compaction.
 func (ce *CompactionEngine) RegisterRegion(region *Region) {
 	if !ce.enabled {
 		return
@@ -225,7 +225,7 @@ func (ce *CompactionEngine) RegisterRegion(region *Region) {
 	ce.regions[region.Header.ID] = region
 }
 
-// UnregisterRegion removes a region from compaction
+// UnregisterRegion removes a region from compaction.
 func (ce *CompactionEngine) UnregisterRegion(regionID RegionID) {
 	ce.mutex.Lock()
 	defer ce.mutex.Unlock()
@@ -233,7 +233,7 @@ func (ce *CompactionEngine) UnregisterRegion(regionID RegionID) {
 	delete(ce.regions, regionID)
 }
 
-// CompactRegion compacts a specific region
+// CompactRegion compacts a specific region.
 func (ce *CompactionEngine) CompactRegion(regionID RegionID, strategyName string) (*CompactionResult, error) {
 	if !ce.enabled {
 		return nil, ErrCompactionDisabled
@@ -247,7 +247,7 @@ func (ce *CompactionEngine) CompactRegion(regionID RegionID, strategyName string
 		return nil, ErrRegionNotFound
 	}
 
-	// Select strategy
+	// Select strategy.
 	var strategy CompactionStrategy
 	if strategyName != "" {
 		strategy = ce.strategies[strategyName]
@@ -259,22 +259,23 @@ func (ce *CompactionEngine) CompactRegion(regionID RegionID, strategyName string
 		return nil, ErrStrategyNotFound
 	}
 
-	// Perform compaction
+	// Perform compaction.
 	result, err := strategy.Compact(region)
 
-	// Update statistics
+	// Update statistics.
 	ce.updateStatistics(result)
 
 	return result, err
 }
 
-// CompactAll compacts all registered regions
+// CompactAll compacts all registered regions.
 func (ce *CompactionEngine) CompactAll() ([]*CompactionResult, error) {
 	if !ce.enabled {
 		return nil, ErrCompactionDisabled
 	}
 
 	ce.mutex.RLock()
+
 	regionIDs := make([]RegionID, 0, len(ce.regions))
 	for id := range ce.regions {
 		regionIDs = append(regionIDs, id)
@@ -286,16 +287,17 @@ func (ce *CompactionEngine) CompactAll() ([]*CompactionResult, error) {
 	for _, regionID := range regionIDs {
 		result, err := ce.CompactRegion(regionID, "")
 		if err != nil {
-			// Log error but continue with other regions
+			// Log error but continue with other regions.
 			continue
 		}
+
 		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-// AutoCompact performs automatic compaction based on triggers
+// AutoCompact performs automatic compaction based on triggers.
 func (ce *CompactionEngine) AutoCompact() error {
 	if !ce.enabled || !ce.config.AutomaticEnabled {
 		return nil
@@ -305,14 +307,14 @@ func (ce *CompactionEngine) AutoCompact() error {
 	defer ce.mutex.RUnlock()
 
 	for _, region := range ce.regions {
-		// Check if region needs compaction
+		// Check if region needs compaction.
 		if ce.shouldCompact(region) {
 			strategy := ce.selectOptimalStrategy(region)
 			if strategy != nil && strategy.CanCompact(region) {
 				go func(r *Region, s CompactionStrategy) {
 					_, err := s.Compact(r)
 					if err != nil {
-						// Log error
+						// Log error.
 					}
 				}(region, strategy)
 			}
@@ -322,7 +324,7 @@ func (ce *CompactionEngine) AutoCompact() error {
 	return nil
 }
 
-// selectOptimalStrategy selects the best compaction strategy for a region
+// selectOptimalStrategy selects the best compaction strategy for a region.
 func (ce *CompactionEngine) selectOptimalStrategy(region *Region) CompactionStrategy {
 	if ce.config.PreferredStrategy != "" {
 		if strategy, exists := ce.strategies[ce.config.PreferredStrategy]; exists {
@@ -331,11 +333,11 @@ func (ce *CompactionEngine) selectOptimalStrategy(region *Region) CompactionStra
 	}
 
 	if !ce.config.AdaptiveStrategy {
-		// Use default strategy
+		// Use default strategy.
 		return ce.strategies["mark-and-sweep"]
 	}
 
-	// Adaptive strategy selection
+	// Adaptive strategy selection.
 	type strategyScore struct {
 		strategy CompactionStrategy
 		score    float64
@@ -350,12 +352,12 @@ func (ce *CompactionEngine) selectOptimalStrategy(region *Region) CompactionStra
 
 		gain := strategy.EstimateGain(region)
 
-		// Calculate score based on multiple factors
+		// Calculate score based on multiple factors.
 		score := gain.Confidence * 100
 		score += gain.ExpectedReduction * 50
 		score += float64(strategy.Priority())
 
-		// Penalize longer estimated duration
+		// Penalize longer estimated duration.
 		if gain.EstimatedDuration > 0 {
 			score -= float64(gain.EstimatedDuration.Milliseconds()) * 0.1
 		}
@@ -370,7 +372,7 @@ func (ce *CompactionEngine) selectOptimalStrategy(region *Region) CompactionStra
 		return nil
 	}
 
-	// Sort by score (highest first)
+	// Sort by score (highest first).
 	sort.Slice(scores, func(i, j int) bool {
 		return scores[i].score > scores[j].score
 	})
@@ -378,21 +380,21 @@ func (ce *CompactionEngine) selectOptimalStrategy(region *Region) CompactionStra
 	return scores[0].strategy
 }
 
-// shouldCompact determines if a region should be compacted
+// shouldCompact determines if a region should be compacted.
 func (ce *CompactionEngine) shouldCompact(region *Region) bool {
-	// Check fragmentation threshold
+	// Check fragmentation threshold.
 	fragRatio := region.calculateFragmentationRatio()
 	if fragRatio > ce.config.FragmentationThreshold {
 		return true
 	}
 
-	// Check memory pressure
+	// Check memory pressure.
 	utilization := float64(region.Header.Used) / float64(region.Header.Size)
 	if utilization > ce.config.MemoryPressureThreshold {
 		return true
 	}
 
-	// Check number of free blocks
+	// Check number of free blocks.
 	freeBlockCount := region.countFreeBlocks()
 	if freeBlockCount > ce.config.MinFreeBlocks {
 		return true
@@ -401,35 +403,35 @@ func (ce *CompactionEngine) shouldCompact(region *Region) bool {
 	return false
 }
 
-// Implementation of MarkAndSweepCompactor
+// Implementation of MarkAndSweepCompactor.
 
-// Name returns the strategy name
+// Name returns the strategy name.
 func (msc *MarkAndSweepCompactor) Name() string {
 	return msc.name
 }
 
-// Priority returns the strategy priority
+// Priority returns the strategy priority.
 func (msc *MarkAndSweepCompactor) Priority() int {
 	return msc.priority
 }
 
-// CanCompact checks if the region can be compacted
+// CanCompact checks if the region can be compacted.
 func (msc *MarkAndSweepCompactor) CanCompact(region *Region) bool {
 	return region.countFreeBlocks() > 1
 }
 
-// EstimateGain estimates the benefits of compaction
+// EstimateGain estimates the benefits of compaction.
 func (msc *MarkAndSweepCompactor) EstimateGain(region *Region) CompactionGain {
 	fragRatio := region.calculateFragmentationRatio()
 	freeBlocks := region.countFreeBlocks()
 
-	// Estimate bytes that could be reclaimed
+	// Estimate bytes that could be reclaimed.
 	expectedReclaimed := uint64(float64(region.Header.Free) * fragRatio * 0.7)
 
-	// Estimate fragmentation reduction
+	// Estimate fragmentation reduction.
 	expectedReduction := fragRatio * 0.8
 
-	// Estimate duration based on region size
+	// Estimate duration based on region size.
 	estimatedDuration := time.Duration(region.Header.Size/1024) * time.Millisecond
 
 	return CompactionGain{
@@ -441,7 +443,7 @@ func (msc *MarkAndSweepCompactor) EstimateGain(region *Region) CompactionGain {
 	}
 }
 
-// Compact performs mark-and-sweep compaction
+// Compact performs mark-and-sweep compaction.
 func (msc *MarkAndSweepCompactor) Compact(region *Region) (*CompactionResult, error) {
 	startTime := time.Now()
 
@@ -454,10 +456,10 @@ func (msc *MarkAndSweepCompactor) Compact(region *Region) (*CompactionResult, er
 	region.Mutex.Lock()
 	defer region.Mutex.Unlock()
 
-	// Phase 1: Mark all allocated blocks
+	// Phase 1: Mark all allocated blocks.
 	allocatedBlocks := msc.markAllocatedBlocks(region)
 
-	// Phase 2: Sweep and compact
+	// Phase 2: Sweep and compact.
 	err := msc.sweepAndCompact(region, allocatedBlocks, result)
 
 	result.EndTime = time.Now()
@@ -469,7 +471,7 @@ func (msc *MarkAndSweepCompactor) Compact(region *Region) (*CompactionResult, er
 	return result, err
 }
 
-// markAllocatedBlocks marks all allocated blocks
+// markAllocatedBlocks marks all allocated blocks.
 func (msc *MarkAndSweepCompactor) markAllocatedBlocks(region *Region) []*CompactionBlock {
 	blocks := make([]*CompactionBlock, 0)
 
@@ -488,21 +490,22 @@ func (msc *MarkAndSweepCompactor) markAllocatedBlocks(region *Region) []*Compact
 	return blocks
 }
 
-// sweepAndCompact sweeps unmarked blocks and compacts memory
+// sweepAndCompact sweeps unmarked blocks and compacts memory.
 func (msc *MarkAndSweepCompactor) sweepAndCompact(region *Region, blocks []*CompactionBlock, result *CompactionResult) error {
-	// Sort blocks by current offset
+	// Sort blocks by current offset.
 	sort.Slice(blocks, func(i, j int) bool {
 		return uintptr(blocks[i].Data) < uintptr(blocks[j].Data)
 	})
 
-	// Compact by sliding blocks down
+	// Compact by sliding blocks down.
 	var newOffset uintptr = 0
 
 	for _, block := range blocks {
 		if block.Marked {
 			if uintptr(block.Data) != uintptr(region.Data)+newOffset {
-				// Move block data
+				// Move block data.
 				msc.moveBlock(block, uintptr(region.Data)+newOffset)
+
 				result.BlocksMoved++
 			}
 
@@ -511,7 +514,7 @@ func (msc *MarkAndSweepCompactor) sweepAndCompact(region *Region, blocks []*Comp
 		}
 	}
 
-	// Update free list - create single large free block
+	// Update free list - create single large free block.
 	if newOffset < uintptr(region.Header.Size) {
 		remainingSize := RegionSize(uintptr(region.Header.Size) - newOffset)
 		msc.createFreeBlock(region, newOffset, remainingSize)
@@ -523,23 +526,23 @@ func (msc *MarkAndSweepCompactor) sweepAndCompact(region *Region, blocks []*Comp
 	return nil
 }
 
-// moveBlock moves a block to a new location
+// moveBlock moves a block to a new location.
 func (msc *MarkAndSweepCompactor) moveBlock(block *CompactionBlock, newAddress uintptr) {
-	// Copy block data
+	// Copy block data.
 	oldData := block.Data
 	newData := unsafe.Add(block.Data, int(newAddress-uintptr(block.Data)+uintptr(BlockHeaderSize)))
 
-	// Copy the data
+	// Copy the data.
 	size := int(block.Size)
 	oldSlice := unsafe.Slice((*byte)(oldData), size)
 	newSlice := unsafe.Slice((*byte)(newData), size)
 	copy(newSlice, oldSlice)
 
-	// Update block pointer
+	// Update block pointer.
 	block.Data = newData
 }
 
-// createFreeBlock creates a new free block
+// createFreeBlock creates a new free block.
 func (msc *MarkAndSweepCompactor) createFreeBlock(region *Region, offset uintptr, size RegionSize) {
 	freeBlock := &FreeBlock{
 		Size:   size,
@@ -548,30 +551,30 @@ func (msc *MarkAndSweepCompactor) createFreeBlock(region *Region, offset uintptr
 		Prev:   nil,
 	}
 
-	// Clear existing free list and add single large block
+	// Clear existing free list and add single large block.
 	region.Header.FreeList = freeBlock
 	region.Header.Free = size
 }
 
-// Implementation of CopyingCompactor
+// Implementation of CopyingCompactor.
 
-// Name returns the strategy name
+// Name returns the strategy name.
 func (cc *CopyingCompactor) Name() string {
 	return cc.name
 }
 
-// Priority returns the strategy priority
+// Priority returns the strategy priority.
 func (cc *CopyingCompactor) Priority() int {
 	return cc.priority
 }
 
-// CanCompact checks if the region can be compacted
+// CanCompact checks if the region can be compacted.
 func (cc *CopyingCompactor) CanCompact(region *Region) bool {
-	// Copying compaction requires sufficient free space
+	// Copying compaction requires sufficient free space.
 	return region.Header.Free > region.Header.Used/2
 }
 
-// EstimateGain estimates the benefits of compaction
+// EstimateGain estimates the benefits of compaction.
 func (cc *CopyingCompactor) EstimateGain(region *Region) CompactionGain {
 	fragRatio := region.calculateFragmentationRatio()
 
@@ -584,35 +587,36 @@ func (cc *CopyingCompactor) EstimateGain(region *Region) CompactionGain {
 	}
 }
 
-// Compact performs copying compaction
+// Compact performs copying compaction.
 func (cc *CopyingCompactor) Compact(region *Region) (*CompactionResult, error) {
-	// Simplified copying compaction implementation
+	// Simplified copying compaction implementation.
 	region.Mutex.Lock()
 	defer region.Mutex.Unlock()
 
-	// For now, delegate to mark-and-sweep
+	// For now, delegate to mark-and-sweep.
 	msc := &MarkAndSweepCompactor{name: "mark-and-sweep", priority: 100}
+
 	return msc.Compact(region)
 }
 
-// Implementation of IncrementalCompactor
+// Implementation of IncrementalCompactor.
 
-// Name returns the strategy name
+// Name returns the strategy name.
 func (ic *IncrementalCompactor) Name() string {
 	return ic.name
 }
 
-// Priority returns the strategy priority
+// Priority returns the strategy priority.
 func (ic *IncrementalCompactor) Priority() int {
 	return ic.priority
 }
 
-// CanCompact checks if the region can be compacted
+// CanCompact checks if the region can be compacted.
 func (ic *IncrementalCompactor) CanCompact(region *Region) bool {
 	return region.countFreeBlocks() > 2
 }
 
-// EstimateGain estimates the benefits of compaction
+// EstimateGain estimates the benefits of compaction.
 func (ic *IncrementalCompactor) EstimateGain(region *Region) CompactionGain {
 	fragRatio := region.calculateFragmentationRatio()
 
@@ -625,35 +629,36 @@ func (ic *IncrementalCompactor) EstimateGain(region *Region) CompactionGain {
 	}
 }
 
-// Compact performs incremental compaction
+// Compact performs incremental compaction.
 func (ic *IncrementalCompactor) Compact(region *Region) (*CompactionResult, error) {
-	// Simplified incremental compaction implementation
+	// Simplified incremental compaction implementation.
 	region.Mutex.Lock()
 	defer region.Mutex.Unlock()
 
-	// For now, delegate to mark-and-sweep with time limit
+	// For now, delegate to mark-and-sweep with time limit.
 	msc := &MarkAndSweepCompactor{name: "mark-and-sweep", priority: 100}
+
 	return msc.Compact(region)
 }
 
-// Implementation of SlidingCompactor
+// Implementation of SlidingCompactor.
 
-// Name returns the strategy name
+// Name returns the strategy name.
 func (sc *SlidingCompactor) Name() string {
 	return sc.name
 }
 
-// Priority returns the strategy priority
+// Priority returns the strategy priority.
 func (sc *SlidingCompactor) Priority() int {
 	return sc.priority
 }
 
-// CanCompact checks if the region can be compacted
+// CanCompact checks if the region can be compacted.
 func (sc *SlidingCompactor) CanCompact(region *Region) bool {
 	return region.countFreeBlocks() > 1
 }
 
-// EstimateGain estimates the benefits of compaction
+// EstimateGain estimates the benefits of compaction.
 func (sc *SlidingCompactor) EstimateGain(region *Region) CompactionGain {
 	fragRatio := region.calculateFragmentationRatio()
 
@@ -666,35 +671,36 @@ func (sc *SlidingCompactor) EstimateGain(region *Region) CompactionGain {
 	}
 }
 
-// Compact performs sliding compaction
+// Compact performs sliding compaction.
 func (sc *SlidingCompactor) Compact(region *Region) (*CompactionResult, error) {
-	// Simplified sliding compaction implementation
+	// Simplified sliding compaction implementation.
 	region.Mutex.Lock()
 	defer region.Mutex.Unlock()
 
-	// For now, delegate to mark-and-sweep
+	// For now, delegate to mark-and-sweep.
 	msc := &MarkAndSweepCompactor{name: "mark-and-sweep", priority: 100}
+
 	return msc.Compact(region)
 }
 
-// Implementation of TwoPassCompactor
+// Implementation of TwoPassCompactor.
 
-// Name returns the strategy name
+// Name returns the strategy name.
 func (tpc *TwoPassCompactor) Name() string {
 	return tpc.name
 }
 
-// Priority returns the strategy priority
+// Priority returns the strategy priority.
 func (tpc *TwoPassCompactor) Priority() int {
 	return tpc.priority
 }
 
-// CanCompact checks if the region can be compacted
+// CanCompact checks if the region can be compacted.
 func (tpc *TwoPassCompactor) CanCompact(region *Region) bool {
 	return region.countFreeBlocks() > 3
 }
 
-// EstimateGain estimates the benefits of compaction
+// EstimateGain estimates the benefits of compaction.
 func (tpc *TwoPassCompactor) EstimateGain(region *Region) CompactionGain {
 	fragRatio := region.calculateFragmentationRatio()
 
@@ -707,22 +713,23 @@ func (tpc *TwoPassCompactor) EstimateGain(region *Region) CompactionGain {
 	}
 }
 
-// Compact performs two-pass compaction
+// Compact performs two-pass compaction.
 func (tpc *TwoPassCompactor) Compact(region *Region) (*CompactionResult, error) {
-	// Simplified two-pass compaction implementation
+	// Simplified two-pass compaction implementation.
 	region.Mutex.Lock()
 	defer region.Mutex.Unlock()
 
-	// For now, delegate to mark-and-sweep
+	// For now, delegate to mark-and-sweep.
 	msc := &MarkAndSweepCompactor{name: "mark-and-sweep", priority: 100}
+
 	return msc.Compact(region)
 }
 
 // Helper functions and other strategy implementations would follow similar patterns...
 
-// Scheduler implementation
+// Scheduler implementation.
 
-// newCompactionScheduler creates a new compaction scheduler
+// newCompactionScheduler creates a new compaction scheduler.
 func newCompactionScheduler(config CompactionConfig) *CompactionScheduler {
 	return &CompactionScheduler{
 		enabled:  config.AutomaticEnabled,
@@ -732,7 +739,7 @@ func newCompactionScheduler(config CompactionConfig) *CompactionScheduler {
 	}
 }
 
-// createDefaultTriggers creates default compaction triggers
+// createDefaultTriggers creates default compaction triggers.
 func createDefaultTriggers() []CompactionTrigger {
 	return []CompactionTrigger{
 		{
@@ -759,7 +766,7 @@ func createDefaultTriggers() []CompactionTrigger {
 	}
 }
 
-// updateStatistics updates compaction statistics
+// updateStatistics updates compaction statistics.
 func (ce *CompactionEngine) updateStatistics(result *CompactionResult) {
 	ce.mutex.Lock()
 	defer ce.mutex.Unlock()
@@ -776,15 +783,15 @@ func (ce *CompactionEngine) updateStatistics(result *CompactionResult) {
 	ce.statistics.TotalBytesReclaimed += result.BytesReclaimed
 	ce.statistics.LastCompactionTime = result.EndTime
 
-	// Update average compaction time
+	// Update average compaction time.
 	if ce.statistics.TotalCompactions > 0 {
 		ce.statistics.AverageCompactionTime = ce.statistics.TotalTimeSpent / time.Duration(ce.statistics.TotalCompactions)
 	}
 
-	// Update strategy statistics
+	// Update strategy statistics.
 	ce.statistics.CompactionsByStrategy[result.Strategy]++
 
-	// Update average fragmentation reduction
+	// Update average fragmentation reduction.
 	fragReduction := result.FragmentationBefore - result.FragmentationAfter
 	if ce.statistics.TotalCompactions == 1 {
 		ce.statistics.AverageFragReduction = fragReduction
@@ -793,7 +800,7 @@ func (ce *CompactionEngine) updateStatistics(result *CompactionResult) {
 	}
 }
 
-// registerStrategy registers a compaction strategy
+// registerStrategy registers a compaction strategy.
 func (ce *CompactionEngine) registerStrategy(strategy CompactionStrategy) {
 	ce.mutex.Lock()
 	defer ce.mutex.Unlock()
@@ -801,7 +808,7 @@ func (ce *CompactionEngine) registerStrategy(strategy CompactionStrategy) {
 	ce.strategies[strategy.Name()] = strategy
 }
 
-// Error definitions
+// Error definitions.
 type CompactionError struct {
 	message string
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func TestGCAvoidanceBasics(t *testing.T) {
-	// Test basic GC avoidance system initialization
+	// Test basic GC avoidance system initialization.
 	config := GCAvoidanceConfig{
 		EnableLifetimeTracking:  true,
 		EnableRefCounting:       true,
@@ -27,13 +27,13 @@ func TestGCAvoidanceBasics(t *testing.T) {
 		t.Error("System should be enabled by default")
 	}
 
-	// Test statistics
+	// Test statistics.
 	stats := system.GetStatistics()
 	if stats == nil {
 		t.Error("Statistics should not be nil")
 	}
 
-	// Test string representation
+	// Test string representation.
 	str := system.String()
 	if str == "" {
 		t.Error("String representation should not be empty")
@@ -48,16 +48,17 @@ func TestLifetimeTracker(t *testing.T) {
 		t.Fatal("Failed to create lifetime tracker")
 	}
 
-	// Test scope management
+	// Test scope management.
 	scope1 := tracker.EnterScope("main")
 	if scope1 == nil {
 		t.Fatal("Failed to enter scope")
 	}
+
 	if scope1.name != "main" {
 		t.Errorf("Expected scope name 'main', got '%s'", scope1.name)
 	}
 
-	// Test allocation tracking
+	// Test allocation tracking.
 	data := make([]byte, 64)
 	ptr := uintptr(unsafe.Pointer(&data[0]))
 	trackingData := tracker.TrackAllocation(ptr, 64, "test_var")
@@ -65,20 +66,22 @@ func TestLifetimeTracker(t *testing.T) {
 	if trackingData == nil {
 		t.Fatal("Failed to track allocation")
 	}
+
 	if trackingData.ptr != ptr {
 		t.Error("Pointer mismatch in tracking data")
 	}
+
 	if trackingData.size != 64 {
 		t.Error("Size mismatch in tracking data")
 	}
 
-	// Test nested scope
+	// Test nested scope.
 	scope2 := tracker.EnterScope("function")
 	if scope2.parent != scope1 {
 		t.Error("Parent scope not set correctly")
 	}
 
-	// Exit scopes
+	// Exit scopes.
 	exitedScope2 := tracker.ExitScope()
 	if exitedScope2 != scope2 {
 		t.Error("Wrong scope exited")
@@ -96,12 +99,13 @@ func TestOptimizedRefCountManager(t *testing.T) {
 		t.Fatal("Failed to create ref count manager")
 	}
 
-	// Test reference counting
+	// Test reference counting.
 	data := make([]byte, 32)
 	ptr := uintptr(unsafe.Pointer(&data[0]))
 
-	// Increment
+	// Increment.
 	rcm.Increment(ptr)
+
 	if counter, exists := rcm.counters[ptr]; !exists {
 		t.Fatal("Counter not created")
 	} else {
@@ -110,28 +114,30 @@ func TestOptimizedRefCountManager(t *testing.T) {
 		}
 	}
 
-	// Multiple increments
+	// Multiple increments.
 	rcm.Increment(ptr)
 	rcm.Increment(ptr)
+
 	if counter, exists := rcm.counters[ptr]; exists {
 		if counter.strongCount != 3 {
 			t.Errorf("Expected count 3, got %d", counter.strongCount)
 		}
 	}
 
-	// Decrements
+	// Decrements.
 	rcm.Decrement(ptr)
 	rcm.Decrement(ptr)
+
 	if counter, exists := rcm.counters[ptr]; exists {
 		if counter.strongCount != 1 {
 			t.Errorf("Expected count 1, got %d", counter.strongCount)
 		}
 	}
 
-	// Final decrement should remove counter
+	// Final decrement should remove counter.
 	rcm.Decrement(ptr)
 
-	// Give time for cleanup
+	// Give time for cleanup.
 	time.Sleep(10 * time.Millisecond)
 
 	if _, exists := rcm.counters[ptr]; exists {
@@ -145,16 +151,17 @@ func TestStackManager(t *testing.T) {
 		t.Fatal("Failed to create stack manager")
 	}
 
-	// Test frame management
+	// Test frame management.
 	frame := sm.PushFrame("test_function")
 	if frame == nil {
 		t.Fatal("Failed to push frame")
 	}
+
 	if frame.name != "test_function" {
 		t.Errorf("Expected frame name 'test_function', got '%s'", frame.name)
 	}
 
-	// Test stack allocation
+	// Test stack allocation.
 	ptr := sm.AllocateOnStack(128, "test_var")
 	if ptr == 0 {
 		t.Fatal("Failed to allocate on stack")
@@ -166,13 +173,15 @@ func TestStackManager(t *testing.T) {
 		if alloc.size != 128 {
 			t.Errorf("Expected size 128, got %d", alloc.size)
 		}
+
 		if !alloc.isLive {
 			t.Error("Allocation should be live")
 		}
 	}
 
-	// Test frame cleanup
+	// Test frame cleanup.
 	sm.PopFrame()
+
 	if sm.currentFrame != nil {
 		t.Error("Current frame should be nil after pop")
 	}
@@ -184,7 +193,7 @@ func TestEscapeAnalyzer(t *testing.T) {
 		t.Fatal("Failed to create escape analyzer")
 	}
 
-	// Test escape analysis
+	// Test escape analysis.
 	data := make([]byte, 64)
 	ptr := uintptr(unsafe.Pointer(&data[0]))
 
@@ -201,7 +210,7 @@ func TestEscapeAnalyzer(t *testing.T) {
 		t.Errorf("Invalid confidence value: %f", result.confidence)
 	}
 
-	// Check that result is stored
+	// Check that result is stored.
 	if stored, exists := ea.escapeResults[ptr]; !exists {
 		t.Error("Escape result not stored")
 	} else {
@@ -212,7 +221,7 @@ func TestEscapeAnalyzer(t *testing.T) {
 }
 
 func TestIntegration(t *testing.T) {
-	// Test integration of all components
+	// Test integration of all components.
 	config := GCAvoidanceConfig{
 		EnableLifetimeTracking:  true,
 		EnableRefCounting:       true,
@@ -225,7 +234,7 @@ func TestIntegration(t *testing.T) {
 
 	system := NewGCAvoidanceSystem(config)
 
-	// Simulate a function call with various allocations
+	// Simulate a function call with various allocations.
 	system.lifetimeTracker.EnterScope("integration_test")
 	frame := system.stackManager.PushFrame("integration_test")
 
@@ -233,45 +242,46 @@ func TestIntegration(t *testing.T) {
 		t.Fatal("Failed to push frame")
 	}
 
-	// Stack allocation
+	// Stack allocation.
 	stackPtr := system.stackManager.AllocateOnStack(64, "stack_var")
 	if stackPtr != 0 {
 		// Print uintptr directly to avoid potential unsafe.Pointer misuse
 		t.Logf("Stack allocation successful: 0x%x", stackPtr)
 	}
 
-	// Tracked allocation
+	// Tracked allocation.
 	data := make([]byte, 128)
 	heapPtr := uintptr(unsafe.Pointer(&data[0]))
 	trackingData := system.lifetimeTracker.TrackAllocation(heapPtr, 128, "heap_var")
+
 	if trackingData != nil {
 		// Print uintptr directly to avoid potential unsafe.Pointer misuse
 		t.Logf("Heap allocation tracked: 0x%x", heapPtr)
 	}
 
-	// Reference counting
+	// Reference counting.
 	system.refCountManager.Increment(heapPtr)
 	system.refCountManager.Increment(heapPtr)
 
-	// Escape analysis
+	// Escape analysis.
 	escapeResult := system.escapeAnalyzer.AnalyzeEscape(heapPtr, "integration")
 	if escapeResult != nil {
 		t.Logf("Escape analysis: escaped=%v, reason=%s",
 			escapeResult.escaped, escapeResult.reason)
 	}
 
-	// Cleanup
+	// Cleanup.
 	system.refCountManager.Decrement(heapPtr)
 	system.refCountManager.Decrement(heapPtr)
 	system.stackManager.PopFrame()
 	system.lifetimeTracker.ExitScope()
 
-	// Check final statistics
+	// Check final statistics.
 	stats := system.GetStatistics()
 	t.Logf("Final statistics: %+v", stats)
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkGCAvoidanceSystem(b *testing.B) {
 	config := GCAvoidanceConfig{
 		EnableLifetimeTracking:  true,
@@ -286,6 +296,7 @@ func BenchmarkGCAvoidanceSystem(b *testing.B) {
 	system := NewGCAvoidanceSystem(config)
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		system.lifetimeTracker.EnterScope("bench")
 		frame := system.stackManager.PushFrame("bench")
@@ -296,8 +307,10 @@ func BenchmarkGCAvoidanceSystem(b *testing.B) {
 				system.refCountManager.Increment(ptr)
 				system.refCountManager.Decrement(ptr)
 			}
+
 			system.stackManager.PopFrame()
 		}
+
 		system.lifetimeTracker.ExitScope()
 	}
 }
@@ -308,6 +321,7 @@ func BenchmarkRefCounting(b *testing.B) {
 	ptr := uintptr(unsafe.Pointer(&data[0]))
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		rcm.Increment(ptr)
 		rcm.Decrement(ptr)

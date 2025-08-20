@@ -37,13 +37,13 @@ func TestEngine_Creation(t *testing.T) {
 func TestEngine_Allocation(t *testing.T) {
 	engine := NewEngine()
 
-	// Test basic allocation
+	// Test basic allocation.
 	ptr := engine.Allocate(100, "test_function")
 	if ptr == 0 {
 		t.Error("Allocation should succeed")
 	}
 
-	// Check statistics
+	// Check statistics.
 	stats := engine.GetStatistics()
 	if stats["total_allocations"].(int64) != 1 {
 		t.Error("Total allocations should be 1")
@@ -53,14 +53,16 @@ func TestEngine_Allocation(t *testing.T) {
 func TestEngine_EnableDisable(t *testing.T) {
 	engine := NewEngine()
 
-	// Test disable
+	// Test disable.
 	engine.Disable()
+
 	if engine.enabled {
 		t.Error("Engine should be disabled")
 	}
 
-	// Test enable
+	// Test enable.
 	engine.Enable()
+
 	if !engine.enabled {
 		t.Error("Engine should be enabled")
 	}
@@ -69,7 +71,7 @@ func TestEngine_EnableDisable(t *testing.T) {
 func TestLifetimeTracker_ScopeManagement(t *testing.T) {
 	tracker := NewLifetimeTracker()
 
-	// Test push scope
+	// Test push scope.
 	scope1 := tracker.PushScope("function1")
 	if scope1 == nil {
 		t.Fatal("Failed to create scope")
@@ -83,7 +85,7 @@ func TestLifetimeTracker_ScopeManagement(t *testing.T) {
 		t.Error("Current scope should be scope1")
 	}
 
-	// Test nested scope
+	// Test nested scope.
 	scope2 := tracker.PushScope("function2")
 	if scope2.Parent != scope1 {
 		t.Error("Scope2 parent should be scope1")
@@ -93,13 +95,15 @@ func TestLifetimeTracker_ScopeManagement(t *testing.T) {
 		t.Error("Scope1 should have scope2 as child")
 	}
 
-	// Test pop scope
+	// Test pop scope.
 	tracker.PopScope()
+
 	if tracker.current != scope1 {
 		t.Error("Current scope should be scope1 after pop")
 	}
 
 	tracker.PopScope()
+
 	if tracker.current != nil {
 		t.Error("Current scope should be nil after popping all")
 	}
@@ -109,11 +113,11 @@ func TestLifetimeTracker_AllocationTracking(t *testing.T) {
 	tracker := NewLifetimeTracker()
 	scope := tracker.PushScope("test_function")
 
-	// Test allocation tracking
+	// Test allocation tracking.
 	ptr := uintptr(0x1000) // Dummy pointer
 	tracker.Track(ptr, 100, StackAlloc)
 
-	// Check allocation was recorded
+	// Check allocation was recorded.
 	if len(tracker.allocations) != 1 {
 		t.Error("Should have 1 tracked allocation")
 	}
@@ -135,7 +139,7 @@ func TestLifetimeTracker_AllocationTracking(t *testing.T) {
 		t.Error("Allocation scope mismatch")
 	}
 
-	// Check scope has allocation
+	// Check scope has allocation.
 	if len(scope.Allocations) != 1 || scope.Allocations[0] != ptr {
 		t.Error("Scope should track the allocation")
 	}
@@ -145,7 +149,7 @@ func TestRefCounter_BasicOperations(t *testing.T) {
 	counter := NewRefCounter()
 	ptr := uintptr(0x2000) // Dummy pointer
 
-	// Test tracking
+	// Test tracking.
 	counter.Track(ptr)
 
 	if len(counter.counters) != 1 {
@@ -161,22 +165,24 @@ func TestRefCounter_BasicOperations(t *testing.T) {
 		t.Error("Initial count should be 1")
 	}
 
-	// Test increment
+	// Test increment.
 	counter.Increment(ptr)
+
 	if entry.Count != 2 {
 		t.Error("Count should be 2 after increment")
 	}
 
-	// Test decrement
+	// Test decrement.
 	counter.Decrement(ptr)
+
 	if entry.Count != 1 {
 		t.Error("Count should be 1 after decrement")
 	}
 
-	// Test decrement to zero
+	// Test decrement to zero.
 	counter.Decrement(ptr)
 
-	// Entry should be cleaned up
+	// Entry should be cleaned up.
 	_, exists = counter.counters[ptr]
 	if exists {
 		t.Error("Entry should be cleaned up when count reaches zero")
@@ -186,7 +192,7 @@ func TestRefCounter_BasicOperations(t *testing.T) {
 func TestStackManager_FrameManagement(t *testing.T) {
 	manager := NewStackManager(10) // 10 frame limit
 
-	// Test initial state
+	// Test initial state.
 	if manager.depth != 0 {
 		t.Error("Initial depth should be 0")
 	}
@@ -195,7 +201,7 @@ func TestStackManager_FrameManagement(t *testing.T) {
 		t.Error("Initial current frame should be nil")
 	}
 
-	// Test allocation (should create first frame)
+	// Test allocation (should create first frame).
 	ptr := manager.Allocate(100, "test_function")
 	if ptr == 0 {
 		t.Error("Allocation should succeed")
@@ -217,8 +223,9 @@ func TestStackManager_FrameManagement(t *testing.T) {
 		t.Error("Frame used space should be 100")
 	}
 
-	// Test pop frame
+	// Test pop frame.
 	manager.PopFrame()
+
 	if manager.depth != 0 {
 		t.Error("Depth should be 0 after pop")
 	}
@@ -231,7 +238,7 @@ func TestStackManager_FrameManagement(t *testing.T) {
 func TestStackManager_LargeAllocation(t *testing.T) {
 	manager := NewStackManager(10)
 
-	// Test large allocation that exceeds frame size
+	// Test large allocation that exceeds frame size.
 	ptr1 := manager.Allocate(4000, "function1") // Within 8KB limit
 	if ptr1 == 0 {
 		t.Error("First allocation should succeed")
@@ -250,17 +257,17 @@ func TestStackManager_LargeAllocation(t *testing.T) {
 func TestEscapeAnalyzer_Prediction(t *testing.T) {
 	analyzer := NewEscapeAnalyzer()
 
-	// Test initial prediction (should be conservative)
+	// Test initial prediction (should be conservative).
 	if !analyzer.WillEscape("unknown_function") {
 		t.Error("Should predict escape for unknown function (conservative)")
 	}
 
-	// Test recording escape events
+	// Test recording escape events.
 	analyzer.RecordEscape("test_function", false) // No escape
 	analyzer.RecordEscape("test_function", false) // No escape
 	analyzer.RecordEscape("test_function", true)  // Escape
 
-	// Check pattern was created
+	// Check pattern was created.
 	if len(analyzer.patterns) != 1 {
 		t.Error("Should have 1 pattern recorded")
 	}
@@ -283,7 +290,7 @@ func TestEscapeAnalyzer_Prediction(t *testing.T) {
 func TestEscapeAnalyzer_ConfidenceBuilding(t *testing.T) {
 	analyzer := NewEscapeAnalyzer()
 
-	// Record many non-escape events
+	// Record many non-escape events.
 	for i := 0; i < 20; i++ {
 		analyzer.RecordEscape("reliable_function", false)
 	}
@@ -297,7 +304,7 @@ func TestEscapeAnalyzer_ConfidenceBuilding(t *testing.T) {
 		t.Error("Confidence should be reasonably high after many samples")
 	}
 
-	// Should predict no escape with high confidence
+	// Should predict no escape with high confidence.
 	if analyzer.WillEscape("reliable_function") {
 		t.Error("Should predict no escape for well-known non-escaping function")
 	}
@@ -306,13 +313,13 @@ func TestEscapeAnalyzer_ConfidenceBuilding(t *testing.T) {
 func TestEngine_IntegratedWorkflow(t *testing.T) {
 	engine := NewEngine()
 
-	// Start scope
+	// Start scope.
 	scope := engine.lifetimeTracker.PushScope("main_function")
 	if scope == nil {
 		t.Fatal("Failed to create scope")
 	}
 
-	// Perform allocations
+	// Perform allocations.
 	ptr1 := engine.Allocate(100, "main_function")
 	ptr2 := engine.Allocate(200, "main_function")
 
@@ -320,16 +327,16 @@ func TestEngine_IntegratedWorkflow(t *testing.T) {
 		t.Error("Allocations should succeed")
 	}
 
-	// Check statistics
+	// Check statistics.
 	stats := engine.GetStatistics()
 	if stats["total_allocations"].(int64) != 2 {
 		t.Error("Should have 2 total allocations")
 	}
 
-	// End scope
+	// End scope.
 	engine.lifetimeTracker.PopScope()
 
-	// Verify the workflow completed successfully
+	// Verify the workflow completed successfully.
 	finalStats := engine.GetStatistics()
 	if finalStats["total_allocations"].(int64) != 2 {
 		t.Error("Total allocations should remain 2")
@@ -338,8 +345,8 @@ func TestEngine_IntegratedWorkflow(t *testing.T) {
 
 func TestAllocationType_String(t *testing.T) {
 	tests := []struct {
-		allocType AllocType
 		expected  string
+		allocType AllocType
 	}{
 		{StackAlloc, "stack"},
 		{RefCountAlloc, "refcount"},
@@ -356,13 +363,13 @@ func TestAllocationType_String(t *testing.T) {
 func TestEngine_Statistics(t *testing.T) {
 	engine := NewEngine()
 
-	// Perform some operations
+	// Perform some operations.
 	engine.Allocate(100, "test1")
 	engine.Allocate(200, "test2")
 
 	stats := engine.GetStatistics()
 
-	// Verify required fields exist
+	// Verify required fields exist.
 	requiredFields := []string{
 		"enabled", "total_allocations", "stack_allocations",
 		"refcount_allocations", "escaped_allocations",
@@ -375,7 +382,7 @@ func TestEngine_Statistics(t *testing.T) {
 		}
 	}
 
-	// Test string representation
+	// Test string representation.
 	str := engine.String()
 	if len(str) == 0 {
 		t.Error("String representation should not be empty")
@@ -385,7 +392,7 @@ func TestEngine_Statistics(t *testing.T) {
 func TestPerformanceBasics(t *testing.T) {
 	engine := NewEngine()
 
-	// Test performance of basic operations
+	// Test performance of basic operations.
 	start := time.Now()
 
 	for i := 0; i < 1000; i++ {
@@ -409,7 +416,7 @@ func TestPerformanceBasics(t *testing.T) {
 func TestEngine_MultiThreadedSafety(t *testing.T) {
 	engine := NewEngine()
 
-	// Test concurrent access
+	// Test concurrent access.
 	done := make(chan bool, 10)
 
 	for i := 0; i < 10; i++ {
@@ -424,7 +431,7 @@ func TestEngine_MultiThreadedSafety(t *testing.T) {
 		}(i)
 	}
 
-	// Wait for all goroutines
+	// Wait for all goroutines.
 	for i := 0; i < 10; i++ {
 		<-done
 	}
@@ -441,10 +448,10 @@ func TestRefCounter_ConcurrentOperations(t *testing.T) {
 
 	counter.Track(ptr)
 
-	// Test concurrent increments only (to avoid zero reaching in concurrent environment)
+	// Test concurrent increments only (to avoid zero reaching in concurrent environment).
 	done := make(chan bool, 10)
 
-	// 10 goroutines incrementing
+	// 10 goroutines incrementing.
 	for i := 0; i < 10; i++ {
 		go func() {
 			for j := 0; j < 10; j++ {
@@ -454,12 +461,12 @@ func TestRefCounter_ConcurrentOperations(t *testing.T) {
 		}()
 	}
 
-	// Wait for all goroutines
+	// Wait for all goroutines.
 	for i := 0; i < 10; i++ {
 		<-done
 	}
 
-	// Should still have the entry (started with 1, added 100, so count = 101)
+	// Should still have the entry (started with 1, added 100, so count = 101).
 	entry, exists := counter.counters[ptr]
 	if !exists {
 		t.Error("Entry should still exist after concurrent operations")
@@ -471,19 +478,19 @@ func TestRefCounter_ConcurrentOperations(t *testing.T) {
 func TestStackManager_OverflowProtection(t *testing.T) {
 	manager := NewStackManager(2) // Very small limit
 
-	// Should succeed for first allocation (creates frame 1)
+	// Should succeed for first allocation (creates frame 1).
 	ptr1 := manager.Allocate(8000, "function1") // Force frame creation
 	if ptr1 == 0 {
 		t.Error("First allocation should succeed")
 	}
 
-	// Should succeed for second allocation (creates frame 2)
+	// Should succeed for second allocation (creates frame 2).
 	ptr2 := manager.Allocate(8000, "function2") // Force new frame
 	if ptr2 == 0 {
 		t.Error("Second allocation should succeed")
 	}
 
-	// Third allocation should fail due to depth limit (would need frame 3)
+	// Third allocation should fail due to depth limit (would need frame 3).
 	ptr3 := manager.Allocate(8000, "function3")
 	if ptr3 != 0 {
 		t.Error("Third allocation should fail due to stack depth limit")
@@ -493,27 +500,28 @@ func TestStackManager_OverflowProtection(t *testing.T) {
 func TestEscapeAnalyzer_LearningPatterns(t *testing.T) {
 	analyzer := NewEscapeAnalyzer()
 
-	// Train with specific patterns
+	// Train with specific patterns.
 	functions := []string{"allocator", "constructor", "getter", "setter"}
 	escapeRates := []float64{0.9, 0.7, 0.1, 0.3} // Expected escape rates
 
 	for fi, function := range functions {
 		for i := 0; i < 100; i++ {
-			// Simulate escape based on expected rate
+			// Simulate escape based on expected rate.
 			escaped := float64(i%100)/100.0 < escapeRates[fi]
 			analyzer.RecordEscape(function, escaped)
 		}
 	}
 
-	// Check learned patterns
+	// Check learned patterns.
 	for fi, function := range functions {
 		pattern := analyzer.patterns[function]
 		if pattern == nil {
 			t.Errorf("Pattern should exist for %s", function)
+
 			continue
 		}
 
-		// Allow for some variance due to modulo rounding
+		// Allow for some variance due to modulo rounding.
 		if pattern.EscapeRate < escapeRates[fi]-0.1 || pattern.EscapeRate > escapeRates[fi]+0.1 {
 			t.Errorf("Function %s: expected escape rate ~%.1f, got %.3f",
 				function, escapeRates[fi], pattern.EscapeRate)

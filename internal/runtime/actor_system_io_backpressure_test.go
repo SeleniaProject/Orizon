@@ -20,12 +20,16 @@ func (s *stubPoller) Start(ctx context.Context) error { return nil }
 func (s *stubPoller) Stop() error                     { return nil }
 func (s *stubPoller) Register(conn net.Conn, kinds []asyncio.EventType, h asyncio.Handler) error {
 	s.h.Store(h)
+
 	return nil
 }
+
 func (s *stubPoller) Deregister(conn net.Conn) error {
 	atomic.AddInt32(&s.deregCount, 1)
+
 	return nil
 }
+
 func (s *stubPoller) fire(ev asyncio.Event) {
 	if v := s.h.Load(); v != nil {
 		v.(asyncio.Handler)(ev)
@@ -49,6 +53,7 @@ type slowBehavior struct{ blockCh chan struct{} }
 
 func (b *slowBehavior) Receive(ctx *ActorContext, msg Message) error {
 	<-b.blockCh
+
 	return nil
 }
 func (b *slowBehavior) PreStart(ctx *ActorContext) error { return nil }
@@ -64,26 +69,30 @@ func TestIOWatch_WatermarkPause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("system: %v", err)
 	}
+
 	if err := sys.Start(); err != nil {
 		t.Fatalf("start: %v", err)
 	}
+
 	defer sys.Stop()
 
 	// Stop scheduler to keep the prefilled mailbox from draining before the watermark check.
 	sys.scheduler.Stop()
 
 	blk := make(chan struct{})
+
 	actor, err := NewActor("ioTarget", UserActor, &slowBehavior{blockCh: blk}, DefaultActorConfig)
 	if err != nil {
 		t.Fatalf("actor: %v", err)
 	}
+
 	sys.mutex.Lock()
 	sys.actors[actor.ID] = actor
 	sys.mailboxes[actor.Mailbox.ID] = actor.Mailbox
 	sys.mutex.Unlock()
 	actor.Context.System = sys
 
-	// Pre-fill mailbox with one message so that length >= 1
+	// Pre-fill mailbox with one message so that length >= 1.
 	if err := sys.SendMessage(0, actor.ID, IOReadable, IOEvent{}); err != nil {
 		t.Fatalf("prefill: %v", err)
 	}
@@ -98,19 +107,21 @@ func TestIOWatch_WatermarkPause(t *testing.T) {
 		ReadEventPriority: NormalPriority,
 	}
 	conn := &fakeConn{}
+
 	if err := sys.WatchConnWithActorOpts(conn, []asyncio.EventType{asyncio.Readable}, actor.ID, opts); err != nil {
 		t.Fatalf("watch: %v", err)
 	}
 
-	// Fire a readable event; with mailbox len >= HighWatermark, it should pause (Deregister once)
+	// Fire a readable event; with mailbox len >= HighWatermark, it should pause (Deregister once).
 	sp.fire(asyncio.Event{Conn: conn, Type: asyncio.Readable})
 
-	// Allow a brief moment for handler to run
+	// Allow a brief moment for handler to run.
 	time.Sleep(20 * time.Millisecond)
+
 	if atomic.LoadInt32(&sp.deregCount) == 0 {
 		t.Fatalf("expected Deregister to be called at least once")
 	}
 
-	// Unblock actor to drain and avoid leaks
+	// Unblock actor to drain and avoid leaks.
 	close(blk)
 }

@@ -1,5 +1,5 @@
-//go:build windows && iocp
-// +build windows,iocp
+//go:build windows && iocp.
+// +build windows,iocp.
 
 package asyncio
 
@@ -38,7 +38,7 @@ type iocpPoller struct {
 	mu   sync.RWMutex
 	regs map[uintptr]*iocpReg
 
-	// keep overlapped structures alive until completion
+	// keep overlapped structures alive until completion.
 	pendingMu sync.Mutex
 	pending   map[*overlappedOp]struct{}
 
@@ -53,28 +53,28 @@ type iocpReg struct {
 	handler  Handler
 	disabled atomic.Uint32
 
-	// writable ticker (optional)
+	// writable ticker (optional).
 	stopW  context.CancelFunc
 	closed chan struct{}
 
-	// keep a reference to the in-flight overlapped for zero-byte recv to avoid GC
+	// keep a reference to the in-flight overlapped for zero-byte recv to avoid GC.
 	pending *overlappedOp
 
-	// keep reference to the in-flight zero-byte send for writable probes
+	// keep reference to the in-flight zero-byte send for writable probes.
 	sendPending *overlappedOp
 
-	// reader used to non-destructively probe readability and EOF via Peek
+	// reader used to non-destructively probe readability and EOF via Peek.
 	reader *bufio.Reader
 
-	// track outstanding send probe to avoid flooding
+	// track outstanding send probe to avoid flooding.
 	sendInFlight atomic.Uint32
 
-	// fallback watcher when IOCP association is not possible
+	// fallback watcher when IOCP association is not possible.
 	watchCancel context.CancelFunc
 	watchDone   chan struct{}
 }
 
-// WSA structures and dynamic import for WSARecv
+// WSA structures and dynamic import for WSARecv.
 type wsaBuf struct {
 	Len uint32
 	Buf *byte
@@ -99,7 +99,7 @@ func wsaRecv(s windows.Handle, bufs *wsaBuf, bufCount uint32, bytes *uint32, fla
 	if r1 == 0 {
 		return nil
 	}
-	// SOCKET_ERROR expected with WSA_IO_PENDING for async
+	// SOCKET_ERROR expected with WSA_IO_PENDING for async.
 	if errno, ok := e.(syscall.Errno); ok && errno == syscall.ERROR_IO_PENDING {
 		return nil
 	}
@@ -162,7 +162,7 @@ func (p *iocpPoller) Stop() error {
 		p.cancel()
 	}
 	p.closed.Store(1)
-	// Post a wake to unblock GetQueuedCompletionStatus
+	// Post a wake to unblock GetQueuedCompletionStatus.
 	_ = windows.PostQueuedCompletionStatus(p.port, 0, 0, nil)
 	p.mu.Lock()
 	regs := p.regs
@@ -176,7 +176,7 @@ func (p *iocpPoller) Stop() error {
 				select {
 				case <-r.closed:
 				case <-time.After(500 * time.Millisecond):
-					// timeout: continue shutdown
+					// timeout: continue shutdown.
 				}
 			}
 		}
@@ -203,7 +203,7 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 	if conn == nil || h == nil {
 		return errors.New("invalid registration")
 	}
-	// Extract SOCKET handle
+	// Extract SOCKET handle.
 	type sc interface {
 		SyscallConn() (syscall.RawConn, error)
 	}
@@ -220,9 +220,9 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 		return er
 	}
 	sh := windows.Handle(s)
-	// Associate with this IOCP (may fail if already associated with another IOCP)
+	// Associate with this IOCP (may fail if already associated with another IOCP).
 	if assoc, err := windows.CreateIoCompletionPort(sh, p.port, 0, 0); err != nil || assoc == 0 {
-		// Fallback: start per-connection watcher for this registration only
+		// Fallback: start per-connection watcher for this registration only.
 		ctx, cancel := context.WithCancel(p.ctx)
 		reg := &iocpReg{sock: sh, conn: conn, kinds: kinds, handler: h, closed: make(chan struct{}, 1), reader: bufio.NewReader(conn), watchCancel: cancel, watchDone: make(chan struct{})}
 		p.mu.Lock()
@@ -238,7 +238,7 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 		p.mu.Unlock()
 		go func(r *iocpReg) {
 			defer close(r.watchDone)
-			// simple fallback watcher: reuse goPoller-like detection
+			// simple fallback watcher: reuse goPoller-like detection.
 			interval := 5 * time.Millisecond
 			tick := time.NewTicker(interval)
 			defer tick.Stop()
@@ -294,7 +294,7 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 	}
 	p.regs[s] = reg
 	p.mu.Unlock()
-	// Post zero-byte receive to get readability notifications
+	// Post zero-byte receive to get readability notifications.
 	if contains(kinds, Readable) {
 		var buf wsaBuf
 		var flags uint32
@@ -305,7 +305,7 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 		p.pendingMu.Unlock()
 		_ = wsaRecv(sh, &buf, 1, nil, &flags, &o.Overlapped) // expect queued completion
 	}
-	// Writable: periodic notification (throttled)
+	// Writable: periodic notification (throttled).
 	if contains(kinds, Writable) {
 		wctx, cancel := context.WithCancel(p.ctx)
 		reg.stopW = cancel
@@ -320,7 +320,7 @@ func (p *iocpPoller) Register(conn net.Conn, kinds []EventType, h Handler) error
 					close(r.closed)
 					return
 				case <-t.C:
-					// Issue zero-byte WSASend to get a completion as writable signal
+					// Issue zero-byte WSASend to get a completion as writable signal.
 					var sbuf wsaBuf // Len=0, Buf=nil
 					o := &overlappedOp{regSock: s, isSend: true}
 					r.sendPending = o
@@ -340,7 +340,7 @@ func (p *iocpPoller) Deregister(conn net.Conn) error {
 		SyscallConn() (syscall.RawConn, error)
 	}
 	scc, ok := conn.(sc)
-	// Try fast path by socket key when possible
+	// Try fast path by socket key when possible.
 	var haveKey bool
 	var s uintptr
 	if ok {
@@ -378,7 +378,7 @@ func (p *iocpPoller) Deregister(conn net.Conn) error {
 			return nil
 		}
 	}
-	// Fallback: search by connection identity (conn may be closed and key unavailable)
+	// Fallback: search by connection identity (conn may be closed and key unavailable).
 	var foundKey uintptr
 	var found *iocpReg
 	for k, r := range p.regs {
@@ -428,10 +428,10 @@ func (p *iocpPoller) loop() {
 			return
 		}
 		if overlapped == nil {
-			// Port wake without overlapped: ignore (used only to wake loop)
+			// Port wake without overlapped: ignore (used only to wake loop).
 			continue
 		}
-		// Completion for zero-byte WSARecv (or canceled)
+		// Completion for zero-byte WSARecv (or canceled).
 		p.dispatchCompletion(overlapped, bytes, err, uintptr(key))
 	}
 }
@@ -449,9 +449,9 @@ func (p *iocpPoller) dispatchWritable(sockKey uintptr) {
 }
 
 func (p *iocpPoller) dispatchCompletion(ov *windows.Overlapped, transferred uint32, gqcsErr error, sockKey uintptr) {
-	// Recover registration from overlapped container
+	// Recover registration from overlapped container.
 	o := (*overlappedOp)(unsafe.Pointer(ov))
-	// drop from pending set to allow GC
+	// drop from pending set to allow GC.
 	p.pendingMu.Lock()
 	delete(p.pending, o)
 	p.pendingMu.Unlock()
@@ -467,12 +467,12 @@ func (p *iocpPoller) dispatchCompletion(ov *windows.Overlapped, transferred uint
 	if !o.isSend && contains(reg.kinds, Readable) {
 		// If completion failed or 0 bytes were transferred, decide EOF/error or re-arm
 		if gqcsErr != nil || transferred == 0 {
-			// If canceled, just return
+			// If canceled, just return.
 			if errno, ok := gqcsErr.(syscall.Errno); ok && errno == syscall.ERROR_OPERATION_ABORTED {
 				return
 			}
 			if gqcsErr != nil {
-				// Map common network errors
+				// Map common network errors.
 				if errno, ok := gqcsErr.(syscall.Errno); ok {
 					switch errno {
 					case syscall.ERROR_NETNAME_DELETED, syscall.ERROR_BROKEN_PIPE:
@@ -484,16 +484,16 @@ func (p *iocpPoller) dispatchCompletion(ov *windows.Overlapped, transferred uint
 					}
 				}
 			}
-			// Probe to decide if this is EOF or spurious completion
+			// Probe to decide if this is EOF or spurious completion.
 			_ = reg.conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
 			if b, err := reg.reader.Peek(1); err == io.EOF || (err == nil && len(b) == 0) {
 				reg.handler(Event{Conn: reg.conn, Type: Error, Err: io.EOF})
 				return
 			}
-			// fallthrough to re-arm if data might be available shortly
+			// fallthrough to re-arm if data might be available shortly.
 		}
 		reg.handler(Event{Conn: reg.conn, Type: Readable})
-		// Re-arm zero-byte read with a fresh overlapped
+		// Re-arm zero-byte read with a fresh overlapped.
 		var buf wsaBuf
 		var flags uint32
 		neo := &overlappedOp{regSock: sockKey}
@@ -504,7 +504,7 @@ func (p *iocpPoller) dispatchCompletion(ov *windows.Overlapped, transferred uint
 		_ = wsaRecv(reg.sock, &buf, 1, nil, &flags, &neo.Overlapped)
 		return
 	}
-	// Writable path: a zero-byte send completed
+	// Writable path: a zero-byte send completed.
 	if o.isSend && contains(reg.kinds, Writable) {
 		reg.handler(Event{Conn: reg.conn, Type: Writable})
 		return

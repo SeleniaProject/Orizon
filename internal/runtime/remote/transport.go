@@ -5,15 +5,15 @@ import "time"
 
 // Envelope is a transport-level message wrapper for remote delivery.
 type Envelope struct {
+	Headers       map[string]string `json:"headers,omitempty"`
 	SenderNode    string            `json:"senderNode"`
 	ReceiverNode  string            `json:"receiverNode"`
 	ReceiverName  string            `json:"receiverName"`
-	ReceiverID    uint64            `json:"receiverId"`
-	MessageType   uint32            `json:"messageType"`
-	PayloadBytes  []byte            `json:"payload"`
-	Headers       map[string]string `json:"headers,omitempty"`
 	CorrelationID string            `json:"correlationId,omitempty"`
+	PayloadBytes  []byte            `json:"payload"`
+	ReceiverID    uint64            `json:"receiverId"`
 	TimestampUnix int64             `json:"timestampUnix"`
+	MessageType   uint32            `json:"messageType"`
 }
 
 // Handler is invoked by a Transport upon message arrival.

@@ -1,5 +1,5 @@
-// HIR symbol resolver for the Orizon programming language
-// This file implements the main resolution logic for HIR programs
+// HIR symbol resolver for the Orizon programming language.
+// This file implements the main resolution logic for HIR programs.
 
 package resolver
 
@@ -9,30 +9,30 @@ import (
 	"github.com/orizon-lang/orizon/internal/hir"
 )
 
-// Resolver performs symbol resolution on HIR programs
+// Resolver performs symbol resolution on HIR programs.
 type Resolver struct {
 	symbolTable     *SymbolTable
 	currentModule   *hir.HIRModule
 	currentFunction *hir.HIRFunctionDeclaration
 
-	// Resolution state
+	// Resolution state.
 	resolutionStack []ResolutionContext
 	genericContext  []GenericScope
 
-	// Configuration
+	// Configuration.
 	config ResolverConfig
 }
 
-// ResolutionContext represents the current resolution context
+// ResolutionContext represents the current resolution context.
 type ResolutionContext struct {
+	TypeInfo *hir.TypeInfo
+	Name     string
 	Kind     ContextKind
 	ScopeID  ScopeID
 	NodeID   hir.NodeID
-	Name     string
-	TypeInfo *hir.TypeInfo
 }
 
-// ContextKind represents the kind of resolution context
+// ContextKind represents the kind of resolution context.
 type ContextKind int
 
 const (
@@ -44,13 +44,13 @@ const (
 	ContextKindType
 )
 
-// GenericScope represents a scope with generic type parameters
+// GenericScope represents a scope with generic type parameters.
 type GenericScope struct {
 	Parameters map[string]*GenericParameter
 	ParentID   *ScopeID
 }
 
-// ResolverConfig contains resolver configuration
+// ResolverConfig contains resolver configuration.
 type ResolverConfig struct {
 	StrictTypeChecking     bool
 	AllowShadowing         bool
@@ -58,7 +58,7 @@ type ResolverConfig struct {
 	EnableGenericInference bool
 }
 
-// NewResolver creates a new resolver
+// NewResolver creates a new resolver.
 func NewResolver(symbolTable *SymbolTable) *Resolver {
 	return &Resolver{
 		symbolTable:     symbolTable,
@@ -73,9 +73,9 @@ func NewResolver(symbolTable *SymbolTable) *Resolver {
 	}
 }
 
-// ResolveProgram resolves symbols in an HIR program
+// ResolveProgram resolves symbols in an HIR program.
 func (r *Resolver) ResolveProgram(program *hir.HIRProgram) error {
-	// Enter global scope
+	// Enter global scope.
 	globalContext := ResolutionContext{
 		Kind:    ContextKindGlobal,
 		ScopeID: r.symbolTable.GetCurrentScope(),
@@ -85,21 +85,21 @@ func (r *Resolver) ResolveProgram(program *hir.HIRProgram) error {
 	r.pushContext(globalContext)
 	defer r.popContext()
 
-	// First pass: collect all module symbols
+	// First pass: collect all module symbols.
 	for _, module := range program.Modules {
 		if err := r.collectModuleSymbols(module); err != nil {
 			return fmt.Errorf("failed to collect module symbols: %w", err)
 		}
 	}
 
-	// Second pass: resolve all symbols
+	// Second pass: resolve all symbols.
 	for _, module := range program.Modules {
 		if err := r.resolveModule(module); err != nil {
 			return fmt.Errorf("failed to resolve module %s: %w", module.Name, err)
 		}
 	}
 
-	// Third pass: validate all resolutions
+	// Third pass: validate all resolutions.
 	if err := r.validateResolutions(program); err != nil {
 		return fmt.Errorf("failed to validate resolutions: %w", err)
 	}
@@ -107,16 +107,16 @@ func (r *Resolver) ResolveProgram(program *hir.HIRProgram) error {
 	return nil
 }
 
-// collectModuleSymbols collects all symbols from modules without resolving them
+// collectModuleSymbols collects all symbols from modules without resolving them.
 func (r *Resolver) collectModuleSymbols(module *hir.HIRModule) error {
-	// Create module scope
+	// Create module scope.
 	moduleScope := r.symbolTable.CreateScope(ScopeKindModule, module.Name, module.Span)
 	r.symbolTable.EnterScope(moduleScope)
 	defer r.symbolTable.ExitScope()
 
 	r.currentModule = module
 
-	// Collect symbols from declarations
+	// Collect symbols from declarations.
 	for _, decl := range module.Declarations {
 		if err := r.collectDeclarationSymbol(decl); err != nil {
 			return err
@@ -126,7 +126,7 @@ func (r *Resolver) collectModuleSymbols(module *hir.HIRModule) error {
 	return nil
 }
 
-// collectDeclarationSymbol collects a symbol from a declaration
+// collectDeclarationSymbol collects a symbol from a declaration.
 func (r *Resolver) collectDeclarationSymbol(decl hir.HIRDeclaration) error {
 	switch d := decl.(type) {
 	case *hir.HIRFunctionDeclaration:
@@ -142,7 +142,7 @@ func (r *Resolver) collectDeclarationSymbol(decl hir.HIRDeclaration) error {
 	}
 }
 
-// collectFunctionSymbol collects a function symbol
+// collectFunctionSymbol collects a function symbol.
 func (r *Resolver) collectFunctionSymbol(funcDecl *hir.HIRFunctionDeclaration) error {
 	symbol := &Symbol{
 		Name:       funcDecl.Name,
@@ -157,7 +157,7 @@ func (r *Resolver) collectFunctionSymbol(funcDecl *hir.HIRFunctionDeclaration) e
 		IsExported: true, // Default for now
 	}
 
-	// Handle generic parameters
+	// Handle generic parameters.
 	if symbol.IsGeneric {
 		for _, param := range funcDecl.TypeParams {
 			genericParam := GenericParameter{
@@ -173,7 +173,7 @@ func (r *Resolver) collectFunctionSymbol(funcDecl *hir.HIRFunctionDeclaration) e
 	return r.symbolTable.DefineSymbol(symbol)
 }
 
-// collectVariableSymbol collects a variable symbol
+// collectVariableSymbol collects a variable symbol.
 func (r *Resolver) collectVariableSymbol(varDecl *hir.HIRVariableDeclaration) error {
 	symbol := &Symbol{
 		Name:       varDecl.Name,
@@ -191,7 +191,7 @@ func (r *Resolver) collectVariableSymbol(varDecl *hir.HIRVariableDeclaration) er
 	return r.symbolTable.DefineSymbol(symbol)
 }
 
-// collectTypeSymbol collects a type symbol
+// collectTypeSymbol collects a type symbol.
 func (r *Resolver) collectTypeSymbol(typeDecl *hir.HIRTypeDeclaration) error {
 	symbol := &Symbol{
 		Name:       typeDecl.Name,
@@ -209,7 +209,7 @@ func (r *Resolver) collectTypeSymbol(typeDecl *hir.HIRTypeDeclaration) error {
 	return r.symbolTable.DefineSymbol(symbol)
 }
 
-// collectConstantSymbol collects a constant symbol
+// collectConstantSymbol collects a constant symbol.
 func (r *Resolver) collectConstantSymbol(constDecl *hir.HIRConstDeclaration) error {
 	symbol := &Symbol{
 		Name:       constDecl.Name,
@@ -227,16 +227,16 @@ func (r *Resolver) collectConstantSymbol(constDecl *hir.HIRConstDeclaration) err
 	return r.symbolTable.DefineSymbol(symbol)
 }
 
-// resolveModule resolves all symbols in a module
+// resolveModule resolves all symbols in a module.
 func (r *Resolver) resolveModule(module *hir.HIRModule) error {
-	// Create module scope and enter it
+	// Create module scope and enter it.
 	moduleScope := r.symbolTable.CreateScope(ScopeKindModule, module.Name, module.Span)
 	r.symbolTable.EnterScope(moduleScope)
 	defer r.symbolTable.ExitScope()
 
 	r.currentModule = module
 
-	// Create module context
+	// Create module context.
 	moduleContext := ResolutionContext{
 		Kind:    ContextKindModule,
 		ScopeID: moduleScope,
@@ -244,16 +244,17 @@ func (r *Resolver) resolveModule(module *hir.HIRModule) error {
 		Name:    module.Name,
 	}
 	r.pushContext(moduleContext)
+
 	defer r.popContext()
 
-	// Resolve imports first
+	// Resolve imports first.
 	for _, importInfo := range module.Imports {
 		if err := r.resolveImport(&importInfo); err != nil {
 			return err
 		}
 	}
 
-	// Resolve declarations
+	// Resolve declarations.
 	for _, decl := range module.Declarations {
 		if err := r.resolveDeclaration(decl); err != nil {
 			return err
@@ -263,9 +264,9 @@ func (r *Resolver) resolveModule(module *hir.HIRModule) error {
 	return nil
 }
 
-// resolveImport resolves an import
+// resolveImport resolves an import.
 func (r *Resolver) resolveImport(importInfo *hir.ImportInfo) error {
-	// Create import info for symbol table
+	// Create import info for symbol table.
 	stImportInfo := &ImportInfo{
 		ModulePath:      importInfo.ModuleName,
 		Alias:           importInfo.Alias,
@@ -275,7 +276,7 @@ func (r *Resolver) resolveImport(importInfo *hir.ImportInfo) error {
 		ModuleID:        r.currentModule.ID,
 	}
 
-	// Add to symbol table
+	// Add to symbol table.
 	return r.symbolTable.AddImport(stImportInfo)
 } // resolveDeclaration resolves a declaration
 func (r *Resolver) resolveDeclaration(decl hir.HIRDeclaration) error {
@@ -293,16 +294,16 @@ func (r *Resolver) resolveDeclaration(decl hir.HIRDeclaration) error {
 	}
 }
 
-// resolveFunctionDeclaration resolves a function declaration
+// resolveFunctionDeclaration resolves a function declaration.
 func (r *Resolver) resolveFunctionDeclaration(funcDecl *hir.HIRFunctionDeclaration) error {
-	// Create function scope
+	// Create function scope.
 	funcScope := r.symbolTable.CreateScope(ScopeKindFunction, funcDecl.Name, funcDecl.Span)
 	r.symbolTable.EnterScope(funcScope)
 	defer r.symbolTable.ExitScope()
 
 	r.currentFunction = funcDecl
 
-	// Create function context
+	// Create function context.
 	funcContext := ResolutionContext{
 		Kind:    ContextKindFunction,
 		ScopeID: funcScope,
@@ -310,9 +311,10 @@ func (r *Resolver) resolveFunctionDeclaration(funcDecl *hir.HIRFunctionDeclarati
 		Name:    funcDecl.Name,
 	}
 	r.pushContext(funcContext)
+
 	defer r.popContext()
 
-	// Handle generic parameters
+	// Handle generic parameters.
 	if funcDecl.Generic {
 		if err := r.enterGenericScope(funcDecl.TypeParams); err != nil {
 			return err
@@ -320,7 +322,7 @@ func (r *Resolver) resolveFunctionDeclaration(funcDecl *hir.HIRFunctionDeclarati
 		defer r.exitGenericScope()
 	}
 
-	// Add parameters to scope
+	// Add parameters to scope.
 	for _, param := range funcDecl.Parameters {
 		paramSymbol := &Symbol{
 			Name:       param.Name,
@@ -339,14 +341,14 @@ func (r *Resolver) resolveFunctionDeclaration(funcDecl *hir.HIRFunctionDeclarati
 		}
 	}
 
-	// Resolve return type
+	// Resolve return type.
 	if funcDecl.ReturnType != nil {
 		if err := r.resolveType(funcDecl.ReturnType); err != nil {
 			return err
 		}
 	}
 
-	// Resolve function body
+	// Resolve function body.
 	if funcDecl.Body != nil {
 		if err := r.resolveStatement(funcDecl.Body); err != nil {
 			return err
@@ -356,27 +358,27 @@ func (r *Resolver) resolveFunctionDeclaration(funcDecl *hir.HIRFunctionDeclarati
 	return nil
 }
 
-// resolveVariableDeclaration resolves a variable declaration
+// resolveVariableDeclaration resolves a variable declaration.
 func (r *Resolver) resolveVariableDeclaration(varDecl *hir.HIRVariableDeclaration) error {
-	// Resolve type if present
+	// Resolve type if present.
 	if varDecl.Type != nil {
 		if err := r.resolveType(varDecl.Type); err != nil {
 			return err
 		}
 	}
 
-	// Resolve initializer if present
+	// Resolve initializer if present.
 	if varDecl.Initializer != nil {
 		if err := r.resolveExpression(varDecl.Initializer); err != nil {
 			return err
 		}
 
-		// Type inference if no explicit type
+		// Type inference if no explicit type.
 		if varDecl.Type == nil && r.config.EnableGenericInference {
 			inferredType := r.inferExpressionType(varDecl.Initializer)
 			if inferredType != nil {
-				// Note: In a full implementation, we would update the HIR node here
-				// For now, we just note that type inference would occur
+				// Note: In a full implementation, we would update the HIR node here.
+				// For now, we just note that type inference would occur.
 			}
 		}
 	}
@@ -384,24 +386,24 @@ func (r *Resolver) resolveVariableDeclaration(varDecl *hir.HIRVariableDeclaratio
 	return nil
 }
 
-// resolveTypeDeclaration resolves a type declaration
+// resolveTypeDeclaration resolves a type declaration.
 func (r *Resolver) resolveTypeDeclaration(typeDecl *hir.HIRTypeDeclaration) error {
-	// Resolve the type definition
+	// Resolve the type definition.
 	return r.resolveType(typeDecl.Type)
 }
 
-// resolveConstantDeclaration resolves a constant declaration
+// resolveConstantDeclaration resolves a constant declaration.
 func (r *Resolver) resolveConstantDeclaration(constDecl *hir.HIRConstDeclaration) error {
-	// Resolve type
+	// Resolve type.
 	if err := r.resolveType(constDecl.Type); err != nil {
 		return err
 	}
 
-	// Resolve value
+	// Resolve value.
 	return r.resolveExpression(constDecl.Value)
 }
 
-// resolveStatement resolves a statement
+// resolveStatement resolves a statement.
 func (r *Resolver) resolveStatement(stmt hir.HIRStatement) error {
 	switch s := stmt.(type) {
 	case *hir.HIRBlockStatement:
@@ -412,20 +414,21 @@ func (r *Resolver) resolveStatement(stmt hir.HIRStatement) error {
 		if s.Expression != nil {
 			return r.resolveExpression(s.Expression)
 		}
+
 		return nil
 	default:
 		return fmt.Errorf("unknown statement type: %T", stmt)
 	}
 }
 
-// resolveBlockStatement resolves a block statement
+// resolveBlockStatement resolves a block statement.
 func (r *Resolver) resolveBlockStatement(block *hir.HIRBlockStatement) error {
-	// Create block scope
+	// Create block scope.
 	blockScope := r.symbolTable.CreateScope(ScopeKindBlock, "block", block.Span)
 	r.symbolTable.EnterScope(blockScope)
 	defer r.symbolTable.ExitScope()
 
-	// Resolve all statements
+	// Resolve all statements.
 	for _, stmt := range block.Statements {
 		if err := r.resolveStatement(stmt); err != nil {
 			return err
@@ -435,7 +438,7 @@ func (r *Resolver) resolveBlockStatement(block *hir.HIRBlockStatement) error {
 	return nil
 }
 
-// resolveExpression resolves an expression
+// resolveExpression resolves an expression.
 func (r *Resolver) resolveExpression(expr hir.HIRExpression) error {
 	switch e := expr.(type) {
 	case *hir.HIRIdentifier:
@@ -453,44 +456,45 @@ func (r *Resolver) resolveExpression(expr hir.HIRExpression) error {
 	}
 }
 
-// resolveIdentifier resolves an identifier
+// resolveIdentifier resolves an identifier.
 func (r *Resolver) resolveIdentifier(id *hir.HIRIdentifier) error {
 	symbol, err := r.symbolTable.LookupSymbol(id.Name)
 	if err != nil {
 		return err
 	}
 
-	// Store resolved symbol reference (would need to extend HIRIdentifier)
+	// Store resolved symbol reference (would need to extend HIRIdentifier).
 	// id.ResolvedSymbol = symbol
 
-	// Update usage count
+	// Update usage count.
 	symbol.UsageCount++
 	symbol.LastUsedSpan = id.Span
 
 	return nil
 }
 
-// resolveBinaryExpression resolves a binary expression
+// resolveBinaryExpression resolves a binary expression.
 func (r *Resolver) resolveBinaryExpression(binary *hir.HIRBinaryExpression) error {
 	if err := r.resolveExpression(binary.Left); err != nil {
 		return err
 	}
+
 	return r.resolveExpression(binary.Right)
 }
 
-// resolveUnaryExpression resolves a unary expression
+// resolveUnaryExpression resolves a unary expression.
 func (r *Resolver) resolveUnaryExpression(unary *hir.HIRUnaryExpression) error {
 	return r.resolveExpression(unary.Operand)
 }
 
-// resolveCallExpression resolves a call expression
+// resolveCallExpression resolves a call expression.
 func (r *Resolver) resolveCallExpression(call *hir.HIRCallExpression) error {
-	// Resolve function expression
+	// Resolve function expression.
 	if err := r.resolveExpression(call.Function); err != nil {
 		return err
 	}
 
-	// Resolve arguments
+	// Resolve arguments.
 	for _, arg := range call.Arguments {
 		if err := r.resolveExpression(arg); err != nil {
 			return err
@@ -500,14 +504,14 @@ func (r *Resolver) resolveCallExpression(call *hir.HIRCallExpression) error {
 	return nil
 }
 
-// resolveType resolves a type reference
+// resolveType resolves a type reference.
 func (r *Resolver) resolveType(hirType hir.HIRType) error {
-	// For now, just validate that the type exists
-	// More sophisticated type resolution will be added later
+	// For now, just validate that the type exists.
+	// More sophisticated type resolution will be added later.
 	return nil
 } // validateResolutions validates all symbol resolutions
 func (r *Resolver) validateResolutions(program *hir.HIRProgram) error {
-	// Check for unused symbols
+	// Check for unused symbols.
 	for _, module := range program.Modules {
 		if err := r.checkUnusedSymbols(module); err != nil {
 			return err
@@ -517,9 +521,9 @@ func (r *Resolver) validateResolutions(program *hir.HIRProgram) error {
 	return nil
 }
 
-// checkUnusedSymbols checks for unused symbols in a module
+// checkUnusedSymbols checks for unused symbols in a module.
 func (r *Resolver) checkUnusedSymbols(module *hir.HIRModule) error {
-	// Get module symbols
+	// Get module symbols.
 	moduleSymbols := r.symbolTable.moduleSymbols[module.ID]
 
 	for _, symbol := range moduleSymbols {
@@ -537,29 +541,30 @@ func (r *Resolver) checkUnusedSymbols(module *hir.HIRModule) error {
 	return nil
 }
 
-// Helper methods
+// Helper methods.
 
-// pushContext pushes a resolution context onto the stack
+// pushContext pushes a resolution context onto the stack.
 func (r *Resolver) pushContext(context ResolutionContext) {
 	r.resolutionStack = append(r.resolutionStack, context)
 }
 
-// popContext pops a resolution context from the stack
+// popContext pops a resolution context from the stack.
 func (r *Resolver) popContext() {
 	if len(r.resolutionStack) > 0 {
 		r.resolutionStack = r.resolutionStack[:len(r.resolutionStack)-1]
 	}
 }
 
-// getCurrentContext returns the current resolution context
+// getCurrentContext returns the current resolution context.
 func (r *Resolver) getCurrentContext() *ResolutionContext {
 	if len(r.resolutionStack) == 0 {
 		return nil
 	}
+
 	return &r.resolutionStack[len(r.resolutionStack)-1]
 }
 
-// enterGenericScope enters a generic scope with type parameters
+// enterGenericScope enters a generic scope with type parameters.
 func (r *Resolver) enterGenericScope(params []hir.TypeInfo) error {
 	genericScope := GenericScope{
 		Parameters: make(map[string]*GenericParameter),
@@ -577,20 +582,21 @@ func (r *Resolver) enterGenericScope(params []hir.TypeInfo) error {
 	}
 
 	r.genericContext = append(r.genericContext, genericScope)
+
 	return nil
 }
 
-// exitGenericScope exits the current generic scope
+// exitGenericScope exits the current generic scope.
 func (r *Resolver) exitGenericScope() {
 	if len(r.genericContext) > 0 {
 		r.genericContext = r.genericContext[:len(r.genericContext)-1]
 	}
 }
 
-// buildFunctionType builds a function type from a function declaration
+// buildFunctionType builds a function type from a function declaration.
 func (r *Resolver) buildFunctionType(funcDecl *hir.HIRFunctionDeclaration) hir.TypeInfo {
-	// For now, return a basic function type
-	// More sophisticated type building will be added later
+	// For now, return a basic function type.
+	// More sophisticated type building will be added later.
 	return hir.TypeInfo{
 		ID:   hir.TypeID(funcDecl.ID),
 		Kind: hir.TypeKindFunction,
@@ -598,28 +604,29 @@ func (r *Resolver) buildFunctionType(funcDecl *hir.HIRFunctionDeclaration) hir.T
 	}
 }
 
-// inferExpressionType infers the type of an expression
+// inferExpressionType infers the type of an expression.
 func (r *Resolver) inferExpressionType(expr hir.HIRExpression) *hir.TypeInfo {
 	switch e := expr.(type) {
 	case *hir.HIRLiteral:
 		return r.inferLiteralType(e)
 	case *hir.HIRIdentifier:
-		// In a full implementation, we would look up the identifier's type
+		// In a full implementation, we would look up the identifier's type.
 		return nil
 	case *hir.HIRBinaryExpression:
 		return r.inferBinaryExpressionType(e)
 	}
+
 	return nil
 }
 
-// inferLiteralType infers the type of a literal
+// inferLiteralType infers the type of a literal.
 func (r *Resolver) inferLiteralType(literal *hir.HIRLiteral) *hir.TypeInfo {
-	// Use the literal's type information directly if available
+	// Use the literal's type information directly if available.
 	if literal.Type.Kind != hir.TypeKindUnknown {
 		return &literal.Type
 	}
 
-	// Simple type inference based on value type
+	// Simple type inference based on value type.
 	switch literal.Value.(type) {
 	case int, int32, int64:
 		return &hir.TypeInfo{Kind: hir.TypeKindInteger, Name: "i32"}
@@ -634,7 +641,7 @@ func (r *Resolver) inferLiteralType(literal *hir.HIRLiteral) *hir.TypeInfo {
 	}
 }
 
-// inferBinaryExpressionType infers the type of a binary expression
+// inferBinaryExpressionType infers the type of a binary expression.
 func (r *Resolver) inferBinaryExpressionType(binary *hir.HIRBinaryExpression) *hir.TypeInfo {
 	leftType := r.inferExpressionType(binary.Left)
 	rightType := r.inferExpressionType(binary.Right)
@@ -646,14 +653,14 @@ func (r *Resolver) inferBinaryExpressionType(binary *hir.HIRBinaryExpression) *h
 	return leftType // fallback to left type
 }
 
-// getCommonType determines the common type of two types
+// getCommonType determines the common type of two types.
 func (r *Resolver) getCommonType(left, right *hir.TypeInfo) *hir.TypeInfo {
-	// Simple type promotion rules
+	// Simple type promotion rules.
 	if left.Kind == right.Kind {
 		return left
 	}
 
-	// Integer to float promotion
+	// Integer to float promotion.
 	if (left.Kind == hir.TypeKindInteger && right.Kind == hir.TypeKindFloat) ||
 		(left.Kind == hir.TypeKindFloat && right.Kind == hir.TypeKindInteger) {
 		return &hir.TypeInfo{Kind: hir.TypeKindFloat, Name: "f64"}

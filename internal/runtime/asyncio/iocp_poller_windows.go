@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build windows.
+// +build windows.
 
 package asyncio
 
@@ -146,10 +146,10 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 	}
 	p.mu.Lock()
 	if old, exists := p.regs[s]; exists {
-		// Idempotent update: refresh handler and kinds; keep existing reader and control goroutines
+		// Idempotent update: refresh handler and kinds; keep existing reader and control goroutines.
 		old.kinds = kinds
 		old.handler = h
-		// refresh byConn mapping in case conn identity changed
+		// refresh byConn mapping in case conn identity changed.
 		p.byConn[conn] = old
 		p.mu.Unlock()
 		// No-op hooks for future unification.
@@ -162,7 +162,7 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 				p.notifier.armWritable(lite)
 			}
 		}
-		// Ensure periodic writable notifier is running if requested
+		// Ensure periodic writable notifier is running if requested.
 		if contains(kinds, Writable) {
 			wctx, cancel := context.WithCancel(p.ctx)
 			prev := old.stop
@@ -195,7 +195,7 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 				}
 			}(old)
 		}
-		// Notify poll loop of potential event mask change
+		// Notify poll loop of potential event mask change.
 		p.wake()
 		return nil
 	}
@@ -217,7 +217,7 @@ func (p *windowsPoller) Register(conn net.Conn, kinds []EventType, h Handler) er
 	// If Writable is requested, start a periodic notifier to ensure progress even when WSAPoll doesn't signal OUT frequently.
 	if contains(kinds, Writable) {
 		wctx, cancel := context.WithCancel(p.ctx)
-		// chain cancels: replacing stop to also cancel ticker goroutine
+		// chain cancels: replacing stop to also cancel ticker goroutine.
 		prev := reg.stop
 		reg.stop = func() {
 			if prev != nil {
@@ -328,7 +328,7 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 			return
 		case <-tick.C:
 			activity := false
-			// Readable
+			// Readable.
 			if contains(reg.kinds, Readable) {
 				_ = reg.conn.SetReadDeadline(time.Now().Add(1 * time.Millisecond))
 				if b, err := reg.reader.Peek(1); err == nil && len(b) > 0 {
@@ -338,7 +338,7 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 					activity = true
 				} else if err != nil {
 					if ne, ok := err.(net.Error); ok && ne.Timeout() {
-						// ignore
+						// ignore.
 					} else if errors.Is(err, io.EOF) {
 						if reg.disabled.Load() == 0 {
 							reg.handler(Event{Conn: reg.conn, Type: Error, Err: io.EOF})
@@ -352,7 +352,7 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 					}
 				}
 			}
-			// Writable (throttled)
+			// Writable (throttled).
 			if contains(reg.kinds, Writable) {
 				now := time.Now()
 				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
@@ -364,7 +364,7 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 					activity = true
 				}
 			}
-			// Adapt interval
+			// Adapt interval.
 			if activity {
 				idleCount = 0
 				if interval > 5*time.Millisecond {
@@ -391,12 +391,12 @@ func (p *windowsPoller) watch(ctx context.Context, reg *winReg) {
 
 // loop executes a central WSAPoll wait over all registered sockets plus a wake FD.
 func (p *windowsPoller) loop() {
-	// Backoff when no fds present to avoid spinning
+	// Backoff when no fds present to avoid spinning.
 	idleDelay := 5 * time.Millisecond
 	for p.closed.Load() == 0 {
-		// Build FD set snapshot
+		// Build FD set snapshot.
 		fds, regs := p.snapshot()
-		// Prepend wake FD if available
+		// Prepend wake FD if available.
 		if wfd, _ := p.wakeFD(); wfd != nil {
 			fds = append([]wsaPollFD{*wfd}, fds...)
 		}
@@ -404,26 +404,26 @@ func (p *windowsPoller) loop() {
 			time.Sleep(idleDelay)
 			continue
 		}
-		// Poll with reasonable timeout to react to Stop
+		// Poll with reasonable timeout to react to Stop.
 		n, err := wsaPoll(fds, 1000)
 		if err != nil {
-			// Sleep a bit on errors to avoid busy loop
+			// Sleep a bit on errors to avoid busy loop.
 			time.Sleep(2 * time.Millisecond)
 			continue
 		}
 		if n <= 0 {
 			continue
 		}
-		// Handle wake fd if included
+		// Handle wake fd if included.
 		startIdx := 0
 		if p.wakeRecv != nil {
-			// Index 0 is wake
+			// Index 0 is wake.
 			if fds[0].Revents != 0 {
 				p.drainWake()
 			}
 			startIdx = 1
 		}
-		// Process events for regs aligned to fds[startIdx:]
+		// Process events for regs aligned to fds[startIdx:].
 		for i := startIdx; i < len(fds) && (i-startIdx) < len(regs); i++ {
 			re := fds[i].Revents
 			if re == 0 {
@@ -436,18 +436,18 @@ func (p *windowsPoller) loop() {
 			if reg.disabled.Load() != 0 {
 				continue
 			}
-			// Error conditions
+			// Error conditions.
 			if (re&pollERR) != 0 || (re&pollHUP) != 0 || (re&pollNVAL) != 0 {
 				reg.handler(Event{Conn: reg.conn, Type: Error, Err: io.EOF})
 				continue
 			}
-			// Readable
+			// Readable.
 			if (re&(pollIN|pollRDNORM|pollPRI|pollRDBAND)) != 0 && contains(reg.kinds, Readable) {
 				if reg.disabled.Load() == 0 {
 					reg.handler(Event{Conn: reg.conn, Type: Readable})
 				}
 			}
-			// Writable (throttled)
+			// Writable (throttled).
 			if (re&(pollOUT|pollWRNORM|pollWRBAND)) != 0 && contains(reg.kinds, Writable) {
 				now := time.Now()
 				last := atomic.LoadInt64(&reg.lastWritableUnixNano)
@@ -479,7 +479,7 @@ func (p *windowsPoller) snapshot() ([]wsaPollFD, []*winReg) {
 			case Writable:
 				ev |= pollOUT | pollWRNORM
 			case Error:
-				// implicit via revents
+				// implicit via revents.
 			}
 		}
 		fds = append(fds, wsaPollFD{Fd: r.sock, Events: ev})

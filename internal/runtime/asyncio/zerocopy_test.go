@@ -23,7 +23,7 @@ func TestZeroCopy_CopyConnToConn(t *testing.T) {
 			return
 		}
 		defer c.Close()
-		// echo loop for a single message
+		// echo loop for a single message.
 		buf := make([]byte, 8)
 		_, _ = io.ReadFull(c, buf)
 		_, _ = c.Write(buf)
@@ -37,7 +37,7 @@ func TestZeroCopy_CopyConnToConn(t *testing.T) {
 	}
 	defer client.Close()
 
-	// twin connection to act as source
+	// twin connection to act as source.
 	srcLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

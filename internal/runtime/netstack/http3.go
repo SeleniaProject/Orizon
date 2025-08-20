@@ -12,12 +12,11 @@ import (
 
 // HTTP3Server wraps http3.Server lifecycle.
 type HTTP3Server struct {
-	srv   *http3.Server
 	pc    net.PacketConn
-	addr  string
+	srv   *http3.Server
 	close func() error
-	// errC captures the first serve error for observability
-	errC chan error
+	errC  chan error
+	addr  string
 }
 
 // NewHTTP3Server creates a server bound to addr with given TLS config and handler.
@@ -28,12 +27,16 @@ func NewHTTP3Server(addr string, tlsCfg *tls.Config, h http.Handler) *HTTP3Serve
 	} else if tlsCfg.MinVersion == 0 || tlsCfg.MinVersion < tls.VersionTLS13 {
 		c := tlsCfg.Clone()
 		c.MinVersion = tls.VersionTLS13
+
 		if len(c.NextProtos) == 0 {
 			c.NextProtos = []string{"h3"}
 		}
+
 		tlsCfg = c
 	}
+
 	s := &http3.Server{Addr: addr, TLSConfig: tlsCfg, Handler: h}
+
 	return &HTTP3Server{srv: s, addr: addr, errC: make(chan error, 1)}
 }
 
@@ -51,22 +54,29 @@ func NewHTTP3ServerWithOptions(addr string, tlsCfg *tls.Config, h http.Handler, 
 	} else if tlsCfg.MinVersion == 0 || tlsCfg.MinVersion < tls.VersionTLS13 {
 		c := tlsCfg.Clone()
 		c.MinVersion = tls.VersionTLS13
+
 		if len(c.NextProtos) == 0 {
 			c.NextProtos = []string{"h3"}
 		}
+
 		tlsCfg = c
 	}
+
 	qc := &quic.Config{}
 	if opts.MaxIdleTimeout > 0 {
 		qc.MaxIdleTimeout = opts.MaxIdleTimeout
 	}
+
 	if opts.KeepAlivePeriod > 0 {
 		qc.KeepAlivePeriod = opts.KeepAlivePeriod
 	}
+
 	if opts.Enable0RTT {
 		qc.Allow0RTT = true
 	}
+
 	s := &http3.Server{Addr: addr, TLSConfig: tlsCfg, Handler: h, QUICConfig: qc}
+
 	return &HTTP3Server{srv: s, addr: addr, errC: make(chan error, 1)}
 }
 
@@ -74,30 +84,37 @@ func NewHTTP3ServerWithOptions(addr string, tlsCfg *tls.Config, h http.Handler, 
 // Use Addr() to get the actual bound address.
 func (s *HTTP3Server) Start() (string, error) {
 	var err error
+
 	s.pc, err = net.ListenPacket("udp", s.addr)
 	if err != nil {
 		return "", err
 	}
+
 	realAddr := s.pc.LocalAddr().String()
 	done := make(chan struct{})
+
 	go func() {
-		// Propagate the first error if any, but do not block shutdown paths
+		// Propagate the first error if any, but do not block shutdown paths.
 		if err := s.srv.Serve(s.pc); err != nil {
 			select {
 			case s.errC <- err:
 			default:
 			}
 		}
+
 		close(done)
 	}()
+
 	s.close = func() error {
 		_ = s.pc.Close()
 		select {
 		case <-done:
 		case <-time.After(time.Second):
 		}
+
 		return nil
 	}
+
 	return realAddr, nil
 }
 
@@ -106,6 +123,7 @@ func (s *HTTP3Server) Stop() error {
 	if s.close != nil {
 		return s.close()
 	}
+
 	return nil
 }
 
@@ -114,8 +132,10 @@ func (s *HTTP3Server) Error() <-chan error {
 	if s == nil || s.errC == nil {
 		ch := make(chan error)
 		close(ch)
+
 		return ch
 	}
+
 	return s.errC
 }
 
@@ -126,12 +146,16 @@ func HTTP3Client(tlsCfg *tls.Config, timeout time.Duration) *http.Client {
 	} else if tlsCfg.MinVersion == 0 || tlsCfg.MinVersion < tls.VersionTLS13 {
 		c := tlsCfg.Clone()
 		c.MinVersion = tls.VersionTLS13
+
 		if len(c.NextProtos) == 0 {
 			c.NextProtos = []string{"h3"}
 		}
+
 		tlsCfg = c
 	}
+
 	tr := &http3.Transport{TLSClientConfig: tlsCfg}
+
 	return &http.Client{Transport: tr, Timeout: timeout}
 }
 
@@ -151,21 +175,28 @@ func HTTP3ClientWithOptions(tlsCfg *tls.Config, timeout time.Duration, opts HTTP
 	} else if tlsCfg.MinVersion == 0 || tlsCfg.MinVersion < tls.VersionTLS13 {
 		c := tlsCfg.Clone()
 		c.MinVersion = tls.VersionTLS13
+
 		if len(c.NextProtos) == 0 {
 			c.NextProtos = []string{"h3"}
 		}
+
 		tlsCfg = c
 	}
+
 	qc := &quic.Config{}
 	if opts.MaxIdleTimeout > 0 {
 		qc.MaxIdleTimeout = opts.MaxIdleTimeout
 	}
+
 	if opts.KeepAlivePeriod > 0 {
 		qc.KeepAlivePeriod = opts.KeepAlivePeriod
 	}
+
 	if opts.Enable0RTT {
 		qc.Allow0RTT = true
 	}
+
 	tr := &http3.Transport{TLSClientConfig: tlsCfg, QUICConfig: qc}
+
 	return &http.Client{Transport: tr, Timeout: timeout}
 }

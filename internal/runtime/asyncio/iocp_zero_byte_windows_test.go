@@ -1,5 +1,5 @@
-//go:build windows && iocp
-// +build windows,iocp
+//go:build windows && iocp.
+// +build windows,iocp.
 
 package asyncio
 
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Verifies that the internal zero-byte WSARecv posts and completes upon data arrival,
+// Verifies that the internal zero-byte WSARecv posts and completes upon data arrival,.
 // surfacing a Readable event to the callback.
 func TestIOCP_ZeroByteRecvTriggersReadable(t *testing.T) {
 	p := NewIOCPPoller()
@@ -53,7 +53,7 @@ func TestIOCP_ZeroByteRecvTriggersReadable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Send a single byte to complete the pending zero-byte recv
+	// Send a single byte to complete the pending zero-byte recv.
 	if _, err := srv.Write([]byte{0x42}); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestIOCP_ZeroByteRecvTriggersReadable(t *testing.T) {
 	}
 }
 
-// Verifies that the internal zero-byte WSASend posts triggers a Writable event
+// Verifies that the internal zero-byte WSASend posts triggers a Writable event.
 // shortly after registration, even with no outbound data queued.
 func TestIOCP_ZeroByteSendTriggersWritable(t *testing.T) {
 	p := NewIOCPPoller()

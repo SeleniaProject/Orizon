@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// TestPositionIntegrationWithAST tests integration between position system and AST
+// TestPositionIntegrationWithAST tests integration between position system and AST.
 func TestPositionIntegrationWithAST(t *testing.T) {
-	// Create a source map for integration testing
+	// Create a source map for integration testing.
 	sourceMap := NewSourceMap()
 	content := `func fibonacci(n int) int {
 	if n <= 1 {
@@ -17,12 +17,12 @@ func TestPositionIntegrationWithAST(t *testing.T) {
 }`
 	file := sourceMap.AddFile("fibonacci.oriz", content)
 
-	// Test position calculations for various parts of the code
+	// Test position calculations for various parts of the code.
 	tests := []struct {
 		name     string
+		expected string
 		line     int
 		column   int
-		expected string
 	}{
 		{"function keyword", 1, 1, "func"},
 		{"function name", 1, 6, "fibonacci"},
@@ -41,7 +41,7 @@ func TestPositionIntegrationWithAST(t *testing.T) {
 				Offset:   file.OffsetFromPosition(Position{Filename: "fibonacci.oriz", Line: test.line, Column: test.column}),
 			}
 
-			// Create a span for the expected token
+			// Create a span for the expected token.
 			span := Span{
 				Start: pos,
 				End: Position{
@@ -52,13 +52,13 @@ func TestPositionIntegrationWithAST(t *testing.T) {
 				},
 			}
 
-			// Verify span text matches expected
+			// Verify span text matches expected.
 			spanText := sourceMap.GetSpanText(span)
 			if spanText != test.expected {
 				t.Errorf("Expected span text '%s', got '%s'", test.expected, spanText)
 			}
 
-			// Test span highlighting
+			// Test span highlighting.
 			highlighter := NewSpanHighlighter(sourceMap)
 			result := highlighter.HighlightSpan(span)
 
@@ -69,7 +69,7 @@ func TestPositionIntegrationWithAST(t *testing.T) {
 	}
 }
 
-// TestDiagnosticIntegration tests diagnostic reporting with source context
+// TestDiagnosticIntegration tests diagnostic reporting with source context.
 func TestDiagnosticIntegration(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := `func main() {
@@ -79,10 +79,10 @@ func TestDiagnosticIntegration(t *testing.T) {
 }`
 	sourceMap.AddFile("syntax_error.oriz", content)
 
-	// Create diagnostic with multiple errors and warnings
+	// Create diagnostic with multiple errors and warnings.
 	diag := NewDiagnostic()
 
-	// Syntax error: incomplete expression
+	// Syntax error: incomplete expression.
 	syntaxErrorPos := Position{
 		Filename: "syntax_error.oriz",
 		Line:     3,
@@ -91,7 +91,7 @@ func TestDiagnosticIntegration(t *testing.T) {
 	}
 	diag.AddError(syntaxErrorPos, "syntax", "unexpected end of line")
 
-	// Warning: unused variable
+	// Warning: unused variable.
 	warningPos := Position{
 		Filename: "syntax_error.oriz",
 		Line:     4,
@@ -100,7 +100,7 @@ func TestDiagnosticIntegration(t *testing.T) {
 	}
 	diag.AddWarning(warningPos, "unused", "variable 'y' may be uninitialized")
 
-	// Test diagnostic visualization
+	// Test diagnostic visualization.
 	visualizer := NewErrorVisualizer(sourceMap)
 	result := visualizer.VisualizeDiagnostic(diag)
 
@@ -120,18 +120,18 @@ func TestDiagnosticIntegration(t *testing.T) {
 		}
 	}
 
-	// Test individual error visualization
+	// Test individual error visualization.
 	errorResult := visualizer.VisualizeError(diag.Errors[0])
 	if !strings.Contains(errorResult, "let y = x +") {
 		t.Error("Error visualization should show source line")
 	}
 }
 
-// TestSourceMapMultipleFiles tests source map with multiple files
+// TestSourceMapMultipleFiles tests source map with multiple files.
 func TestSourceMapMultipleFiles(t *testing.T) {
 	sourceMap := NewSourceMap()
 
-	// Add multiple source files
+	// Add multiple source files.
 	mainContent := `import "utils"
 
 func main() {
@@ -144,19 +144,19 @@ func main() {
 }`
 	sourceMap.AddFile("utils.oriz", utilsContent)
 
-	// Test cross-file position handling
+	// Test cross-file position handling.
 	mainPos := Position{Filename: "main.oriz", Line: 4, Column: 2, Offset: 30}
 	utilsPos := Position{Filename: "utils.oriz", Line: 2, Column: 2, Offset: 15}
 
-	// Test that positions from different files are handled correctly
+	// Test that positions from different files are handled correctly.
 	if !mainPos.Before(utilsPos) {
-		// Different files should be compared by filename
+		// Different files should be compared by filename.
 		if mainPos.Filename >= utilsPos.Filename {
 			t.Error("Position comparison across files should work by filename")
 		}
 	}
 
-	// Test span operations across files
+	// Test span operations across files.
 	mainSpan := Span{
 		Start: Position{Filename: "main.oriz", Line: 1, Column: 1, Offset: 0},
 		End:   Position{Filename: "main.oriz", Line: 1, Column: 7, Offset: 6},
@@ -167,12 +167,12 @@ func main() {
 		End:   Position{Filename: "utils.oriz", Line: 1, Column: 5, Offset: 4},
 	}
 
-	// Spans from different files should not overlap
+	// Spans from different files should not overlap.
 	if mainSpan.Overlaps(utilsSpan) {
 		t.Error("Spans from different files should not overlap")
 	}
 
-	// Test source text retrieval
+	// Test source text retrieval.
 	mainText := sourceMap.GetSpanText(mainSpan)
 	if mainText != "import" {
 		t.Errorf("Expected 'import', got '%s'", mainText)
@@ -184,7 +184,7 @@ func main() {
 	}
 }
 
-// TestCodeInspectorIntegration tests code inspector with realistic code
+// TestCodeInspectorIntegration tests code inspector with realistic code.
 func TestCodeInspectorIntegration(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := `// Fibonacci implementation with memoization
@@ -215,7 +215,7 @@ func main() {
 
 	inspector := NewCodeInspector(sourceMap)
 
-	// Test file inspection
+	// Test file inspection.
 	inspection := inspector.InspectFile("fibonacci.oriz")
 
 	expectedContent := []string{
@@ -233,10 +233,10 @@ func main() {
 		}
 	}
 
-	// Test file statistics
+	// Test file statistics.
 	stats := inspector.GetFileStatistics("fibonacci.oriz")
 
-	// Verify basic statistics
+	// Verify basic statistics.
 	if stats["filename"] != "fibonacci.oriz" {
 		t.Errorf("Expected filename 'fibonacci.oriz', got '%v'", stats["filename"])
 	}
@@ -251,33 +251,35 @@ func main() {
 		t.Errorf("Expected at least 300 characters, got %d", totalChars)
 	}
 
-	// Should have some empty lines (from formatting)
+	// Should have some empty lines (from formatting).
 	emptyLines := stats["empty_lines"].(int)
 	if emptyLines < 1 {
 		t.Errorf("Expected at least 1 empty line, got %d", emptyLines)
 	}
 }
 
-// TestVisualizationPerformance tests performance of visualization tools
+// TestVisualizationPerformance tests performance of visualization tools.
 func TestVisualizationPerformance(t *testing.T) {
 	sourceMap := NewSourceMap()
 
-	// Create a large source file for performance testing
+	// Create a large source file for performance testing.
 	var contentBuilder strings.Builder
 	for i := 0; i < 1000; i++ {
 		contentBuilder.WriteString("func function")
 		contentBuilder.WriteString("X") // Simplified for testing
 		contentBuilder.WriteString("() {\n\treturn 42\n}\n")
 	}
+
 	content := contentBuilder.String()
 
 	sourceMap.AddFile("large.oriz", content)
 
-	// Test that visualization completes in reasonable time
+	// Test that visualization completes in reasonable time.
 	highlighter := NewSpanHighlighter(sourceMap)
 
-	// Create spans throughout the file
+	// Create spans throughout the file.
 	spans := make([]Span, 100)
+
 	for i := 0; i < 100; i++ {
 		line := (i * 3) + 1 // Every function declaration line
 		spans[i] = Span{
@@ -286,7 +288,7 @@ func TestVisualizationPerformance(t *testing.T) {
 		}
 	}
 
-	// This should complete without timeout
+	// This should complete without timeout.
 	result := highlighter.HighlightMultipleSpans(spans)
 
 	if !strings.Contains(result, "Multiple Span Highlighting") {
@@ -297,7 +299,7 @@ func TestVisualizationPerformance(t *testing.T) {
 		t.Error("Performance test should highlight function keywords")
 	}
 
-	// Test code inspection performance
+	// Test code inspection performance.
 	inspector := NewCodeInspector(sourceMap)
 	stats := inspector.GetFileStatistics("large.oriz")
 
@@ -306,7 +308,7 @@ func TestVisualizationPerformance(t *testing.T) {
 	}
 }
 
-// TestErrorRecoveryWithPosition tests error recovery scenarios
+// TestErrorRecoveryWithPosition tests error recovery scenarios.
 func TestErrorRecoveryWithPosition(t *testing.T) {
 	sourceMap := NewSourceMap()
 	content := `func problematic() {
@@ -317,31 +319,31 @@ func TestErrorRecoveryWithPosition(t *testing.T) {
 }`
 	sourceMap.AddFile("errors.oriz", content)
 
-	// Simulate multiple parse errors
+	// Simulate multiple parse errors.
 	diag := NewDiagnostic()
 
-	// First error: incomplete expression
+	// First error: incomplete expression.
 	diag.AddError(
 		Position{Filename: "errors.oriz", Line: 2, Column: 13, Offset: 25},
 		"syntax",
 		"expected expression after '+'",
 	)
 
-	// Second error: incomplete expression
+	// Second error: incomplete expression.
 	diag.AddError(
 		Position{Filename: "errors.oriz", Line: 3, Column: 13, Offset: 40},
 		"syntax",
 		"expected expression after '*'",
 	)
 
-	// Warning: variables may be uninitialized
+	// Warning: variables may be uninitialized.
 	diag.AddWarning(
 		Position{Filename: "errors.oriz", Line: 4, Column: 10, Offset: 55},
 		"semantic",
 		"variables 'x' and 'y' may not be properly initialized",
 	)
 
-	// Test that diagnostic handles multiple issues well
+	// Test that diagnostic handles multiple issues well.
 	visualizer := NewErrorVisualizer(sourceMap)
 	result := visualizer.VisualizeDiagnostic(diag)
 
@@ -362,7 +364,7 @@ func TestErrorRecoveryWithPosition(t *testing.T) {
 		}
 	}
 
-	// Verify that all source lines are shown
+	// Verify that all source lines are shown.
 	lines := sourceMap.GetFiles()["errors.oriz"].Lines
 	for i, line := range lines {
 		if strings.TrimSpace(line) != "" && !strings.Contains(result, strings.TrimSpace(line)) {

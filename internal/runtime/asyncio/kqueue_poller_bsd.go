@@ -1,5 +1,5 @@
-//go:build darwin || freebsd || netbsd || openbsd
-// +build darwin freebsd netbsd openbsd
+//go:build darwin || freebsd || netbsd || openbsd.
+// +build darwin freebsd netbsd openbsd.
 
 package asyncio
 
@@ -54,7 +54,7 @@ func (p *kqueuePoller) Stop() error {
 	regs := p.regs
 	p.regs = make(map[int]*kqReg)
 	p.mu.Unlock()
-	// No explicit EV_DELETE here for all; closing kq is enough, but try to clean
+	// No explicit EV_DELETE here for all; closing kq is enough, but try to clean.
 	for fd := range regs {
 		delRead := unix.Kevent_t{Ident: uint64(fd), Filter: unix.EVFILT_READ, Flags: unix.EV_DELETE}
 		delWrite := unix.Kevent_t{Ident: uint64(fd), Filter: unix.EVFILT_WRITE, Flags: unix.EV_DELETE}
@@ -127,7 +127,7 @@ func (p *kqueuePoller) loop() {
 			if reg == nil {
 				continue
 			}
-			// Error conditions are indicated by EV_ERROR flag
+			// Error conditions are indicated by EV_ERROR flag.
 			if (ev.Flags & unix.EV_ERROR) != 0 {
 				reg.handler(Event{Conn: reg.conn, Type: Error})
 				continue
