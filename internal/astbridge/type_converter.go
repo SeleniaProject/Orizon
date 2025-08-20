@@ -33,6 +33,63 @@ func (tc *TypeConverter) FromParserType(parserType p.Type) (ast.Type, error) {
 		return tc.fromParserBasicType(concrete)
 	case *p.TupleType:
 		return tc.fromParserTupleType(concrete)
+	case *p.ReferenceType:
+		// represent as IdentifierType preserving textual form, including lifetime and mut.
+		name := "&" + concrete.Inner.String()
+		if concrete.IsMutable {
+			name = "&mut " + concrete.Inner.String()
+		}
+		if concrete.Lifetime != "" {
+			// prepend lifetime after &
+			if concrete.IsMutable {
+				name = "&'" + concrete.Lifetime + " mut " + concrete.Inner.String()
+			} else {
+				name = "&'" + concrete.Lifetime + " " + concrete.Inner.String()
+			}
+		}
+		return &ast.IdentifierType{Span: fromParserSpan(concrete.Span), Name: &ast.Identifier{Span: fromParserSpan(concrete.Span), Value: name}}, nil
+	case *p.PointerType:
+		name := "*" + concrete.Inner.String()
+		if concrete.IsMutable {
+			name = "*mut " + concrete.Inner.String()
+		}
+		return &ast.IdentifierType{Span: fromParserSpan(concrete.Span), Name: &ast.Identifier{Span: fromParserSpan(concrete.Span), Value: name}}, nil
+	case *p.ArrayType:
+		// [T] or [T; N]
+		txt := "[" + tc.PrettyPrintParserType(concrete.ElementType) + "]"
+		if !concrete.IsDynamic {
+			txt = "[" + tc.PrettyPrintParserType(concrete.ElementType) + "; " + concrete.Size.String() + "]"
+		}
+		return &ast.IdentifierType{Span: fromParserSpan(concrete.Span), Name: &ast.Identifier{Span: fromParserSpan(concrete.Span), Value: txt}}, nil
+	case *p.GenericType:
+		// Render like Base<...>
+		base := tc.PrettyPrintParserType(concrete.BaseType)
+		params := make([]string, 0, len(concrete.TypeParameters))
+		for _, t := range concrete.TypeParameters {
+			params = append(params, tc.PrettyPrintParserType(t))
+		}
+		txt := base + "<" + strings.Join(params, ", ") + ">"
+		return &ast.IdentifierType{Span: fromParserSpan(concrete.Span), Name: &ast.Identifier{Span: fromParserSpan(concrete.Span), Value: txt}}, nil
+	case *p.FunctionType:
+		// async prefix + (params) -> return
+		var params []string
+		for _, pparam := range concrete.Parameters {
+			if pparam.Name != "" {
+				params = append(params, fmt.Sprintf("%s: %s", pparam.Name, tc.PrettyPrintParserType(pparam.Type)))
+			} else {
+				params = append(params, tc.PrettyPrintParserType(pparam.Type))
+			}
+		}
+		txt := "(" + strings.Join(params, ", ") + ") -> "
+		if concrete.ReturnType != nil {
+			txt += tc.PrettyPrintParserType(concrete.ReturnType)
+		} else {
+			txt += "void"
+		}
+		if concrete.IsAsync {
+			txt = "async " + txt
+		}
+		return &ast.IdentifierType{Span: fromParserSpan(concrete.Span), Name: &ast.Identifier{Span: fromParserSpan(concrete.Span), Value: txt}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported parser type: %T", parserType)
 	}
@@ -68,11 +125,57 @@ func (tc *TypeConverter) PrettyPrintParserType(parserType p.Type) string {
 		return concrete.Name
 	case *p.TupleType:
 		return tc.formatTupleType(concrete)
+	case *p.ReferenceType:
+		if concrete.Lifetime != "" {
+			if concrete.IsMutable {
+				return fmt.Sprintf("&'%s mut %s", concrete.Lifetime, tc.PrettyPrintParserType(concrete.Inner))
+			}
+			return fmt.Sprintf("&'%s %s", concrete.Lifetime, tc.PrettyPrintParserType(concrete.Inner))
+		}
+		if concrete.IsMutable {
+			return "&mut " + tc.PrettyPrintParserType(concrete.Inner)
+		}
+		return "&" + tc.PrettyPrintParserType(concrete.Inner)
+	case *p.PointerType:
+		if concrete.IsMutable {
+			return "*mut " + tc.PrettyPrintParserType(concrete.Inner)
+		}
+		return "*" + tc.PrettyPrintParserType(concrete.Inner)
+	case *p.ArrayType:
+		if concrete.IsDynamic {
+			return "[" + tc.PrettyPrintParserType(concrete.ElementType) + "]"
+		}
+		return "[" + tc.PrettyPrintParserType(concrete.ElementType) + "; " + concrete.Size.String() + "]"
+	case *p.GenericType:
+		base := tc.PrettyPrintParserType(concrete.BaseType)
+		params := make([]string, 0, len(concrete.TypeParameters))
+		for _, t := range concrete.TypeParameters {
+			params = append(params, tc.PrettyPrintParserType(t))
+		}
+		return base + "<" + strings.Join(params, ", ") + ">"
+	case *p.FunctionType:
+		var params []string
+		for _, pparam := range concrete.Parameters {
+			if pparam.Name != "" {
+				params = append(params, fmt.Sprintf("%s: %s", pparam.Name, tc.PrettyPrintParserType(pparam.Type)))
+			} else {
+				params = append(params, tc.PrettyPrintParserType(pparam.Type))
+			}
+		}
+		txt := "(" + strings.Join(params, ", ") + ") -> "
+		if concrete.ReturnType != nil {
+			txt += tc.PrettyPrintParserType(concrete.ReturnType)
+		} else {
+			txt += "void"
+		}
+		if concrete.IsAsync {
+			txt = "async " + txt
+		}
+		return txt
 	default:
 		if stringer, ok := parserType.(fmt.Stringer); ok {
 			return stringer.String()
 		}
-
 		return "<unknown-type>"
 	}
 }
@@ -97,18 +200,19 @@ func (tc *TypeConverter) formatTupleType(tupleType *p.TupleType) string {
 // fromParserBasicType converts parser BasicType to AST BasicType.
 // This method maps between the different basic type representations and ensures.
 // proper handling of primitive type semantics.
-func (tc *TypeConverter) fromParserBasicType(basicType *p.BasicType) (*ast.BasicType, error) {
+func (tc *TypeConverter) fromParserBasicType(basicType *p.BasicType) (ast.Type, error) {
 	if basicType == nil {
 		return nil, fmt.Errorf("cannot convert nil parser basic type")
 	}
 
-	// Map parser basic type names to AST basic kinds.
-	kind := tc.mapBasicTypeName(basicType.Name)
-
-	return &ast.BasicType{
-		Span: fromParserSpan(basicType.Span),
-		Kind: kind,
-	}, nil
+	// Known basic names map to BasicType; others are represented as IdentifierType.
+	switch basicType.Name {
+	case "int", "i32", "i64", "float", "f32", "f64", "string", "str", "bool", "boolean", "char", "character", "void", "unit", "()":
+		kind := tc.mapBasicTypeName(basicType.Name)
+		return &ast.BasicType{Span: fromParserSpan(basicType.Span), Kind: kind}, nil
+	default:
+		return &ast.IdentifierType{Span: fromParserSpan(basicType.Span), Name: &ast.Identifier{Span: fromParserSpan(basicType.Span), Value: basicType.Name}}, nil
+	}
 }
 
 // toParserBasicType converts AST BasicType to parser BasicType.
@@ -129,15 +233,99 @@ func (tc *TypeConverter) toParserBasicType(basicType *ast.BasicType) (*p.BasicTy
 
 // toParserIdentifierType converts AST IdentifierType to parser BasicType.
 // Since parser doesn't have explicit IdentifierType, we represent it as BasicType.
-func (tc *TypeConverter) toParserIdentifierType(identType *ast.IdentifierType) (*p.BasicType, error) {
+func (tc *TypeConverter) toParserIdentifierType(identType *ast.IdentifierType) (p.Type, error) {
 	if identType == nil {
 		return nil, fmt.Errorf("cannot convert nil AST identifier type")
 	}
-
-	return &p.BasicType{
-		Span: toParserSpan(identType.Span),
-		Name: identType.Name.Value,
-	}, nil
+	name := identType.Name.Value
+	// Try to parse known textual encodings back into structured parser types.
+	// 1) Reference: &'<lifetime> [mut ]T  or &mut T or &T
+	if strings.HasPrefix(name, "&'") || strings.HasPrefix(name, "&mut ") || strings.HasPrefix(name, "& ") || strings.HasPrefix(name, "&") {
+		// Lifetime form
+		if strings.HasPrefix(name, "&'") {
+			rest := strings.TrimPrefix(name, "&'")
+			parts := strings.SplitN(rest, " ", 2)
+			if len(parts) == 2 {
+				lifetime := parts[0]
+				innerStr := parts[1]
+				isMut := false
+				if strings.HasPrefix(innerStr, "mut ") {
+					isMut = true
+					innerStr = strings.TrimPrefix(innerStr, "mut ")
+				}
+				inner, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: innerStr}})
+				return &p.ReferenceType{Inner: inner, Lifetime: lifetime, IsMutable: isMut, Span: toParserSpan(identType.Span)}, nil
+			}
+		}
+		// Non-lifetime forms
+		innerStr := strings.TrimPrefix(name, "&mut ")
+		if innerStr == name {
+			innerStr = strings.TrimPrefix(name, "&")
+		}
+		isMut := strings.HasPrefix(name, "&mut ")
+		inner, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: strings.TrimSpace(innerStr)}})
+		return &p.ReferenceType{Inner: inner, IsMutable: isMut, Span: toParserSpan(identType.Span)}, nil
+	}
+	// 2) Pointer: *mut T or *T
+	if strings.HasPrefix(name, "*mut ") || strings.HasPrefix(name, "*") {
+		innerStr := strings.TrimPrefix(name, "*mut ")
+		if innerStr == name {
+			innerStr = strings.TrimPrefix(name, "*")
+		}
+		inner, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: strings.TrimSpace(innerStr)}})
+		return &p.PointerType{Inner: inner, IsMutable: strings.HasPrefix(name, "*mut "), Span: toParserSpan(identType.Span)}, nil
+	}
+	// 3) Dynamic array: [T]
+	if strings.HasPrefix(name, "[") && strings.HasSuffix(name, "]") {
+		body := strings.TrimSuffix(strings.TrimPrefix(name, "["), "]")
+		// Sized form: [T; N]
+		if strings.Contains(body, ";") {
+			parts := strings.SplitN(body, ";", 2)
+			elemStr := strings.TrimSpace(parts[0])
+			sizeStr := strings.TrimSpace(parts[1])
+			elem, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: elemStr}})
+			return &p.ArrayType{ElementType: elem, Size: &p.Literal{Value: sizeStr}, IsDynamic: false, Span: toParserSpan(identType.Span)}, nil
+		}
+		elem, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: body}})
+		return &p.ArrayType{ElementType: elem, IsDynamic: true, Span: toParserSpan(identType.Span)}, nil
+	}
+	// 4) Generic: Base<...>
+	if i := strings.Index(name, "<"); i > 0 && strings.HasSuffix(name, ">") {
+		base := strings.TrimSpace(name[:i])
+		paramsStr := strings.TrimSpace(name[i+1 : len(name)-1])
+		// split by commas while tracking nested angle depth
+		var parts []string
+		depth := 0
+		start := 0
+		for idx := 0; idx < len(paramsStr); idx++ {
+			c := paramsStr[idx]
+			if c == '<' {
+				depth++
+			} else if c == '>' {
+				if depth > 0 {
+					depth--
+				}
+			} else if c == ',' && depth == 0 {
+				parts = append(parts, strings.TrimSpace(paramsStr[start:idx]))
+				start = idx + 1
+			}
+		}
+		if start <= len(paramsStr) {
+			s := strings.TrimSpace(paramsStr[start:])
+			if s != "" {
+				parts = append(parts, s)
+			}
+		}
+		var params []p.Type
+		for _, ps := range parts {
+			pt, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: ps}})
+			params = append(params, pt)
+		}
+		baseType, _ := tc.toParserIdentifierType(&ast.IdentifierType{Name: &ast.Identifier{Value: base}})
+		return &p.GenericType{BaseType: baseType, TypeParameters: params, Span: toParserSpan(identType.Span)}, nil
+	}
+	// Fallback to BasicType with the name.
+	return &p.BasicType{Span: toParserSpan(identType.Span), Name: name}, nil
 }
 
 // fromParserTupleType converts parser TupleType to appropriate AST type.
