@@ -1,4 +1,4 @@
-// Advanced Algorithms and Benchmarking for Orizon Collections
+// Advanced Algorithms and Benchmarking for Orizon Collections.
 package collections
 
 import (
@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// ====== Parallel Sorting Algorithms ======
+// ====== Parallel Sorting Algorithms ======.
 
 type ParallelSorter[T any] struct {
 	compare func(T, T) int
@@ -34,10 +34,12 @@ func (ps *ParallelSorter[T]) ParallelQuickSort(data []T) {
 	threshold := 10000 // Use parallel for arrays larger than this
 	if len(data) < threshold {
 		ps.quickSort(data, 0, len(data)-1)
+
 		return
 	}
 
 	var wg sync.WaitGroup
+
 	ps.parallelQuickSortHelper(data, 0, len(data)-1, &wg, 0)
 	wg.Wait()
 }
@@ -47,10 +49,11 @@ func (ps *ParallelSorter[T]) parallelQuickSortHelper(data []T, low, high int, wg
 		maxDepth := int(math.Log2(float64(ps.workers)))
 
 		if depth < maxDepth && (high-low) > 1000 {
-			// Parallel execution
+			// Parallel execution.
 			pivot := ps.partition(data, low, high)
 
 			wg.Add(2)
+
 			go func() {
 				defer wg.Done()
 				ps.parallelQuickSortHelper(data, low, pivot-1, wg, depth+1)
@@ -60,7 +63,7 @@ func (ps *ParallelSorter[T]) parallelQuickSortHelper(data []T, low, high int, wg
 				ps.parallelQuickSortHelper(data, pivot+1, high, wg, depth+1)
 			}()
 		} else {
-			// Sequential execution
+			// Sequential execution.
 			ps.quickSort(data, low, high)
 		}
 	}
@@ -84,7 +87,9 @@ func (ps *ParallelSorter[T]) partition(data []T, low, high int) int {
 			data[i], data[j] = data[j], data[i]
 		}
 	}
+
 	data[i+1], data[high] = data[high], data[i+1]
+
 	return i + 1
 }
 
@@ -106,8 +111,9 @@ func (ps *ParallelSorter[T]) parallelMergeSortHelper(data, temp []T, left, right
 	maxDepth := int(math.Log2(float64(ps.workers)))
 
 	if depth < maxDepth && (right-left) > 1000 {
-		// Parallel execution
+		// Parallel execution.
 		var wg sync.WaitGroup
+
 		wg.Add(2)
 
 		go func() {
@@ -121,7 +127,7 @@ func (ps *ParallelSorter[T]) parallelMergeSortHelper(data, temp []T, left, right
 
 		wg.Wait()
 	} else {
-		// Sequential execution
+		// Sequential execution.
 		ps.parallelMergeSortHelper(data, temp, left, mid, depth+1)
 		ps.parallelMergeSortHelper(data, temp, mid+1, right, depth+1)
 	}
@@ -142,6 +148,7 @@ func (ps *ParallelSorter[T]) merge(data, temp []T, left, mid, right int) {
 			data[k] = temp[j]
 			j++
 		}
+
 		k++
 	}
 
@@ -158,9 +165,9 @@ func (ps *ParallelSorter[T]) merge(data, temp []T, left, mid, right int) {
 	}
 }
 
-// ====== Advanced Tree Structures ======
+// ====== Advanced Tree Structures ======.
 
-// Red-Black Tree
+// Red-Black Tree.
 type RBColor int
 
 const (
@@ -171,10 +178,10 @@ const (
 type RBNode[K comparable, V any] struct {
 	key    K
 	value  V
-	color  RBColor
 	left   *RBNode[K, V]
 	right  *RBNode[K, V]
 	parent *RBNode[K, V]
+	color  RBColor
 }
 
 type RedBlackTree[K comparable, V any] struct {
@@ -187,6 +194,7 @@ type RedBlackTree[K comparable, V any] struct {
 
 func NewRedBlackTree[K comparable, V any](compare func(K, K) int) *RedBlackTree[K, V] {
 	var zeroK K
+
 	var zeroV V
 
 	nil := &RBNode[K, V]{
@@ -202,6 +210,7 @@ func NewRedBlackTree[K comparable, V any](compare func(K, K) int) *RedBlackTree[
 	}
 
 	rbt.root = rbt.nil
+
 	return rbt
 }
 
@@ -219,18 +228,21 @@ func (rbt *RedBlackTree[K, V]) Insert(key K, value V) {
 	}
 
 	var parent *RBNode[K, V] = rbt.nil
+
 	current := rbt.root
 
-	// Standard BST insertion
+	// Standard BST insertion.
 	for current != rbt.nil {
 		parent = current
+
 		if rbt.compare(key, current.key) < 0 {
 			current = current.left
 		} else if rbt.compare(key, current.key) > 0 {
 			current = current.right
 		} else {
-			// Update existing
+			// Update existing.
 			current.value = value
+
 			return
 		}
 	}
@@ -253,24 +265,24 @@ func (rbt *RedBlackTree[K, V]) insertFixup(node *RBNode[K, V]) {
 		if node.parent == node.parent.parent.left {
 			uncle := node.parent.parent.right
 			if uncle.color == Red {
-				// Case 1: Uncle is red
+				// Case 1: Uncle is red.
 				node.parent.color = Black
 				uncle.color = Black
 				node.parent.parent.color = Red
 				node = node.parent.parent
 			} else {
 				if node == node.parent.right {
-					// Case 2: Node is right child
+					// Case 2: Node is right child.
 					node = node.parent
 					rbt.leftRotate(node)
 				}
-				// Case 3: Node is left child
+				// Case 3: Node is left child.
 				node.parent.color = Black
 				node.parent.parent.color = Red
 				rbt.rightRotate(node.parent.parent)
 			}
 		} else {
-			// Symmetric cases
+			// Symmetric cases.
 			uncle := node.parent.parent.left
 			if uncle.color == Red {
 				node.parent.color = Black
@@ -282,12 +294,14 @@ func (rbt *RedBlackTree[K, V]) insertFixup(node *RBNode[K, V]) {
 					node = node.parent
 					rbt.rightRotate(node)
 				}
+
 				node.parent.color = Black
 				node.parent.parent.color = Red
 				rbt.leftRotate(node.parent.parent)
 			}
 		}
 	}
+
 	rbt.root.color = Black
 }
 
@@ -350,16 +364,18 @@ func (rbt *RedBlackTree[K, V]) Search(key K) (V, bool) {
 	}
 
 	var zero V
+
 	return zero, false
 }
 
 func (rbt *RedBlackTree[K, V]) Size() int {
 	rbt.mu.RLock()
 	defer rbt.mu.RUnlock()
+
 	return rbt.size
 }
 
-// ====== Performance Benchmarking ======
+// ====== Performance Benchmarking ======.
 
 type BenchmarkResult struct {
 	Name           string
@@ -385,10 +401,13 @@ func (b *Benchmark) Run(name string, operations int64, fn func()) BenchmarkResul
 	runtime.GC() // Clean slate
 
 	var m1, m2 runtime.MemStats
+
 	runtime.ReadMemStats(&m1)
 
 	start := time.Now()
+
 	fn()
+
 	duration := time.Since(start)
 
 	runtime.ReadMemStats(&m2)
@@ -413,17 +432,21 @@ func (b *Benchmark) RunParallel(name string, operations int64, parallelism int, 
 	runtime.GC()
 
 	var m1, m2 runtime.MemStats
+
 	runtime.ReadMemStats(&m1)
 
 	start := time.Now()
 
 	var wg sync.WaitGroup
+
 	opsPerWorker := operations / int64(parallelism)
 
 	for i := 0; i < parallelism; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			for j := int64(0); j < opsPerWorker; j++ {
 				fn()
 			}
@@ -431,6 +454,7 @@ func (b *Benchmark) RunParallel(name string, operations int64, parallelism int, 
 	}
 
 	wg.Wait()
+
 	duration := time.Since(start)
 
 	runtime.ReadMemStats(&m2)
@@ -457,6 +481,7 @@ func (b *Benchmark) Results() []BenchmarkResult {
 
 	results := make([]BenchmarkResult, len(b.results))
 	copy(results, b.results)
+
 	return results
 }
 
@@ -481,16 +506,16 @@ func (b *Benchmark) PrintResults() {
 	}
 }
 
-// ====== Stress Testing Framework ======
+// ====== Stress Testing Framework ======.
 
 type StressTest struct {
+	ctx        context.Context
+	cancel     context.CancelFunc
 	name       string
 	duration   time.Duration
 	goroutines int
 	operations atomic.Int64
 	errors     atomic.Int64
-	ctx        context.Context
-	cancel     context.CancelFunc
 }
 
 func NewStressTest(name string, duration time.Duration, goroutines int) *StressTest {
@@ -513,6 +538,7 @@ func (st *StressTest) Run(fn func() error) {
 
 	for i := 0; i < st.goroutines; i++ {
 		wg.Add(1)
+
 		go func(workerID int) {
 			defer wg.Done()
 
@@ -524,6 +550,7 @@ func (st *StressTest) Run(fn func() error) {
 					if err := fn(); err != nil {
 						st.errors.Add(1)
 					}
+
 					st.operations.Add(1)
 				}
 			}
@@ -539,14 +566,14 @@ func (st *StressTest) Run(fn func() error) {
 		float64(st.operations.Load()-st.errors.Load())/float64(st.operations.Load())*100)
 }
 
-// ====== Concurrent Hash Map with Advanced Features ======
+// ====== Concurrent Hash Map with Advanced Features ======.
 
 type AdvancedHashMap[K comparable, V any] struct {
-	segments []*hashMapSegment[K, V]
-	segMask  uint32
 	hash     func(K) uint32
-	mu       sync.RWMutex
+	segments []*hashMapSegment[K, V]
 	size     atomic.Int64
+	mu       sync.RWMutex
+	segMask  uint32
 	resizing atomic.Bool
 }
 
@@ -572,6 +599,7 @@ func NewAdvancedHashMap[K comparable, V any](hashFn func(K) uint32, initialCap i
 	segmentCount := uint32(16) // Fixed number of segments
 
 	segments := make([]*hashMapSegment[K, V], segmentCount)
+
 	bucketsPerSeg := uint32(initialCap) / segmentCount
 	if bucketsPerSeg == 0 {
 		bucketsPerSeg = 1
@@ -620,17 +648,18 @@ func (m *AdvancedHashMap[K, V]) Put(key K, value V) {
 	bucket.mu.Lock()
 	defer bucket.mu.Unlock()
 
-	// Check if key exists
+	// Check if key exists.
 	for i := range bucket.entries {
 		if !bucket.entries[i].deleted &&
 			bucket.entries[i].hash == hash &&
 			bucket.entries[i].key == key {
 			bucket.entries[i].value = value
+
 			return
 		}
 	}
 
-	// Add new entry
+	// Add new entry.
 	bucket.entries = append(bucket.entries, hashMapEntry[K, V]{
 		key:   key,
 		value: value,
@@ -639,7 +668,7 @@ func (m *AdvancedHashMap[K, V]) Put(key K, value V) {
 
 	m.size.Add(1)
 
-	// Check load factor and resize if needed
+	// Check load factor and resize if needed.
 	if len(bucket.entries) > 8 && !m.resizing.Load() {
 		go m.tryResize()
 	}
@@ -648,6 +677,7 @@ func (m *AdvancedHashMap[K, V]) Put(key K, value V) {
 func (m *AdvancedHashMap[K, V]) Get(key K) (V, bool) {
 	if m == nil || m.segments == nil {
 		var zero V
+
 		return zero, false
 	}
 
@@ -656,6 +686,7 @@ func (m *AdvancedHashMap[K, V]) Get(key K) (V, bool) {
 
 	if segIdx >= uint32(len(m.segments)) || m.segments[segIdx] == nil {
 		var zero V
+
 		return zero, false
 	}
 
@@ -664,6 +695,7 @@ func (m *AdvancedHashMap[K, V]) Get(key K) (V, bool) {
 
 	if bucketIdx >= uint32(len(segment.buckets)) {
 		var zero V
+
 		return zero, false
 	}
 
@@ -681,6 +713,7 @@ func (m *AdvancedHashMap[K, V]) Get(key K) (V, bool) {
 	}
 
 	var zero V
+
 	return zero, false
 }
 
@@ -713,7 +746,9 @@ func (m *AdvancedHashMap[K, V]) Remove(key K) bool {
 			bucket.entries[i].hash == hash &&
 			bucket.entries[i].key == key {
 			bucket.entries[i].deleted = true
+
 			m.size.Add(-1)
+
 			return true
 		}
 	}
@@ -734,7 +769,7 @@ func (m *AdvancedHashMap[K, V]) tryResize() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Double the bucket count for each segment
+	// Double the bucket count for each segment.
 	for _, segment := range m.segments {
 		segment.mu.Lock()
 
@@ -748,9 +783,9 @@ func (m *AdvancedHashMap[K, V]) tryResize() {
 
 		newMask := uint32(newSize - 1)
 
-		// Rehash all entries with proper synchronization to avoid mutex value copying
+		// Rehash all entries with proper synchronization to avoid mutex value copying.
 		for i := range oldBuckets {
-			// Use index access to avoid copying the mutex-containing bucket struct
+			// Use index access to avoid copying the mutex-containing bucket struct.
 			bucket := &oldBuckets[i]
 			bucket.mu.RLock() // Acquire read lock for safe access
 

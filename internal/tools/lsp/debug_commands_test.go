@@ -71,11 +71,11 @@ func TestLSP_DebugCommands_SnapshotAndMessages(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	// LSP server over in-memory pipes with proper server options
+	// LSP server over in-memory pipes with proper server options.
 	pr, pw := io.Pipe()
 	outPr, outPw := io.Pipe()
 
-	// Create server options with appropriate configuration for testing
+	// Create server options with appropriate configuration for testing.
 	serverOptions := &ServerOptions{
 		EnableDebugIntegration: true,
 		DebugHTTPURL:           srv.URL,
@@ -116,7 +116,7 @@ func TestLSP_DebugCommands_SnapshotAndMessages(t *testing.T) {
 	}
 
 	r := bufio.NewReader(outPr)
-	// read 3 responses
+	// read 3 responses.
 	if _, err := readRPC(r, time.Second); err != nil {
 		t.Fatal(err)
 	} // initialize
@@ -129,7 +129,7 @@ func TestLSP_DebugCommands_SnapshotAndMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Validate JSON
+	// Validate JSON.
 	var obj map[string]any
 	if err := json.Unmarshal(snap, &obj); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
@@ -167,7 +167,7 @@ func TestLSP_DebugCommands_GraphDeadlocksCorrelation(t *testing.T) {
 	pr, pw := io.Pipe()
 	outPr, outPw := io.Pipe()
 
-	// Create server options for the second test server instance
+	// Create server options for the second test server instance.
 	serverOptions2 := &ServerOptions{
 		EnableDebugIntegration: true,
 		DebugHTTPURL:           srv.URL,
@@ -177,7 +177,7 @@ func TestLSP_DebugCommands_GraphDeadlocksCorrelation(t *testing.T) {
 
 	go func() { _ = NewServer(pr, outPw, serverOptions2).Run() }()
 
-	// initialize
+	// initialize.
 	initReq := map[string]any{
 		"jsonrpc": "2.0", "id": 1.0, "method": "initialize",
 		"params": map[string]any{"rootUri": "", "initializationOptions": map[string]any{"debugHTTP": srv.URL}},
@@ -187,7 +187,7 @@ func TestLSP_DebugCommands_GraphDeadlocksCorrelation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// graph
+	// graph.
 	reqGraph := map[string]any{"jsonrpc": "2.0", "id": 2.0, "method": "workspace/executeCommand",
 		"params": map[string]any{"command": "orizon.getActorGraph"}}
 	b, _ = json.Marshal(reqGraph)
@@ -195,7 +195,7 @@ func TestLSP_DebugCommands_GraphDeadlocksCorrelation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// deadlocks
+	// deadlocks.
 	reqDead := map[string]any{"jsonrpc": "2.0", "id": 3.0, "method": "workspace/executeCommand",
 		"params": map[string]any{"command": "orizon.getDeadlocks"}}
 	b, _ = json.Marshal(reqDead)
@@ -203,7 +203,7 @@ func TestLSP_DebugCommands_GraphDeadlocksCorrelation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// correlation
+	// correlation.
 	reqCorr := map[string]any{"jsonrpc": "2.0", "id": 4.0, "method": "workspace/executeCommand",
 		"params": map[string]any{"command": "orizon.getCorrelationEvents", "arguments": []any{"abc", 5.0}}}
 	b, _ = json.Marshal(reqCorr)

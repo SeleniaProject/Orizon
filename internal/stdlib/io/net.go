@@ -28,7 +28,7 @@ func TLSDial(network, addr string, cfg *tls.Config) (net.Conn, error) {
 // TLSServer wraps a listener with TLS server settings.
 func TLSServer(ln net.Listener, cfg *tls.Config) net.Listener { return netstack.TLSServer(ln, cfg) }
 
-// UDP exports
+// UDP exports.
 type UDPEndpoint = netstack.UDPEndpoint
 
 func ListenUDP(addr string) (*UDPEndpoint, error) { return netstack.ListenUDP(addr) }
@@ -37,28 +37,34 @@ func DialUDP(addr string) (*UDPEndpoint, error)   { return netstack.DialUDP(addr
 // TCPMetrics exposes runtime metrics.
 func TCPMetrics() map[string]uint64 { return netstack.TCPMetrics() }
 
-// HTTP/3 exports
-type HTTP3Server = netstack.HTTP3Server
-type HTTP3Options = netstack.HTTP3Options
+// HTTP/3 exports.
+type (
+	HTTP3Server  = netstack.HTTP3Server
+	HTTP3Options = netstack.HTTP3Options
+)
 
 func NewHTTP3Server(addr string, tlsCfg *tls.Config, h http.Handler) *HTTP3Server {
 	return netstack.NewHTTP3Server(addr, tlsCfg, h)
 }
+
 func NewHTTP3ServerWithOptions(addr string, tlsCfg *tls.Config, h http.Handler, opts HTTP3Options) *HTTP3Server {
 	return netstack.NewHTTP3ServerWithOptions(addr, tlsCfg, h, opts)
 }
+
 func HTTP3Client(tlsCfg *tls.Config, timeout time.Duration) *http.Client {
 	return netstack.HTTP3Client(tlsCfg, timeout)
 }
+
 func HTTP3ClientWithOptions(tlsCfg *tls.Config, timeout time.Duration, opts HTTP3Options) *http.Client {
 	return netstack.HTTP3ClientWithOptions(tlsCfg, timeout, opts)
 }
 func ShutdownHTTP3(c *http.Client) { netstack.ShutdownHTTP3(c) }
 
-// Certificate utilities (dev/test convenience)
+// Certificate utilities (dev/test convenience).
 func GenerateSelfSignedTLS(hosts []string, validFor time.Duration) (*tls.Config, error) {
 	return netstack.GenerateSelfSignedTLS(hosts, validFor)
 }
+
 func LoadTLSConfig(certFile, keyFile string) (*tls.Config, error) {
 	return netstack.LoadTLSConfig(certFile, keyFile)
 }

@@ -55,6 +55,7 @@ func (f FS) Walk(root string, fn func(fullPath string, d fs.DirEntry, err error)
 // Exists returns true if path can be stat'ed.
 func (f FS) Exists(name string) bool {
 	_, err := f.fs.Stat(name)
+
 	return err == nil
 }
 
@@ -65,31 +66,34 @@ func (f FS) ReadFile(name string) ([]byte, error) {
 		return nil, err
 	}
 	defer file.Close()
-	// Best-effort: if Stat reports a reasonable size, bounded read
+	// Best-effort: if Stat reports a reasonable size, bounded read.
 	if info, err2 := file.Stat(); err2 == nil {
 		if sz := info.Size(); sz > 0 && sz < 16<<20 { // cap 16MB prealloc
 			return io.ReadAll(io.LimitReader(file, sz))
 		}
 	}
+
 	return io.ReadAll(file)
 }
 
 // WriteFile creates/truncates and writes content, syncing before close.
 func (f FS) WriteFile(name string, data []byte, perm fs.FileMode) error {
-	// Ensure parent dir for MemFS; OSFS MkdirAll is explicit by caller
+	// Ensure parent dir for MemFS; OSFS MkdirAll is explicit by caller.
 	file, err := f.fs.Create(name)
 	if err != nil {
 		return err
 	}
-	// Ensure close on return
+	// Ensure close on return.
 	defer file.Close()
+
 	if _, err := file.Write(data); err != nil {
 		return err
 	}
-	// Best-effort durability
+	// Best-effort durability.
 	if err := file.Sync(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -100,30 +104,39 @@ func (f FS) AtomicWrite(name string, data []byte, perm fs.FileMode) error {
 	if err := f.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	// generate random suffix
+	// generate random suffix.
 	bs := make([]byte, 6)
 	if _, err := rand.Read(bs); err != nil {
 		return err
 	}
+
 	tmp := filepath.Join(dir, ".tmp-"+filepath.Base(name)+"-"+fmtBytes(bs))
+
 	file, err := f.fs.Create(tmp)
 	if err != nil {
 		return err
 	}
+
 	if _, err := file.Write(data); err != nil {
 		return err
 	}
+
 	if err := file.Sync(); err != nil {
 		return err
 	}
+
 	if err := file.Close(); err != nil {
 		_ = f.fs.Remove(tmp)
+
 		return err
 	}
+
 	if err := f.fs.Rename(tmp, name); err != nil {
 		_ = f.fs.Remove(tmp)
+
 		return err
 	}
+
 	return nil
 }
 
@@ -132,29 +145,36 @@ func (f FS) WithTempFile(dir, pattern string, fn func(string) error) error {
 	if dir == "" {
 		dir = "."
 	}
-	// naive unique name
+	// naive unique name.
 	bs := make([]byte, 6)
 	if _, err := rand.Read(bs); err != nil {
 		return err
 	}
+
 	name := filepath.Join(dir, pattern+"-"+fmtBytes(bs))
+
 	h, err := f.fs.Create(name)
 	if err != nil {
 		return err
 	}
+
 	h.Close()
+
 	defer f.fs.Remove(name)
+
 	return fn(name)
 }
 
-// small hex encoding (no fmt to keep deps low)
+// small hex encoding (no fmt to keep deps low).
 func fmtBytes(b []byte) string {
 	const hexd = "0123456789abcdef"
+
 	out := make([]byte, len(b)*2)
 	for i, v := range b {
 		out[2*i] = hexd[v>>4]
 		out[2*i+1] = hexd[v&0x0f]
 	}
+
 	return string(out)
 }
 
@@ -164,15 +184,20 @@ func (f FS) CopyFile(src, dst string, perm fs.FileMode) error {
 	if err != nil {
 		return err
 	}
+
 	defer in.Close()
+
 	out, err := f.fs.Create(dst)
 	if err != nil {
 		return err
 	}
+
 	defer out.Close()
+
 	if _, err := io.Copy(out, in); err != nil {
 		return err
 	}
+
 	return out.Sync()
 }
 
@@ -184,9 +209,11 @@ func (f FS) Move(src, dst string) error {
 	if err := f.fs.Rename(src, dst); err == nil {
 		return nil
 	}
+
 	if err := f.CopyFile(src, dst, 0); err != nil {
 		return err
 	}
+
 	return f.fs.Remove(src)
 }
 

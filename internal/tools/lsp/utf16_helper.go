@@ -60,7 +60,7 @@ func offsetFromLineCharUTF16(text string, targetLine, targetChar int) int {
 		byteIdx += size
 	}
 
-	// If we reach end of text
+	// If we reach end of text.
 	if line == targetLine && char == targetChar {
 		return byteIdx
 	}

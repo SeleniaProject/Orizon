@@ -7,6 +7,7 @@ func TestOptionBasic(t *testing.T) {
 	if o.IsNone() {
 		t.Fatalf("expected Some")
 	}
+
 	v, ok := o.Unwrap()
 	if !ok || v != 10 {
 		t.Fatalf("unwrap mismatch: %v %v", v, ok)
@@ -16,6 +17,7 @@ func TestOptionBasic(t *testing.T) {
 	if n.IsSome() {
 		t.Fatalf("expected None")
 	}
+
 	if n.Or(7) != 7 {
 		t.Fatalf("fallback failed")
 	}

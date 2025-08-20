@@ -11,15 +11,17 @@ func GenInt() Generator[int] {
 		if size <= 0 {
 			size = 30
 		}
-		// biased toward small numbers but allow larger
+		// biased toward small numbers but allow larger.
 		max := int(math.Pow(2, float64(min(size, 31)))) - 1
 		if max <= 0 {
 			max = 1
 		}
+
 		sign := 1
 		if r.Intn(2) == 0 {
 			sign = -1
 		}
+
 		return sign * r.Intn(max+1)
 	}
 }
@@ -30,20 +32,25 @@ func ShrinkInt() Shrinker[int] {
 		if v == 0 {
 			return nil
 		}
+
 		out := []int{v / 2, 0}
 		if v > 0 {
 			out = append(out, v-1)
 		} else {
 			out = append(out, v+1)
 		}
+
 		uniq := make(map[int]struct{}, len(out))
 		res := make([]int, 0, len(out))
+
 		for _, x := range out {
 			if _, ok := uniq[x]; !ok {
 				uniq[x] = struct{}{}
+
 				res = append(res, x)
 			}
 		}
+
 		return res
 	}
 }
@@ -58,9 +65,11 @@ func GenSlice[T any](elem Generator[T]) Generator[[]T] {
 	return func(r *rand.Rand, size int) []T {
 		n := r.Intn(max(0, size) + 1)
 		out := make([]T, n)
+
 		for i := 0; i < n; i++ {
 			out[i] = elem(r, size)
 		}
+
 		return out
 	}
 }
@@ -71,13 +80,14 @@ func ShrinkSlice[T any](elem Shrinker[T]) Shrinker[[]T] {
 		if len(v) == 0 {
 			return nil
 		}
+
 		candidates := make([][]T, 0, 4)
-		// remove second half
+		// remove second half.
 		mid := len(v) / 2
 		candidates = append(candidates, append([]T(nil), v[:mid]...))
-		// remove first half
+		// remove first half.
 		candidates = append(candidates, append([]T(nil), v[mid:]...))
-		// shrink head element
+		// shrink head element.
 		if elem != nil {
 			shr := elem(v[0])
 			for _, s := range shr {
@@ -85,6 +95,7 @@ func ShrinkSlice[T any](elem Shrinker[T]) Shrinker[[]T] {
 				candidates = append(candidates, nv)
 			}
 		}
+
 		return candidates
 	}
 }
@@ -93,11 +104,14 @@ func min(a, b int) int {
 	if a < b {
 		return a
 	}
+
 	return b
 }
+
 func max(a, b int) int {
 	if a > b {
 		return a
 	}
+
 	return b
 }

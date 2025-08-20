@@ -10,11 +10,12 @@ import (
 	"time"
 )
 
-// ====== Hash Functions for Testing ======
+// ====== Hash Functions for Testing ======.
 
 func hashString(s string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
+
 	return h.Sum32()
 }
 
@@ -28,6 +29,7 @@ func compareInt(a, b int) int {
 	} else if a > b {
 		return 1
 	}
+
 	return 0
 }
 
@@ -37,15 +39,16 @@ func compareString(a, b string) int {
 	} else if a > b {
 		return 1
 	}
+
 	return 0
 }
 
-// ====== Concurrent Data Structure Tests ======
+// ====== Concurrent Data Structure Tests ======.
 
 func TestLockFreeQueue(t *testing.T) {
 	queue := NewLockFreeQueue[int]()
 
-	// Test basic operations
+	// Test basic operations.
 	queue.Enqueue(1)
 	queue.Enqueue(2)
 
@@ -59,33 +62,40 @@ func TestLockFreeQueue(t *testing.T) {
 		t.Errorf("Expected 2, got %v", val)
 	}
 
-	// Test concurrent operations
+	// Test concurrent operations.
 	var wg sync.WaitGroup
+
 	producers := 2
 	consumers := 2
 	itemsPerProducer := 10
 
 	consumed := make([]int, 0, producers*itemsPerProducer)
+
 	var mu sync.Mutex
+
 	done := make(chan struct{})
 
-	// Start producers
+	// Start producers.
 	producerWg := sync.WaitGroup{}
 	for i := 0; i < producers; i++ {
 		producerWg.Add(1)
+
 		go func(start int) {
 			defer producerWg.Done()
+
 			for j := 0; j < itemsPerProducer; j++ {
 				queue.Enqueue(start*itemsPerProducer + j)
 			}
 		}(i)
 	}
 
-	// Start consumers
+	// Start consumers.
 	for i := 0; i < consumers; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			for {
 				select {
 				case <-done:
@@ -103,19 +113,22 @@ func TestLockFreeQueue(t *testing.T) {
 		}()
 	}
 
-	// Wait for producers to finish, then signal consumers to stop
+	// Wait for producers to finish, then signal consumers to stop.
 	go func() {
 		producerWg.Wait()
-		// Give consumers a bit more time to drain the queue
+		// Give consumers a bit more time to drain the queue.
 		for {
 			mu.Lock()
 			count := len(consumed)
 			mu.Unlock()
+
 			if count >= producers*itemsPerProducer {
 				break
 			}
+
 			time.Sleep(time.Microsecond)
 		}
+
 		close(done)
 	}()
 
@@ -129,7 +142,7 @@ func TestLockFreeQueue(t *testing.T) {
 func TestWaitFreeRingBuffer(t *testing.T) {
 	buffer := NewWaitFreeRingBuffer[string](8) // Power of 2
 
-	// Test basic operations
+	// Test basic operations.
 	if !buffer.Push("a") {
 		t.Error("Failed to push to empty buffer")
 	}
@@ -143,48 +156,57 @@ func TestWaitFreeRingBuffer(t *testing.T) {
 		t.Errorf("Expected 'a', got %v", val)
 	}
 
-	// Test overflow (buffer has "b" already, so we can add 6 more)
+	// Test overflow (buffer has "b" already, so we can add 6 more).
 	for i := 0; i < 6; i++ {
 		if !buffer.Push(fmt.Sprintf("item%d", i)) {
 			t.Errorf("Failed to push item %d", i)
 		}
 	}
 
-	// Buffer should be full now (has 7 items total)
+	// Buffer should be full now (has 7 items total).
 	if buffer.Push("overflow") {
 		t.Error("Buffer should be full")
 	}
 
-	// Test concurrent access
+	// Test concurrent access.
 	var wg sync.WaitGroup
+
 	pushCount := 0
 	popCount := 0
+
 	var mu sync.Mutex
 
-	// Producer
+	// Producer.
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
+
 		for i := 0; i < 1000; i++ {
 			for !buffer.Push(fmt.Sprintf("item%d", i)) {
 				time.Sleep(time.Microsecond)
 			}
+
 			mu.Lock()
 			pushCount++
 			mu.Unlock()
 		}
 	}()
 
-	// Consumer
+	// Consumer.
 	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
+
 		for {
 			if _, ok := buffer.Pop(); ok {
 				mu.Lock()
+
 				popCount++
 				if popCount >= 1000 {
 					mu.Unlock()
+
 					return
 				}
 				mu.Unlock()
@@ -204,7 +226,7 @@ func TestWaitFreeRingBuffer(t *testing.T) {
 func TestRedBlackTree(t *testing.T) {
 	tree := NewRedBlackTree[int, string](compareInt)
 
-	// Test insertions
+	// Test insertions.
 	tree.Insert(10, "ten")
 	tree.Insert(5, "five")
 	tree.Insert(15, "fifteen")
@@ -213,7 +235,7 @@ func TestRedBlackTree(t *testing.T) {
 	tree.Insert(12, "twelve")
 	tree.Insert(18, "eighteen")
 
-	// Test searches
+	// Test searches.
 	if val, ok := tree.Search(10); !ok || val != "ten" {
 		t.Errorf("Expected 'ten', got %v", val)
 	}
@@ -226,20 +248,23 @@ func TestRedBlackTree(t *testing.T) {
 		t.Error("Should not find non-existent key")
 	}
 
-	// Test size
+	// Test size.
 	if tree.Size() != 7 {
 		t.Errorf("Expected size 7, got %d", tree.Size())
 	}
 
-	// Test concurrent operations
+	// Test concurrent operations.
 	var wg sync.WaitGroup
+
 	operations := 1000
 
-	// Concurrent inserts
+	// Concurrent inserts.
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
+
 		go func(start int) {
 			defer wg.Done()
+
 			for j := 0; j < operations/10; j++ {
 				key := start*operations + j
 				tree.Insert(key, fmt.Sprintf("value%d", key))
@@ -247,11 +272,13 @@ func TestRedBlackTree(t *testing.T) {
 		}(i)
 	}
 
-	// Concurrent searches
+	// Concurrent searches.
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			for j := 0; j < operations; j++ {
 				tree.Search(j)
 			}
@@ -264,7 +291,7 @@ func TestRedBlackTree(t *testing.T) {
 func TestConcurrentSkipList(t *testing.T) {
 	skipList := NewConcurrentSkipList[int, string](compareInt)
 
-	// Test basic operations
+	// Test basic operations.
 	skipList.Insert(10, "ten")
 	skipList.Insert(5, "five")
 	skipList.Insert(15, "fifteen")
@@ -277,15 +304,18 @@ func TestConcurrentSkipList(t *testing.T) {
 		t.Error("Should not find non-existent key")
 	}
 
-	// Test concurrent operations
+	// Test concurrent operations.
 	var wg sync.WaitGroup
+
 	items := 10000
 
-	// Concurrent inserts
+	// Concurrent inserts.
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
+
 		go func(start int) {
 			defer wg.Done()
+
 			for j := 0; j < items/10; j++ {
 				key := start*(items/10) + j
 				skipList.Insert(key, fmt.Sprintf("value%d", key))
@@ -295,8 +325,9 @@ func TestConcurrentSkipList(t *testing.T) {
 
 	wg.Wait()
 
-	// Verify all insertions
+	// Verify all insertions.
 	missing := 0
+
 	for i := 0; i < items; i++ {
 		if _, ok := skipList.Search(i); !ok {
 			missing++
@@ -311,7 +342,7 @@ func TestConcurrentSkipList(t *testing.T) {
 func TestParallelSorting(t *testing.T) {
 	sorter := NewParallelSorter[int](compareInt)
 
-	// Test parallel quicksort
+	// Test parallel quicksort.
 	data := make([]int, 100000)
 	for i := range data {
 		data[i] = rand.Int()
@@ -321,30 +352,36 @@ func TestParallelSorting(t *testing.T) {
 	copy(original, data)
 
 	start := time.Now()
+
 	sorter.ParallelQuickSort(data)
+
 	duration := time.Since(start)
 
-	// Verify sorted
+	// Verify sorted.
 	for i := 1; i < len(data); i++ {
 		if data[i-1] > data[i] {
 			t.Error("Array not properly sorted")
+
 			break
 		}
 	}
 
 	fmt.Printf("Parallel QuickSort of %d elements took %v\n", len(data), duration)
 
-	// Test parallel mergesort
+	// Test parallel mergesort.
 	copy(data, original)
 
 	start = time.Now()
+
 	sorter.ParallelMergeSort(data)
+
 	duration = time.Since(start)
 
-	// Verify sorted
+	// Verify sorted.
 	for i := 1; i < len(data); i++ {
 		if data[i-1] > data[i] {
 			t.Error("Array not properly sorted by merge sort")
+
 			break
 		}
 	}
@@ -355,7 +392,7 @@ func TestParallelSorting(t *testing.T) {
 func TestAdvancedHashMap(t *testing.T) {
 	hashMap := NewAdvancedHashMap[string, int](hashString, 16)
 
-	// Test basic operations
+	// Test basic operations.
 	hashMap.Put("key1", 1)
 	hashMap.Put("key2", 2)
 	hashMap.Put("key3", 3)
@@ -368,7 +405,7 @@ func TestAdvancedHashMap(t *testing.T) {
 		t.Errorf("Expected 2, got %v", val)
 	}
 
-	// Test removal
+	// Test removal.
 	if !hashMap.Remove("key2") {
 		t.Error("Failed to remove existing key")
 	}
@@ -381,15 +418,18 @@ func TestAdvancedHashMap(t *testing.T) {
 		t.Errorf("Expected size 2, got %d", hashMap.Size())
 	}
 
-	// Test concurrent operations
+	// Test concurrent operations.
 	var wg sync.WaitGroup
+
 	operations := 10000
 
-	// Concurrent puts
+	// Concurrent puts.
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
+
 		go func(start int) {
 			defer wg.Done()
+
 			for j := 0; j < operations/10; j++ {
 				key := fmt.Sprintf("key%d", start*operations+j)
 				hashMap.Put(key, start*operations+j)
@@ -397,11 +437,13 @@ func TestAdvancedHashMap(t *testing.T) {
 		}(i)
 	}
 
-	// Concurrent gets
+	// Concurrent gets.
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			for j := 0; j < operations; j++ {
 				key := fmt.Sprintf("key%d", j)
 				hashMap.Get(key)
@@ -414,12 +456,12 @@ func TestAdvancedHashMap(t *testing.T) {
 	fmt.Printf("Advanced HashMap size after concurrent operations: %d\n", hashMap.Size())
 }
 
-// ====== Benchmark Tests ======
+// ====== Benchmark Tests ======.
 
 func TestBenchmarkFramework(t *testing.T) {
 	bench := NewBenchmark()
 
-	// Benchmark vector operations
+	// Benchmark vector operations.
 	vec := NewVector[int]()
 
 	result := bench.Run("Vector Push", 100000, func() {
@@ -430,7 +472,7 @@ func TestBenchmarkFramework(t *testing.T) {
 		result.ThroughputOps,
 		result.Duration.Nanoseconds()/result.Operations)
 
-	// Benchmark parallel operations
+	// Benchmark parallel operations.
 	result = bench.RunParallel("Parallel HashMap Put", 100000, 8, func() {
 		hashMap := NewAdvancedHashMap[int, string](hashInt, 1024)
 		key := rand.Int()
@@ -443,7 +485,7 @@ func TestBenchmarkFramework(t *testing.T) {
 }
 
 func TestStressTest(t *testing.T) {
-	// Create a stress test for concurrent hash map
+	// Create a stress test for concurrent hash map.
 	hashMap := NewAdvancedHashMap[string, int](hashString, 64)
 
 	stressTest := NewStressTest("HashMap Stress", 2*time.Second, 20)
@@ -465,7 +507,7 @@ func TestStressTest(t *testing.T) {
 }
 
 func TestNUMAPool(t *testing.T) {
-	// Test NUMA-aware object pool
+	// Test NUMA-aware object pool.
 	pool := NewNUMAPool[[]byte](
 		func() []byte {
 			return make([]byte, 1024)
@@ -475,7 +517,7 @@ func TestNUMAPool(t *testing.T) {
 		},
 	)
 
-	// Test basic operations
+	// Test basic operations.
 	buf1 := pool.Get()
 	if len(buf1) != 1024 {
 		t.Errorf("Expected buffer size 1024, got %d", len(buf1))
@@ -489,14 +531,17 @@ func TestNUMAPool(t *testing.T) {
 		t.Errorf("Expected reset buffer, got length %d", len(buf2))
 	}
 
-	// Test concurrent operations
+	// Test concurrent operations.
 	var wg sync.WaitGroup
+
 	operations := 10000
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
+
 			for j := 0; j < operations/10; j++ {
 				buf := pool.Get()
 				buf = append(buf[:0], []byte("test")...)
@@ -508,11 +553,12 @@ func TestNUMAPool(t *testing.T) {
 	wg.Wait()
 }
 
-// ====== Performance Comparison Tests ======
+// ====== Performance Comparison Tests ======.
 
 func BenchmarkDataStructureComparison(b *testing.B) {
-	// Compare different map implementations
+	// Compare different map implementations.
 	stdMap := make(map[string]int)
+
 	var stdMapMu sync.RWMutex
 
 	advancedMap := NewAdvancedHashMap[string, int](hashString, 1024)
@@ -524,8 +570,10 @@ func BenchmarkDataStructureComparison(b *testing.B) {
 
 	b.Run("StdMap", func(b *testing.B) {
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			key := keys[i%len(keys)]
+
 			stdMapMu.Lock()
 			stdMap[key] = i
 			stdMapMu.Unlock()
@@ -534,6 +582,7 @@ func BenchmarkDataStructureComparison(b *testing.B) {
 
 	b.Run("AdvancedHashMap", func(b *testing.B) {
 		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			key := keys[i%len(keys)]
 			advancedMap.Put(key, i)
@@ -544,7 +593,7 @@ func BenchmarkDataStructureComparison(b *testing.B) {
 func BenchmarkConcurrentOperations(b *testing.B) {
 	hashMap := NewAdvancedHashMap[int, string](hashInt, 1024)
 
-	// Populate with initial data
+	// Populate with initial data.
 	for i := 0; i < 1000; i++ {
 		hashMap.Put(i, fmt.Sprintf("value%d", i))
 	}
@@ -565,15 +614,16 @@ func BenchmarkConcurrentOperations(b *testing.B) {
 	})
 }
 
-// ====== Memory and Performance Profiling ======
+// ====== Memory and Performance Profiling ======.
 
 func TestMemoryUsage(t *testing.T) {
 	runtime.GC()
 
 	var m1, m2 runtime.MemStats
+
 	runtime.ReadMemStats(&m1)
 
-	// Create large data structures
+	// Create large data structures.
 	vec := NewVector[int]()
 	for i := 0; i < 100000; i++ {
 		vec.Push(i)

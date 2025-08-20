@@ -9,26 +9,23 @@ import (
 	"time"
 )
 
-// Scheduler provides a controllable scheduling environment for exploring
+// Scheduler provides a controllable scheduling environment for exploring.
 // different interleavings of concurrent tasks. It is inspired by PCT-style
 // randomized schedulers and is suitable for small-to-medium concurrency tests.
 type Scheduler struct {
-	seed    int64
 	r       *rand.Rand
 	ready   chan *task
+	doneCh  chan struct{}
 	wg      sync.WaitGroup
-	stopped atomic.Uint32
-
-	// fairness window for yielding decisions
+	seed    int64
 	quantum int
-
-	doneCh chan struct{}
+	stopped atomic.Uint32
 }
 
 type task struct {
-	id   int
 	step chan struct{}
 	run  func(ctx context.Context, s *Scheduler)
+	id   int
 }
 
 // Options configures the Scheduler behavior.
@@ -42,9 +39,11 @@ func New(opts Options) *Scheduler {
 	if opts.Seed == 0 {
 		opts.Seed = time.Now().UnixNano()
 	}
+
 	if opts.Quantum <= 0 {
 		opts.Quantum = 1
 	}
+
 	return &Scheduler{
 		seed:    opts.Seed,
 		r:       rand.New(rand.NewSource(opts.Seed)),
@@ -61,11 +60,13 @@ func (s *Scheduler) Seed() int64 { return s.seed }
 func (s *Scheduler) Go(fn func(ctx context.Context, sched *Scheduler)) {
 	t := &task{id: s.r.Int(), step: make(chan struct{}, 1), run: fn}
 	s.wg.Add(1)
+
 	go func() {
 		defer s.wg.Done()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		// first admission requires step token
+		// first admission requires step token.
 		s.ready <- t
 		<-t.step
 		fn(ctx, s)
@@ -79,37 +80,40 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		ctx, cancel = context.WithCancel(context.Background())
 		defer cancel()
 	}
-	// notify when all tasks complete
+	// notify when all tasks complete.
 	go func() { s.wg.Wait(); close(s.doneCh) }()
-	// scheduler loop
+	// scheduler loop.
 	yieldCount := 0
 	idleStreak := 0
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-s.doneCh:
-			// Drain any residual ready steps for fairness; then exit when queue is quiet
+			// Drain any residual ready steps for fairness; then exit when queue is quiet.
 			if drained(s.ready) {
 				return nil
 			}
 		case t := <-s.ready:
-			// allow task to make progress, then decide next step
+			// allow task to make progress, then decide next step.
 			s.allow(t)
+
 			yieldCount++
 			if yieldCount%s.quantum == 0 {
 				runtime.Gosched()
 			}
 		case <-time.After(1 * time.Millisecond):
-			// back off to avoid spinning
+			// back off to avoid spinning.
 			idleStreak++
 			if idleStreak > 5 {
-				// if done and repeatedly idle, exit
+				// if done and repeatedly idle, exit.
 				select {
 				case <-s.doneCh:
 					return nil
 				default:
 				}
+
 				idleStreak = 0
 			}
 		}
@@ -129,7 +133,7 @@ func (s *Scheduler) Yield() {
 	if s.stopped.Load() == 1 {
 		return
 	}
-	// requeue current goroutine as a task by recovering its parked token
+	// requeue current goroutine as a task by recovering its parked token.
 	// The technique: block until scheduler grants next step token.
 	// Callers should ensure cooperative yield points.
 	current := &task{step: make(chan struct{}, 1)}
@@ -165,19 +169,26 @@ func Explore(trials int, factory func(seed int64) (wait func() error)) []error {
 			trials = 1
 		}
 	}
+
 	errs := make([]error, trials)
+
 	var wg sync.WaitGroup
 	for i := 0; i < trials; i++ {
 		wg.Add(1)
+
 		go func(i int) {
 			defer wg.Done()
+
 			seed := time.Now().UnixNano() + int64(i)
+
 			wait := factory(seed)
 			if wait != nil {
 				errs[i] = wait()
 			}
 		}(i)
 	}
+
 	wg.Wait()
+
 	return errs
 }

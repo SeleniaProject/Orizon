@@ -13,16 +13,20 @@ func TestForAll1_SliceReverseInvolution(t *testing.T) {
 		ys := append([]int(nil), xs...)
 		reverse(ys)
 		reverse(ys)
+
 		if len(xs) != len(ys) {
 			return false
 		}
+
 		for i := range xs {
 			if xs[i] != ys[i] {
 				return false
 			}
 		}
+
 		return true
 	}
+
 	res := ForAll1(gen, shrink, prop, Options{Trials: 200, MaxShrinkTime: 2 * time.Second})
 	if res.Failed {
 		t.Fatalf("property failed: seed=%d input=%v shrunk=%v", res.Seed, res.FailingInput, res.ShrunkInput)
@@ -38,8 +42,10 @@ func TestForAll1_NegativeShrinksTowardZero(t *testing.T) {
 		for _, v := range xs {
 			sum += v
 		}
+
 		return sum < 0 // often false -> triggers shrink
 	}
+
 	res := ForAll1(gen, shrink, propBad, Options{Trials: 200, MaxShrinkRounds: 50, MaxShrinkTime: 2 * time.Second})
 	if !res.Failed {
 		t.Fatalf("expected failure to trigger shrinking")

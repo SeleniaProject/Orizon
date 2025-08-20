@@ -49,11 +49,11 @@ func TestSemanticTokensRequestHandlesRangeParameter(t *testing.T) {
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
-	// initialize
+	// initialize.
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{}})
 	_, _ = readFramedJSON(t, r, 3*time.Second)
 
-	// initialized
+	// initialized.
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "method": "initialized", "params": map[string]any{}})
 	_, _ = readFramedJSON(t, r, 200*time.Millisecond)
 
@@ -71,7 +71,7 @@ func TestSemanticTokensRequestHandlesRangeParameter(t *testing.T) {
 		},
 	})
 
-	// semantic tokens request with range
+	// semantic tokens request with range.
 	writeFramedJSON(t, inW, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      2,

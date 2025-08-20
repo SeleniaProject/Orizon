@@ -16,7 +16,7 @@ import (
 
 // GenOptions controls mock code generation.
 type GenOptions struct {
-	// Interface to mock
+	// Interface to mock.
 	InterfaceName string
 	// Package name of generated code. If empty, use the target package name + "mock" suffix.
 	PackageName string
@@ -33,6 +33,7 @@ func Generate(opts GenOptions) (string, error) {
 	if strings.TrimSpace(opts.InterfaceName) == "" {
 		return "", errors.New("InterfaceName is required")
 	}
+
 	patterns := opts.SourcePatterns
 	if len(patterns) == 0 {
 		patterns = []string{"./..."}
@@ -42,10 +43,12 @@ func Generate(opts GenOptions) (string, error) {
 	if len(opts.BuildTags) > 0 {
 		cfg.BuildFlags = append(cfg.BuildFlags, fmt.Sprintf("-tags=%s", strings.Join(opts.BuildTags, ",")))
 	}
+
 	pkgs, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		return "", err
 	}
+
 	if packages.PrintErrors(pkgs) > 0 {
 		return "", errors.New("failed to load packages")
 	}
@@ -56,20 +59,24 @@ func Generate(opts GenOptions) (string, error) {
 		ifaceObj   types.Object
 		targetName = opts.InterfaceName
 	)
+
 	for _, p := range pkgs {
-		// Search for the interface by name in types scope
+		// Search for the interface by name in types scope.
 		if p.Types == nil || p.Types.Scope() == nil {
 			continue
 		}
+
 		if obj := p.Types.Scope().Lookup(targetName); obj != nil {
 			if t, ok := obj.Type().Underlying().(*types.Interface); ok {
 				ifaceType = t.Complete()
 				ifaceObj = obj
 				foundPkg = p
+
 				break
 			}
 		}
 	}
+
 	if foundPkg == nil || ifaceType == nil {
 		return "", fmt.Errorf("interface %q not found in provided source patterns", targetName)
 	}
@@ -83,43 +90,49 @@ func Generate(opts GenOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if opts.Destination != "" {
 		if err := os.MkdirAll(filepath.Dir(opts.Destination), 0o755); err != nil {
 			return "", err
 		}
+
 		if err := os.WriteFile(opts.Destination, []byte(code), 0o644); err != nil {
 			return "", err
 		}
 	}
+
 	return code, nil
 }
 
 func renderMock(pkg string, obj types.Object, iface *types.Interface) (string, error) {
 	var buf bytes.Buffer
+
 	fmt.Fprintf(&buf, "package %s\n\n", pkg)
 	buf.WriteString("import (\n\t\"sync\"\n)\n\n")
 
 	name := obj.Name()
 	mockName := name + "Mock"
 
-	// Collect methods including embedded
+	// Collect methods including embedded.
 	methods := collectMethods(iface)
 
-	// Type header
+	// Type header.
 	fmt.Fprintf(&buf, "// %s is a concurrency-safe test double for %s.\n", mockName, name)
 	fmt.Fprintf(&buf, "type %s struct {\n\tmu sync.Mutex\n", mockName)
+
 	for _, m := range methods {
 		fmt.Fprintf(&buf, "\t%sStub func(%s) (%s)\n", m.name, joinFieldList(m.params), joinFieldList(m.results))
 		fmt.Fprintf(&buf, "\t%sCalls []%s_%sCall\n", m.name, name, m.name)
 	}
+
 	buf.WriteString("}\n\n")
 
-	// Call records
+	// Call records.
 	for _, m := range methods {
 		fmt.Fprintf(&buf, "type %s_%sCall struct { %s %s }\n\n", name, m.name, fieldsDecl("Arg", m.params), fieldsDecl("Ret", m.results))
 	}
 
-	// Methods implementations
+	// Methods implementations.
 	for _, m := range methods {
 		fmt.Fprintf(&buf, "func (m *%s) %s(%s) (%s) {\n", mockName, m.name, paramDecls(m.params), resultDecls(m.results))
 		buf.WriteString("\tm.mu.Lock()\n")
@@ -128,28 +141,32 @@ func renderMock(pkg string, obj types.Object, iface *types.Interface) (string, e
 		buf.WriteString(m.name)
 		buf.WriteString("Stub\n\tm.mu.Unlock()\n")
 		buf.WriteString("\tif stub != nil { return stub(" + namesList(m.params) + ") }\n")
-		// return zero values when no stub
+		// return zero values when no stub.
 		if len(m.results) == 0 {
 			buf.WriteString("\treturn\n")
 		} else {
 			buf.WriteString("\treturn " + zeroValuesList(m.results) + "\n")
 		}
+
 		buf.WriteString("}\n\n")
 	}
 
-	// Reset helper
+	// Reset helper.
 	fmt.Fprintf(&buf, "func (m *%s) Reset() {\n\tm.mu.Lock()\n", mockName)
+
 	for _, m := range methods {
 		fmt.Fprintf(&buf, "\tm.%sStub = nil\n\tm.%sCalls = nil\n", m.name, m.name)
 	}
+
 	buf.WriteString("\tm.mu.Unlock()\n}\n")
 
-	// gofmt
+	// gofmt.
 	fmted, err := format.Source(buf.Bytes())
 	if err != nil {
-		// Return unformatted for easier debugging
+		// Return unformatted for easier debugging.
 		return buf.String(), nil
 	}
+
 	return string(fmted), nil
 }
 
@@ -161,6 +178,7 @@ type method struct {
 
 func collectMethods(iface *types.Interface) []method {
 	var ms []method
+
 	for i := 0; i < iface.NumMethods(); i++ {
 		m := iface.Method(i)
 		sig := m.Type().(*types.Signature)
@@ -168,8 +186,9 @@ func collectMethods(iface *types.Interface) []method {
 		results := tupleTypes(sig.Results())
 		ms = append(ms, method{name: m.Name(), params: params, results: results})
 	}
-	// Stable ordering
+	// Stable ordering.
 	sort.Slice(ms, func(i, j int) bool { return ms[i].name < ms[j].name })
+
 	return ms
 }
 
@@ -177,10 +196,12 @@ func tupleTypes(t *types.Tuple) []types.Type {
 	if t == nil {
 		return nil
 	}
+
 	out := make([]types.Type, t.Len())
 	for i := 0; i < t.Len(); i++ {
 		out[i] = t.At(i).Type()
 	}
+
 	return out
 }
 
@@ -188,10 +209,12 @@ func joinFieldList(ts []types.Type) string {
 	if len(ts) == 0 {
 		return ""
 	}
+
 	parts := make([]string, len(ts))
 	for i, t := range ts {
 		parts[i] = types.TypeString(t, qualifier)
 	}
+
 	return strings.Join(parts, ", ")
 }
 
@@ -200,6 +223,7 @@ func paramDecls(ts []types.Type) string {
 	for i, t := range ts {
 		parts[i] = fmt.Sprintf("a%d %s", i, types.TypeString(t, qualifier))
 	}
+
 	return strings.Join(parts, ", ")
 }
 
@@ -209,10 +233,12 @@ func fieldsDecl(prefix string, ts []types.Type) string {
 	if len(ts) == 0 {
 		return ""
 	}
+
 	parts := make([]string, len(ts))
 	for i, t := range ts {
 		parts[i] = fmt.Sprintf("%s%d %s", prefix, i, types.TypeString(t, qualifier))
 	}
+
 	return strings.Join(parts, " ")
 }
 
@@ -220,10 +246,12 @@ func valuesList(prefix string, ts []types.Type) string {
 	if len(ts) == 0 {
 		return ""
 	}
+
 	parts := make([]string, len(ts))
 	for i := range ts {
 		parts[i] = fmt.Sprintf("%s%d: a%d,", prefix, i, i)
 	}
+
 	return strings.Join(parts, " ")
 }
 
@@ -232,6 +260,7 @@ func namesList(ts []types.Type) string {
 	for i := range ts {
 		parts[i] = fmt.Sprintf("a%d", i)
 	}
+
 	return strings.Join(parts, ", ")
 }
 
@@ -240,6 +269,7 @@ func zeroValuesList(ts []types.Type) string {
 	for i, t := range ts {
 		parts[i] = zeroValue(t)
 	}
+
 	return strings.Join(parts, ", ")
 }
 
@@ -271,5 +301,6 @@ func qualifier(p *types.Package) string {
 	if p == nil {
 		return ""
 	}
+
 	return p.Name()
 }

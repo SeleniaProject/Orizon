@@ -13,14 +13,17 @@ type Signed interface {
 type Unsigned interface {
 	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
 }
-type Integer interface{ Signed | Unsigned }
-type Float interface{ ~float32 | ~float64 }
+type (
+	Integer interface{ Signed | Unsigned }
+	Float   interface{ ~float32 | ~float64 }
+)
 
 // Min returns the minimum of a and b.
 func Min[T Ordered](a, b T) T {
 	if a < b {
 		return a
 	}
+
 	return b
 }
 
@@ -29,6 +32,7 @@ func Max[T Ordered](a, b T) T {
 	if a > b {
 		return a
 	}
+
 	return b
 }
 
@@ -37,12 +41,15 @@ func Clamp[T Ordered](v, lo, hi T) T {
 	if lo > hi {
 		lo, hi = hi, lo
 	}
+
 	if v < lo {
 		return lo
 	}
+
 	if v > hi {
 		return hi
 	}
+
 	return v
 }
 
@@ -51,6 +58,7 @@ func Abs[T Signed | Float](v T) T {
 	if v < 0 {
 		return -v
 	}
+
 	return v
 }
 
@@ -60,6 +68,7 @@ func Sum[T Integer | Float](xs []T) T {
 	for _, x := range xs {
 		s += x
 	}
+
 	return s
 }
 
@@ -68,9 +77,11 @@ func MeanF[T Float](xs []T) float64 {
 	if len(xs) == 0 {
 		return 0
 	}
+
 	var s float64
 	for _, x := range xs {
 		s += float64(x)
 	}
+
 	return s / float64(len(xs))
 }

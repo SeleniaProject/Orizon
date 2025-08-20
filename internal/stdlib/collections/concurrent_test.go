@@ -10,6 +10,7 @@ import (
 func hashStringFnv(s string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
+
 	return h.Sum32()
 }
 
@@ -19,11 +20,12 @@ func compareInts(a, b int) int {
 	} else if a > b {
 		return 1
 	}
+
 	return 0
 }
 
 func TestNUMAPoolBasic(t *testing.T) {
-	// Test NUMA-aware object pool
+	// Test NUMA-aware object pool.
 	pool := NewNUMAPool[[]byte](
 		func() []byte {
 			return make([]byte, 1024)
@@ -33,7 +35,7 @@ func TestNUMAPoolBasic(t *testing.T) {
 		},
 	)
 
-	// Test basic operations
+	// Test basic operations.
 	buf1 := pool.Get()
 	if len(buf1) != 1024 {
 		t.Errorf("Expected buffer size 1024, got %d", len(buf1))
@@ -53,12 +55,12 @@ func TestNUMAPoolBasic(t *testing.T) {
 func TestRedBlackTreeBasic(t *testing.T) {
 	tree := NewRedBlackTree[int, string](compareInts)
 
-	// Test insertions
+	// Test insertions.
 	tree.Insert(10, "ten")
 	tree.Insert(5, "five")
 	tree.Insert(15, "fifteen")
 
-	// Test searches
+	// Test searches.
 	if val, ok := tree.Search(10); !ok || val != "ten" {
 		t.Errorf("Expected 'ten', got %v", val)
 	}
@@ -71,7 +73,7 @@ func TestRedBlackTreeBasic(t *testing.T) {
 		t.Error("Should not find non-existent key")
 	}
 
-	// Test size
+	// Test size.
 	if tree.Size() != 3 {
 		t.Errorf("Expected size 3, got %d", tree.Size())
 	}
@@ -82,15 +84,16 @@ func TestRedBlackTreeBasic(t *testing.T) {
 func TestParallelSortingBasic(t *testing.T) {
 	sorter := NewParallelSorter[int](compareInts)
 
-	// Test with small array first
+	// Test with small array first.
 	data := []int{5, 2, 8, 1, 9, 3}
 
 	sorter.ParallelQuickSort(data)
 
-	// Verify sorted
+	// Verify sorted.
 	for i := 1; i < len(data); i++ {
 		if data[i-1] > data[i] {
 			t.Error("Array not properly sorted")
+
 			break
 		}
 	}
@@ -101,7 +104,7 @@ func TestParallelSortingBasic(t *testing.T) {
 func TestAdvancedHashMapBasic(t *testing.T) {
 	hashMap := NewAdvancedHashMap[string, int](hashStringFnv, 16)
 
-	// Test basic operations
+	// Test basic operations.
 	hashMap.Put("key1", 1)
 	hashMap.Put("key2", 2)
 	hashMap.Put("key3", 3)
@@ -114,7 +117,7 @@ func TestAdvancedHashMapBasic(t *testing.T) {
 		t.Errorf("Expected 2, got %v", val)
 	}
 
-	// Test removal
+	// Test removal.
 	if !hashMap.Remove("key2") {
 		t.Error("Failed to remove existing key")
 	}
@@ -133,7 +136,7 @@ func TestAdvancedHashMapBasic(t *testing.T) {
 func TestWaitFreeRingBufferBasic(t *testing.T) {
 	buffer := NewWaitFreeRingBuffer[string](8) // Power of 2
 
-	// Test basic operations
+	// Test basic operations.
 	if !buffer.Push("a") {
 		t.Error("Failed to push to empty buffer")
 	}
@@ -152,7 +155,7 @@ func TestWaitFreeRingBufferBasic(t *testing.T) {
 		t.Errorf("Expected 'b', got %v", val)
 	}
 
-	// Test empty buffer
+	// Test empty buffer.
 	_, ok = buffer.Pop()
 	if ok {
 		t.Error("Should not be able to pop from empty buffer")
@@ -164,7 +167,7 @@ func TestWaitFreeRingBufferBasic(t *testing.T) {
 func TestBenchmarkFrameworkBasic(t *testing.T) {
 	bench := NewBenchmark()
 
-	// Benchmark vector operations
+	// Benchmark vector operations.
 	vec := NewVector[int]()
 
 	result := bench.Run("Vector Push", 1000, func() {
@@ -185,19 +188,22 @@ func TestBenchmarkFrameworkBasic(t *testing.T) {
 }
 
 func TestLightweightConcurrentOperations(t *testing.T) {
-	// Test with smaller concurrent operations to avoid timeouts
+	// Test with smaller concurrent operations to avoid timeouts.
 	hashMap := NewAdvancedHashMap[int, string](func(i int) uint32 {
 		return uint32(i * 2654435761)
 	}, 64)
 
 	var wg sync.WaitGroup
+
 	operations := 100 // Reduced from 10000
 
-	// Concurrent puts
+	// Concurrent puts.
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
+
 		go func(start int) {
 			defer wg.Done()
+
 			for j := 0; j < operations/5; j++ {
 				key := start*operations + j
 				hashMap.Put(key, fmt.Sprintf("value%d", key))

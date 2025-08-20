@@ -91,7 +91,7 @@ func readFramedJSON(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[s
 	}
 	ch := make(chan result, 1)
 	go func() {
-		// Read headers until blank line; track Content-Length
+		// Read headers until blank line; track Content-Length.
 		contentLength := 0
 		for {
 			line, err := r.ReadString('\n')
@@ -100,7 +100,7 @@ func readFramedJSON(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[s
 				return
 			}
 			if line == "\r\n" {
-				// Ignore stray blank lines before headers
+				// Ignore stray blank lines before headers.
 				if contentLength == 0 {
 					continue
 				}
@@ -110,7 +110,7 @@ func readFramedJSON(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[s
 				name := toLower(trimSpace(line[:idx]))
 				if name == "content-length" {
 					val := trimSpace(line[idx+1:])
-					// strip trailing CRLF if present
+					// strip trailing CRLF if present.
 					for len(val) > 0 && (val[len(val)-1] == '\r' || val[len(val)-1] == '\n') {
 						val = val[:len(val)-1]
 					}
@@ -154,7 +154,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 
 	srv := NewServer(inR, outW, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 
-	// Run server in background goroutine
+	// Run server in background goroutine.
 	done := make(chan struct{})
 	go func() {
 		_ = srv.Run()
@@ -163,7 +163,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 
 	outReader := bufio.NewReader(outR)
 
-	// 1) initialize request → expect response with capabilities and serverInfo
+	// 1) initialize request → expect response with capabilities and serverInfo.
 	initReq := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      1,
@@ -187,7 +187,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 		t.Fatalf("initialize missing serverInfo: %v", msg)
 	}
 
-	// 2) didOpen notification → expect publishDiagnostics notification
+	// 2) didOpen notification → expect publishDiagnostics notification.
 	source := "func main() { let x = 1 }\n"
 	didOpen := map[string]any{
 		"jsonrpc": "2.0",
@@ -202,7 +202,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	}
 	writeFramedJSON(t, inW, didOpen)
 
-	// The next message should be a publishDiagnostics notification
+	// The next message should be a publishDiagnostics notification.
 	diagMsg, err := readFramedJSON(t, outReader, 5*time.Second)
 	if err != nil {
 		t.Fatalf("read diagnostics: %v", err)
@@ -210,7 +210,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	if m, ok := diagMsg["method"].(string); !ok || m != "textDocument/publishDiagnostics" {
 		t.Fatalf("expected publishDiagnostics, got: %v", diagMsg)
 	}
-	// Send an incremental change that appends an identifier to ensure change:2 path
+	// Send an incremental change that appends an identifier to ensure change:2 path.
 	didChange := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "textDocument/didChange",
@@ -228,15 +228,15 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 		},
 	}
 	writeFramedJSON(t, inW, didChange)
-	// Expect diagnostics again (empty or not is fine); just confirm server responds
+	// Expect diagnostics again (empty or not is fine); just confirm server responds.
 	if _, err := readFramedJSON(t, outReader, 5*time.Second); err != nil {
 		t.Fatalf("read diagnostics after change: %v", err)
 	}
 
-	// didClose は後で検証する（hoverのためにドキュメントを保持する）
+	// didClose は後で検証する（hoverのためにドキュメントを保持する）.
 
-	// 3) hover request over identifier x (line 0, near position of x)
-	// Find position of 'x' in UTF-16 units
+	// 3) hover request over identifier x (line 0, near position of x).
+	// Find position of 'x' in UTF-16 units.
 	bytePos := bytes.IndexByte([]byte(source), 'x')
 	if bytePos <= 0 {
 		t.Fatalf("x not found in source")
@@ -261,7 +261,7 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 		t.Fatalf("hover missing result: %v", hoverResp)
 	}
 
-	// 4) shutdown request + exit notification
+	// 4) shutdown request + exit notification.
 	shutdown := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      3,
@@ -280,21 +280,21 @@ func TestInitializeOpenHoverShutdown(t *testing.T) {
 	}
 	writeFramedJSON(t, inW, exit)
 
-	// Wait for server loop to exit
+	// Wait for server loop to exit.
 	select {
 	case <-done:
-		// ok
+		// ok.
 	case <-time.After(5 * time.Second):
 		t.Fatalf("server did not exit after 'exit' message")
 	}
 }
 
 func TestUTF16LineCharMappingWithEmoji(t *testing.T) {
-	// Text includes a surrogate pair (emoji) and non-ASCII character to verify UTF-16 mapping
+	// Text includes a surrogate pair (emoji) and non-ASCII character to verify UTF-16 mapping.
 	text := "a🙂b\n中"
 	// Byte offsets of runes: a(0), 🙂(1..), b, newline, 中
 	// Round-trip a set of strategic positions. LSP uses UTF-16 columns, so
-	// interior byte offsets within a UTF-8 rune may legally map to the rune's
+	// interior byte offsets within a UTF-8 rune may legally map to the rune's.
 	// start or end when converting back. Accept those canonicalizations.
 	positions := []int{0, 1, 5, len("a🙂b"), len(text) - 1, len(text)}
 	for _, off := range positions {
@@ -306,9 +306,9 @@ func TestUTF16LineCharMappingWithEmoji(t *testing.T) {
 			t.Fatalf("round-trip failed: off=%d line=%d char=%d back=%d (start=%d end=%d)", off, line, char, back, cs, ce)
 		}
 	}
-	// Also probe a position inside the emoji (between surrogate halves) by using the UTF-16 column
+	// Also probe a position inside the emoji (between surrogate halves) by using the UTF-16 column.
 	line, _ := utf16LineCharFromOffset(text, 2) // somewhere within emoji bytes
-	// The emoji occupies 2 UTF-16 units; step to the end of the emoji in UTF-16 space
+	// The emoji occupies 2 UTF-16 units; step to the end of the emoji in UTF-16 space.
 	chEnd := 2
 	off := offsetFromLineCharUTF16(text, line, chEnd)
 	if off <= 1 {
@@ -316,16 +316,16 @@ func TestUTF16LineCharMappingWithEmoji(t *testing.T) {
 	}
 }
 
-// runeBoundsAtOrBefore returns the UTF-8 byte start and end indices of the rune
+// runeBoundsAtOrBefore returns the UTF-8 byte start and end indices of the rune.
 // that ends at or before the given byte offset. If off is at a rune boundary,
-// it returns that rune's bounds; if off is in the middle of a rune or at the
+// it returns that rune's bounds; if off is in the middle of a rune or at the.
 // end of the string, it returns the preceding rune's bounds.
 func runeContainingBounds(s string, off int) (int, int) {
 	if off < 0 {
 		off = 0
 	}
 	if off >= len(s) {
-		// Use last rune
+		// Use last rune.
 		if len(s) == 0 {
 			return 0, 0
 		}
@@ -335,7 +335,7 @@ func runeContainingBounds(s string, off int) (int, int) {
 		}
 		return len(s) - sz, len(s)
 	}
-	// Move to the start of the containing rune
+	// Move to the start of the containing rune.
 	start := off
 	for start > 0 && !utf8.RuneStart(s[start]) {
 		start--
@@ -361,14 +361,14 @@ func TestIndexWorkspaceRespectsRoot(t *testing.T) {
 	if err := os.WriteFile(b, []byte("func b() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// File outside root should not be indexed
+	// File outside root should not be indexed.
 	outsideDir := t.TempDir()
 	outside := filepath.Join(outsideDir, "c.oriz")
 	_ = os.WriteFile(outside, []byte("func c() {}\n"), 0o644)
 
 	srv := NewServer(bytes.NewReader(nil), io.Discard, &ServerOptions{MaxDocumentSize: 1024 * 1024, CacheSize: 100})
 
-	// Simplified test - just verify server creation succeeds for workspace management
+	// Simplified test - just verify server creation succeeds for workspace management.
 	if srv.documentManager == nil {
 		t.Fatal("server document manager not initialized")
 	}

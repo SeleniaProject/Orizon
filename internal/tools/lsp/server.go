@@ -9,18 +9,18 @@ import (
 )
 
 // Server represents the main LSP server implementation.
-// This structure maintains the core state and provides the primary interface
+// This structure maintains the core state and provides the primary interface.
 // for Language Server Protocol operations in the Orizon language server.
 //
-// The server is designed with a modular architecture where different aspects
-// of LSP functionality are handled by specialized components, ensuring
+// The server is designed with a modular architecture where different aspects.
+// of LSP functionality are handled by specialized components, ensuring.
 // separation of concerns and maintainability.
 type Server struct {
-	// Communication channels
+	// Communication channels.
 	in  *bufio.Reader
 	out io.Writer
 
-	// Core LSP components
+	// Core LSP components.
 	documentManager    *DocumentManager
 	symbolIndexer      *SymbolIndexer
 	astCache           *ASTCache
@@ -31,46 +31,46 @@ type Server struct {
 	formattingProvider *FormattingProvider
 	semanticTokens     *SemanticTokensProvider
 
-	// Optional features
+	// Optional features.
 	debugIntegration *DebugIntegration
 
-	// Server state and metrics
+	// Server state and metrics.
 	metrics *ServerMetrics
 	rpc     *RPCHandler
 
-	// Lifecycle management
+	// Lifecycle management.
 	isInitialized int32 // atomic
 	isShutdown    int32 // atomic
 }
 
 // ServerOptions configures the LSP server behavior and feature enablement.
-// These options allow fine-tuning of server capabilities, resource limits,
+// These options allow fine-tuning of server capabilities, resource limits,.
 // and integration with external tools.
 //
-// Options are typically set during server initialization and remain
+// Options are typically set during server initialization and remain.
 // constant throughout the server's lifetime.
 type ServerOptions struct {
-	// Resource limits
+	// Resource limits.
 	MaxDocumentSize int64 // Maximum size of documents to process (in bytes)
 	CacheSize       int   // Size of various internal caches
 
-	// Feature toggles
+	// Feature toggles.
 	EnableDebugIntegration bool   // Enable GDB/debugging integration
 	DebugHTTPURL           string // HTTP URL for debug information display
 	RSPAddress             string // Remote Serial Protocol address for debugging
 
-	// Performance tuning
+	// Performance tuning.
 	EnableAsyncDiagnostics bool // Run diagnostics asynchronously
 	DiagnosticsThrottle    int  // Throttle diagnostics updates (milliseconds)
 }
 
 // NewServer creates and initializes a new LSP server instance.
 //
-// The server is configured with the provided options and establishes
+// The server is configured with the provided options and establishes.
 // communication channels through the reader and writer interfaces.
 // All necessary components are initialized with appropriate dependencies.
 func NewServer(reader io.Reader, writer io.Writer, options *ServerOptions) *Server {
-	// Apply default options if nil provided
+	// Apply default options if nil provided.
 	if options == nil {
 		options = &ServerOptions{
 			MaxDocumentSize:        5 * 1024 * 1024, // 5MB default
@@ -81,29 +81,29 @@ func NewServer(reader io.Reader, writer io.Writer, options *ServerOptions) *Serv
 		}
 	}
 
-	// Initialize core components with proper dependencies
+	// Initialize core components with proper dependencies.
 	documentManager := NewDocumentManager(options.MaxDocumentSize)
 	symbolIndexer := NewSymbolIndexer(options.CacheSize)
 	astCache := NewASTCache(options.CacheSize)
 	workspaceManager := NewWorkspaceManager()
 
-	// Create language feature providers
+	// Create language feature providers.
 	hoverProvider := NewHoverProvider(symbolIndexer, astCache)
 	completionProvider := NewCompletionProvider(symbolIndexer, astCache)
 	diagnosticsEngine := NewDiagnosticsEngine()
 	formattingProvider := NewFormattingProvider()
 	semanticTokens := NewSemanticTokensProvider()
 
-	// Initialize optional debugging integration
+	// Initialize optional debugging integration.
 	var debugIntegration *DebugIntegration
 	if options.EnableDebugIntegration {
 		debugIntegration = NewDebugIntegration(options.DebugHTTPURL, options.RSPAddress)
 	}
 
-	// Set up metrics collection
+	// Set up metrics collection.
 	metrics := NewServerMetrics()
 
-	// Create JSON-RPC handler
+	// Create JSON-RPC handler.
 	rpcHandler := NewRPCHandler(bufio.NewReader(reader), writer)
 
 	server := &Server{
@@ -128,23 +128,23 @@ func NewServer(reader io.Reader, writer io.Writer, options *ServerOptions) *Serv
 
 // Run starts the main server loop, processing JSON-RPC requests from clients.
 //
-// This method blocks until the server receives a shutdown request or
+// This method blocks until the server receives a shutdown request or.
 // encounters a fatal error. It handles the complete LSP lifecycle including
 // initialization, request processing, and graceful shutdown.
 //
-// The server processes requests sequentially to maintain state consistency,
+// The server processes requests sequentially to maintain state consistency,.
 // though individual operations may spawn goroutines for parallel processing.
 func (s *Server) Run() error {
-	// Main message processing loop will be implemented here
-	// This includes JSON-RPC parsing, method dispatch, and response handling
+	// Main message processing loop will be implemented here.
+	// This includes JSON-RPC parsing, method dispatch, and response handling.
 
-	// For now, this is a stub that maintains the interface
+	// For now, this is a stub that maintains the interface.
 	return nil
 }
 
 // IsInitialized returns whether the server has completed LSP initialization.
 //
-// The server must receive and successfully process an 'initialize' request
+// The server must receive and successfully process an 'initialize' request.
 // before it can handle most other LSP requests. This method provides a
 // thread-safe way to check initialization status.
 func (s *Server) IsInitialized() bool {
@@ -153,7 +153,7 @@ func (s *Server) IsInitialized() bool {
 
 // IsShutdown returns whether the server has received a shutdown request.
 //
-// After shutdown, the server should not process new requests except for
+// After shutdown, the server should not process new requests except for.
 // the 'exit' notification. This method provides a thread-safe way to
 // check shutdown status.
 func (s *Server) IsShutdown() bool {
@@ -162,7 +162,7 @@ func (s *Server) IsShutdown() bool {
 
 // markInitialized atomically marks the server as initialized.
 //
-// This should be called only after successful processing of the LSP
+// This should be called only after successful processing of the LSP.
 // 'initialize' request to enable full server functionality.
 func (s *Server) markInitialized() {
 	atomic.StoreInt32(&s.isInitialized, 1)
@@ -170,7 +170,7 @@ func (s *Server) markInitialized() {
 
 // markShutdown atomically marks the server as shutdown.
 //
-// This should be called when processing the LSP 'shutdown' request
+// This should be called when processing the LSP 'shutdown' request.
 // to begin graceful server termination.
 func (s *Server) markShutdown() {
 	atomic.StoreInt32(&s.isShutdown, 1)
@@ -178,13 +178,13 @@ func (s *Server) markShutdown() {
 
 // Metrics returns the server's performance and usage metrics.
 //
-// These metrics can be used for monitoring, debugging, and optimization
+// These metrics can be used for monitoring, debugging, and optimization.
 // of the LSP server's performance characteristics.
 func (s *Server) Metrics() *ServerMetrics {
 	return s.metrics
 }
 
-// Component access methods for testing and advanced usage
+// Component access methods for testing and advanced usage.
 
 // DocumentManager returns the server's document management component.
 func (s *Server) DocumentManager() *DocumentManager {
@@ -212,32 +212,32 @@ func (s *Server) DebugIntegration() *DebugIntegration {
 	return s.debugIntegration
 }
 
-// Supporting types and component definitions
-// These represent the modular architecture of the LSP server
+// Supporting types and component definitions.
+// These represent the modular architecture of the LSP server.
 
 // ServerMetrics tracks server performance and usage statistics.
 //
-// Metrics are collected throughout server operation and can be used
+// Metrics are collected throughout server operation and can be used.
 // for monitoring, profiling, and optimization decisions.
 type ServerMetrics struct {
-	// Request processing metrics
+	// Request processing metrics.
 	RequestsReceived   int64 // Total requests received
 	RequestsProcessed  int64 // Total requests successfully processed
 	RequestsErrored    int64 // Total requests that resulted in errors
 	AverageRequestTime int64 // Average request processing time (microseconds)
 
-	// Document management metrics
+	// Document management metrics.
 	DocumentsOpened int64 // Total documents opened during session
 	DocumentsClosed int64 // Total documents closed during session
 	TotalDocuments  int64 // Current number of open documents
 
-	// Symbol indexing metrics
+	// Symbol indexing metrics.
 	SymbolsIndexed int64 // Total symbols indexed
 	IndexingTime   int64 // Total time spent indexing (microseconds)
 	CacheHits      int64 // Number of successful cache lookups
 	CacheMisses    int64 // Number of failed cache lookups
 
-	// Diagnostic metrics
+	// Diagnostic metrics.
 	DiagnosticsRun    int64 // Total diagnostic runs
 	DiagnosticsTime   int64 // Total time spent on diagnostics (microseconds)
 	DiagnosticsIssues int64 // Total diagnostic issues found
@@ -245,7 +245,7 @@ type ServerMetrics struct {
 
 // NewServerMetrics creates a new metrics collection instance.
 //
-// All metrics are initialized to zero and will be updated as the
+// All metrics are initialized to zero and will be updated as the.
 // server processes requests and performs operations.
 func NewServerMetrics() *ServerMetrics {
 	return &ServerMetrics{}
@@ -260,14 +260,14 @@ func (m *ServerMetrics) UpdateRequestMetrics(processingTime int64, success bool)
 		atomic.AddInt64(&m.RequestsErrored, 1)
 	}
 
-	// Update rolling average (simplified)
+	// Update rolling average (simplified).
 	currentAvg := atomic.LoadInt64(&m.AverageRequestTime)
 	newAvg := (currentAvg + processingTime) / 2
 	atomic.StoreInt64(&m.AverageRequestTime, newAvg)
 }
 
-// Component stub definitions
-// These will be implemented in separate files for each component
+// Component stub definitions.
+// These will be implemented in separate files for each component.
 
 // DocumentManager handles LSP document lifecycle and content management.
 type DocumentManager struct{}
@@ -326,7 +326,7 @@ type RPCHandler struct{}
 
 func NewRPCHandler(reader *bufio.Reader, writer io.Writer) *RPCHandler { return &RPCHandler{} }
 
-// JSON-RPC message structures
+// JSON-RPC message structures.
 
 type JSONRPCRequest struct {
 	ID     json.RawMessage
@@ -334,7 +334,7 @@ type JSONRPCRequest struct {
 	Params json.RawMessage
 }
 
-// RunStdio starts the LSP server using stdio for communication
+// RunStdio starts the LSP server using stdio for communication.
 func RunStdio() error {
 	options := &ServerOptions{
 		MaxDocumentSize:        10 * 1024 * 1024, // 10MB
@@ -348,7 +348,7 @@ func RunStdio() error {
 	return server.Run()
 }
 
-// Stub handler methods (to be implemented in handler files)
+// Stub handler methods (to be implemented in handler files).
 func (s *Server) handleInitialize(request *JSONRPCRequest)                      {}
 func (s *Server) handleTextDocumentDidOpen(request *JSONRPCRequest)             {}
 func (s *Server) handleTextDocumentDidChange(request *JSONRPCRequest)           {}

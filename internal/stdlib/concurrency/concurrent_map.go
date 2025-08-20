@@ -7,13 +7,13 @@ import (
 
 // ConcurrentMap is a simple striped concurrent map.
 type ConcurrentMap[K comparable, V any] struct {
-	shards []cmShard[K, V]
 	hashFn func(K) uint64
+	shards []cmShard[K, V]
 }
 
 type cmShard[K comparable, V any] struct {
-	mu sync.RWMutex
 	m  map[K]V
+	mu sync.RWMutex
 }
 
 // NewConcurrentMap creates a concurrent map with shardCount shards.
@@ -27,19 +27,23 @@ func NewConcurrentMapWithHasher[K comparable, V any](shardCount int, hasher func
 	if shardCount <= 0 {
 		shardCount = 32
 	}
+
 	shards := make([]cmShard[K, V], shardCount)
 	for i := range shards {
 		shards[i].m = make(map[K]V)
 	}
+
 	if hasher == nil {
 		hasher = defaultHasher[K]
 	}
+
 	return &ConcurrentMap[K, V]{shards: shards, hashFn: hasher}
 }
 
 func (c *ConcurrentMap[K, V]) shard(k K) *cmShard[K, V] {
 	h := c.hashFn(k)
 	idx := int(h % uint64(len(c.shards)))
+
 	return &c.shards[idx]
 }
 
@@ -57,6 +61,7 @@ func (c *ConcurrentMap[K, V]) Get(k K) (V, bool) {
 	s.mu.RLock()
 	v, ok := s.m[k]
 	s.mu.RUnlock()
+
 	return v, ok
 }
 
@@ -71,11 +76,13 @@ func (c *ConcurrentMap[K, V]) Delete(k K) {
 // Len returns an approximate size (may be slightly stale under concurrency).
 func (c *ConcurrentMap[K, V]) Len() int {
 	t := 0
+
 	for i := range c.shards {
 		c.shards[i].mu.RLock()
 		t += len(c.shards[i].m)
 		c.shards[i].mu.RUnlock()
 	}
+
 	return t
 }
 
@@ -87,6 +94,7 @@ func (c *ConcurrentMap[K, V]) Range(fn func(K, V) bool) {
 		for k, v := range sh.m {
 			if !fn(k, v) {
 				sh.mu.RUnlock()
+
 				return
 			}
 		}
@@ -98,15 +106,17 @@ func (c *ConcurrentMap[K, V]) Range(fn func(K, V) bool) {
 func defaultHasher[K comparable](k K) uint64 {
 	switch v := any(k).(type) {
 	case string:
-		// FNV-1a 64-bit
+		// FNV-1a 64-bit.
 		var h uint64 = 1469598103934665603
 		for i := 0; i < len(v); i++ {
 			h ^= uint64(v[i])
 			h *= 1099511628211
 		}
+
 		return h
 	case int:
 		x := uint64(v)
+
 		return mix64(x)
 	case int32:
 		return mix64(uint64(uint32(v)))
@@ -122,11 +132,14 @@ func defaultHasher[K comparable](k K) uint64 {
 		// Fall back to string representation.
 		// Note: slower but generic.
 		s := fmt.Sprintf("%v", v)
+
 		var h uint64 = 1469598103934665603
+
 		for i := 0; i < len(s); i++ {
 			h ^= uint64(s[i])
 			h *= 1099511628211
 		}
+
 		return h
 	}
 }
@@ -137,5 +150,6 @@ func mix64(x uint64) uint64 {
 	x ^= x >> 33
 	x *= 0xc4ceb9fe1a85ec53
 	x ^= x >> 33
+
 	return x
 }

@@ -11,7 +11,10 @@ type Option[T any] struct {
 func Some[T any](v T) Option[T] { return Option[T]{v: v, valid: true} }
 
 // None constructs an empty Option.
-func None[T any]() Option[T] { var zero T; return Option[T]{v: zero, valid: false} }
+func None[T any]() Option[T] {
+	var zero T
+	return Option[T]{v: zero, valid: false}
+}
 
 // IsSome reports whether the option holds a value.
 func (o Option[T]) IsSome() bool { return o.valid }
@@ -27,6 +30,7 @@ func (o Option[T]) Or(fallback T) T {
 	if o.valid {
 		return o.v
 	}
+
 	return fallback
 }
 
@@ -35,5 +39,6 @@ func Map[T any, U any](o Option[T], f func(T) U) Option[U] {
 	if o.valid {
 		return Some(f(o.v))
 	}
+
 	return None[U]()
 }

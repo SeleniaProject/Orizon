@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// writeRaw writes raw bytes to the writer for testing edge cases
+// writeRaw writes raw bytes to the writer for testing edge cases.
 func writeRaw(t *testing.T, w io.Writer, data []byte) {
 	t.Helper()
 	if _, err := w.Write(data); err != nil {
@@ -32,7 +32,7 @@ func readJSONFrame(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[st
 		var res result
 		defer func() { done <- res }()
 
-		// Read headers
+		// Read headers.
 		for {
 			line, err := r.ReadString('\n')
 			if err != nil {
@@ -56,7 +56,7 @@ func readJSONFrame(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[st
 					return
 				}
 
-				// Read body
+				// Read body.
 				body := make([]byte, contentLen)
 				if _, err := io.ReadFull(r, body); err != nil {
 					res.err = err
@@ -97,7 +97,7 @@ func TestServerRejectsOversizedHeaders(t *testing.T) {
 	go func() { _ = srv.Run(); close(done) }()
 	rd := bufio.NewReader(outR)
 
-	// Build >100 header lines (no body)
+	// Build >100 header lines (no body).
 	var hdr bytes.Buffer
 	for i := 0; i < 101; i++ {
 		hdr.WriteString("X-Foo: bar\r\n")
@@ -129,7 +129,7 @@ func TestServerRejectsOversizedContent(t *testing.T) {
 	go func() { _ = srv.Run(); close(done) }()
 	rd := bufio.NewReader(outR)
 
-	// Content-Length above server hard cap
+	// Content-Length above server hard cap.
 	writeRaw(t, inW, []byte("Content-Length: 99999999\r\n\r\n"))
 	msg, err := readJSONFrame(t, rd, 5*time.Second)
 	if err != nil {
@@ -155,7 +155,7 @@ func TestServerRejectsInvalidHeaders(t *testing.T) {
 	go func() { _ = srv.Run(); close(done) }()
 	rd := bufio.NewReader(outR)
 
-	// Invalid header - no colon separator
+	// Invalid header - no colon separator.
 	writeRaw(t, inW, []byte("ContentLength 50\r\n\r\n"))
 	msg, err := readJSONFrame(t, rd, 5*time.Second)
 	if err != nil {

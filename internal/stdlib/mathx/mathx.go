@@ -19,6 +19,7 @@ func Min[T Ordered](a, b T) T {
 	if a < b {
 		return a
 	}
+
 	return b
 }
 
@@ -27,6 +28,7 @@ func Max[T Ordered](a, b T) T {
 	if a > b {
 		return a
 	}
+
 	return b
 }
 
@@ -35,9 +37,11 @@ func Clamp[T Ordered](v, lo, hi T) T {
 	if v < lo {
 		return lo
 	}
+
 	if v > hi {
 		return hi
 	}
+
 	return v
 }
 
@@ -46,6 +50,7 @@ func Abs[T Signed](x T) T {
 	if x < 0 {
 		return -x
 	}
+
 	return x
 }
 

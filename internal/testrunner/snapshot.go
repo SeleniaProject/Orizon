@@ -11,21 +11,16 @@ import (
 	"time"
 )
 
-// SnapshotOptions controls snapshot test behavior
+// SnapshotOptions controls snapshot test behavior.
 type SnapshotOptions struct {
-	// BaseDir is the directory where snapshot files are stored
-	BaseDir string
-	// Update forces updating snapshots instead of comparing
-	Update bool
-	// Format specifies the snapshot format: "text", "json", "binary"
-	Format string
-	// DiffTool specifies external diff tool for comparison
+	BaseDir  string
+	Format   string
 	DiffTool string
-	// Cleanup removes orphaned snapshot files
-	Cleanup bool
+	Update   bool
+	Cleanup  bool
 }
 
-// DefaultSnapshotOptions returns default snapshot configuration
+// DefaultSnapshotOptions returns default snapshot configuration.
 func DefaultSnapshotOptions() SnapshotOptions {
 	return SnapshotOptions{
 		BaseDir:  "testdata/snapshots",
@@ -36,23 +31,23 @@ func DefaultSnapshotOptions() SnapshotOptions {
 	}
 }
 
-// SnapshotManager handles snapshot testing functionality
+// SnapshotManager handles snapshot testing functionality.
 type SnapshotManager struct {
-	options     SnapshotOptions
 	usedFiles   map[string]bool
 	testResults map[string]SnapshotResult
+	options     SnapshotOptions
 }
 
-// SnapshotResult represents the result of a snapshot test
+// SnapshotResult represents the result of a snapshot test.
 type SnapshotResult struct {
+	Created      time.Time
 	TestName     string
 	SnapshotPath string
-	Status       string // "pass", "fail", "updated", "created"
+	Status       string
 	Diff         string
-	Created      time.Time
 }
 
-// NewSnapshotManager creates a new snapshot manager
+// NewSnapshotManager creates a new snapshot manager.
 func NewSnapshotManager(options SnapshotOptions) *SnapshotManager {
 	return &SnapshotManager{
 		options:     options,
@@ -61,32 +56,34 @@ func NewSnapshotManager(options SnapshotOptions) *SnapshotManager {
 	}
 }
 
-// VerifySnapshot checks if actual output matches the stored snapshot
+// VerifySnapshot checks if actual output matches the stored snapshot.
 func (sm *SnapshotManager) VerifySnapshot(testName, actual string) (bool, error) {
 	snapshotPath := sm.getSnapshotPath(testName)
 
-	// Mark this snapshot file as used
+	// Mark this snapshot file as used.
 	sm.usedFiles[snapshotPath] = true
 
-	// Ensure snapshot directory exists
-	if err := os.MkdirAll(filepath.Dir(snapshotPath), 0755); err != nil {
+	// Ensure snapshot directory exists.
+	if err := os.MkdirAll(filepath.Dir(snapshotPath), 0o755); err != nil {
 		return false, fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
-	// Check if snapshot file exists
+	// Check if snapshot file exists.
 	expected, err := os.ReadFile(snapshotPath)
 	if os.IsNotExist(err) {
-		// Create new snapshot if update mode or first run
+		// Create new snapshot if update mode or first run.
 		if sm.options.Update {
 			if err := sm.writeSnapshot(snapshotPath, actual); err != nil {
 				return false, err
 			}
+
 			sm.testResults[testName] = SnapshotResult{
 				TestName:     testName,
 				SnapshotPath: snapshotPath,
 				Status:       "created",
 				Created:      time.Now(),
 			}
+
 			return true, nil
 		} else {
 			sm.testResults[testName] = SnapshotResult{
@@ -96,13 +93,14 @@ func (sm *SnapshotManager) VerifySnapshot(testName, actual string) (bool, error)
 				Diff:         fmt.Sprintf("Snapshot file %s does not exist. Run with --update-snapshots to create it.", snapshotPath),
 				Created:      time.Now(),
 			}
+
 			return false, fmt.Errorf("snapshot file %s does not exist", snapshotPath)
 		}
 	} else if err != nil {
 		return false, fmt.Errorf("failed to read snapshot file %s: %w", snapshotPath, err)
 	}
 
-	// Compare actual vs expected
+	// Compare actual vs expected.
 	expectedStr := string(expected)
 	if actual == expectedStr {
 		sm.testResults[testName] = SnapshotResult{
@@ -111,24 +109,27 @@ func (sm *SnapshotManager) VerifySnapshot(testName, actual string) (bool, error)
 			Status:       "pass",
 			Created:      time.Now(),
 		}
+
 		return true, nil
 	}
 
-	// Content differs
+	// Content differs.
 	if sm.options.Update {
-		// Update snapshot
+		// Update snapshot.
 		if err := sm.writeSnapshot(snapshotPath, actual); err != nil {
 			return false, err
 		}
+
 		sm.testResults[testName] = SnapshotResult{
 			TestName:     testName,
 			SnapshotPath: snapshotPath,
 			Status:       "updated",
 			Created:      time.Now(),
 		}
+
 		return true, nil
 	} else {
-		// Generate diff
+		// Generate diff.
 		diff := sm.generateDiff(expectedStr, actual)
 		sm.testResults[testName] = SnapshotResult{
 			TestName:     testName,
@@ -137,25 +138,28 @@ func (sm *SnapshotManager) VerifySnapshot(testName, actual string) (bool, error)
 			Diff:         diff,
 			Created:      time.Now(),
 		}
+
 		return false, fmt.Errorf("snapshot mismatch for %s", testName)
 	}
 }
 
-// VerifyGoldenFile checks if actual output matches a golden file
+// VerifyGoldenFile checks if actual output matches a golden file.
 func (sm *SnapshotManager) VerifyGoldenFile(goldenPath, actual string) (bool, error) {
-	// Mark this golden file as used
+	// Mark this golden file as used.
 	sm.usedFiles[goldenPath] = true
 
 	expected, err := os.ReadFile(goldenPath)
 	if os.IsNotExist(err) {
 		if sm.options.Update {
-			// Create new golden file
-			if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
+			// Create new golden file.
+			if err := os.MkdirAll(filepath.Dir(goldenPath), 0o755); err != nil {
 				return false, fmt.Errorf("failed to create golden file directory: %w", err)
 			}
+
 			if err := sm.writeSnapshot(goldenPath, actual); err != nil {
 				return false, err
 			}
+
 			return true, nil
 		} else {
 			return false, fmt.Errorf("golden file %s does not exist", goldenPath)
@@ -170,18 +174,20 @@ func (sm *SnapshotManager) VerifyGoldenFile(goldenPath, actual string) (bool, er
 	}
 
 	if sm.options.Update {
-		// Update golden file
+		// Update golden file.
 		if err := sm.writeSnapshot(goldenPath, actual); err != nil {
 			return false, err
 		}
+
 		return true, nil
 	} else {
 		diff := sm.generateDiff(expectedStr, actual)
+
 		return false, fmt.Errorf("golden file mismatch for %s:\n%s", goldenPath, diff)
 	}
 }
 
-// CleanupOrphanedSnapshots removes snapshot files that weren't used in tests
+// CleanupOrphanedSnapshots removes snapshot files that weren't used in tests.
 func (sm *SnapshotManager) CleanupOrphanedSnapshots() error {
 	if !sm.options.Cleanup {
 		return nil
@@ -203,19 +209,18 @@ func (sm *SnapshotManager) CleanupOrphanedSnapshots() error {
 			return nil
 		}
 
-		// Check if this file was used in tests
+		// Check if this file was used in tests.
 		if !sm.usedFiles[path] && strings.HasSuffix(path, ".snap") {
 			orphanedFiles = append(orphanedFiles, path)
 		}
 
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to walk snapshot directory: %w", err)
 	}
 
-	// Remove orphaned files
+	// Remove orphaned files.
 	for _, file := range orphanedFiles {
 		if err := os.Remove(file); err != nil {
 			fmt.Printf("Warning: failed to remove orphaned snapshot %s: %v\n", file, err)
@@ -227,12 +232,12 @@ func (sm *SnapshotManager) CleanupOrphanedSnapshots() error {
 	return nil
 }
 
-// GetResults returns all snapshot test results
+// GetResults returns all snapshot test results.
 func (sm *SnapshotManager) GetResults() map[string]SnapshotResult {
 	return sm.testResults
 }
 
-// GenerateReport creates a summary report of snapshot tests
+// GenerateReport creates a summary report of snapshot tests.
 func (sm *SnapshotManager) GenerateReport() string {
 	var report strings.Builder
 
@@ -265,9 +270,11 @@ func (sm *SnapshotManager) GenerateReport() string {
 
 	if failed > 0 {
 		report.WriteString("\nFailed Tests:\n")
+
 		for _, result := range sm.testResults {
 			if result.Status == "fail" {
 				report.WriteString(fmt.Sprintf("- %s\n", result.TestName))
+
 				if result.Diff != "" {
 					report.WriteString(fmt.Sprintf("  %s\n", result.Diff))
 				}
@@ -278,15 +285,16 @@ func (sm *SnapshotManager) GenerateReport() string {
 	return report.String()
 }
 
-// getSnapshotPath generates the path for a snapshot file
+// getSnapshotPath generates the path for a snapshot file.
 func (sm *SnapshotManager) getSnapshotPath(testName string) string {
-	// Sanitize test name for filesystem
+	// Sanitize test name for filesystem.
 	safeName := strings.ReplaceAll(testName, "/", "_")
 	safeName = strings.ReplaceAll(safeName, "\\", "_")
 	safeName = strings.ReplaceAll(safeName, ":", "_")
 
-	// Add appropriate extension based on format
+	// Add appropriate extension based on format.
 	var ext string
+
 	switch sm.options.Format {
 	case "json":
 		ext = ".json"
@@ -299,33 +307,35 @@ func (sm *SnapshotManager) getSnapshotPath(testName string) string {
 	return filepath.Join(sm.options.BaseDir, safeName+ext)
 }
 
-// writeSnapshot writes content to a snapshot file
+// writeSnapshot writes content to a snapshot file.
 func (sm *SnapshotManager) writeSnapshot(path, content string) error {
 	switch sm.options.Format {
 	case "binary":
-		// For binary format, treat content as hex-encoded
+		// For binary format, treat content as hex-encoded.
 		data, err := hex.DecodeString(content)
 		if err != nil {
 			return fmt.Errorf("invalid hex content for binary snapshot: %w", err)
 		}
-		return os.WriteFile(path, data, 0644)
+
+		return os.WriteFile(path, data, 0o644)
 	default:
-		return os.WriteFile(path, []byte(content), 0644)
+		return os.WriteFile(path, []byte(content), 0o644)
 	}
 }
 
-// generateDiff creates a simple diff between expected and actual content
+// generateDiff creates a simple diff between expected and actual content.
 func (sm *SnapshotManager) generateDiff(expected, actual string) string {
 	if sm.options.DiffTool != "" {
-		// TODO: Implement external diff tool support
+		// TODO: Implement external diff tool support.
 		return fmt.Sprintf("Use %s to view differences", sm.options.DiffTool)
 	}
 
-	// Simple line-by-line diff
+	// Simple line-by-line diff.
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 
 	var diff strings.Builder
+
 	diff.WriteString("Expected vs Actual:\n")
 
 	maxLines := len(expectedLines)
@@ -338,6 +348,7 @@ func (sm *SnapshotManager) generateDiff(expected, actual string) string {
 		if i < len(expectedLines) {
 			expectedLine = expectedLines[i]
 		}
+
 		if i < len(actualLines) {
 			actualLine = actualLines[i]
 		}
@@ -352,8 +363,9 @@ func (sm *SnapshotManager) generateDiff(expected, actual string) string {
 	return diff.String()
 }
 
-// HashContent generates a content hash for snapshot comparison
+// HashContent generates a content hash for snapshot comparison.
 func HashContent(content string) string {
 	hash := sha256.Sum256([]byte(content))
+
 	return hex.EncodeToString(hash[:])
 }

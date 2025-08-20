@@ -17,13 +17,13 @@ func TestCompletionResolveAndExtractRefactor(t *testing.T) {
 	go func() { _ = srv.Run(); close(done) }()
 	r := bufio.NewReader(outR)
 
-	// initialize
+	// initialize.
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": map[string]any{}})
 	if _, err := readFramedJSON(t, r, 2*time.Second); err != nil {
 		t.Fatalf("init resp: %v", err)
 	}
 
-	// didOpen simple doc with one expression
+	// didOpen simple doc with one expression.
 	src := "func main() { let x = 1 + 2 }\n"
 	writeFramedJSON(t, inW, map[string]any{
 		"jsonrpc": "2.0",
@@ -36,7 +36,7 @@ func TestCompletionResolveAndExtractRefactor(t *testing.T) {
 		t.Fatalf("open diags: %v", err)
 	}
 
-	// completion at start should include keyword items with data
+	// completion at start should include keyword items with data.
 	writeFramedJSON(t, inW, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      2,
@@ -56,15 +56,15 @@ func TestCompletionResolveAndExtractRefactor(t *testing.T) {
 		t.Fatalf("no completion items")
 	}
 
-	// pick first item and call resolve
+	// pick first item and call resolve.
 	item := items[0].(map[string]any)
 	writeFramedJSON(t, inW, map[string]any{"jsonrpc": "2.0", "id": 3, "method": "completionItem/resolve", "params": item})
 	if _, err := readFramedJSON(t, r, 2*time.Second); err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
 
-	// codeAction: select "1 + 2" to extract
-	// find positions: the expression is on line 0, after "let x = " which is 12 chars in ASCII here
+	// codeAction: select "1 + 2" to extract.
+	// find positions: the expression is on line 0, after "let x = " which is 12 chars in ASCII here.
 	writeFramedJSON(t, inW, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      4,

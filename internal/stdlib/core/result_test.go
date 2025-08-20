@@ -10,6 +10,7 @@ func TestResultBasic(t *testing.T) {
 	if !r.IsOk() || r.IsErr() {
 		t.Fatalf("ok flags")
 	}
+
 	v, err := r.Unwrap()
 	if err != nil || v != 5 {
 		t.Fatalf("unwrap ok")
@@ -19,12 +20,14 @@ func TestResultBasic(t *testing.T) {
 	if e.IsOk() || !e.IsErr() {
 		t.Fatalf("err flags")
 	}
+
 	_, err = e.Unwrap()
 	if err == nil {
 		t.Fatalf("expected error")
 	}
 
 	m := MapResult(r, func(x int) int { return x + 1 })
+
 	v, err = m.Unwrap()
 	if err != nil || v != 6 {
 		t.Fatalf("map ok")

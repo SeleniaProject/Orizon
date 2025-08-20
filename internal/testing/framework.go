@@ -13,18 +13,18 @@ import (
 	"time"
 )
 
-// TestConfig contains configuration for test execution
+// TestConfig contains configuration for test execution.
 type TestConfig struct {
-	Timeout       time.Duration
 	CompilerPath  string
 	TempDir       string
+	Timeout       time.Duration
 	KeepTempFiles bool
 	Verbose       bool
 }
 
-// DefaultTestConfig returns a default test configuration
+// DefaultTestConfig returns a default test configuration.
 func DefaultTestConfig() *TestConfig {
-	// Try to find the compiler in common locations
+	// Try to find the compiler in common locations.
 	compilerPath := "orizon.exe"
 	possiblePaths := []string{
 		"./build/orizon-compiler.exe", // Prefer built compiler
@@ -42,11 +42,12 @@ func DefaultTestConfig() *TestConfig {
 		absPath, _ := filepath.Abs(path)
 		if _, err := os.Stat(absPath); err == nil {
 			compilerPath = absPath
+
 			break
 		}
 	}
 
-	// Debug: print the resolved compiler path
+	// Debug: print the resolved compiler path.
 	// fmt.Printf("DEBUG: Using compiler path: %s\n", compilerPath)
 	// fmt.Printf("DEBUG: Checking paths: %v\n", possiblePaths)
 
@@ -59,45 +60,46 @@ func DefaultTestConfig() *TestConfig {
 	}
 }
 
-// TestResult represents the result of a test execution
+// TestResult represents the result of a test execution.
 type TestResult struct {
-	Success     bool
+	Error       error
 	Output      string
 	ErrorOutput string
 	ExitCode    int
 	Duration    time.Duration
-	Error       error
+	Success     bool
 }
 
-// CompilerTest represents a single compiler test case
+// CompilerTest represents a single compiler test case.
 type CompilerTest struct {
+	Config      *TestConfig
 	Name        string
 	SourceCode  string
 	ExpectedOut string
 	ExpectedErr string
 	ShouldFail  bool
-	Config      *TestConfig
 }
 
-// TestFramework provides infrastructure for running compiler tests
+// TestFramework provides infrastructure for running compiler tests.
 type TestFramework struct {
 	config  *TestConfig
 	tempDir string
 }
 
-// NewTestFramework creates a new test framework instance
+// NewTestFramework creates a new test framework instance.
 func NewTestFramework(config *TestConfig) (*TestFramework, error) {
 	if config == nil {
 		config = DefaultTestConfig()
 	}
 
-	// Create temp directory if not specified
+	// Create temp directory if not specified.
 	tempDir := config.TempDir
 	if tempDir == "" {
 		var err error
+
 		tempDir, err = os.MkdirTemp("", "orizon_test_*")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create temp directory: %v", err)
+			return nil, fmt.Errorf("failed to create temp directory: %w", err)
 		}
 	}
 
@@ -107,45 +109,48 @@ func NewTestFramework(config *TestConfig) (*TestFramework, error) {
 	}, nil
 }
 
-// Cleanup removes temporary files if not configured to keep them
+// Cleanup removes temporary files if not configured to keep them.
 func (tf *TestFramework) Cleanup() error {
 	if !tf.config.KeepTempFiles && tf.tempDir != "" {
 		return os.RemoveAll(tf.tempDir)
 	}
+
 	return nil
 }
 
-// RunTest executes a single compiler test
+// RunTest executes a single compiler test.
 func (tf *TestFramework) RunTest(test *CompilerTest) *TestResult {
 	start := time.Now()
 	result := &TestResult{}
 
-	// Create source file with proper encoding for Orizon compiler
+	// Create source file with proper encoding for Orizon compiler.
 	sourceFile := filepath.Join(tf.tempDir, test.Name+".oriz")
-	// Use ASCII encoding to avoid UTF-8 BOM issues
-	if err := os.WriteFile(sourceFile, []byte(test.SourceCode), 0644); err != nil {
-		result.Error = fmt.Errorf("failed to write source file: %v", err)
+	// Use ASCII encoding to avoid UTF-8 BOM issues.
+	if err := os.WriteFile(sourceFile, []byte(test.SourceCode), 0o644); err != nil {
+		result.Error = fmt.Errorf("failed to write source file: %w", err)
 		result.Duration = time.Since(start)
+
 		return result
 	}
 
-	// Run compiler (currently supports lexing + parsing only)
+	// Run compiler (currently supports lexing + parsing only).
 	cmd := exec.Command(tf.config.CompilerPath, sourceFile)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	// Set timeout using context
+	// Set timeout using context.
 	if tf.config.Timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), tf.config.Timeout)
 		defer cancel()
+
 		cmd = exec.CommandContext(ctx, tf.config.CompilerPath, sourceFile)
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 	}
 
-	// Execute compiler
+	// Execute compiler.
 	err := cmd.Run()
 	result.Output = stdout.String()
 	result.ErrorOutput = stderr.String()
@@ -155,60 +160,66 @@ func (tf *TestFramework) RunTest(test *CompilerTest) *TestResult {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitError.ExitCode()
 		}
+
 		if test.ShouldFail {
 			result.Success = true // Parse failure was expected
 		} else {
-			result.Error = fmt.Errorf("parsing failed: %v", err)
+			result.Error = fmt.Errorf("parsing failed: %w", err)
 			result.Success = false
 		}
+
 		return result
 	}
 
-	// Check if parsing should have failed
+	// Check if parsing should have failed.
 	if test.ShouldFail {
 		// For current implementation (lexing only), we can't detect all syntax/type errors
-		// So we'll mark these as passing for now until full parsing is implemented
+		// So we'll mark these as passing for now until full parsing is implemented.
 		result.Success = true // TODO: Implement proper error detection in future phases
 		result.Output = "Lexing successful (error detection not yet implemented)"
+
 		return result
 	}
 
-	// For now, we only test parsing success (no execution)
-	// In future phases, this will include code generation and execution
+	// For now, we only test parsing success (no execution).
+	// In future phases, this will include code generation and execution.
 	result.Success = true
 	result.Output = "Parsing successful" // Mock expected output for now
 
-	// For current implementation, we only test parsing success
-	// Output validation is simplified for parsing-only tests
+	// For current implementation, we only test parsing success.
+	// Output validation is simplified for parsing-only tests.
 	if test.ExpectedOut != "" {
-		// For parsing-only tests, any successful parse meets the expected output
-		// In future phases, this will check actual program execution output
+		// For parsing-only tests, any successful parse meets the expected output.
+		// In future phases, this will check actual program execution output.
 		result.Success = true
 	}
 
 	if test.ExpectedErr != "" && !strings.Contains(result.ErrorOutput, test.ExpectedErr) {
 		result.Error = fmt.Errorf("expected error '%s' not found in actual error output", test.ExpectedErr)
 		result.Success = false
+
 		return result
 	}
 
 	return result
 }
 
-// runProgram executes a compiled program and returns its output
+// runProgram executes a compiled program and returns its output.
 func (tf *TestFramework) runProgram(programPath string) *TestResult {
 	start := time.Now()
 	result := &TestResult{}
 
 	cmd := exec.Command(programPath)
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	// Set timeout using context
+	// Set timeout using context.
 	if tf.config.Timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), tf.config.Timeout)
 		defer cancel()
+
 		cmd = exec.CommandContext(ctx, programPath)
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -223,7 +234,8 @@ func (tf *TestFramework) runProgram(programPath string) *TestResult {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitError.ExitCode()
 		}
-		result.Error = fmt.Errorf("program execution failed: %v", err)
+
+		result.Error = fmt.Errorf("program execution failed: %w", err)
 		result.Success = false
 	} else {
 		result.Success = true
@@ -232,7 +244,7 @@ func (tf *TestFramework) runProgram(programPath string) *TestResult {
 	return result
 }
 
-// RunTestSuite executes a collection of tests
+// RunTestSuite executes a collection of tests.
 func (tf *TestFramework) RunTestSuite(tests []*CompilerTest, t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
@@ -240,9 +252,11 @@ func (tf *TestFramework) RunTestSuite(tests []*CompilerTest, t *testing.T) {
 
 			if tf.config.Verbose {
 				t.Logf("Test %s completed in %v", test.Name, result.Duration)
+
 				if result.Output != "" {
 					t.Logf("Output: %s", result.Output)
 				}
+
 				if result.ErrorOutput != "" {
 					t.Logf("Error Output: %s", result.ErrorOutput)
 				}
@@ -259,28 +273,29 @@ func (tf *TestFramework) RunTestSuite(tests []*CompilerTest, t *testing.T) {
 	}
 }
 
-// BenchmarkFramework provides infrastructure for performance testing
+// BenchmarkFramework provides infrastructure for performance testing.
 type BenchmarkFramework struct {
 	framework *TestFramework
 }
 
-// NewBenchmarkFramework creates a new benchmark framework
+// NewBenchmarkFramework creates a new benchmark framework.
 func NewBenchmarkFramework(config *TestConfig) (*BenchmarkFramework, error) {
 	framework, err := NewTestFramework(config)
 	if err != nil {
 		return nil, err
 	}
+
 	return &BenchmarkFramework{framework: framework}, nil
 }
 
-// BenchmarkTest represents a benchmark test case
+// BenchmarkTest represents a benchmark test case.
 type BenchmarkTest struct {
 	Name       string
 	SourceCode string
 	Iterations int
 }
 
-// RunBenchmark executes a benchmark test
+// RunBenchmark executes a benchmark test.
 func (bf *BenchmarkFramework) RunBenchmark(benchmark *BenchmarkTest, b *testing.B) {
 	test := &CompilerTest{
 		Name:       benchmark.Name,
@@ -289,6 +304,7 @@ func (bf *BenchmarkFramework) RunBenchmark(benchmark *BenchmarkTest, b *testing.
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		result := bf.framework.RunTest(test)
 		if !result.Success {
@@ -297,12 +313,12 @@ func (bf *BenchmarkFramework) RunBenchmark(benchmark *BenchmarkTest, b *testing.
 	}
 }
 
-// Cleanup cleans up benchmark framework resources
+// Cleanup cleans up benchmark framework resources.
 func (bf *BenchmarkFramework) Cleanup() error {
 	return bf.framework.Cleanup()
 }
 
-// GoldenFileTest represents a golden file test case
+// GoldenFileTest represents a golden file test case.
 type GoldenFileTest struct {
 	Name         string
 	SourceCode   string
@@ -310,9 +326,9 @@ type GoldenFileTest struct {
 	UpdateGolden bool
 }
 
-// RunGoldenFileTest executes a golden file test
+// RunGoldenFileTest executes a golden file test.
 func (tf *TestFramework) RunGoldenFileTest(test *GoldenFileTest, t *testing.T) {
-	// Compile the source code
+	// Compile the source code.
 	compilerTest := &CompilerTest{
 		Name:       test.Name,
 		SourceCode: test.SourceCode,
@@ -324,35 +340,41 @@ func (tf *TestFramework) RunGoldenFileTest(test *GoldenFileTest, t *testing.T) {
 		t.Fatalf("Compilation failed: %v", result.Error)
 	}
 
-	// Read or create golden file
+	// Read or create golden file.
 	goldenPath := test.GoldenFile
+
 	var expectedOutput string
 
 	if test.UpdateGolden {
-		// Update golden file with current output
-		if err := os.WriteFile(goldenPath, []byte(result.Output), 0644); err != nil {
+		// Update golden file with current output.
+		if err := os.WriteFile(goldenPath, []byte(result.Output), 0o644); err != nil {
 			t.Fatalf("Failed to update golden file: %v", err)
 		}
+
 		t.Logf("Updated golden file: %s", goldenPath)
+
 		return
 	}
 
-	// Read expected output from golden file
+	// Read expected output from golden file.
 	if goldenData, err := os.ReadFile(goldenPath); err != nil {
 		if os.IsNotExist(err) {
-			// Create golden file if it doesn't exist
-			if err := os.WriteFile(goldenPath, []byte(result.Output), 0644); err != nil {
+			// Create golden file if it doesn't exist.
+			if err := os.WriteFile(goldenPath, []byte(result.Output), 0o644); err != nil {
 				t.Fatalf("Failed to create golden file: %v", err)
 			}
+
 			t.Logf("Created golden file: %s", goldenPath)
+
 			return
 		}
+
 		t.Fatalf("Failed to read golden file: %v", err)
 	} else {
 		expectedOutput = string(goldenData)
 	}
 
-	// Compare output with golden file
+	// Compare output with golden file.
 	if result.Output != expectedOutput {
 		t.Errorf("Output differs from golden file %s", goldenPath)
 		t.Errorf("Expected:\n%s", expectedOutput)
@@ -360,20 +382,21 @@ func (tf *TestFramework) RunGoldenFileTest(test *GoldenFileTest, t *testing.T) {
 	}
 }
 
-// TestReporter provides test result reporting
+// TestReporter provides test result reporting.
 type TestReporter struct {
 	writer io.Writer
 }
 
-// NewTestReporter creates a new test reporter
+// NewTestReporter creates a new test reporter.
 func NewTestReporter(writer io.Writer) *TestReporter {
 	if writer == nil {
 		writer = os.Stdout
 	}
+
 	return &TestReporter{writer: writer}
 }
 
-// ReportTestResult reports a single test result
+// ReportTestResult reports a single test result.
 func (tr *TestReporter) ReportTestResult(test *CompilerTest, result *TestResult) {
 	status := "PASS"
 	if !result.Success {
@@ -387,7 +410,7 @@ func (tr *TestReporter) ReportTestResult(test *CompilerTest, result *TestResult)
 	}
 }
 
-// ReportSummary reports a summary of test results
+// ReportSummary reports a summary of test results.
 func (tr *TestReporter) ReportSummary(results []*TestResult) {
 	total := len(results)
 	passed := 0
@@ -400,6 +423,7 @@ func (tr *TestReporter) ReportSummary(results []*TestResult) {
 		} else {
 			failed++
 		}
+
 		totalDuration += result.Duration
 	}
 

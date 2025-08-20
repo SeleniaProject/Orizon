@@ -9,45 +9,45 @@ import (
 	"time"
 )
 
-// TestReport represents a comprehensive test report
+// TestReport represents a comprehensive test report.
 type TestReport struct {
 	Timestamp    time.Time        `json:"timestamp" xml:"timestamp,attr"`
+	Summary      *TestSummary     `json:"summary" xml:"summary"`
+	Environment  *TestEnvironment `json:"environment" xml:"environment"`
+	Suites       []*TestSuite     `json:"suites" xml:"suite"`
 	Duration     time.Duration    `json:"duration" xml:"duration,attr"`
 	TotalTests   int              `json:"total_tests" xml:"total_tests,attr"`
 	PassedTests  int              `json:"passed_tests" xml:"passed_tests,attr"`
 	FailedTests  int              `json:"failed_tests" xml:"failed_tests,attr"`
 	SkippedTests int              `json:"skipped_tests" xml:"skipped_tests,attr"`
-	Suites       []*TestSuite     `json:"suites" xml:"suite"`
-	Summary      *TestSummary     `json:"summary" xml:"summary"`
-	Environment  *TestEnvironment `json:"environment" xml:"environment"`
 }
 
-// TestSuite represents a collection of related tests
+// TestSuite represents a collection of related tests.
 type TestSuite struct {
 	Name       string          `json:"name" xml:"name,attr"`
-	Duration   time.Duration   `json:"duration" xml:"duration,attr"`
 	Tests      []*TestCase     `json:"tests" xml:"test"`
+	Errors     []*TestError    `json:"errors,omitempty" xml:"error,omitempty"`
+	Properties []*TestProperty `json:"properties,omitempty" xml:"property,omitempty"`
+	Duration   time.Duration   `json:"duration" xml:"duration,attr"`
 	Passed     int             `json:"passed" xml:"passed,attr"`
 	Failed     int             `json:"failed" xml:"failed,attr"`
 	Skipped    int             `json:"skipped" xml:"skipped,attr"`
-	Errors     []*TestError    `json:"errors,omitempty" xml:"error,omitempty"`
-	Properties []*TestProperty `json:"properties,omitempty" xml:"property,omitempty"`
 }
 
-// TestCase represents a single test case
+// TestCase represents a single test case.
 type TestCase struct {
+	Failure     *TestFailure    `json:"failure,omitempty" xml:"failure,omitempty"`
+	Error       *TestError      `json:"error,omitempty" xml:"error,omitempty"`
 	Name        string          `json:"name" xml:"name,attr"`
 	ClassName   string          `json:"class_name" xml:"classname,attr"`
-	Duration    time.Duration   `json:"duration" xml:"time,attr"`
 	Status      TestStatus      `json:"status" xml:"status,attr"`
 	Output      string          `json:"output,omitempty" xml:"system-out,omitempty"`
 	ErrorOutput string          `json:"error_output,omitempty" xml:"system-err,omitempty"`
-	Failure     *TestFailure    `json:"failure,omitempty" xml:"failure,omitempty"`
-	Error       *TestError      `json:"error,omitempty" xml:"error,omitempty"`
 	Properties  []*TestProperty `json:"properties,omitempty" xml:"property,omitempty"`
+	Duration    time.Duration   `json:"duration" xml:"time,attr"`
 }
 
-// TestStatus represents the status of a test
+// TestStatus represents the status of a test.
 type TestStatus string
 
 const (
@@ -57,52 +57,52 @@ const (
 	TestStatusError   TestStatus = "error"
 )
 
-// TestFailure represents a test failure
+// TestFailure represents a test failure.
 type TestFailure struct {
 	Message string `json:"message" xml:"message,attr"`
 	Type    string `json:"type" xml:"type,attr"`
 	Content string `json:"content" xml:",chardata"`
 }
 
-// TestError represents a test error
+// TestError represents a test error.
 type TestError struct {
 	Message string `json:"message" xml:"message,attr"`
 	Type    string `json:"type" xml:"type,attr"`
 	Content string `json:"content" xml:",chardata"`
 }
 
-// TestProperty represents a key-value property
+// TestProperty represents a key-value property.
 type TestProperty struct {
 	Name  string `json:"name" xml:"name,attr"`
 	Value string `json:"value" xml:"value,attr"`
 }
 
-// TestSummary provides summary statistics
+// TestSummary provides summary statistics.
 type TestSummary struct {
+	FastestTest     string        `json:"fastest_test" xml:"fastest_test,attr"`
+	SlowestTest     string        `json:"slowest_test" xml:"slowest_test,attr"`
 	CompilationTime time.Duration `json:"compilation_time" xml:"compilation_time,attr"`
 	ExecutionTime   time.Duration `json:"execution_time" xml:"execution_time,attr"`
 	AverageTestTime time.Duration `json:"average_test_time" xml:"average_test_time,attr"`
-	FastestTest     string        `json:"fastest_test" xml:"fastest_test,attr"`
-	SlowestTest     string        `json:"slowest_test" xml:"slowest_test,attr"`
 	MemoryUsage     int64         `json:"memory_usage" xml:"memory_usage,attr"`
 	CoveragePercent float64       `json:"coverage_percent" xml:"coverage_percent,attr"`
 }
 
-// TestEnvironment captures environment information
+// TestEnvironment captures environment information.
 type TestEnvironment struct {
+	Variables       map[string]string `json:"variables" xml:"variable"`
 	CompilerVersion string            `json:"compiler_version" xml:"compiler_version,attr"`
 	Platform        string            `json:"platform" xml:"platform,attr"`
 	Architecture    string            `json:"architecture" xml:"architecture,attr"`
 	GoVersion       string            `json:"go_version" xml:"go_version,attr"`
-	Variables       map[string]string `json:"variables" xml:"variable"`
 }
 
-// ReportGenerator generates test reports in various formats
+// ReportGenerator generates test reports in various formats.
 type ReportGenerator struct {
 	report *TestReport
 }
 
-// NewReportGenerator creates a new report generator
+// NewReportGenerator creates a new report generator.
 func NewReportGenerator() *ReportGenerator {
 	return &ReportGenerator{
 		report: &TestReport{
@@ -112,7 +112,7 @@ func NewReportGenerator() *ReportGenerator {
 	}
 }
 
-// AddSuite adds a test suite to the report
+// AddSuite adds a test suite to the report.
 func (rg *ReportGenerator) AddSuite(suite *TestSuite) {
 	rg.report.Suites = append(rg.report.Suites, suite)
 	rg.report.TotalTests += len(suite.Tests)
@@ -121,17 +121,17 @@ func (rg *ReportGenerator) AddSuite(suite *TestSuite) {
 	rg.report.SkippedTests += suite.Skipped
 }
 
-// SetEnvironment sets the test environment information
+// SetEnvironment sets the test environment information.
 func (rg *ReportGenerator) SetEnvironment(env *TestEnvironment) {
 	rg.report.Environment = env
 }
 
-// SetSummary sets the test summary information
+// SetSummary sets the test summary information.
 func (rg *ReportGenerator) SetSummary(summary *TestSummary) {
 	rg.report.Summary = summary
 }
 
-// Finalize finalizes the report with calculated metrics
+// Finalize finalizes the report with calculated metrics.
 func (rg *ReportGenerator) Finalize() {
 	rg.report.Duration = time.Since(rg.report.Timestamp)
 
@@ -139,13 +139,16 @@ func (rg *ReportGenerator) Finalize() {
 		rg.report.Summary = &TestSummary{}
 	}
 
-	// Calculate average test time
+	// Calculate average test time.
 	if rg.report.TotalTests > 0 {
 		totalTestTime := time.Duration(0)
+
 		var fastestTime, slowestTime time.Duration
+
 		var fastestTest, slowestTest string
 
 		first := true
+
 		for _, suite := range rg.report.Suites {
 			for _, test := range suite.Tests {
 				totalTestTime += test.Duration
@@ -170,16 +173,17 @@ func (rg *ReportGenerator) Finalize() {
 	}
 }
 
-// GenerateJSON generates a JSON report
+// GenerateJSON generates a JSON report.
 func (rg *ReportGenerator) GenerateJSON(writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 	encoder.SetIndent("", "  ")
+
 	return encoder.Encode(rg.report)
 }
 
-// GenerateXML generates an XML report (JUnit format)
+// GenerateXML generates an XML report (JUnit format).
 func (rg *ReportGenerator) GenerateXML(writer io.Writer) error {
-	// XML header
+	// XML header.
 	if _, err := writer.Write([]byte(xml.Header)); err != nil {
 		return err
 	}
@@ -187,7 +191,7 @@ func (rg *ReportGenerator) GenerateXML(writer io.Writer) error {
 	encoder := xml.NewEncoder(writer)
 	encoder.Indent("", "  ")
 
-	// Root element
+	// Root element.
 	start := xml.StartElement{
 		Name: xml.Name{Local: "testsuites"},
 		Attr: []xml.Attr{
@@ -204,14 +208,14 @@ func (rg *ReportGenerator) GenerateXML(writer io.Writer) error {
 		return err
 	}
 
-	// Encode each test suite
+	// Encode each test suite.
 	for _, suite := range rg.report.Suites {
 		if err := encoder.Encode(suite); err != nil {
 			return err
 		}
 	}
 
-	// Close root element
+	// Close root element.
 	if err := encoder.EncodeToken(start.End()); err != nil {
 		return err
 	}
@@ -219,7 +223,7 @@ func (rg *ReportGenerator) GenerateXML(writer io.Writer) error {
 	return encoder.Flush()
 }
 
-// GenerateHTML generates an HTML report
+// GenerateHTML generates an HTML report.
 func (rg *ReportGenerator) GenerateHTML(writer io.Writer) error {
 	html := `<!DOCTYPE html>
 <html lang="en">
@@ -283,7 +287,7 @@ func (rg *ReportGenerator) GenerateHTML(writer io.Writer) error {
     <br>
 `
 
-	// Add test suites
+	// Add test suites.
 	for _, suite := range rg.report.Suites {
 		html += `
     <div class="suite">
@@ -310,6 +314,7 @@ func (rg *ReportGenerator) GenerateHTML(writer io.Writer) error {
 				} else if test.Error != nil {
 					errorMsg = test.Error.Message
 				}
+
 				html += `
                 <div class="error-details">` + errorMsg + `</div>`
 			}
@@ -323,16 +328,17 @@ func (rg *ReportGenerator) GenerateHTML(writer io.Writer) error {
     </div>`
 	}
 
-	// Close HTML
+	// Close HTML.
 	html += `
 </body>
 </html>`
 
 	_, err := writer.Write([]byte(html))
+
 	return err
 }
 
-// SaveToFile saves the report to a file in the specified format
+// SaveToFile saves the report to a file in the specified format.
 func (rg *ReportGenerator) SaveToFile(filename string, format string) error {
 	file, err := os.Create(filename)
 	if err != nil {
@@ -352,16 +358,19 @@ func (rg *ReportGenerator) SaveToFile(filename string, format string) error {
 	}
 }
 
-// ConvertTestResultToCase converts a TestResult to a TestCase
+// ConvertTestResultToCase converts a TestResult to a TestCase.
 func ConvertTestResultToCase(test *CompilerTest, result *TestResult) *TestCase {
 	var status TestStatus
+
 	var failure *TestFailure
+
 	var testError *TestError
 
 	if result.Success {
 		status = TestStatusPassed
 	} else {
 		status = TestStatusFailed
+
 		if result.Error != nil {
 			failure = &TestFailure{
 				Message: result.Error.Error(),

@@ -8,7 +8,7 @@ import (
 func TestBasicVector(t *testing.T) {
 	vec := NewVector[int]()
 
-	// Test basic operations
+	// Test basic operations.
 	vec.Push(1)
 	vec.Push(2)
 	vec.Push(3)
@@ -37,7 +37,7 @@ func TestBasicVector(t *testing.T) {
 func TestBasicHashMap(t *testing.T) {
 	hashMap := NewHashMap[string, int]()
 
-	// Test basic operations
+	// Test basic operations.
 	hashMap.Insert("key1", 1)
 	hashMap.Insert("key2", 2)
 	hashMap.Insert("key3", 3)
@@ -70,7 +70,7 @@ func TestBasicHashMap(t *testing.T) {
 func TestBasicAtomicCounter(t *testing.T) {
 	counter := NewAtomicCounter()
 
-	// Test increment
+	// Test increment.
 	counter.Inc()
 	counter.Inc()
 	counter.Add(5)
@@ -79,8 +79,9 @@ func TestBasicAtomicCounter(t *testing.T) {
 		t.Errorf("Expected counter value 7, got %d", counter.Get())
 	}
 
-	// Test decrement
+	// Test decrement.
 	counter.Dec()
+
 	if counter.Get() != 6 {
 		t.Errorf("Expected counter value 6, got %d", counter.Get())
 	}
@@ -89,7 +90,7 @@ func TestBasicAtomicCounter(t *testing.T) {
 }
 
 func TestBasicCompilation(t *testing.T) {
-	// Just test that all types can be instantiated
+	// Just test that all types can be instantiated.
 	vec := NewVector[string]()
 	vec.Push("test")
 
