@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-// Simple debug parser
+// Simple debug parser.
 type SimpleParser struct {
 	input    string
 	position int
