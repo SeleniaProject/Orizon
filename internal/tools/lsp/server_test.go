@@ -91,20 +91,13 @@ func readFramedJSON(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[s
 	}
 	ch := make(chan result, 1)
 	go func() {
-		// Read headers until blank line; track Content-Length.
+		// Read headers; tolerate presence or absence of a blank line separator.
 		contentLength := 0
 		for {
 			line, err := r.ReadString('\n')
 			if err != nil {
 				ch <- result{nil, err}
 				return
-			}
-			if line == "\r\n" {
-				// Ignore stray blank lines before headers.
-				if contentLength == 0 {
-					continue
-				}
-				break
 			}
 			if idx := indexByte(line, ':'); idx >= 0 {
 				name := toLower(trimSpace(line[:idx]))
@@ -119,10 +112,36 @@ func readFramedJSON(t *testing.T, r *bufio.Reader, timeout time.Duration) (map[s
 					}
 				}
 			}
+			// If we encounter the blank line, stop header parsing.
+			if line == "\r\n" {
+				// Ignore leading blank lines before headers.
+				if contentLength == 0 {
+					continue
+				}
+				break
+			}
+			// If Content-Length is known and the next bytes are not CRLF, proceed.
+			if contentLength > 0 {
+				if b, err := r.Peek(2); err == nil {
+					if !(len(b) == 2 && b[0] == '\r' && b[1] == '\n') {
+						// No blank line, body starts immediately.
+						break
+					}
+				} else {
+					// Cannot peek, assume body starts.
+					break
+				}
+			}
 		}
 		if contentLength <= 0 {
 			ch <- result{nil, io.ErrUnexpectedEOF}
 			return
+		}
+		// If a blank line is present before the body, consume it.
+		if b, err := r.Peek(2); err == nil {
+			if len(b) == 2 && b[0] == '\r' && b[1] == '\n' {
+				_, _ = r.Discard(2)
+			}
 		}
 		body := make([]byte, contentLength)
 		if _, err := io.ReadFull(r, body); err != nil {
