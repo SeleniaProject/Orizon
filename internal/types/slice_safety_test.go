@@ -1,9 +1,12 @@
 package types
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"unsafe"
+
+	"github.com/orizon-lang/orizon/internal/errors"
 )
 
 func TestOrizonSlice_SafetyValidation(t *testing.T) {
@@ -41,7 +44,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			},
 			index:       15,
 			expectPanic: true,
-			expectedMsg: "Index out of bounds",
+			expectedMsg: "Index 15 out of bounds for length 10",
 		},
 		{
 			name: "nil data pointer",
@@ -54,7 +57,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			},
 			index:       5,
 			expectPanic: true,
-			expectedMsg: "Null slice data pointer",
+			expectedMsg: "Null pointer dereference in slice.data",
 		},
 		{
 			name: "nil typeInfo",
@@ -69,7 +72,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			},
 			index:       5,
 			expectPanic: true,
-			expectedMsg: "Invalid slice: nil typeInfo",
+			expectedMsg: "Null pointer dereference in slice.typeInfo",
 		},
 		{
 			name: "zero element size",
@@ -84,7 +87,7 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			},
 			index:       5,
 			expectPanic: true,
-			expectedMsg: "Invalid element size: 0",
+			expectedMsg: "Invalid size 0 in slice element size",
 		},
 	}
 
@@ -95,7 +98,15 @@ func TestOrizonSlice_SafetyValidation(t *testing.T) {
 			if tt.expectPanic {
 				defer func() {
 					if r := recover(); r != nil {
-						panicMsg := r.(string)
+						var panicMsg string
+						// Handle both string and StandardError types for better error compatibility
+						if errObj, ok := r.(*errors.StandardError); ok {
+							panicMsg = errObj.Error()
+						} else if str, ok := r.(string); ok {
+							panicMsg = str
+						} else {
+							panicMsg = fmt.Sprintf("%v", r)
+						}
 						if tt.expectedMsg != "" && !strings.Contains(panicMsg, tt.expectedMsg) {
 							t.Errorf("expected panic message to contain %q, got %q", tt.expectedMsg, panicMsg)
 						}
@@ -126,7 +137,15 @@ func TestOrizonSlice_SetSafetyValidation(t *testing.T) {
 	// Test nil value pointer.
 	defer func() {
 		if r := recover(); r != nil {
-			panicMsg := r.(string)
+			var panicMsg string
+			// Handle both string and StandardError types for better error compatibility
+			if errObj, ok := r.(*errors.StandardError); ok {
+				panicMsg = errObj.Error()
+			} else if str, ok := r.(string); ok {
+				panicMsg = str
+			} else {
+				panicMsg = fmt.Sprintf("%v", r)
+			}
 			if !strings.Contains(panicMsg, "Null value pointer") {
 				t.Errorf("expected panic message to contain 'Null value pointer', got %q", panicMsg)
 			}

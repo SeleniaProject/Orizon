@@ -76,22 +76,39 @@ func (allocator *SafeAllocator) IsValidPointer(ptr unsafe.Pointer, size uintptr)
 	allocator.mutex.RLock()
 	defer allocator.mutex.RUnlock()
 
+	// Additional safety checks for pointer validity
+	accessStart := uintptr(ptr)
+
+	// Check for potential integer overflow in access range calculation
+	if size > 0 && accessStart > ^uintptr(0)-size {
+		return false // Would overflow
+	}
+
+	accessEnd := accessStart + size
+
 	// Check if the pointer is within any registered allocation.
 	for allocPtr, info := range allocator.allocations {
 		if !info.Valid {
 			continue
 		}
 
-		// Calculate the range of the allocation.
+		// Calculate the range of the allocation with overflow protection
 		allocStart := uintptr(allocPtr)
+
+		// Verify allocation size is valid
+		if info.Size > ^uintptr(0)-allocStart {
+			continue // Invalid allocation range
+		}
+
 		allocEnd := allocStart + info.Size
 
-		// Calculate the range of the requested access.
-		accessStart := uintptr(ptr)
-		accessEnd := accessStart + size
-
-		// Check if the access is entirely within the allocation.
-		if accessStart >= allocStart && accessEnd <= allocEnd {
+		// Enhanced boundary checks
+		// 1. Check if access is entirely within allocation
+		// 2. Ensure no wraparound occurred in calculations
+		if accessStart >= allocStart &&
+			accessEnd <= allocEnd &&
+			accessEnd >= accessStart && // No wraparound in access range
+			allocEnd >= allocStart { // No wraparound in allocation range
 			return true
 		}
 	}

@@ -43,12 +43,21 @@ func PrintVersion(toolName string, jsonOutput bool) {
 	info := GetVersionInfo()
 
 	if jsonOutput {
-		data, _ := json.MarshalIndent(map[string]interface{}{
+		data, err := json.MarshalIndent(map[string]interface{}{
 			"tool":         toolName,
 			"version_info": info,
 		}, "", "  ")
-		fmt.Println(string(data))
-	} else {
+		if err != nil {
+			// Fallback to plain text if JSON marshaling fails
+			fmt.Fprintf(os.Stderr, "Error: Failed to marshal version info to JSON: %v\n", err)
+			jsonOutput = false
+		} else {
+			fmt.Println(string(data))
+			return
+		}
+	}
+
+	if !jsonOutput {
 		fmt.Printf("%s v%s\n", toolName, info.Version)
 		fmt.Printf("Build Date: %s\n", info.BuildDate)
 		if info.CommitSHA != "unknown" && info.CommitSHA != "" {

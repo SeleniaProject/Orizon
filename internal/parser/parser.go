@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
@@ -30,6 +31,12 @@ type Parser struct {
 	tokenCount      int   // Total tokens processed
 	memoryAllocated int64 // Estimated memory usage
 	enableProfiling bool  // Whether to collect performance metrics
+
+	// Memory pools for performance optimization
+	stringPool    *sync.Pool // Pool for string builders
+	slicePool     *sync.Pool // Pool for slices
+	identifierPool *sync.Pool // Pool for identifier nodes
+	literalPool    *sync.Pool // Pool for literal nodes
 }
 
 // ParseError represents a parsing error with enhanced context and recovery hints.
@@ -146,6 +153,28 @@ func NewParser(l *lexer.Lexer, filename string) *Parser {
 		tokenCount:      0,
 		memoryAllocated: 0,
 		enableProfiling: true, // Enable by default for development
+
+		// Initialize memory pools for performance optimization
+		stringPool: &sync.Pool{
+			New: func() interface{} {
+				return &strings.Builder{}
+			},
+		},
+		slicePool: &sync.Pool{
+			New: func() interface{} {
+				return make([]interface{}, 0, 16)
+			},
+		},
+		identifierPool: &sync.Pool{
+			New: func() interface{} {
+				return &Identifier{}
+			},
+		},
+		literalPool: &sync.Pool{
+			New: func() interface{} {
+				return &Literal{}
+			},
+		},
 	}
 
 	// Initialize suggestion engine with phrase-level recovery.
@@ -200,6 +229,86 @@ func (p *Parser) ResetStats() {
 // SetProfiling enables or disables performance profiling.
 func (p *Parser) SetProfiling(enabled bool) {
 	p.enableProfiling = enabled
+}
+
+// newPooledIdentifier creates a new identifier using memory pool for performance optimization.
+func (p *Parser) newPooledIdentifier(span Span, value string) *Identifier {
+	// Get identifier from pool
+	ident := p.identifierPool.Get().(*Identifier)
+
+	// Reset and set values
+	ident.Span = span
+	ident.Value = value
+
+	// Performance monitoring
+	if p.enableProfiling {
+		p.nodeCount++
+		p.memoryAllocated += int64(len(value) + 16) // estimate memory usage
+	}
+
+	return ident
+}
+
+// returnPooledIdentifier returns an identifier to the pool for reuse.
+func (p *Parser) returnPooledIdentifier(ident *Identifier) {
+	// Reset fields before returning to pool
+	ident.Value = ""
+	ident.Span = Span{}
+	p.identifierPool.Put(ident)
+}
+
+// newPooledStringBuilder creates a string builder from pool for efficient string operations.
+func (p *Parser) newPooledStringBuilder() *strings.Builder {
+	return p.stringPool.Get().(*strings.Builder)
+}
+
+// returnPooledStringBuilder returns string builder to pool.
+func (p *Parser) returnPooledStringBuilder(sb *strings.Builder) {
+	sb.Reset()
+	p.stringPool.Put(sb)
+}
+
+// newPooledSlice creates a slice from pool for efficient slice operations.
+func (p *Parser) newPooledSlice() []interface{} {
+	return p.slicePool.Get().([]interface{})
+}
+
+// returnPooledSlice returns slice to pool.
+func (p *Parser) returnPooledSlice(slice []interface{}) {
+	// Clear slice before returning
+	for i := range slice {
+		slice[i] = nil
+	}
+	slice = slice[:0]
+	p.slicePool.Put(slice)
+}
+
+// newPooledLiteral creates a new literal using memory pool for performance optimization.
+func (p *Parser) newPooledLiteral(span Span, value interface{}, kind LiteralKind) *Literal {
+	// Get literal from pool
+	lit := p.literalPool.Get().(*Literal)
+
+	// Reset and set values
+	lit.Span = span
+	lit.Value = value
+	lit.Kind = kind
+
+	// Performance monitoring
+	if p.enableProfiling {
+		p.nodeCount++
+		p.memoryAllocated += int64(24) // estimate memory usage for literal
+	}
+
+	return lit
+}
+
+// returnPooledLiteral returns a literal to the pool for reuse.
+func (p *Parser) returnPooledLiteral(lit *Literal) {
+	// Reset fields before returning to pool
+	lit.Value = nil
+	lit.Span = Span{}
+	lit.Kind = 0
+	p.literalPool.Put(lit)
 }
 
 // nextToken advances the parser to the next token with optimized trivia skipping.
@@ -3616,9 +3725,19 @@ func (p *Parser) parseIdentifier() Expression {
 
 	// If we have multiple parts, create a path expression
 	if len(parts) > 1 {
-		// For now, create an identifier with the joined path
-		// Later, this can be enhanced to create a proper PathExpression AST node
-		return NewIdentifier(span, strings.Join(parts, "::"))
+		// Use pooled string builder for efficient string concatenation
+		sb := p.newPooledStringBuilder()
+		for i, part := range parts {
+			if i > 0 {
+				sb.WriteString("::")
+			}
+			sb.WriteString(part)
+		}
+		value := sb.String()
+		p.returnPooledStringBuilder(sb)
+
+		// Use pooled identifier for better performance
+		return p.newPooledIdentifier(span, value)
 	}
 
 	return NewIdentifier(TokenToSpan(p.current), p.current.Literal)
@@ -3635,7 +3754,8 @@ func (p *Parser) parseIntegerLiteral() Expression {
 		return nil
 	}
 
-	return NewLiteral(TokenToSpan(p.current), value, LiteralInteger)
+	// Use pooled literal for better performance
+	return p.newPooledLiteral(TokenToSpan(p.current), value, LiteralInteger)
 }
 
 // parseFloatLiteral parses a float literal.
@@ -3649,12 +3769,14 @@ func (p *Parser) parseFloatLiteral() Expression {
 		return nil
 	}
 
-	return NewLiteral(TokenToSpan(p.current), value, LiteralFloat)
+	// Use pooled literal for better performance
+	return p.newPooledLiteral(TokenToSpan(p.current), value, LiteralFloat)
 }
 
 // parseStringLiteral parses a string literal.
 func (p *Parser) parseStringLiteral() Expression {
-	return NewLiteral(TokenToSpan(p.current), p.current.Literal, LiteralString)
+	// Use pooled literal for better performance
+	return p.newPooledLiteral(TokenToSpan(p.current), p.current.Literal, LiteralString)
 }
 
 // parseTemplateString parses a template string with interpolation.

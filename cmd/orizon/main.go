@@ -1,3 +1,6 @@
+// Package main provides the main entry point for the Orizon CLI tool.
+// It handles command parsing, subcommand routing, and delegates to specific
+// command handlers while maintaining clean separation of concerns.
 package main
 
 import (
@@ -19,6 +22,9 @@ import (
 
 	"github.com/orizon-lang/orizon/internal/cli"
 	pm "github.com/orizon-lang/orizon/internal/packagemanager"
+	"github.com/orizon-lang/orizon/cmd/orizon/pkg/commands"
+	"github.com/orizon-lang/orizon/cmd/orizon/pkg/types"
+	"github.com/orizon-lang/orizon/cmd/orizon/pkg/utils"
 )
 
 func main() {
@@ -164,50 +170,40 @@ type lockfile struct {
 	Entries []pm.LockEntry `json:"entries"`
 }
 
-func pkg(args []string) {
-	if len(args) == 0 {
-		fmt.Println("pkg subcommands: init | publish | add | resolve | lock | verify | list | fetch | update | remove | graph | why | outdated | vendor | sign | verify-sig | audit | serve | auth")
+// utils_pkg provides a bridge to the refactored utilities
+type utils_pkg struct{}
 
+// CreateRegistryContext creates a registry context using the refactored utilities
+func (u *utils_pkg) CreateRegistryContext() (types.RegistryContext, error) {
+	return utils.CreateRegistryContext()
+}
+
+func pkg(args []string) {
+	// Import the new command registry and utilities
+	registry := commands.NewRegistry()
+	utils := &utils_pkg{} // This would need to be defined
+
+	if len(args) == 0 {
+		registry.ListCommands()
 		return
 	}
-	// Choose registry via env ORIZON_REGISTRY: http URL for remote, or path for local. Default ./.orizon/registry
-	regEnv := strings.TrimSpace(os.Getenv("ORIZON_REGISTRY"))
 
-	var reg pm.Registry
-
-	var err error
-
-	if strings.HasPrefix(strings.ToLower(regEnv), "http://") || strings.HasPrefix(strings.ToLower(regEnv), "https://") {
-		// HTTP client will pick ORIZON_REGISTRY_TOKEN automatically or from credentials.json
-		reg = pm.NewHTTPRegistry(regEnv)
-	} else {
-		// (トークンの自動プロンプトは行わない。必要なら pkg auth login で登録し、.
-		// サーバ側が readwrite で401を返す場合のみユーザーに設定を案内する).
-		regRoot := regEnv
-		if regRoot == "" {
-			regRoot = filepath.Join(".orizon", "registry")
-		}
-
-		if err := os.MkdirAll(regRoot, 0o755); err != nil {
-			fmt.Fprintln(os.Stderr, "registry init:", err)
-			os.Exit(1)
-		}
-
-		reg, err = pm.NewFileRegistry(regRoot)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "registry open:", err)
-			os.Exit(1)
-		}
+	// Create registry context
+	ctx, err := utils.CreateRegistryContext()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create registry context: %v\n", err)
+		os.Exit(1)
 	}
 
-	ctx := context.Background()
-	// signature store under ./.orizon/signatures
-	sigStore, _ := pm.NewFileSignatureStore(filepath.Join(".orizon", "signatures"))
+	// Execute the command
+	subcommand := args[0]
+	subArgs := args[1:]
 
-	switch args[0] {
-	case "auth":
-		if len(args) < 2 {
-			fmt.Println("usage: orizon pkg auth login")
+	if err := registry.ExecuteCommand(subcommand, ctx, subArgs); err != nil {
+		fmt.Fprintf(os.Stderr, "Error executing command '%s': %v\n", subcommand, err)
+		os.Exit(1)
+	}
+	}
 
 			return
 		}
@@ -887,8 +883,6 @@ func pkg(args []string) {
 		os.Exit(2)
 	}
 }
-
-func readManifest() manifest {
 	b, err := os.ReadFile("orizon.json")
 	if err != nil {
 		// default manifest if missing.
@@ -939,8 +933,6 @@ func resolveTool(tool string) string {
 
 	return filepath.Join("build", bin)
 }
-
-func runCmd(ctx context.Context, cmd string, args ...string) error {
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -1066,96 +1058,4 @@ func buildGraph(ctx context.Context, reg pm.Registry, pinned map[pm.PackageID]st
 	}
 
 	return out, nil
-}
-
-func rootsFromManifest(m manifest) []string {
-	roots := make([]string, 0, len(m.Dependencies))
-	for name := range m.Dependencies {
-		roots = append(roots, name)
-	}
-
-	return roots
-}
-
-// whyPath: BFS from roots to target name, returning path of names.
-func whyPath(g map[string][]string, roots []string, target string) []string {
-	// nodes are name@version; compare by name only for reachability explanation.
-	type node struct {
-		key  string
-		path []string
-	}
-
-	seen := map[string]bool{}
-	q := []node{}
-	// seed by any root occurrences in graph.
-	for k := range g {
-		name := k
-		if i := strings.IndexByte(k, '@'); i >= 0 {
-			name = k[:i]
-		}
-
-		for _, r := range roots {
-			if name == r {
-				q = append(q, node{key: k, path: []string{name}})
-				seen[k] = true
-
-				break
-			}
-		}
-	}
-
-	for len(q) > 0 {
-		cur := q[0]
-		q = q[1:]
-
-		cname := cur.key
-		if i := strings.IndexByte(cname, '@'); i >= 0 {
-			cname = cname[:i]
-		}
-
-		if cname == target {
-			return cur.path
-		}
-
-		for _, nxt := range g[cur.key] {
-			if seen[nxt] {
-				continue
-			}
-
-			seen[nxt] = true
-
-			nname := nxt
-			if i := strings.IndexByte(nname, '@'); i >= 0 {
-				nname = nname[:i]
-			}
-
-			q = append(q, node{key: nxt, path: append(append([]string{}, cur.path...), nname)})
-		}
-	}
-
-	return nil
-}
-
-// ioConcurrency reads ORIZON_MAX_CONCURRENCY or defaults to GOMAXPROCS*8.
-func ioConcurrency() int {
-	if v := os.Getenv("ORIZON_MAX_CONCURRENCY"); strings.TrimSpace(v) != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			if n > 1024 {
-				return 1024
-			}
-
-			return n
-		}
-	}
-
-	n := runtime.GOMAXPROCS(0) * 8
-	if n < 4 {
-		n = 4
-	}
-
-	if n > 1024 {
-		n = 1024
-	}
-
-	return n
 }

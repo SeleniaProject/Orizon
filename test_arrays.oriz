@@ -1,8 +1,0 @@
-func main() {
-    let numbers: [i32; 5] = [1, 2, 3, 4, 5];
-    let grades = [85.5, 92.0, 78.5, 96.0];
-    
-    if numbers[0] >= 1 {
-        println("First number is valid");
-    }
-}

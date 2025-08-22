@@ -1,11 +1,8 @@
 func main() {
-    // 配列リテラル
-    let numbers = [1, 2, 3, 4, 5];
-    let strings = ["hello", "world"];
+    let numbers: [i32; 5] = [1, 2, 3, 4, 5];
+    let grades = [85.5, 92.0, 78.5, 96.0];
     
-    // 配列アクセス
-    let first = numbers[0];
-    let second = numbers[1];
-    
-    print("配列テスト完了");
+    if numbers[0] >= 1 {
+        println("First number is valid");
+    }
 }

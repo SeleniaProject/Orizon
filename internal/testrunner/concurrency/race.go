@@ -43,7 +43,7 @@ type RaceDetector struct {
 	locksHeld map[int64]map[int64]struct{}
 	vars      map[uintptr]*raceVar
 	races     []Race
-	mu        sync.Mutex
+	mu        sync.RWMutex // Use RWMutex for better read concurrency
 }
 
 // NewRaceDetector creates a new detector instance.
@@ -99,29 +99,39 @@ func (d *RaceDetector) Races() []Race {
 
 // HasRace reports whether any race has been detected.
 func (d *RaceDetector) HasRace() bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.mu.RLock() // Use read lock for better concurrency
+	defer d.mu.RUnlock()
 
 	return len(d.races) > 0
 }
 
 func (d *RaceDetector) onAccess(gid int64, addr uintptr, kind accessKind) {
+	// Fast path: read-only check for existing variable state
+	d.mu.RLock()
+	st := d.vars[addr]
+	curLocks := d.copyLocks(d.locksHeld[gid])
+	d.mu.RUnlock()
+
+	// If variable doesn't exist, we need write access
+	if st == nil {
+		d.mu.Lock()
+		// Double-check after acquiring write lock
+		st = d.vars[addr]
+		if st == nil {
+			st = &raceVar{
+				seenByThread: make(map[int64]accessKind),
+				reportedEdge: make(map[string]struct{}),
+			}
+			// Initialize candidate lockset to locks currently held.
+			st.lockset = curLocks
+			d.vars[addr] = st
+		}
+		d.mu.Unlock()
+	}
+
+	// Perform race detection with minimal lock time
 	d.mu.Lock()
 	defer d.mu.Unlock()
-
-	// Get current thread lockset snapshot.
-	curLocks := d.copyLocks(d.locksHeld[gid])
-
-	st := d.vars[addr]
-	if st == nil {
-		st = &raceVar{
-			seenByThread: make(map[int64]accessKind),
-			reportedEdge: make(map[string]struct{}),
-		}
-		// Initialize candidate lockset to locks currently held.
-		st.lockset = curLocks
-		d.vars[addr] = st
-	}
 
 	// Check for conflicting prior accesses from other threads without common locks.
 	for other, okind := range st.seenByThread {

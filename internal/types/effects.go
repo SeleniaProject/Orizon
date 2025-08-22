@@ -207,16 +207,19 @@ func NewEffectSet() *EffectSet {
 }
 
 // Add adds a side effect to the set.
+// Optimized to reduce unnecessary cloning and improve performance.
 func (es *EffectSet) Add(effect *SideEffect) {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 
 	if existing, exists := es.effects[effect.Kind]; exists {
-		// Merge effects, keeping the higher level.
+		// Only clone and replace if the new effect has higher level
 		if effect.Level > existing.Level {
 			es.effects[effect.Kind] = effect.Clone()
 		}
+		// If effect.Level <= existing.Level, do nothing (avoid unnecessary clone)
 	} else {
+		// Clone only when adding new effect
 		es.effects[effect.Kind] = effect.Clone()
 	}
 }
@@ -251,20 +254,36 @@ func (es *EffectSet) Get(kind EffectKind) (*SideEffect, bool) {
 }
 
 // Union creates a new EffectSet containing effects from both sets.
+// Optimized for better memory efficiency and reduced allocations.
 func (es *EffectSet) Union(other *EffectSet) *EffectSet {
-	result := NewEffectSet()
-
+	// Pre-allocate with estimated capacity to reduce map reallocations
 	es.mu.RLock()
-	for _, effect := range es.effects {
-		result.Add(effect)
-	}
-	es.mu.RUnlock()
-
 	other.mu.RLock()
-	for _, effect := range other.effects {
-		result.Add(effect)
+
+	estimatedSize := len(es.effects) + len(other.effects)
+	result := &EffectSet{
+		effects: make(map[EffectKind]*SideEffect, estimatedSize),
 	}
+
+	// Copy effects from first set - direct assignment for better performance
+	for kind, effect := range es.effects {
+		result.effects[kind] = effect.Clone()
+	}
+
+	// Merge effects from second set
+	for kind, effect := range other.effects {
+		if existing, exists := result.effects[kind]; exists {
+			// Only clone if we need to merge (reduces allocations)
+			if effect.Level > existing.Level {
+				result.effects[kind] = effect.Clone()
+			}
+		} else {
+			result.effects[kind] = effect.Clone()
+		}
+	}
+
 	other.mu.RUnlock()
+	es.mu.RUnlock()
 
 	return result
 }

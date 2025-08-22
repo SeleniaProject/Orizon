@@ -306,10 +306,37 @@ func (sm *StackManager) Allocate(size uintptr, function string) uintptr {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	if sm.current == nil || sm.current.Used+size > 8192 { // 8KB frame limit
+	// Enhanced size validation
+	if size == 0 {
+		return 0 // Invalid size
+	}
+
+	const maxFrameSize = 8192 // 8KB frame limit
+	const maxStackDepth = 256 // Maximum stack depth
+
+	// Check if allocation size is reasonable
+	if size > maxFrameSize {
+		return 0 // Allocation too large for single frame
+	}
+
+	// Check if we need a new frame or if current frame is insufficient
+	needNewFrame := sm.current == nil ||
+		sm.current.Used+size > maxFrameSize ||
+		sm.depth >= maxStackDepth
+
+	if needNewFrame {
+		if sm.depth >= maxStackDepth {
+			return 0 // Stack depth limit exceeded
+		}
+
 		if !sm.pushFrame(function) {
 			return 0 // Stack overflow
 		}
+	}
+
+	// Verify frame state before allocation
+	if sm.current == nil {
+		return 0 // Frame creation failed
 	}
 
 	// Simple allocation.

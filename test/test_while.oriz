@@ -1,10 +1,7 @@
 func main() {
-    let i = 0;
-    
-    while (i < 3) {
-        print("ループ中");
-        i = i + 1;
+    let mut count = 0;
+    while count < 5 {
+        println("Count: {}", count);
+        count = count + 1;
     }
-    
-    print("whileループテスト完了");
 }

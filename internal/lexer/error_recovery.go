@@ -395,7 +395,16 @@ func (er *ErrorRecovery) panicModeRecovery(lexer *Lexer, err *LexicalError) (*To
 
 		// Safety limit to prevent infinite loops.
 		if skippedChars > 1000 {
-			return nil, fmt.Errorf("panic mode recovery exceeded safety limit")
+			err.CharactersSkipped = skippedChars
+			err.RecoveryType = RecoveryPanicMode
+
+			// Return a safe error token instead of nil to prevent cascading failures
+			return &Token{
+				Type:    TokenError,
+				Literal: fmt.Sprintf("recovery_limit_exceeded_%d_chars", skippedChars),
+				Line:    1,
+				Column:  lexer.position,
+			}, fmt.Errorf("panic mode recovery exceeded safety limit of 1000 characters")
 		}
 	}
 
