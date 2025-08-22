@@ -1,0 +1,26 @@
+# License
+
+This project is dual-licensed under your choice of:
+
+- **MIT License** ([LICENSE-MIT](LICENSE-MIT))
+- **Apache License, Version 2.0** ([LICENSE-APACHE](LICENSE-APACHE))
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in Orizon by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+
+## Why Dual License?
+
+We chose dual licensing to provide maximum compatibility and flexibility:
+
+- **MIT License**: Simple and permissive, compatible with virtually all other licenses
+- **Apache License 2.0**: Provides explicit patent protection and contributor protections
+
+## Usage Guidelines
+
+- **Open Source Projects**: Choose either license based on your project's requirements
+- **Commercial Use**: Both licenses permit commercial use without restrictions
+- **Patent Concerns**: Apache 2.0 provides better patent protection
+- **Simplicity**: MIT is shorter and simpler if patents aren't a concern
+
+## Contributors
+
+By contributing to this project, you agree that your contributions will be licensed under both licenses.
