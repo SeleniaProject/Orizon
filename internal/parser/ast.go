@@ -795,11 +795,27 @@ type MacroInvocation struct {
 	Span      Span
 }
 
-func (i *MacroInvocation) GetSpan() Span                      { return i.Span }
-func (i *MacroInvocation) String() string                     { return fmt.Sprintf("%s!(...)", i.Name.Value) }
-func (i *MacroInvocation) Accept(visitor Visitor) interface{} { return visitor.VisitMacroInvocation(i) }
-func (i *MacroInvocation) expressionNode()                    {}
-func (i *MacroInvocation) statementNode()                     {} // Macros can be both expressions and statements
+func (i *MacroInvocation) GetSpan() Span {
+	if i == nil {
+		// Return zero span for nil MacroInvocation to prevent panics
+		return Span{}
+	}
+	return i.Span
+}
+func (i *MacroInvocation) String() string {
+	if i == nil || i.Name == nil {
+		return "nil_macro!()"
+	}
+	return fmt.Sprintf("%s!(...)", i.Name.Value)
+}
+func (i *MacroInvocation) Accept(visitor Visitor) interface{} {
+	if i == nil {
+		return nil
+	}
+	return visitor.VisitMacroInvocation(i)
+}
+func (i *MacroInvocation) expressionNode() {}
+func (i *MacroInvocation) statementNode()  {} // Macros can be both expressions and statements
 
 // MacroArgument represents an argument passed to a macro.
 type MacroArgument struct {
@@ -974,7 +990,9 @@ type Visitor interface {
 	VisitIndexExpression(*IndexExpression) interface{}
 	VisitMemberExpression(*MemberExpression) interface{}
 	VisitStructExpression(*StructExpression) interface{}
+	VisitRangeExpression(*RangeExpression) interface{}
 	VisitForStatement(*ForStatement) interface{}
+	VisitForInStatement(*ForInStatement) interface{}
 	VisitBreakStatement(*BreakStatement) interface{}
 	VisitContinueStatement(*ContinueStatement) interface{}
 	VisitMatchStatement(*MatchStatement) interface{}

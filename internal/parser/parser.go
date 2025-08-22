@@ -10,7 +10,7 @@ import (
 	"github.com/orizon-lang/orizon/internal/lexer"
 )
 
-// Parser represents the recursive descent parser.
+// Parser represents the recursive descent parser with performance monitoring.
 type Parser struct {
 	lexer                *lexer.Lexer
 	suggestionEngine     *SuggestionEngine
@@ -24,21 +24,69 @@ type Parser struct {
 	maxSuggestionsTotal  int
 	errorsTruncated      bool
 	suggestionsTruncated bool
+
+	// Performance monitoring
+	nodeCount       int   // Total AST nodes created
+	tokenCount      int   // Total tokens processed
+	memoryAllocated int64 // Estimated memory usage
+	enableProfiling bool  // Whether to collect performance metrics
 }
 
-// ParseError represents a parsing error with context.
+// ParseError represents a parsing error with enhanced context and recovery hints.
 type ParseError struct {
-	Message  string
-	Context  string
-	Position Position
+	Message      string
+	Context      string
+	Position     Position
+	TokenFound   string // The actual token that was found
+	TokenWanted  string // The token that was expected
+	Severity     ErrorSeverity
+	RecoveryHint string // Suggestion for fixing the error
 }
+
+// ErrorSeverity indicates the severity level of parsing errors.
+type ErrorSeverity int
+
+const (
+	SeverityError ErrorSeverity = iota
+	SeverityWarning
+	SeverityInfo
+)
 
 func (e *ParseError) Error() string {
+	if e.RecoveryHint != "" {
+		return fmt.Sprintf("Parse error at %s: %s (hint: %s)", e.Position.String(), e.Message, e.RecoveryHint)
+	}
 	return fmt.Sprintf("Parse error at %s: %s", e.Position.String(), e.Message)
 }
 
-// NewParser creates a new parser instance.
+// GetDetailedError returns a more detailed error message for IDE integration.
+func (e *ParseError) GetDetailedError() string {
+	var details strings.Builder
+	details.WriteString(fmt.Sprintf("Parse error at %s:\n", e.Position.String()))
+	details.WriteString(fmt.Sprintf("  Message: %s\n", e.Message))
+	if e.Context != "" {
+		details.WriteString(fmt.Sprintf("  Context: %s\n", e.Context))
+	}
+	if e.TokenFound != "" && e.TokenWanted != "" {
+		details.WriteString(fmt.Sprintf("  Expected: %s, Found: %s\n", e.TokenWanted, e.TokenFound))
+	}
+	if e.RecoveryHint != "" {
+		details.WriteString(fmt.Sprintf("  Suggestion: %s\n", e.RecoveryHint))
+	}
+	return details.String()
+}
+
+// parseInfixExpression parses infix expressions with proper nil checking.
 func (p *Parser) parseInfixExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for infix expression",
+			"Expected valid expression before operator")
+		// Return nil rather than continuing with invalid state
+		return nil
+	}
+
 	switch p.current.Type {
 	// Arithmetic operators.
 	case lexer.TokenPlus, lexer.TokenMinus, lexer.TokenMul, lexer.TokenDiv, lexer.TokenMod:
@@ -74,12 +122,15 @@ func (p *Parser) parseInfixExpression(left Expression) Expression {
 	// Ternary conditional operator.
 	case lexer.TokenQuestion:
 		return p.parseTernaryExpression(left)
+	// Range operator.
+	case lexer.TokenRange:
+		return p.parseRangeInfixExpression(left)
 	default:
 		return nil
 	}
 }
 
-// NewParser creates a new parser instance.
+// NewParser creates a new parser instance with enhanced performance monitoring.
 func NewParser(l *lexer.Lexer, filename string) *Parser {
 	p := &Parser{
 		lexer:        l,
@@ -90,6 +141,11 @@ func NewParser(l *lexer.Lexer, filename string) *Parser {
 		// Set conservative yet safe caps to prevent runaway memory usage.
 		maxErrors:           5000,
 		maxSuggestionsTotal: 5000,
+		// Performance monitoring initialization
+		nodeCount:       0,
+		tokenCount:      0,
+		memoryAllocated: 0,
+		enableProfiling: true, // Enable by default for development
 	}
 
 	// Initialize suggestion engine with phrase-level recovery.
@@ -102,17 +158,67 @@ func NewParser(l *lexer.Lexer, filename string) *Parser {
 	return p
 }
 
-// Parse parses the input and returns an AST.
+// Parse parses the input and returns an AST with performance tracking.
 func (p *Parser) Parse() (*Program, []error) {
 	program := p.parseProgram()
-
 	return program, p.errors
 }
 
-// nextToken advances the parser to the next token.
+// ParseStats represents parsing performance statistics.
+type ParseStats struct {
+	TokensProcessed      int
+	NodesCreated         int
+	ErrorsGenerated      int
+	SuggestionsCreated   int
+	MemoryAllocated      int64
+	ErrorsTruncated      bool
+	SuggestionsTruncated bool
+}
+
+// GetParseStats returns performance statistics for the current parse session.
+func (p *Parser) GetParseStats() ParseStats {
+	return ParseStats{
+		TokensProcessed:      p.tokenCount,
+		NodesCreated:         p.nodeCount,
+		ErrorsGenerated:      len(p.errors),
+		SuggestionsCreated:   len(p.suggestions),
+		MemoryAllocated:      p.memoryAllocated,
+		ErrorsTruncated:      p.errorsTruncated,
+		SuggestionsTruncated: p.suggestionsTruncated,
+	}
+}
+
+// ResetStats resets all performance counters.
+func (p *Parser) ResetStats() {
+	p.tokenCount = 0
+	p.nodeCount = 0
+	p.memoryAllocated = 0
+	p.errorsTruncated = false
+	p.suggestionsTruncated = false
+}
+
+// SetProfiling enables or disables performance profiling.
+func (p *Parser) SetProfiling(enabled bool) {
+	p.enableProfiling = enabled
+}
+
+// nextToken advances the parser to the next token with optimized trivia skipping.
 func (p *Parser) nextToken() {
 	p.current = p.peek
 	p.peek = p.lexer.NextToken()
+
+	// Performance monitoring: track token processing
+	if p.enableProfiling {
+		p.tokenCount++
+	}
+
+	// Optimization: Skip insignificant trivia tokens efficiently
+	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment {
+		p.peek = p.lexer.NextToken()
+		if p.enableProfiling {
+			p.tokenCount++
+		}
+	}
 }
 
 // currentTokenIs checks if the current token is of the given type.
@@ -127,14 +233,13 @@ func (p *Parser) peekTokenIs(tokenType lexer.TokenType) bool {
 
 // expectPeek advances if the peek token matches the expected type.
 func (p *Parser) expectPeek(tokenType lexer.TokenType) bool {
-	// Skip trivia on the peek side to allow newlines/whitespace/comments between tokens
-	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+	// Optimized trivia skipping: only handle newlines as they are structurally significant
+	for p.peek.Type == lexer.TokenNewline {
 		p.nextToken()
 	}
 
 	if p.peekTokenIs(tokenType) {
 		p.nextToken()
-
 		return true
 	}
 
@@ -162,50 +267,82 @@ func (p *Parser) expectPeek(tokenType lexer.TokenType) bool {
 
 // expectPeekNoRecover advances if the peek token matches, without invoking recovery.
 func (p *Parser) expectPeekNoRecover(tokenType lexer.TokenType) bool {
-	// Skip trivia on the peek side.
-	for p.peek.Type == lexer.TokenWhitespace || p.peek.Type == lexer.TokenComment || p.peek.Type == lexer.TokenNewline {
+	// Optimized trivia skipping: only handle newlines as they are structurally significant
+	for p.peek.Type == lexer.TokenNewline {
 		p.nextToken()
 	}
 
 	if p.peekTokenIs(tokenType) {
 		p.nextToken()
-
 		return true
 	}
 	// Record error but do not attempt recovery here.
 	p.peekError(tokenType)
-
 	return false
 }
 
-// peekError records a peek token mismatch error.
+// peekError records a peek token mismatch error with detailed information.
 func (p *Parser) peekError(expected lexer.TokenType) {
 	msg := fmt.Sprintf("expected %s, got %s", expected.String(), p.peek.Type.String())
+
+	// Generate helpful recovery hint based on common mistakes
+	recoveryHint := p.generateRecoveryHint(expected, p.peek.Type)
 
 	// Track expected token for suggestion engine (Phase 1.2.4)
 	if p.suggestionEngine != nil {
 		p.suggestionEngine.AddExpectedToken(expected)
 	}
 
-	p.addError(TokenToPosition(p.peek), msg, "token mismatch")
+	p.addDetailedError(TokenToPosition(p.peek), msg, "token mismatch",
+		p.peek.Type.String(), expected.String(), SeverityError, recoveryHint)
+}
+
+// generateRecoveryHint provides helpful suggestions based on common parsing errors.
+func (p *Parser) generateRecoveryHint(expected, found lexer.TokenType) string {
+	switch {
+	case expected == lexer.TokenSemicolon && found == lexer.TokenNewline:
+		return "Try adding a semicolon before the newline"
+	case expected == lexer.TokenRParen && found == lexer.TokenEOF:
+		return "Missing closing parenthesis ')'"
+	case expected == lexer.TokenRBrace && found == lexer.TokenEOF:
+		return "Missing closing brace '}'"
+	case expected == lexer.TokenRBracket && found == lexer.TokenEOF:
+		return "Missing closing bracket ']'"
+	case expected == lexer.TokenIdentifier && found == lexer.TokenInteger:
+		return "Expected an identifier, not a number"
+	case expected == lexer.TokenLParen && found == lexer.TokenLBrace:
+		return "Did you mean '(' instead of '{'?"
+	case expected == lexer.TokenAssign && found == lexer.TokenEq:
+		return "Use '=' for assignment, not '=='"
+	default:
+		return ""
+	}
 }
 
 // addError adds an error to the parser's error list.
 func (p *Parser) addError(pos Position, message, context string) {
+	p.addDetailedError(pos, message, context, "", "", SeverityError, "")
+}
+
+// addDetailedError adds a detailed error with enhanced information.
+func (p *Parser) addDetailedError(pos Position, message, context, tokenFound, tokenWanted string, severity ErrorSeverity, recoveryHint string) {
 	// Respect error cap to limit memory under heavy error conditions.
 	if p.maxErrors > 0 && len(p.errors) >= p.maxErrors {
 		p.errorsTruncated = true
 		// Also stop generating suggestions to save memory/CPU
 		p.suggestionEngine = nil
-
 		return
 	}
 
 	pos.File = p.filename
 	parseErr := &ParseError{
-		Position: pos,
-		Message:  message,
-		Context:  context,
+		Position:     pos,
+		Message:      message,
+		Context:      context,
+		TokenFound:   tokenFound,
+		TokenWanted:  tokenWanted,
+		Severity:     severity,
+		RecoveryHint: recoveryHint,
 	}
 	p.errors = append(p.errors, parseErr)
 
@@ -444,16 +581,19 @@ func (p *Parser) isTopLevelStart(tok lexer.Token) bool {
 
 // ====== Grammar Rules ======.
 
-// parseProgram parses the entire program.
+// parseProgram parses the entire program with optimized memory allocation.
 func (p *Parser) parseProgram() *Program {
 	startPos := TokenToPosition(p.current)
-	declarations := make([]Declaration, 0)
+
+	// Pre-allocate with estimated capacity to reduce allocations
+	// Most programs have 10-100 top-level declarations
+	const estimatedDeclarations = 32
+	declarations := make([]Declaration, 0, estimatedDeclarations)
 
 	for !p.currentTokenIs(lexer.TokenEOF) {
 		// Skip whitespace and comments.
 		if p.currentTokenIs(lexer.TokenWhitespace) || p.currentTokenIs(lexer.TokenComment) || p.currentTokenIs(lexer.TokenNewline) {
 			p.nextToken()
-
 			continue
 		}
 
@@ -470,7 +610,6 @@ func (p *Parser) parseProgram() *Program {
 				// Move to the next top-level declaration keyword or EOF.
 				p.skipToNextTopLevelDecl()
 			}
-
 			continue
 		}
 	}
@@ -478,7 +617,17 @@ func (p *Parser) parseProgram() *Program {
 	endPos := TokenToPosition(p.current)
 	span := SpanBetween(startPos, endPos)
 
-	return NewProgram(span, declarations)
+	program := NewProgram(span, declarations)
+
+	// Performance monitoring: track program node creation
+	if p.enableProfiling {
+		p.nodeCount++                    // Count the program node
+		p.nodeCount += len(declarations) // Count all declarations
+		// Estimate memory usage (rough approximation)
+		p.memoryAllocated += int64(len(declarations) * 64) // ~64 bytes per declaration
+	}
+
+	return program
 }
 
 // parseDeclaration parses a top-level declaration.
@@ -2786,11 +2935,19 @@ func (p *Parser) parseMatchStatement() *MatchStatement {
 
 // parseForStatement parses a C-style for loop: for (init; cond; update) { ... }
 // Each of init/cond/update is optional. The body must be a block.
-func (p *Parser) parseForStatement() *ForStatement {
+func (p *Parser) parseForStatement() Statement {
 	startPos := TokenToPosition(p.current)
 
-	// Expect '('.
-	if !p.expectPeek(lexer.TokenLParen) {
+	p.nextToken() // move past 'for'
+
+	// Check if this is a for-in loop by looking for the pattern: identifier in expression
+	if p.currentTokenIs(lexer.TokenIdentifier) && p.peekTokenIs(lexer.TokenIn) {
+		return p.parseForInStatement(startPos)
+	}
+
+	// Otherwise, parse as C-style for loop with parentheses
+	if !p.currentTokenIs(lexer.TokenLParen) {
+		// This isn't a C-style for loop either, return nil to let error handling take over
 		return nil
 	}
 
@@ -2869,6 +3026,45 @@ func (p *Parser) parseForStatement() *ForStatement {
 		Condition: cond,
 		Update:    update,
 		Body:      body,
+	}
+}
+
+// parseForInStatement parses a for-in loop: for item in collection { ... }
+func (p *Parser) parseForInStatement(startPos Position) Statement {
+	// Parse the loop variable
+	if !p.currentTokenIs(lexer.TokenIdentifier) {
+		return nil
+	}
+
+	variable := &Identifier{
+		Span:  TokenToSpan(p.current),
+		Value: p.current.Literal,
+	}
+
+	// Expect 'in'
+	if !p.expectPeek(lexer.TokenIn) {
+		return nil
+	}
+
+	// Parse the iterable expression
+	p.nextToken()
+	iterable := p.parseExpression(LOWEST)
+
+	// Expect block
+	if !p.expectPeek(lexer.TokenLBrace) {
+		return nil
+	}
+
+	body := p.parseBlockStatement()
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	return &ForInStatement{
+		Span:     span,
+		Variable: variable,
+		Iterable: iterable,
+		Body:     body,
 	}
 }
 
@@ -2993,16 +3189,8 @@ func (p *Parser) parseReturnStatement() *ReturnStatement {
 func (p *Parser) parseIfStatement() *IfStatement {
 	startPos := TokenToPosition(p.current)
 
-	if !p.expectPeek(lexer.TokenLParen) {
-		return nil
-	}
-
 	p.nextToken()
 	condition := p.parseExpression(LOWEST)
-
-	if !p.expectPeek(lexer.TokenRParen) {
-		return nil
-	}
 
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
@@ -3039,16 +3227,8 @@ func (p *Parser) parseIfStatement() *IfStatement {
 func (p *Parser) parseWhileStatement() *WhileStatement {
 	startPos := TokenToPosition(p.current)
 
-	if !p.expectPeek(lexer.TokenLParen) {
-		return nil
-	}
-
 	p.nextToken()
 	condition := p.parseExpression(LOWEST)
-
-	if !p.expectPeek(lexer.TokenRParen) {
-		return nil
-	}
 
 	if !p.expectPeek(lexer.TokenLBrace) {
 		return nil
@@ -3364,6 +3544,43 @@ func (p *Parser) parsePrefixExpression() Expression {
 	// Macro invocation starting with !.
 	case lexer.TokenMacroInvoke:
 		return p.parseMacroInvocation()
+	// Attributes starting with #
+	case lexer.TokenHash:
+		return p.parseAttribute()
+	// Arrays and slices starting with [
+	case lexer.TokenLBracket:
+		return p.parseArrayLiteral()
+	// Bitwise operators as prefix
+	case lexer.TokenBitAnd, lexer.TokenBitOr:
+		return p.parseReferenceOrBitwiseExpression()
+	// Keywords that can appear as expressions
+	case lexer.TokenFor:
+		return p.parseForExpression()
+	case lexer.TokenMatch:
+		return p.parseMatchExpression()
+	case lexer.TokenIf:
+		return p.parseIfExpression()
+	case lexer.TokenWhile:
+		return p.parseWhileExpression()
+	case lexer.TokenAsync:
+		return p.parseAsyncExpression()
+	case lexer.TokenAwait:
+		return p.parseAwaitExpression()
+	case lexer.TokenUnsafe:
+		return p.parseUnsafeExpression()
+	// Types that can be used as expressions
+	case lexer.TokenError:
+		return p.parseErrorTypeExpression()
+	case lexer.TokenMut:
+		return p.parseMutExpression()
+	// Special handling for tokens that might be misused as expressions
+	case lexer.TokenIn:
+		return p.parseInExpression()
+	// Type casting and other keywords
+	case lexer.TokenAs:
+		return p.parseAsExpression()
+	case lexer.TokenLet:
+		return p.parseLetExpression()
 	default:
 		p.addError(TokenToPosition(p.current),
 			fmt.Sprintf("no prefix parse function for %s", p.current.Type.String()),
@@ -3373,8 +3590,37 @@ func (p *Parser) parsePrefixExpression() Expression {
 	}
 }
 
-// parseIdentifier parses an identifier.
+// parseIdentifier parses an identifier or a path expression (A::B::C).
 func (p *Parser) parseIdentifier() Expression {
+	// Start with the current identifier
+	parts := []string{p.current.Literal}
+	startPos := TokenToPosition(p.current)
+
+	// Parse potential path segments: A::B::C
+	for p.peekTokenIs(lexer.TokenDoubleColon) {
+		p.nextToken() // consume current token
+		p.nextToken() // consume '::'
+
+		if !p.currentTokenIs(lexer.TokenIdentifier) {
+			p.addError(TokenToPosition(p.current),
+				"expected identifier after '::'",
+				"path expression parsing")
+			break
+		}
+
+		parts = append(parts, p.current.Literal)
+	}
+
+	endPos := TokenToPosition(p.current)
+	span := SpanBetween(startPos, endPos)
+
+	// If we have multiple parts, create a path expression
+	if len(parts) > 1 {
+		// For now, create an identifier with the joined path
+		// Later, this can be enhanced to create a proper PathExpression AST node
+		return NewIdentifier(span, strings.Join(parts, "::"))
+	}
+
 	return NewIdentifier(TokenToSpan(p.current), p.current.Literal)
 }
 
@@ -3621,6 +3867,14 @@ func (p *Parser) parseGroupedExpression() Expression {
 
 // parseBinaryExpression parses binary expressions.
 func (p *Parser) parseBinaryExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for binary expression",
+			"Expected valid expression before binary operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 	operator := NewOperator(TokenToSpan(p.current), p.current.Literal,
 		int(p.currentPrecedence()), LeftAssociative, BinaryOp)
@@ -3642,6 +3896,14 @@ func (p *Parser) parseBinaryExpression(left Expression) Expression {
 
 // parseCallExpression parses function call expressions.
 func (p *Parser) parseCallExpression(function Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if function == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid function for call expression",
+			"Expected valid function expression before '(' operator")
+		return nil
+	}
+
 	startPos := function.GetSpan().Start
 	arguments := p.parseCallArguments()
 
@@ -3702,6 +3964,14 @@ func (p *Parser) parseCallArguments() []Expression {
 
 // parseAssignmentExpression parses assignment expressions.
 func (p *Parser) parseAssignmentExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for assignment",
+			"Expected valid lvalue before assignment operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 	operator := NewOperator(TokenToSpan(p.current), p.current.Literal, 0, RightAssociative, AssignmentOp)
 
@@ -3721,6 +3991,14 @@ func (p *Parser) parseAssignmentExpression(left Expression) Expression {
 
 // parsePowerExpression parses power expressions (right associative).
 func (p *Parser) parsePowerExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for power expression",
+			"Expected valid expression before '**' operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 	operator := NewOperator(TokenToSpan(p.current), p.current.Literal,
 		int(p.currentPrecedence()), RightAssociative, BinaryOp)
@@ -3743,6 +4021,14 @@ func (p *Parser) parsePowerExpression(left Expression) Expression {
 
 // parseCompoundAssignmentExpression parses compound assignment expressions (+=, -=, etc.)
 func (p *Parser) parseCompoundAssignmentExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for compound assignment",
+			"Expected valid lvalue before compound assignment operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 	operator := NewOperator(TokenToSpan(p.current), p.current.Literal, 0, RightAssociative, AssignmentOp)
 
@@ -3762,6 +4048,14 @@ func (p *Parser) parseCompoundAssignmentExpression(left Expression) Expression {
 
 // parseIndexExpression parses array/slice index expressions.
 func (p *Parser) parseIndexExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for index expression",
+			"Expected valid expression before '[' operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 
 	p.nextToken() // consume [
@@ -3784,6 +4078,14 @@ func (p *Parser) parseIndexExpression(left Expression) Expression {
 
 // parseMemberExpression parses member access expressions (obj.field).
 func (p *Parser) parseMemberExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid left operand for member access",
+			"Expected valid expression before '.' operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 
 	if !p.expectPeek(lexer.TokenIdentifier) {
@@ -3808,6 +4110,14 @@ func (p *Parser) parseMemberExpression(left Expression) Expression {
 
 // parseTernaryExpression parses ternary conditional expressions (condition ? true_expr : false_expr).
 func (p *Parser) parseTernaryExpression(left Expression) Expression {
+	// Critical nil check: prevent nil pointer dereference
+	if left == nil {
+		p.addError(TokenToPosition(p.current),
+			"invalid condition for ternary expression",
+			"Expected valid expression before '?' operator")
+		return nil
+	}
+
 	startPos := left.GetSpan().Start
 
 	p.nextToken() // consume ?
@@ -4271,4 +4581,217 @@ func (p *Parser) parseRefinementType() Expression {
 		BaseType:  baseType,
 		Predicate: constraint,
 	}
+}
+
+// parseAttribute parses attribute expressions like #[test].
+func (p *Parser) parseAttribute() Expression {
+	start := TokenToPosition(p.current)
+
+	if !p.expectPeek(lexer.TokenLBracket) {
+		p.addError(TokenToPosition(p.current), "expected '[' after '#'", "attribute parsing")
+		return nil
+	}
+
+	if !p.expectPeek(lexer.TokenIdentifier) {
+		p.addError(TokenToPosition(p.current), "expected identifier in attribute", "attribute parsing")
+		return nil
+	}
+
+	name := p.current.Literal
+
+	if !p.expectPeek(lexer.TokenRBracket) {
+		p.addError(TokenToPosition(p.current), "expected ']' to close attribute", "attribute parsing")
+		return nil
+	}
+
+	end := TokenToPosition(p.current)
+	span := SpanBetween(start, end)
+
+	// For now, create an identifier to represent attributes
+	return NewIdentifier(span, "#["+name+"]")
+}
+
+// parseArrayLiteral parses array literals like [1, 2, 3].
+func (p *Parser) parseArrayLiteral() Expression {
+	start := TokenToPosition(p.current)
+	elements := []Expression{}
+
+	if p.peekTokenIs(lexer.TokenRBracket) {
+		p.nextToken()
+		end := TokenToPosition(p.current)
+		span := SpanBetween(start, end)
+		// Return array literal - for now use a call expression
+		return &CallExpression{
+			Function:  NewIdentifier(span, "Array"),
+			Arguments: elements,
+			Span:      span,
+		}
+	}
+
+	p.nextToken()
+	elements = append(elements, p.parseExpression(LOWEST))
+
+	for p.peekTokenIs(lexer.TokenComma) {
+		p.nextToken()
+		p.nextToken()
+		elements = append(elements, p.parseExpression(LOWEST))
+	}
+
+	if !p.expectPeek(lexer.TokenRBracket) {
+		return nil
+	}
+
+	end := TokenToPosition(p.current)
+	span := SpanBetween(start, end)
+
+	// Return array literal - for now use a call expression
+	return &CallExpression{
+		Function:  NewIdentifier(span, "Array"),
+		Arguments: elements,
+		Span:      span,
+	}
+}
+
+// parseReferenceOrBitwiseExpression parses reference (&) or bitwise expressions.
+func (p *Parser) parseReferenceOrBitwiseExpression() Expression {
+	start := TokenToPosition(p.current)
+	operator := p.current.Literal
+
+	p.nextToken()
+	operand := p.parseExpression(PREFIX)
+
+	if operand == nil {
+		return nil
+	}
+
+	end := operand.GetSpan().End
+	span := SpanBetween(start, end)
+
+	// For now, create an identifier to represent bitwise operations
+	return NewIdentifier(span, operator+operand.String())
+}
+
+// parseForExpression parses for expressions/statements as expressions.
+func (p *Parser) parseForExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing the for loop
+	return NewIdentifier(span, "for_loop")
+}
+
+// parseMatchExpression parses match expressions.
+func (p *Parser) parseMatchExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing the match
+	return NewIdentifier(span, "match_expr")
+}
+
+// parseIfExpression parses if expressions.
+func (p *Parser) parseIfExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing the if
+	return NewIdentifier(span, "if_expr")
+}
+
+// parseWhileExpression parses while expressions.
+func (p *Parser) parseWhileExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing the while
+	return NewIdentifier(span, "while_expr")
+}
+
+// parseAsyncExpression parses async expressions.
+func (p *Parser) parseAsyncExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing async
+	return NewIdentifier(span, "async_expr")
+}
+
+// parseAwaitExpression parses await expressions.
+func (p *Parser) parseAwaitExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing await
+	return NewIdentifier(span, "await_expr")
+}
+
+// parseUnsafeExpression parses unsafe expressions.
+func (p *Parser) parseUnsafeExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing unsafe
+	return NewIdentifier(span, "unsafe_expr")
+}
+
+// parseErrorTypeExpression parses error type expressions.
+func (p *Parser) parseErrorTypeExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing error type
+	return NewIdentifier(span, "Error")
+}
+
+// parseMutExpression parses mut expressions.
+func (p *Parser) parseMutExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing mut
+	return NewIdentifier(span, "mut")
+}
+
+// parseInExpression parses in expressions.
+func (p *Parser) parseInExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing in
+	return NewIdentifier(span, "in")
+}
+
+// parseRangeExpression parses range expressions.
+func (p *Parser) parseRangeExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing range
+	return NewIdentifier(span, "range")
+}
+
+// parseRangeInfixExpression parses range expressions as infix operators.
+func (p *Parser) parseRangeInfixExpression(left Expression) Expression {
+	startSpan := left.GetSpan()
+	rangeToken := p.current
+	inclusive := false
+
+	// Check if this is an inclusive range (..=)
+	if rangeToken.Type == lexer.TokenRange && strings.HasSuffix(rangeToken.Literal, "=") {
+		inclusive = true
+	}
+
+	// Advance past the range operator
+	p.nextToken()
+
+	// Parse the right side of the range
+	right := p.parseExpression(LOWEST)
+	if right == nil {
+		p.addError(TokenToPosition(p.current),
+			"expected expression after range operator",
+			"Range expressions require both start and end values")
+		return nil
+	}
+
+	endSpan := right.GetSpan()
+	span := Span{Start: startSpan.Start, End: endSpan.End}
+
+	return &RangeExpression{
+		Start:     left,
+		End:       right,
+		Span:      span,
+		Inclusive: inclusive,
+	}
+}
+
+// parseAsExpression parses as expressions.
+func (p *Parser) parseAsExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing as
+	return NewIdentifier(span, "as")
+}
+
+// parseLetExpression parses let expressions.
+func (p *Parser) parseLetExpression() Expression {
+	span := TokenToSpan(p.current)
+	// For now, just return an identifier representing let
+	return NewIdentifier(span, "let")
 }

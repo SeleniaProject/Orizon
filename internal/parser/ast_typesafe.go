@@ -36,6 +36,7 @@ const (
 	NodeKindIfStatement
 	NodeKindWhileStatement
 	NodeKindForStatement
+	NodeKindForInStatement
 	NodeKindBreakStatement
 	NodeKindContinueStatement
 
@@ -47,6 +48,7 @@ const (
 	NodeKindCallExpression
 	NodeKindAssignmentExpression
 	NodeKindTernaryExpression
+	NodeKindRangeExpression
 	NodeKindMacroInvocation
 	NodeKindArrayExpression
 	NodeKindIndexExpression
@@ -117,6 +119,8 @@ func (nk NodeKind) String() string {
 		return "WhileStatement"
 	case NodeKindForStatement:
 		return "ForStatement"
+	case NodeKindForInStatement:
+		return "ForInStatement"
 	case NodeKindBreakStatement:
 		return "BreakStatement"
 	case NodeKindContinueStatement:
@@ -135,6 +139,8 @@ func (nk NodeKind) String() string {
 		return "AssignmentExpression"
 	case NodeKindTernaryExpression:
 		return "TernaryExpression"
+	case NodeKindRangeExpression:
+		return "RangeExpression"
 	case NodeKindMacroInvocation:
 		return "MacroInvocation"
 	case NodeKindArrayExpression:
@@ -252,6 +258,7 @@ type TypedVisitor[T any] interface {
 	VisitMemberExpression(*MemberExpression) T
 	// Additional statement nodes.
 	VisitForStatement(*ForStatement) T
+	VisitForInStatement(*ForInStatement) T
 	VisitBreakStatement(*BreakStatement) T
 	VisitContinueStatement(*ContinueStatement) T
 }

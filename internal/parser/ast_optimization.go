@@ -692,6 +692,16 @@ func (ao *ASTOptimizer) VisitForStatement(fs *ForStatement) interface{} {
 	return fs
 }
 
+func (ao *ASTOptimizer) VisitForInStatement(fis *ForInStatement) interface{} {
+	// For now, just pass through for-in statements.
+	return fis
+}
+
+func (ao *ASTOptimizer) VisitRangeExpression(re *RangeExpression) interface{} {
+	// For now, just pass through range expressions.
+	return re
+}
+
 func (ao *ASTOptimizer) VisitBreakStatement(bs *BreakStatement) interface{} {
 	return bs
 }

@@ -351,6 +351,70 @@ func (se *StructExpression) ReplaceChild(index int, newChild TypeSafeNode) error
 	return fmt.Errorf("ReplaceChild not implemented for StructExpression")
 }
 
+// RangeExpression represents range expressions: start..end or start..=end
+type RangeExpression struct {
+	Start     Expression
+	End       Expression
+	Span      Span
+	Inclusive bool // true for ..=, false for ..
+}
+
+func (re *RangeExpression) GetSpan() Span { return re.Span }
+func (re *RangeExpression) String() string {
+	if re.Inclusive {
+		return fmt.Sprintf("%s..=%s", re.Start.String(), re.End.String())
+	}
+	return fmt.Sprintf("%s..%s", re.Start.String(), re.End.String())
+}
+
+func (re *RangeExpression) Accept(visitor Visitor) interface{} {
+	return visitor.VisitRangeExpression(re)
+}
+func (re *RangeExpression) expressionNode()       {}
+func (re *RangeExpression) GetNodeKind() NodeKind { return NodeKindRangeExpression }
+func (re *RangeExpression) Clone() TypeSafeNode {
+	clone := *re
+	if re.Start != nil {
+		clone.Start = re.Start.(TypeSafeNode).Clone().(Expression)
+	}
+	if re.End != nil {
+		clone.End = re.End.(TypeSafeNode).Clone().(Expression)
+	}
+	return &clone
+}
+
+func (re *RangeExpression) Equals(other TypeSafeNode) bool {
+	if ore, ok := other.(*RangeExpression); ok {
+		return re.Inclusive == ore.Inclusive &&
+			((re.Start == nil && ore.Start == nil) ||
+				(re.Start != nil && ore.Start != nil &&
+					re.Start.(TypeSafeNode).Equals(ore.Start.(TypeSafeNode)))) &&
+			((re.End == nil && ore.End == nil) ||
+				(re.End != nil && ore.End != nil &&
+					re.End.(TypeSafeNode).Equals(ore.End.(TypeSafeNode))))
+	}
+	return false
+}
+
+func (re *RangeExpression) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0, 2)
+	if re.Start != nil {
+		children = append(children, re.Start.(TypeSafeNode))
+	}
+	if re.End != nil {
+		children = append(children, re.End.(TypeSafeNode))
+	}
+	return children
+}
+
+func (re *RangeExpression) ReplaceChild(index int, newChild TypeSafeNode) error {
+	children := re.GetChildren()
+	if index < 0 || index >= len(children) {
+		return fmt.Errorf("index %d out of range for RangeExpression children", index)
+	}
+	return fmt.Errorf("ReplaceChild not fully implemented for RangeExpression")
+}
+
 // ====== Additional Statement Nodes ======.
 
 // ForStatement represents for loops.
@@ -448,6 +512,70 @@ func (fs *ForStatement) ReplaceChild(index int, newChild TypeSafeNode) error {
 	// This implementation would need to track which child is being replaced.
 	// based on the actual structure and ordering.
 	return fmt.Errorf("ReplaceChild not fully implemented for ForStatement")
+}
+
+// ForInStatement represents for-in loops (for item in collection).
+type ForInStatement struct {
+	Variable *Identifier
+	Iterable Expression
+	Body     *BlockStatement
+	Span     Span
+}
+
+func (fis *ForInStatement) GetSpan() Span  { return fis.Span }
+func (fis *ForInStatement) String() string { return "for ... in ... { ... }" }
+func (fis *ForInStatement) Accept(visitor Visitor) interface{} {
+	return visitor.VisitForInStatement(fis)
+}
+func (fis *ForInStatement) statementNode()        {}
+func (fis *ForInStatement) GetNodeKind() NodeKind { return NodeKindForInStatement }
+func (fis *ForInStatement) Clone() TypeSafeNode {
+	clone := *fis
+	if fis.Variable != nil {
+		clone.Variable = fis.Variable.Clone().(*Identifier)
+	}
+	if fis.Iterable != nil {
+		clone.Iterable = fis.Iterable.(TypeSafeNode).Clone().(Expression)
+	}
+	if fis.Body != nil {
+		clone.Body = fis.Body.Clone().(*BlockStatement)
+	}
+	return &clone
+}
+
+func (fis *ForInStatement) Equals(other TypeSafeNode) bool {
+	if ois, ok := other.(*ForInStatement); ok {
+		return ((fis.Variable == nil && ois.Variable == nil) ||
+			(fis.Variable != nil && ois.Variable != nil && fis.Variable.Equals(ois.Variable))) &&
+			((fis.Iterable == nil && ois.Iterable == nil) ||
+				(fis.Iterable != nil && ois.Iterable != nil &&
+					fis.Iterable.(TypeSafeNode).Equals(ois.Iterable.(TypeSafeNode)))) &&
+			((fis.Body == nil && ois.Body == nil) ||
+				(fis.Body != nil && ois.Body != nil && fis.Body.Equals(ois.Body)))
+	}
+	return false
+}
+
+func (fis *ForInStatement) GetChildren() []TypeSafeNode {
+	children := make([]TypeSafeNode, 0, 3)
+	if fis.Variable != nil {
+		children = append(children, fis.Variable)
+	}
+	if fis.Iterable != nil {
+		children = append(children, fis.Iterable.(TypeSafeNode))
+	}
+	if fis.Body != nil {
+		children = append(children, fis.Body)
+	}
+	return children
+}
+
+func (fis *ForInStatement) ReplaceChild(index int, newChild TypeSafeNode) error {
+	children := fis.GetChildren()
+	if index < 0 || index >= len(children) {
+		return fmt.Errorf("index %d out of range for ForInStatement children", index)
+	}
+	return fmt.Errorf("ReplaceChild not fully implemented for ForInStatement")
 }
 
 // BreakStatement represents break statement.
