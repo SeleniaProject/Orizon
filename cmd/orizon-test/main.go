@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/orizon-lang/orizon/internal/cli"
 	"github.com/orizon-lang/orizon/internal/testrunner"
 )
 
@@ -36,6 +37,9 @@ func main() {
 		snapshotDir      string
 		cleanupSnapshots bool
 		goldenTests      bool
+		showVersion      bool
+		showHelp         bool
+		jsonOutput       bool
 	)
 
 	flag.StringVar(&pkgs, "packages", "./...", "comma-separated package patterns (e.g. ./...,./internal/...)")
@@ -61,7 +65,33 @@ func main() {
 	flag.StringVar(&snapshotDir, "snapshot-dir", "testdata/snapshots", "directory for snapshot files")
 	flag.BoolVar(&cleanupSnapshots, "cleanup-snapshots", false, "remove orphaned snapshot files")
 	flag.BoolVar(&goldenTests, "golden", false, "enable golden file testing support")
+	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.BoolVar(&showHelp, "help", false, "show help information")
+	flag.BoolVar(&jsonOutput, "json-format", false, "output version in JSON format")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Advanced test runner for Orizon projects with retry logic, flakiness detection, and rich reporting.\n\n")
+		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nEXAMPLES:\n")
+		fmt.Fprintf(os.Stderr, "  %s                        # Run all tests\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -packages ./internal   # Run tests in internal packages\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -retries 3 -race       # Run with race detection and 3 retries\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -json -junit out.xml   # Output JSON and JUnit XML\n", os.Args[0])
+	}
+
 	flag.Parse()
+
+	if showHelp {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if showVersion {
+		cli.PrintVersion("Orizon Test Runner", jsonOutput)
+		os.Exit(0)
+	}
 
 	pkgsArr := splitNonEmpty(pkgs, ",")
 	env := splitNonEmpty(envList, ";")

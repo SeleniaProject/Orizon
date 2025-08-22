@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/orizon-lang/orizon/internal/cli"
 	"github.com/orizon-lang/orizon/internal/lexer"
 	"github.com/orizon-lang/orizon/internal/parser"
 	"github.com/orizon-lang/orizon/internal/testrunner/fuzz"
@@ -19,31 +20,34 @@ import (
 
 func main() {
 	var (
-		dur        time.Duration
-		seed       int64
-		max        int
-		par        int
-		corpusPath string
-		corpusDir  string
-		corpusOut  string
-		outPath    string
-		crashDir   string
-		lang       string
-		minimize   string
-		targetKind string
-		covOut     string
-		covStats   bool
-		per        time.Duration
-		minOnCrash bool
-		minDir     string
-		minBudget  time.Duration
-		saveSeed   string
-		printStats bool
-		jsonStats  string
-		intensity  float64
-		autotune   bool
-		covMode    string
-		maxExecs   uint64
+		dur         time.Duration
+		seed        int64
+		max         int
+		par         int
+		corpusPath  string
+		corpusDir   string
+		corpusOut   string
+		outPath     string
+		crashDir    string
+		lang        string
+		minimize    string
+		targetKind  string
+		covOut      string
+		covStats    bool
+		per         time.Duration
+		minOnCrash  bool
+		minDir      string
+		minBudget   time.Duration
+		saveSeed    string
+		printStats  bool
+		jsonStats   string
+		intensity   float64
+		autotune    bool
+		covMode     string
+		maxExecs    uint64
+		showVersion bool
+		showHelp    bool
+		jsonOutput  bool
 	)
 
 	flag.DurationVar(&dur, "duration", 5*time.Second, "fuzzing duration")
@@ -71,7 +75,39 @@ func main() {
 	flag.BoolVar(&autotune, "autotune", false, "enable adaptive mutation intensity")
 	flag.StringVar(&covMode, "cov-mode", "weighted", "coverage mode (edge|weighted|trigram|both)")
 	flag.Uint64Var(&maxExecs, "max-execs", 0, "stop after this many executions (0=unlimited)")
+	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.BoolVar(&showHelp, "help", false, "show help information")
+	flag.BoolVar(&jsonOutput, "json-format", false, "output version in JSON format")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Advanced fuzzing tool for Orizon compiler components with coverage-guided testing.\n\n")
+		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nTARGETS:\n")
+		fmt.Fprintf(os.Stderr, "  noop        No-op target for testing fuzzer itself\n")
+		fmt.Fprintf(os.Stderr, "  lexer       Fuzz the lexical analyzer\n")
+		fmt.Fprintf(os.Stderr, "  parser      Fuzz the parser\n")
+		fmt.Fprintf(os.Stderr, "  astbridge   Fuzz AST bridge\n")
+		fmt.Fprintf(os.Stderr, "  hir         Fuzz HIR generation\n")
+		fmt.Fprintf(os.Stderr, "  custom      Custom target implementation\n")
+		fmt.Fprintf(os.Stderr, "\nEXAMPLES:\n")
+		fmt.Fprintf(os.Stderr, "  %s -target parser -duration 1m     # Fuzz parser for 1 minute\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -target lexer -corpus corp.txt  # Fuzz lexer with corpus\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -p 4 -autotune -stats           # Parallel fuzzing with stats\n", os.Args[0])
+	}
+
 	flag.Parse()
+
+	if showHelp {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if showVersion {
+		cli.PrintVersion("Orizon Fuzzer", jsonOutput)
+		os.Exit(0)
+	}
 
 	L := getLocale(lang)
 
