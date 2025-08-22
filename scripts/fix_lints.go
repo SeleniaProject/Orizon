@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,7 +12,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run fix_lints.go <directory>")
+		log.Println("Usage: go run fix_lints.go <directory>")
 		os.Exit(1)
 	}
 
@@ -34,19 +35,29 @@ func main() {
 		return fixFile(path)
 	})
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Linting fixes applied successfully!")
+	log.Println("Linting fixes applied successfully!")
 }
 
 func fixFile(filename string) error {
-	input, err := os.Open(filename)
-	if err != nil {
-		return err
+	// Validate the filename to prevent path traversal attacks
+	if strings.Contains(filename, "..") || strings.Contains(filename, "~") {
+		return fmt.Errorf("invalid filename: %s", filename)
 	}
-	defer input.Close()
+
+	input, err := os.Open(filepath.Clean(filename))
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", filename, err)
+	}
+
+	defer func() {
+		if closeErr := input.Close(); closeErr != nil {
+			log.Printf("Warning: failed to close input file: %v", closeErr)
+		}
+	}()
 
 	var lines []string
 
@@ -63,23 +74,34 @@ func fixFile(filename string) error {
 		lines = append(lines, line)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return err
+	if scanErr := scanner.Err(); scanErr != nil {
+		return fmt.Errorf("scanner error: %w", scanErr)
 	}
 
 	// Write back to file.
-	output, err := os.Create(filename)
+	output, err := os.Create(filepath.Clean(filename))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer output.Close()
+
+	defer func() {
+		if closeErr := output.Close(); closeErr != nil {
+			log.Printf("Warning: failed to close output file: %v", closeErr)
+		}
+	}()
 
 	writer := bufio.NewWriter(output)
 	for _, line := range lines {
-		fmt.Fprintln(writer, line)
+		if _, writeErr := writer.WriteString(line + "\n"); writeErr != nil {
+			return fmt.Errorf("failed to write line: %w", writeErr)
+		}
 	}
 
-	return writer.Flush()
+	if flushErr := writer.Flush(); flushErr != nil {
+		return fmt.Errorf("failed to flush writer: %w", flushErr)
+	}
+
+	return nil
 }
 
 func fixGodotViolations(line string) string {
@@ -93,7 +115,7 @@ func fixGodotViolations(line string) string {
 	return line
 }
 
-func fixTestPackageViolations(line string, filename string) string {
+func fixTestPackageViolations(line, filename string) string {
 	// Fix test package names.
 	if strings.Contains(filename, "/test/") && strings.HasPrefix(strings.TrimSpace(line), "package ") {
 		if strings.Contains(filename, "/benchmark/") {
