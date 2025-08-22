@@ -370,32 +370,32 @@ type UnifiedEffectConstraint interface {
 	Describe() string
 }
 
-// UnifiedEffectKindConstraint constrains by effect kind.
-type UnifiedEffectKindConstraint struct {
+// unifiedEffectKindConstraint constrains by effect kind.
+type unifiedEffectKindConstraint struct {
 	AllowedKinds []UnifiedEffectKind
 	DeniedKinds  []UnifiedEffectKind
 }
 
-// NewUnifiedEffectKindConstraint creates a new kind constraint.
-func NewUnifiedEffectKindConstraint() *UnifiedEffectKindConstraint {
-	return &UnifiedEffectKindConstraint{
+// newUnifiedEffectKindConstraint creates a new kind constraint.
+func newUnifiedEffectKindConstraint() *unifiedEffectKindConstraint {
+	return &unifiedEffectKindConstraint{
 		AllowedKinds: make([]UnifiedEffectKind, 0),
 		DeniedKinds:  make([]UnifiedEffectKind, 0),
 	}
 }
 
 // Allow adds an allowed kind.
-func (c *UnifiedEffectKindConstraint) Allow(kind UnifiedEffectKind) {
+func (c *unifiedEffectKindConstraint) Allow(kind UnifiedEffectKind) {
 	c.AllowedKinds = append(c.AllowedKinds, kind)
 }
 
 // Deny adds a denied kind.
-func (c *UnifiedEffectKindConstraint) Deny(kind UnifiedEffectKind) {
+func (c *unifiedEffectKindConstraint) Deny(kind UnifiedEffectKind) {
 	c.DeniedKinds = append(c.DeniedKinds, kind)
 }
 
 // Check checks if an effect satisfies the constraint.
-func (c *UnifiedEffectKindConstraint) Check(effect *UnifiedEffect) bool {
+func (c *unifiedEffectKindConstraint) Check(effect *UnifiedEffect) bool {
 	// Check denied kinds first.
 	for _, deniedKind := range c.DeniedKinds {
 		if effect.Kind == deniedKind {
@@ -419,27 +419,27 @@ func (c *UnifiedEffectKindConstraint) Check(effect *UnifiedEffect) bool {
 }
 
 // Describe returns a description of the constraint.
-func (c *UnifiedEffectKindConstraint) Describe() string {
+func (c *unifiedEffectKindConstraint) Describe() string {
 	return "Effect kind constraint"
 }
 
-// UnifiedEffectAnalyzer provides comprehensive analysis of unified effects.
-type UnifiedEffectAnalyzer struct {
+// unifiedEffectAnalyzer provides comprehensive analysis of unified effects.
+type unifiedEffectAnalyzer struct {
 	signatures map[string]*UnifiedEffectSignature
 	policies   []UnifiedEffectPolicy
 	mutex      sync.RWMutex
 }
 
-// NewUnifiedEffectAnalyzer creates a new unified effect analyzer.
-func NewUnifiedEffectAnalyzer() *UnifiedEffectAnalyzer {
-	return &UnifiedEffectAnalyzer{
+// newUnifiedEffectAnalyzer creates a new unified effect analyzer.
+func newUnifiedEffectAnalyzer() *unifiedEffectAnalyzer {
+	return &unifiedEffectAnalyzer{
 		signatures: make(map[string]*UnifiedEffectSignature),
 		policies:   make([]UnifiedEffectPolicy, 0),
 	}
 }
 
 // RegisterSignature registers a function signature.
-func (a *UnifiedEffectAnalyzer) RegisterSignature(sig *UnifiedEffectSignature) {
+func (a *unifiedEffectAnalyzer) RegisterSignature(sig *UnifiedEffectSignature) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -447,7 +447,7 @@ func (a *UnifiedEffectAnalyzer) RegisterSignature(sig *UnifiedEffectSignature) {
 }
 
 // GetSignature retrieves a function signature.
-func (a *UnifiedEffectAnalyzer) GetSignature(functionName string) (*UnifiedEffectSignature, bool) {
+func (a *unifiedEffectAnalyzer) GetSignature(functionName string) (*UnifiedEffectSignature, bool) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
@@ -457,7 +457,7 @@ func (a *UnifiedEffectAnalyzer) GetSignature(functionName string) (*UnifiedEffec
 }
 
 // AddPolicy adds an effect policy.
-func (a *UnifiedEffectAnalyzer) AddPolicy(policy UnifiedEffectPolicy) {
+func (a *unifiedEffectAnalyzer) AddPolicy(policy UnifiedEffectPolicy) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -465,11 +465,11 @@ func (a *UnifiedEffectAnalyzer) AddPolicy(policy UnifiedEffectPolicy) {
 }
 
 // AnalyzeEffects analyzes effects for policy compliance.
-func (a *UnifiedEffectAnalyzer) AnalyzeEffects(effects *UnifiedEffectSet) *UnifiedEffectAnalysisResult {
+func (a *unifiedEffectAnalyzer) AnalyzeEffects(effects *UnifiedEffectSet) *unifiedEffectAnalysisResult {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	result := &UnifiedEffectAnalysisResult{
+	result := &unifiedEffectAnalysisResult{
 		TotalEffects:    effects.Size(),
 		PureEffects:     0,
 		ImpureEffects:   0,
@@ -525,13 +525,13 @@ type UnifiedEffectPolicy interface {
 	Describe() string
 }
 
-// PurityPolicy enforces purity requirements.
-type PurityPolicy struct {
+// purityPolicy enforces purity requirements.
+type purityPolicy struct {
 	RequirePure bool
 }
 
 // Check checks if an effect satisfies the purity policy.
-func (p *PurityPolicy) Check(effect *UnifiedEffect) bool {
+func (p *purityPolicy) Check(effect *UnifiedEffect) bool {
 	if p.RequirePure {
 		return effect.Pure
 	}
@@ -540,7 +540,7 @@ func (p *PurityPolicy) Check(effect *UnifiedEffect) bool {
 }
 
 // Describe returns a description of the policy.
-func (p *PurityPolicy) Describe() string {
+func (p *purityPolicy) Describe() string {
 	if p.RequirePure {
 		return "Requires pure effects only"
 	}
@@ -548,13 +548,13 @@ func (p *PurityPolicy) Describe() string {
 	return "No purity requirements"
 }
 
-// SafetyPolicy enforces safety requirements.
-type SafetyPolicy struct {
+// safetyPolicy enforces safety requirements.
+type safetyPolicy struct {
 	RequireSafe bool
 }
 
 // Check checks if an effect satisfies the safety policy.
-func (s *SafetyPolicy) Check(effect *UnifiedEffect) bool {
+func (s *safetyPolicy) Check(effect *UnifiedEffect) bool {
 	if s.RequireSafe {
 		return effect.Safe
 	}
@@ -563,7 +563,7 @@ func (s *SafetyPolicy) Check(effect *UnifiedEffect) bool {
 }
 
 // Describe returns a description of the policy.
-func (s *SafetyPolicy) Describe() string {
+func (s *safetyPolicy) Describe() string {
 	if s.RequireSafe {
 		return "Requires safe effects only"
 	}
@@ -571,8 +571,8 @@ func (s *SafetyPolicy) Describe() string {
 	return "No safety requirements"
 }
 
-// UnifiedEffectAnalysisResult represents the result of effect analysis.
-type UnifiedEffectAnalysisResult struct {
+// unifiedEffectAnalysisResult represents the result of effect analysis.
+type unifiedEffectAnalysisResult struct {
 	Violations      []string
 	Recommendations []string
 	TotalEffects    int
@@ -584,7 +584,7 @@ type UnifiedEffectAnalysisResult struct {
 }
 
 // String returns a string representation of the analysis result.
-func (r *UnifiedEffectAnalysisResult) String() string {
+func (r *unifiedEffectAnalysisResult) String() string {
 	return fmt.Sprintf(
 		"Analysis Result: %d total effects (%d pure, %d impure, %d safe, %d unsafe), "+
 			"Passed: %v, Violations: %d, Recommendations: %d",
@@ -592,16 +592,16 @@ func (r *UnifiedEffectAnalysisResult) String() string {
 		r.Passed, len(r.Violations), len(r.Recommendations))
 }
 
-// UnifiedEffectConverter provides conversion between effect systems.
-type UnifiedEffectConverter struct{}
+// unifiedEffectConverter provides conversion between effect systems.
+type unifiedEffectConverter struct{}
 
-// NewUnifiedEffectConverter creates a new effect converter.
-func NewUnifiedEffectConverter() *UnifiedEffectConverter {
-	return &UnifiedEffectConverter{}
+// newUnifiedEffectConverter creates a new effect converter.
+func newUnifiedEffectConverter() *unifiedEffectConverter {
+	return &unifiedEffectConverter{}
 }
 
 // FromSideEffect converts a side effect to unified effect.
-func (c *UnifiedEffectConverter) FromSideEffect(sideEffect *Effect) *UnifiedEffect {
+func (c *unifiedEffectConverter) FromSideEffect(sideEffect *Effect) *UnifiedEffect {
 	// Map effect name to kind (simplified approach).
 	kind := c.mapEffectNameToKind(sideEffect.Name)
 	unified := NewUnifiedEffect(kind, EffectLevelLow) // Default level
@@ -616,7 +616,7 @@ func (c *UnifiedEffectConverter) FromSideEffect(sideEffect *Effect) *UnifiedEffe
 }
 
 // mapEffectNameToKind maps an effect name to UnifiedEffectKind.
-func (c *UnifiedEffectConverter) mapEffectNameToKind(name string) UnifiedEffectKind {
+func (c *unifiedEffectConverter) mapEffectNameToKind(name string) UnifiedEffectKind {
 	switch name {
 	case "IO":
 		return UnifiedEffectIORead
@@ -636,7 +636,7 @@ func (c *UnifiedEffectConverter) mapEffectNameToKind(name string) UnifiedEffectK
 }
 
 // FromExceptionEffect converts an exception effect to unified effect.
-func (c *UnifiedEffectConverter) FromExceptionEffect(exceptionEffect *ExceptionEffect) *UnifiedEffect {
+func (c *unifiedEffectConverter) FromExceptionEffect(exceptionEffect *ExceptionEffect) *UnifiedEffect {
 	unified := NewUnifiedEffect(c.mapExceptionEffectKind(exceptionEffect.Kind), exceptionEffect.Level)
 	unified.ExceptionEffect = exceptionEffect
 	unified.Description = exceptionEffect.Description
@@ -648,7 +648,7 @@ func (c *UnifiedEffectConverter) FromExceptionEffect(exceptionEffect *ExceptionE
 }
 
 // FromIOEffect converts an I/O effect to unified effect.
-func (c *UnifiedEffectConverter) FromIOEffect(ioEffect *IOEffect) *UnifiedEffect {
+func (c *unifiedEffectConverter) FromIOEffect(ioEffect *IOEffect) *UnifiedEffect {
 	unified := NewUnifiedEffect(c.mapIOEffectKind(ioEffect.Kind), ioEffect.Level)
 	unified.IOEffect = ioEffect
 	unified.Description = ioEffect.Description
@@ -662,7 +662,7 @@ func (c *UnifiedEffectConverter) FromIOEffect(ioEffect *IOEffect) *UnifiedEffect
 }
 
 // mapExceptionEffectKind maps exception effect kind to unified effect kind.
-func (c *UnifiedEffectConverter) mapExceptionEffectKind(kind ExceptionEffectKind) UnifiedEffectKind {
+func (c *unifiedEffectConverter) mapExceptionEffectKind(kind ExceptionEffectKind) UnifiedEffectKind {
 	switch kind {
 	case ExceptionEffectThrows, ExceptionEffectArithmeticError, ExceptionEffectNullPointer,
 		ExceptionEffectIndexOutOfBounds, ExceptionEffectTypeError, ExceptionEffectIOError:
@@ -677,7 +677,7 @@ func (c *UnifiedEffectConverter) mapExceptionEffectKind(kind ExceptionEffectKind
 }
 
 // mapIOEffectKind maps I/O effect kind to unified effect kind.
-func (c *UnifiedEffectConverter) mapIOEffectKind(kind IOEffectKind) UnifiedEffectKind {
+func (c *unifiedEffectConverter) mapIOEffectKind(kind IOEffectKind) UnifiedEffectKind {
 	switch kind {
 	case IOEffectPure:
 		return UnifiedEffectPure

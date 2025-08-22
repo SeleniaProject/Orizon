@@ -558,15 +558,27 @@ func (t *Type) Equals(other *Type) bool {
 		return tSlice.ElementType.Equals(oSlice.ElementType)
 
 	case TypeKindPointer:
-		tPointer := t.Data.(*PointerType)
-		oPointer := other.Data.(*PointerType)
+		tPointer, ok := t.Data.(*PointerType)
+		if !ok {
+			return false
+		}
+		oPointer, ok := other.Data.(*PointerType)
+		if !ok {
+			return false
+		}
 
 		return tPointer.IsNullable == oPointer.IsNullable &&
 			tPointer.PointeeType.Equals(oPointer.PointeeType)
 
 	case TypeKindStruct:
-		tStruct := t.Data.(*StructType)
-		oStruct := other.Data.(*StructType)
+		tStruct, ok := t.Data.(*StructType)
+		if !ok {
+			return false
+		}
+		oStruct, ok := other.Data.(*StructType)
+		if !ok {
+			return false
+		}
 
 		if tStruct.Name != oStruct.Name || len(tStruct.Fields) != len(oStruct.Fields) {
 			return false
@@ -582,8 +594,14 @@ func (t *Type) Equals(other *Type) bool {
 		return true
 
 	case TypeKindTuple:
-		tTuple := t.Data.(*TupleType)
-		oTuple := other.Data.(*TupleType)
+		tTuple, ok := t.Data.(*TupleType)
+		if !ok {
+			return false
+		}
+		oTuple, ok := other.Data.(*TupleType)
+		if !ok {
+			return false
+		}
 
 		if len(tTuple.Elements) != len(oTuple.Elements) {
 			return false
@@ -598,8 +616,14 @@ func (t *Type) Equals(other *Type) bool {
 		return true
 
 	case TypeKindFunction:
-		tFunc := t.Data.(*FunctionType)
-		oFunc := other.Data.(*FunctionType)
+		tFunc, ok := t.Data.(*FunctionType)
+		if !ok {
+			return false
+		}
+		oFunc, ok := other.Data.(*FunctionType)
+		if !ok {
+			return false
+		}
 
 		if len(tFunc.Parameters) != len(oFunc.Parameters) ||
 			tFunc.IsVariadic != oFunc.IsVariadic ||
@@ -617,8 +641,14 @@ func (t *Type) Equals(other *Type) bool {
 		return true
 
 	case TypeKindTypeVar:
-		tVar := t.Data.(*TypeVar)
-		oVar := other.Data.(*TypeVar)
+		tVar, ok := t.Data.(*TypeVar)
+		if !ok {
+			return false
+		}
+		oVar, ok := other.Data.(*TypeVar)
+		if !ok {
+			return false
+		}
 
 		return tVar.ID == oVar.ID
 
@@ -643,8 +673,14 @@ func (t *Type) CanConvertTo(target *Type) bool {
 
 	// Pointer conversions.
 	if t.Kind == TypeKindPointer && target.Kind == TypeKindPointer {
-		tPtr := t.Data.(*PointerType)
-		targetPtr := target.Data.(*PointerType)
+		tPtr, ok := t.Data.(*PointerType)
+		if !ok {
+			return false
+		}
+		targetPtr, ok := target.Data.(*PointerType)
+		if !ok {
+			return false
+		}
 		// Nullable pointer can convert to non-nullable pointer (null check required).
 		// Non-nullable pointer cannot convert to nullable pointer (would break non-null guarantee).
 		if tPtr.IsNullable && !targetPtr.IsNullable {
@@ -660,8 +696,14 @@ func (t *Type) CanConvertTo(target *Type) bool {
 
 	// Array to slice conversion.
 	if t.Kind == TypeKindArray && target.Kind == TypeKindSlice {
-		tArray := t.Data.(*ArrayType)
-		targetSlice := target.Data.(*SliceType)
+		tArray, ok := t.Data.(*ArrayType)
+		if !ok {
+			return false
+		}
+		targetSlice, ok := target.Data.(*SliceType)
+		if !ok {
+			return false
+		}
 
 		return tArray.ElementType.Equals(targetSlice.ElementType)
 	}
@@ -688,6 +730,13 @@ func (t *Type) IsNumeric() bool {
 		TypeKindUint8, TypeKindUint16, TypeKindUint32, TypeKindUint64,
 		TypeKindFloat32, TypeKindFloat64:
 		return true
+	case TypeKindVoid, TypeKindBool, TypeKindChar, TypeKindString,
+		TypeKindArray, TypeKindSlice, TypeKindPointer, TypeKindStruct,
+		TypeKindEnum, TypeKindUnion, TypeKindTuple, TypeKindFunction,
+		TypeKindChannel, TypeKindGeneric, TypeKindTypeVar, TypeKindRefinement,
+		TypeKindLinear, TypeKindEffect, TypeKindDependent, TypeKindTrait,
+		TypeKindAny, TypeKindNever, TypeKindUnknown:
+		return false
 	default:
 		return false
 	}
@@ -699,6 +748,13 @@ func (t *Type) IsInteger() bool {
 	case TypeKindInt8, TypeKindInt16, TypeKindInt32, TypeKindInt64,
 		TypeKindUint8, TypeKindUint16, TypeKindUint32, TypeKindUint64:
 		return true
+	case TypeKindVoid, TypeKindBool, TypeKindFloat32, TypeKindFloat64,
+		TypeKindChar, TypeKindString, TypeKindArray, TypeKindSlice,
+		TypeKindPointer, TypeKindStruct, TypeKindEnum, TypeKindUnion,
+		TypeKindTuple, TypeKindFunction, TypeKindChannel, TypeKindGeneric,
+		TypeKindTypeVar, TypeKindRefinement, TypeKindLinear, TypeKindEffect,
+		TypeKindDependent, TypeKindTrait, TypeKindAny, TypeKindNever, TypeKindUnknown:
+		return false
 	default:
 		return false
 	}
@@ -709,6 +765,15 @@ func (t *Type) IsFloat() bool {
 	switch t.Kind {
 	case TypeKindFloat32, TypeKindFloat64:
 		return true
+	case TypeKindVoid, TypeKindBool, TypeKindInt8, TypeKindInt16,
+		TypeKindInt32, TypeKindInt64, TypeKindUint8, TypeKindUint16,
+		TypeKindUint32, TypeKindUint64, TypeKindChar, TypeKindString,
+		TypeKindArray, TypeKindSlice, TypeKindPointer, TypeKindStruct,
+		TypeKindEnum, TypeKindUnion, TypeKindTuple, TypeKindFunction,
+		TypeKindChannel, TypeKindGeneric, TypeKindTypeVar, TypeKindRefinement,
+		TypeKindLinear, TypeKindEffect, TypeKindDependent, TypeKindTrait,
+		TypeKindAny, TypeKindNever, TypeKindUnknown:
+		return false
 	default:
 		return false
 	}
@@ -737,6 +802,14 @@ func (t *Type) IsAggregate() bool {
 	switch t.Kind {
 	case TypeKindArray, TypeKindStruct, TypeKindTuple, TypeKindUnion:
 		return true
+	case TypeKindVoid, TypeKindBool, TypeKindInt8, TypeKindInt16,
+		TypeKindInt32, TypeKindInt64, TypeKindUint8, TypeKindUint16,
+		TypeKindUint32, TypeKindUint64, TypeKindFloat32, TypeKindFloat64,
+		TypeKindChar, TypeKindString, TypeKindSlice, TypeKindPointer,
+		TypeKindEnum, TypeKindFunction, TypeKindChannel, TypeKindGeneric,
+		TypeKindTypeVar, TypeKindRefinement, TypeKindLinear, TypeKindEffect,
+		TypeKindDependent, TypeKindTrait, TypeKindAny, TypeKindNever, TypeKindUnknown:
+		return false
 	default:
 		return false
 	}
@@ -763,123 +836,158 @@ func (t *Type) String() string {
 		return t.Kind.String()
 
 	case TypeKindArray:
-		array := t.Data.(*ArrayType)
-
-		return fmt.Sprintf("[%d]%s", array.Length, array.ElementType.String())
+		if array, ok := t.Data.(*ArrayType); ok {
+			return fmt.Sprintf("[%d]%s", array.Length, array.ElementType.String())
+		}
+		return "Array<invalid>"
 
 	case TypeKindSlice:
-		slice := t.Data.(*SliceType)
-
-		return fmt.Sprintf("[]%s", slice.ElementType.String())
+		if slice, ok := t.Data.(*SliceType); ok {
+			return fmt.Sprintf("[]%s", slice.ElementType.String())
+		}
+		return "Slice<invalid>"
 
 	case TypeKindPointer:
-		pointer := t.Data.(*PointerType)
-		nullable := ""
-
-		if pointer.IsNullable {
-			nullable = "?"
+		if pointer, ok := t.Data.(*PointerType); ok {
+			nullable := ""
+			if pointer.IsNullable {
+				nullable = "?"
+			}
+			return fmt.Sprintf("*%s%s", pointer.PointeeType.String(), nullable)
 		}
-
-		return fmt.Sprintf("*%s%s", pointer.PointeeType.String(), nullable)
+		return "Pointer<invalid>"
 
 	case TypeKindStruct:
-		structType := t.Data.(*StructType)
-		if structType.Name != "" {
-			return structType.Name
-		}
+		if structType, ok := t.Data.(*StructType); ok {
+			if structType.Name != "" {
+				return structType.Name
+			}
 
-		var fields []string
-		for _, field := range structType.Fields {
-			fields = append(fields, fmt.Sprintf("%s: %s", field.Name, field.Type.String()))
-		}
+			var fields []string
+			for _, field := range structType.Fields {
+				fields = append(fields, fmt.Sprintf("%s: %s", field.Name, field.Type.String()))
+			}
 
-		return fmt.Sprintf("struct { %s }", strings.Join(fields, ", "))
+			return fmt.Sprintf("struct { %s }", strings.Join(fields, ", "))
+		}
+		return "Struct<invalid>"
 
 	case TypeKindEnum:
-		enumType := t.Data.(*EnumType)
-
-		return enumType.Name
+		if enumType, ok := t.Data.(*EnumType); ok {
+			return enumType.Name
+		}
+		return "Enum<invalid>"
 
 	case TypeKindUnion:
-		unionType := t.Data.(*UnionType)
-
-		return unionType.Name
+		if unionType, ok := t.Data.(*UnionType); ok {
+			return unionType.Name
+		}
+		return "Union<invalid>"
 
 	case TypeKindTuple:
-		tuple := t.Data.(*TupleType)
-
-		var elements []string
-
-		for _, element := range tuple.Elements {
-			elements = append(elements, element.String())
+		if tuple, ok := t.Data.(*TupleType); ok {
+			var elements []string
+			for _, element := range tuple.Elements {
+				elements = append(elements, element.String())
+			}
+			return fmt.Sprintf("(%s)", strings.Join(elements, ", "))
 		}
-
-		return fmt.Sprintf("(%s)", strings.Join(elements, ", "))
+		return "Tuple<invalid>"
 
 	case TypeKindFunction:
-		function := t.Data.(*FunctionType)
+		if function, ok := t.Data.(*FunctionType); ok {
+			var params []string
+			for _, param := range function.Parameters {
+				params = append(params, param.String())
+			}
 
-		var params []string
+			paramStr := strings.Join(params, ", ")
+			if function.IsVariadic {
+				paramStr += ", ..."
+			}
 
-		for _, param := range function.Parameters {
-			params = append(params, param.String())
+			asyncStr := ""
+			if function.IsAsync {
+				asyncStr = "async "
+			}
+
+			return fmt.Sprintf("%sfn(%s) -> %s", asyncStr, paramStr, function.ReturnType.String())
 		}
-
-		paramStr := strings.Join(params, ", ")
-		if function.IsVariadic {
-			paramStr += ", ..."
-		}
-
-		asyncStr := ""
-		if function.IsAsync {
-			asyncStr = "async "
-		}
-
-		return fmt.Sprintf("%sfn(%s) -> %s", asyncStr, paramStr, function.ReturnType.String())
+		return "Function<invalid>"
 
 	case TypeKindChannel:
-		channel := t.Data.(*ChannelType)
-		dirStr := ""
+		if channel, ok := t.Data.(*ChannelType); ok {
+			dirStr := ""
+			switch channel.Direction {
+			case ChannelSendOnly:
+				dirStr = "send "
+			case ChannelReceiveOnly:
+				dirStr = "recv "
+			case ChannelBidirectional:
+				dirStr = ""
+			}
 
-		switch channel.Direction {
-		case ChannelSendOnly:
-			dirStr = "send "
-		case ChannelReceiveOnly:
-			dirStr = "recv "
+			bufStr := ""
+			if channel.Buffered {
+				bufStr = fmt.Sprintf("<%d>", channel.BufferSize)
+			}
+
+			return fmt.Sprintf("%schan%s %s", dirStr, bufStr, channel.ElementType.String())
 		}
-
-		bufStr := ""
-		if channel.Buffered {
-			bufStr = fmt.Sprintf("<%d>", channel.BufferSize)
-		}
-
-		return fmt.Sprintf("%schan%s %s", dirStr, bufStr, channel.ElementType.String())
+		return "Channel<invalid>"
 
 	case TypeKindGeneric:
-		generic := t.Data.(*GenericType)
-		if len(generic.Constraints) == 0 {
-			return generic.Name
-		}
+		if generic, ok := t.Data.(*GenericType); ok {
+			if len(generic.Constraints) == 0 {
+				return generic.Name
+			}
 
-		var constraints []string
-		for _, constraint := range generic.Constraints {
-			constraints = append(constraints, constraint.String())
-		}
+			var constraints []string
+			for _, constraint := range generic.Constraints {
+				constraints = append(constraints, constraint.String())
+			}
 
-		return fmt.Sprintf("%s: %s", generic.Name, strings.Join(constraints, " + "))
+			return fmt.Sprintf("%s: %s", generic.Name, strings.Join(constraints, " + "))
+		}
+		return "Generic<invalid>"
 
 	case TypeKindTypeVar:
-		typeVar := t.Data.(*TypeVar)
-		if typeVar.Bound != nil {
-			return typeVar.Bound.String()
+		if typeVar, ok := t.Data.(*TypeVar); ok {
+			if typeVar.Bound != nil {
+				return typeVar.Bound.String()
+			}
+			return fmt.Sprintf("'%s", typeVar.Name)
 		}
-
-		return fmt.Sprintf("'%s", typeVar.Name)
+		return "TypeVar<invalid>"
 
 	case TypeKindRefinement:
-		refinement := t.Data.(*RefinementType)
+		// RefinementType is not defined in this file, using generic string
+		return "Refinement<not_implemented>"
 
-		return fmt.Sprintf("%s{%s}", refinement.BaseType.String(), refinement.Predicate)
+	case TypeKindLinear:
+		if linear, ok := t.Data.(*LinearType); ok {
+			return fmt.Sprintf("Linear<%s>", linear.BaseType.String())
+		}
+		return "Linear<invalid>"
+
+	case TypeKindEffect:
+		if effect, ok := t.Data.(*EffectType); ok {
+			if len(effect.Effects) > 0 {
+				return fmt.Sprintf("Effect<%s>", effect.BaseType.String())
+			}
+			return effect.BaseType.String()
+		}
+		return "Effect<invalid>"
+
+	case TypeKindDependent:
+		if dependent, ok := t.Data.(*DependentType); ok {
+			return fmt.Sprintf("Dependent<%s>", dependent.BaseType.String())
+		}
+		return "Dependent<invalid>"
+
+	case TypeKindTrait:
+		// TraitType is not defined in this file, using generic string
+		return "Trait<not_implemented>"
 
 	default:
 		return fmt.Sprintf("<%s>", t.Kind.String())
