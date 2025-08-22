@@ -396,96 +396,13 @@ type ServerMetrics struct {
 	CacheMisses    int64 // Number of failed cache lookups
 
 	// Diagnostic metrics.
-	DiagnosticsRun    int64 // Total diagnostic runs
-	DiagnosticsTime   int64 // Total time spent on diagnostics (microseconds)
-	DiagnosticsIssues int64 // Total diagnostic issues found
+	DiagnosticsRun   int64 // Total diagnostic runs
+	DiagnosticsTime  int64 // Total time spent on diagnostics (microseconds)
+	DiagnosticsFound int64 // Total diagnostic issues found
+	DiagnosticsFixed int64 // Total diagnostic issues resolved
 }
-
-// NewServerMetrics creates a new metrics collection instance.
-//
-// All metrics are initialized to zero and will be updated as the.
-// server processes requests and performs operations.
-func NewServerMetrics() *ServerMetrics {
-	return &ServerMetrics{}
-}
-
-// UpdateRequestMetrics updates request-related performance metrics.
-func (m *ServerMetrics) UpdateRequestMetrics(processingTime int64, success bool) {
-	atomic.AddInt64(&m.RequestsReceived, 1)
-	if success {
-		atomic.AddInt64(&m.RequestsProcessed, 1)
-	} else {
-		atomic.AddInt64(&m.RequestsErrored, 1)
-	}
-
-	// Update rolling average (simplified).
-	currentAvg := atomic.LoadInt64(&m.AverageRequestTime)
-	newAvg := (currentAvg + processingTime) / 2
-	atomic.StoreInt64(&m.AverageRequestTime, newAvg)
-}
-
-// Component stub definitions.
-// These will be implemented in separate files for each component.
-
-// DocumentManager handles LSP document lifecycle and content management.
-type DocumentManager struct{}
-
-func NewDocumentManager(maxSize int64) *DocumentManager { return &DocumentManager{} }
-
-// SymbolIndexer provides fast symbol lookup and completion support.
-type SymbolIndexer struct{}
-
-func NewSymbolIndexer(cacheSize int) *SymbolIndexer { return &SymbolIndexer{} }
-
-// ASTCache manages parsed AST caching for performance optimization.
-type ASTCache struct{}
-
-func NewASTCache(cacheSize int) *ASTCache { return &ASTCache{} }
-
-// WorkspaceManager handles workspace-level operations and configuration.
-type WorkspaceManager struct{}
-
-func NewWorkspaceManager() *WorkspaceManager { return &WorkspaceManager{} }
-
-// HoverProvider implements LSP hover information display.
-type HoverProvider struct{}
-
-func NewHoverProvider(si *SymbolIndexer, ac *ASTCache) *HoverProvider { return &HoverProvider{} }
-
-// CompletionProvider implements LSP code completion functionality.
-type CompletionProvider struct{}
-
-func NewCompletionProvider(si *SymbolIndexer, ac *ASTCache) *CompletionProvider {
-	return &CompletionProvider{}
-}
-
-// DiagnosticsEngine provides code analysis and error reporting.
-type DiagnosticsEngine struct{}
-
-func NewDiagnosticsEngine() *DiagnosticsEngine { return &DiagnosticsEngine{} }
-
-// FormattingProvider implements code formatting capabilities.
-type FormattingProvider struct{}
-
-func NewFormattingProvider() *FormattingProvider { return &FormattingProvider{} }
-
-// SemanticTokensProvider implements semantic highlighting support.
-type SemanticTokensProvider struct{}
-
-func NewSemanticTokensProvider() *SemanticTokensProvider { return &SemanticTokensProvider{} }
-
-// DebugIntegration provides GDB and debugging tool integration.
-type DebugIntegration struct{}
-
-func NewDebugIntegration(httpURL, rspAddr string) *DebugIntegration { return &DebugIntegration{} }
-
-// RPCHandler manages JSON-RPC protocol communication.
-type RPCHandler struct{}
-
-func NewRPCHandler(reader *bufio.Reader, writer io.Writer) *RPCHandler { return &RPCHandler{} }
 
 // JSON-RPC message structures.
-
 type JSONRPCRequest struct {
 	ID     json.RawMessage
 	Method string
@@ -505,19 +422,6 @@ func RunStdio() error {
 	server := NewServer(os.Stdin, os.Stdout, options)
 	return server.Run()
 }
-
-// Stub handler methods (to be implemented in handler files).
-func (s *Server) handleInitialize(request *JSONRPCRequest)                      {}
-func (s *Server) handleTextDocumentDidOpen(request *JSONRPCRequest)             {}
-func (s *Server) handleTextDocumentDidChange(request *JSONRPCRequest)           {}
-func (s *Server) handleTextDocumentDidClose(request *JSONRPCRequest)            {}
-func (s *Server) handleTextDocumentHover(request *JSONRPCRequest)               {}
-func (s *Server) handleTextDocumentCompletion(request *JSONRPCRequest)          {}
-func (s *Server) handleTextDocumentFormatting(request *JSONRPCRequest)          {}
-func (s *Server) handleSemanticTokensFull(request *JSONRPCRequest)              {}
-func (s *Server) handleWorkspaceDidChangeConfiguration(request *JSONRPCRequest) {}
-func (s *Server) handleShutdown(request *JSONRPCRequest)                        {}
-func (s *Server) handleExit(request *JSONRPCRequest)                            {}
 
 // --- Minimal LSP wire helpers ---
 
@@ -581,4 +485,154 @@ func readFramedMessageWire(r *bufio.Reader) ([]byte, error) {
 		return nil, err
 	}
 	return buf, nil
+}
+
+// Minimal component implementations for LSP server functionality
+
+func NewDocumentManager(maxSize int64) *DocumentManager {
+	return &DocumentManager{
+		documents: make(map[string]*Document),
+		maxSize:   maxSize,
+	}
+}
+
+type DocumentManager struct {
+	documents map[string]*Document
+	maxSize   int64
+}
+
+type Document struct {
+	URI     string
+	Content string
+	Version int
+}
+
+func NewSymbolIndexer(cacheSize int) *SymbolIndexer {
+	return &SymbolIndexer{
+		symbols:   make(map[string][]Symbol),
+		cacheSize: cacheSize,
+	}
+}
+
+type SymbolIndexer struct {
+	symbols   map[string][]Symbol
+	cacheSize int
+}
+
+type Symbol struct {
+	Name     string
+	Kind     string
+	Location string
+}
+
+func NewASTCache(cacheSize int) *ASTCache {
+	return &ASTCache{
+		cache:   make(map[string]interface{}),
+		maxSize: cacheSize,
+	}
+}
+
+type ASTCache struct {
+	cache   map[string]interface{}
+	maxSize int
+}
+
+func NewWorkspaceManager() *WorkspaceManager {
+	return &WorkspaceManager{
+		folders: make([]string, 0),
+	}
+}
+
+type WorkspaceManager struct {
+	folders []string
+}
+
+func NewHoverProvider(symbolIndexer *SymbolIndexer, astCache *ASTCache) *HoverProvider {
+	return &HoverProvider{
+		symbolIndexer: symbolIndexer,
+		astCache:      astCache,
+	}
+}
+
+type HoverProvider struct {
+	symbolIndexer *SymbolIndexer
+	astCache      *ASTCache
+}
+
+func NewCompletionProvider(symbolIndexer *SymbolIndexer, astCache *ASTCache) *CompletionProvider {
+	return &CompletionProvider{
+		symbolIndexer: symbolIndexer,
+		astCache:      astCache,
+	}
+}
+
+type CompletionProvider struct {
+	symbolIndexer *SymbolIndexer
+	astCache      *ASTCache
+}
+
+func NewDiagnosticsEngine() *DiagnosticsEngine {
+	return &DiagnosticsEngine{
+		diagnostics: make(map[string][]Diagnostic),
+	}
+}
+
+type DiagnosticsEngine struct {
+	diagnostics map[string][]Diagnostic
+}
+
+type Diagnostic struct {
+	Range    Range
+	Severity int
+	Message  string
+}
+
+type Range struct {
+	Start Position
+	End   Position
+}
+
+type Position struct {
+	Line      int
+	Character int
+}
+
+func NewFormattingProvider() *FormattingProvider {
+	return &FormattingProvider{}
+}
+
+type FormattingProvider struct{}
+
+func NewSemanticTokensProvider() *SemanticTokensProvider {
+	return &SemanticTokensProvider{}
+}
+
+type SemanticTokensProvider struct{}
+
+func NewDebugIntegration(httpURL, rspAddress string) *DebugIntegration {
+	return &DebugIntegration{
+		httpURL:    httpURL,
+		rspAddress: rspAddress,
+	}
+}
+
+type DebugIntegration struct {
+	httpURL    string
+	rspAddress string
+}
+
+func NewServerMetrics() *ServerMetrics {
+	return &ServerMetrics{}
+}
+
+func NewRPCHandler(reader *bufio.Reader, writer io.Writer) *RPCHandler {
+	return &RPCHandler{
+		reader: reader,
+		writer: writer,
+	}
+}
+
+type RPCHandler struct {
+	reader *bufio.Reader
+	writer io.Writer
 }
