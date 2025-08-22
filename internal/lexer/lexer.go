@@ -797,6 +797,16 @@ func isHexDigit(ch byte) bool {
 	return isDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
 
+// containsDecimalPoint checks if the number literal contains a decimal point
+func containsDecimalPoint(literal string) bool {
+	return strings.Contains(literal, ".")
+}
+
+// containsExponent checks if the number literal contains an exponent
+func containsExponent(literal string) bool {
+	return strings.Contains(literal, "e") || strings.Contains(literal, "E")
+}
+
 // isBinaryDigit checks if character is binary digit.
 func isBinaryDigit(ch byte) bool {
 	return ch == '0' || ch == '1'
@@ -1200,7 +1210,13 @@ func (l *Lexer) NextToken() Token {
 				}
 			}
 
-			tok = l.newTokenFromPosition(TokenInteger, numberLiteral, startPos)
+			// Determine if it's a float or integer
+			tokenType := TokenInteger
+			if containsDecimalPoint(numberLiteral) || containsExponent(numberLiteral) {
+				tokenType = TokenFloat
+			}
+
+			tok = l.newTokenFromPosition(tokenType, numberLiteral, startPos)
 
 			return tok
 		} else if l.ch >= 0x80 { // Unicode文字
