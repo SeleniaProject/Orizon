@@ -1,0 +1,54 @@
+// エラー処理 - Result型とOption型
+// 安全なエラー処理の方法を学ぶ
+
+// エラーを返す可能性のある関数
+func divide(a: f64, b: f64) -> Result<f64, String> {
+    if b == 0.0 {
+        return Err("Division by zero");
+    }
+    return Ok(a / b);
+}
+
+// 値が存在しない可能性のある関数
+func find_element(arr: [i32], target: i32) -> Option<usize> {
+    for i in 0..arr.len() {
+        if arr[i] == target {
+            return Some(i);
+        }
+    }
+    return None;
+}
+
+func main() {
+    // Result型の使用
+    println("=== Result Type Examples ===");
+    
+    match divide(10.0, 2.0) {
+        Ok(result) => println("10 / 2 = {}", result),
+        Err(error) => println("Error: {}", error),
+    }
+    
+    match divide(10.0, 0.0) {
+        Ok(result) => println("10 / 0 = {}", result),
+        Err(error) => println("Error: {}", error),
+    }
+    
+    // Option型の使用
+    println("\n=== Option Type Examples ===");
+    
+    let numbers = [1, 2, 3, 4, 5];
+    
+    match find_element(numbers, 3) {
+        Some(index) => println("Found 3 at index {}", index),
+        None => println("3 not found"),
+    }
+    
+    match find_element(numbers, 7) {
+        Some(index) => println("Found 7 at index {}", index),
+        None => println("7 not found"),
+    }
+    
+    // unwrap_or でデフォルト値を提供
+    let index = find_element(numbers, 7).unwrap_or(999);
+    println("Index (with default): {}", index);
+}

@@ -1,0 +1,77 @@
+// メモリ管理 - 所有権とライフタイム
+// Orizonの安全なメモリ管理を学ぶ
+
+func take_ownership(s: String) {
+    println("Took ownership of: {}", s);
+    // s はここでドロップされる
+}
+
+func borrow_string(s: &String) {
+    println("Borrowed: {}", s);
+    // s の所有権は移動しない
+}
+
+func modify_string(s: &mut String) {
+    s.push_str(" - modified");
+    println("Modified string: {}", s);
+}
+
+struct Buffer {
+    data: Vec<u8>,
+    capacity: usize,
+}
+
+impl Buffer {
+    func new(capacity: usize) -> Buffer {
+        return Buffer {
+            data: Vec::with_capacity(capacity),
+            capacity: capacity,
+        };
+    }
+    
+    func add_byte(&mut self, byte: u8) -> Result<(), String> {
+        if self.data.len() >= self.capacity {
+            return Err("Buffer overflow");
+        }
+        self.data.push(byte);
+        return Ok(());
+    }
+    
+    func get_data(&self) -> &Vec<u8> {
+        return &self.data;
+    }
+}
+
+func main() {
+    println("=== Ownership Examples ===");
+    
+    // 所有権の移動
+    let owned_string = String::from("Hello");
+    take_ownership(owned_string);
+    // owned_string はもう使用できない
+    
+    // 借用
+    let borrowed_string = String::from("World");
+    borrow_string(&borrowed_string);
+    println("Still can use: {}", borrowed_string);
+    
+    // 可変借用
+    let mut mutable_string = String::from("Orizon");
+    modify_string(&mut mutable_string);
+    println("Final string: {}", mutable_string);
+    
+    println("\n=== Buffer Management ===");
+    
+    // バッファの作成と使用
+    let mut buffer = Buffer::new(10);
+    
+    for i in 0..5 {
+        match buffer.add_byte(i as u8) {
+            Ok(()) => println("Added byte {}", i),
+            Err(error) => println("Error: {}", error),
+        }
+    }
+    
+    let data = buffer.get_data();
+    println("Buffer contains {} bytes", data.len());
+}

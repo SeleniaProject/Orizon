@@ -1,0 +1,26 @@
+// 変数と型 - Orizonの基本的なデータ型
+// 整数、文字列、ブール値の使い方を学ぶ
+
+func main() {
+    // 整数型の変数
+    let age: i32 = 25;
+    let count: u64 = 1000;
+    
+    // 文字列型の変数
+    let name: String = "Orizon";
+    let message: String = "Programming Language";
+    
+    // ブール型の変数
+    let is_systems_language: bool = true;
+    let is_slow: bool = false;
+    
+    // 浮動小数点型
+    let pi: f64 = 3.14159;
+    let temperature: f32 = 36.5;
+    
+    // 出力
+    println("Language: {}", name);
+    println("Age: {}", age);
+    println("Pi value: {}", pi);
+    println("Is systems language: {}", is_systems_language);
+}

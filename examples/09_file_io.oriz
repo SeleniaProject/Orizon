@@ -1,0 +1,124 @@
+// ファイルI/O - ファイルの読み書き
+// ファイルシステムとの相互作用を学ぶ
+
+use std::fs;
+use std::io::{Read, Write};
+use std::path::Path;
+
+func write_to_file(filename: &str, content: &str) -> Result<(), String> {
+    match fs::write(filename, content) {
+        Ok(()) => {
+            println("Successfully wrote to {}", filename);
+            return Ok(());
+        },
+        Err(error) => {
+            return Err(format!("Failed to write to {}: {}", filename, error));
+        }
+    }
+}
+
+func read_from_file(filename: &str) -> Result<String, String> {
+    match fs::read_to_string(filename) {
+        Ok(content) => {
+            println("Successfully read from {}", filename);
+            return Ok(content);
+        },
+        Err(error) => {
+            return Err(format!("Failed to read from {}: {}", filename, error));
+        }
+    }
+}
+
+func append_to_file(filename: &str, content: &str) -> Result<(), String> {
+    let mut file = match fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(filename) {
+        Ok(file) => file,
+        Err(error) => return Err(format!("Failed to open {}: {}", filename, error)),
+    };
+    
+    match file.write_all(content.as_bytes()) {
+        Ok(()) => {
+            println("Successfully appended to {}", filename);
+            return Ok(());
+        },
+        Err(error) => {
+            return Err(format!("Failed to append to {}: {}", filename, error));
+        }
+    }
+}
+
+func list_files(directory: &str) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+    
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) => return Err(format!("Failed to read directory {}: {}", directory, error)),
+    };
+    
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_file() {
+            files.push(path.file_name().unwrap().to_string_lossy().to_string());
+        }
+    }
+    
+    return Ok(files);
+}
+
+func main() {
+    println("=== File I/O Examples ===");
+    
+    let filename = "example.txt";
+    let sample_content = "Hello, Orizon!\nThis is a sample file.\nCreated for demonstration.";
+    
+    // ファイルに書き込み
+    match write_to_file(filename, sample_content) {
+        Ok(()) => println("Write operation successful"),
+        Err(error) => println("Write error: {}", error),
+    }
+    
+    // ファイルから読み込み
+    match read_from_file(filename) {
+        Ok(content) => {
+            println("File content:");
+            println("{}", content);
+        },
+        Err(error) => println("Read error: {}", error),
+    }
+    
+    // ファイルに追記
+    let additional_content = "\nAppended line 1\nAppended line 2";
+    match append_to_file(filename, additional_content) {
+        Ok(()) => println("Append operation successful"),
+        Err(error) => println("Append error: {}", error),
+    }
+    
+    // 再度読み込み
+    match read_from_file(filename) {
+        Ok(content) => {
+            println("\nUpdated file content:");
+            println("{}", content);
+        },
+        Err(error) => println("Read error: {}", error),
+    }
+    
+    // ディレクトリ内のファイル一覧
+    match list_files(".") {
+        Ok(files) => {
+            println("\nFiles in current directory:");
+            for file in files {
+                println("  {}", file);
+            }
+        },
+        Err(error) => println("Directory listing error: {}", error),
+    }
+    
+    // クリーンアップ
+    match fs::remove_file(filename) {
+        Ok(()) => println("\nCleanup: Removed {}", filename),
+        Err(error) => println("Cleanup error: {}", error),
+    }
+}

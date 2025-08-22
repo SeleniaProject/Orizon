@@ -1,0 +1,57 @@
+// データ構造 - 構造体とメソッド
+// カスタムデータ型の定義と使用方法を学ぶ
+
+// 構造体の定義
+struct Person {
+    name: String,
+    age: u32,
+    email: String,
+}
+
+// メソッドの実装
+impl Person {
+    // コンストラクタ関数
+    func new(name: String, age: u32, email: String) -> Person {
+        return Person {
+            name: name,
+            age: age,
+            email: email,
+        };
+    }
+    
+    // インスタンスメソッド
+    func greet(&self) {
+        println("Hello, my name is {}", self.name);
+    }
+    
+    func is_adult(&self) -> bool {
+        return self.age >= 18;
+    }
+    
+    func birthday(&mut self) {
+        self.age = self.age + 1;
+        println("{} is now {} years old!", self.name, self.age);
+    }
+}
+
+func main() {
+    // 構造体のインスタンス作成
+    let mut person = Person::new(
+        "Alice",
+        25,
+        "alice@example.com"
+    );
+    
+    // メソッドの呼び出し
+    person.greet();
+    
+    if person.is_adult() {
+        println("{} is an adult", person.name);
+    }
+    
+    // 誕生日を祝う
+    person.birthday();
+    
+    // フィールドアクセス
+    println("Email: {}", person.email);
+}

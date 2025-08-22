@@ -1,0 +1,8 @@
+// Hello World - 最初のOrizonプログラム
+// Orizon言語の基本的な構文を学ぶためのサンプル
+
+func main() {
+    // 標準出力にメッセージを表示
+    println("Hello, Orizon World!");
+    println("Welcome to systems programming!");
+}

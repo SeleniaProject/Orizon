@@ -1,0 +1,27 @@
+// 関数 - 関数の定義、引数、戻り値
+// コードの再利用と構造化を学ぶ
+
+// 引数なし、戻り値なしの関数
+func greet() {
+    println("Hello from Orizon!");
+}
+
+// 引数あり、戻り値なしの関数
+func greet_person(name: String) {
+    println("Hello, Developer!");
+}
+
+// 引数あり、戻り値ありの関数
+func add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+func main() {
+    // 関数の呼び出し
+    greet();
+    greet_person("Developer");
+    
+    // 戻り値を受け取る
+    let result = add(10, 5);
+    println("10 + 5 = 15");
+}

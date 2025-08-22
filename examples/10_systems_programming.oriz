@@ -1,0 +1,155 @@
+// システムプログラミング - 低レベル操作
+// メモリ、ポインタ、システムコールの例
+
+use std::mem;
+use std::ptr;
+
+// 安全でない操作のための構造体
+struct RawBuffer {
+    ptr: *mut u8,
+    size: usize,
+    capacity: usize,
+}
+
+impl RawBuffer {
+    func new(capacity: usize) -> RawBuffer {
+        unsafe {
+            let layout = std::alloc::Layout::from_size_align(capacity, 1).unwrap();
+            let ptr = std::alloc::alloc(layout) as *mut u8;
+            if ptr.is_null() {
+                panic!("Memory allocation failed");
+            }
+            
+            return RawBuffer {
+                ptr: ptr,
+                size: 0,
+                capacity: capacity,
+            };
+        }
+    }
+    
+    func push_byte(&mut self, byte: u8) -> Result<(), String> {
+        if self.size >= self.capacity {
+            return Err("Buffer overflow");
+        }
+        
+        unsafe {
+            *self.ptr.add(self.size) = byte;
+            self.size += 1;
+        }
+        
+        return Ok(());
+    }
+    
+    func get_byte(&self, index: usize) -> Result<u8, String> {
+        if index >= self.size {
+            return Err("Index out of bounds");
+        }
+        
+        unsafe {
+            return Ok(*self.ptr.add(index));
+        }
+    }
+    
+    func as_slice(&self) -> &[u8] {
+        unsafe {
+            return std::slice::from_raw_parts(self.ptr, self.size);
+        }
+    }
+}
+
+impl Drop for RawBuffer {
+    func drop(&mut self) {
+        unsafe {
+            let layout = std::alloc::Layout::from_size_align(self.capacity, 1).unwrap();
+            std::alloc::dealloc(self.ptr as *mut u8, layout);
+        }
+    }
+}
+
+// ビット操作の例
+func bit_operations() {
+    println("=== Bit Operations ===");
+    
+    let mut flags: u32 = 0;
+    
+    // ビットを設定
+    flags |= 1 << 0;  // bit 0 を設定
+    flags |= 1 << 3;  // bit 3 を設定
+    flags |= 1 << 7;  // bit 7 を設定
+    
+    println("Flags after setting: 0b{:08b} ({})", flags, flags);
+    
+    // ビットをチェック
+    for i in 0..8 {
+        if (flags & (1 << i)) != 0 {
+            println("Bit {} is set", i);
+        }
+    }
+    
+    // ビットをクリア
+    flags &= !(1 << 3);  // bit 3 をクリア
+    println("Flags after clearing bit 3: 0b{:08b} ({})", flags, flags);
+}
+
+// メモリレイアウトの例
+func memory_layout() {
+    println("\n=== Memory Layout ===");
+    
+    let x: i32 = 42;
+    let y: f64 = 3.14159;
+    let z: [u8; 4] = [1, 2, 3, 4];
+    
+    println("Size of i32: {} bytes", mem::size_of::<i32>());
+    println("Size of f64: {} bytes", mem::size_of::<f64>());
+    println("Size of [u8; 4]: {} bytes", mem::size_of::<[u8; 4]>());
+    
+    println("Address of x: {:p}", &x);
+    println("Address of y: {:p}", &y);
+    println("Address of z: {:p}", &z);
+    
+    // アライメント情報
+    println("Alignment of i32: {} bytes", mem::align_of::<i32>());
+    println("Alignment of f64: {} bytes", mem::align_of::<f64>());
+    println("Alignment of [u8; 4]: {} bytes", mem::align_of::<[u8; 4]>());
+}
+
+func main() {
+    println("=== System Programming Examples ===");
+    
+    // ビット操作
+    bit_operations();
+    
+    // メモリレイアウト
+    memory_layout();
+    
+    // 生のバッファ操作
+    println("\n=== Raw Buffer Operations ===");
+    
+    let mut buffer = RawBuffer::new(16);
+    
+    // データを追加
+    for i in 0..10 {
+        match buffer.push_byte(i as u8) {
+            Ok(()) => println("Added byte: {}", i),
+            Err(error) => println("Error: {}", error),
+        }
+    }
+    
+    // データを読み取り
+    println("Buffer contents:");
+    for i in 0..buffer.size {
+        match buffer.get_byte(i) {
+            Ok(byte) => print!("{} ", byte),
+            Err(error) => println("Error reading byte {}: {}", i, error),
+        }
+    }
+    println!();
+    
+    // スライスとして表示
+    let slice = buffer.as_slice();
+    println("As slice: {:?}", slice);
+    
+    println("\nBuffer size: {} bytes", buffer.size);
+    println("Buffer capacity: {} bytes", buffer.capacity);
+}
