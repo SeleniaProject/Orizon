@@ -1,0 +1,308 @@
+// Orizon OS Kernel Module
+// カーネル開発用の基本的な機能を提供
+
+#[no_std]
+#[kernel_module]
+pub mod kernel {
+    use core::{ptr, mem};
+    
+    // カーネルレベルの基本型定義
+    pub type PhysAddr = usize;
+    pub type VirtAddr = usize;
+    pub type PageSize = usize;
+    
+    // ページサイズ定数
+    pub const PAGE_SIZE: PageSize = 4096;
+    pub const PAGE_MASK: usize = PAGE_SIZE - 1;
+    
+    // メモリ管理
+    pub mod memory {
+        use super::*;
+        
+        // ページフレーム管理
+        pub struct PageFrame {
+            addr: PhysAddr,
+            flags: u32,
+        }
+        
+        impl PageFrame {
+            pub fn new(addr: PhysAddr) -> Self {
+                Self { addr, flags: 0 }
+            }
+            
+            pub fn mark_used(&mut self) {
+                self.flags |= 1;
+            }
+            
+            pub fn mark_free(&mut self) {
+                self.flags &= !1;
+            }
+            
+            pub fn is_used(&self) -> bool {
+                (self.flags & 1) != 0
+            }
+        }
+        
+        // 簡単なページアロケータ
+        pub struct PageAllocator {
+            start: PhysAddr,
+            end: PhysAddr,
+            current: PhysAddr,
+        }
+        
+        impl PageAllocator {
+            pub fn new(start: PhysAddr, end: PhysAddr) -> Self {
+                Self {
+                    start: align_up(start, PAGE_SIZE),
+                    end: align_down(end, PAGE_SIZE),
+                    current: align_up(start, PAGE_SIZE),
+                }
+            }
+            
+            pub fn alloc_page(&mut self) -> Option<PhysAddr> {
+                if self.current + PAGE_SIZE <= self.end {
+                    let addr = self.current;
+                    self.current += PAGE_SIZE;
+                    Some(addr)
+                } else {
+                    None
+                }
+            }
+        }
+        
+        // アライメント関数
+        pub fn align_up(addr: usize, align: usize) -> usize {
+            (addr + align - 1) & !(align - 1)
+        }
+        
+        pub fn align_down(addr: usize, align: usize) -> usize {
+            addr & !(align - 1)
+        }
+    }
+    
+    // ハードウェア直接アクセス
+    pub mod hw {
+        use super::*;
+        
+        // ポートI/O
+        pub struct IoPort<T> {
+            port: u16,
+            _phantom: core::marker::PhantomData<T>,
+        }
+        
+        impl<T> IoPort<T> {
+            pub const fn new(port: u16) -> Self {
+                Self {
+                    port,
+                    _phantom: core::marker::PhantomData,
+                }
+            }
+        }
+        
+        impl IoPort<u8> {
+            pub unsafe fn read(&self) -> u8 {
+                let result: u8;
+                asm!("in al, dx", out("al") result, in("dx") self.port, options(nomem, nostack, preserves_flags));
+                result
+            }
+            
+            pub unsafe fn write(&self, value: u8) {
+                asm!("out dx, al", in("dx") self.port, in("al") value, options(nomem, nostack, preserves_flags));
+            }
+        }
+        
+        impl IoPort<u16> {
+            pub unsafe fn read(&self) -> u16 {
+                let result: u16;
+                asm!("in ax, dx", out("ax") result, in("dx") self.port, options(nomem, nostack, preserves_flags));
+                result
+            }
+            
+            pub unsafe fn write(&self, value: u16) {
+                asm!("out dx, ax", in("dx") self.port, in("ax") value, options(nomem, nostack, preserves_flags));
+            }
+        }
+        
+        impl IoPort<u32> {
+            pub unsafe fn read(&self) -> u32 {
+                let result: u32;
+                asm!("in eax, dx", out("eax") result, in("dx") self.port, options(nomem, nostack, preserves_flags));
+                result
+            }
+            
+            pub unsafe fn write(&self, value: u32) {
+                asm!("out dx, eax", in("dx") self.port, in("eax") value, options(nomem, nostack, preserves_flags));
+            }
+        }
+        
+        // メモリマップドI/O
+        pub unsafe fn read_volatile<T>(addr: *const T) -> T {
+            core::ptr::read_volatile(addr)
+        }
+        
+        pub unsafe fn write_volatile<T>(addr: *mut T, value: T) {
+            core::ptr::write_volatile(addr, value);
+        }
+        
+        // CPU制御
+        pub fn halt() -> ! {
+            unsafe {
+                loop {
+                    asm!("hlt", options(nomem, nostack, preserves_flags));
+                }
+            }
+        }
+        
+        pub fn enable_interrupts() {
+            unsafe {
+                asm!("sti", options(nomem, nostack, preserves_flags));
+            }
+        }
+        
+        pub fn disable_interrupts() {
+            unsafe {
+                asm!("cli", options(nomem, nostack, preserves_flags));
+            }
+        }
+    }
+    
+    // 割り込み処理
+    pub mod interrupt {
+        use super::*;
+        
+        pub type InterruptHandler = extern "C" fn();
+        
+        // IDT (Interrupt Descriptor Table) エントリ
+        #[repr(C, packed)]
+        pub struct IdtEntry {
+            offset_low: u16,
+            selector: u16,
+            ist: u8,
+            type_attributes: u8,
+            offset_middle: u16,
+            offset_high: u32,
+            reserved: u32,
+        }
+        
+        impl IdtEntry {
+            pub fn new(handler: InterruptHandler) -> Self {
+                let addr = handler as usize;
+                Self {
+                    offset_low: (addr & 0xFFFF) as u16,
+                    selector: 0x08, // カーネルコードセグメント
+                    ist: 0,
+                    type_attributes: 0x8E, // Present, Ring 0, Interrupt Gate
+                    offset_middle: ((addr >> 16) & 0xFFFF) as u16,
+                    offset_high: ((addr >> 32) & 0xFFFFFFFF) as u32,
+                    reserved: 0,
+                }
+            }
+            
+            pub fn empty() -> Self {
+                Self {
+                    offset_low: 0,
+                    selector: 0,
+                    ist: 0,
+                    type_attributes: 0,
+                    offset_middle: 0,
+                    offset_high: 0,
+                    reserved: 0,
+                }
+            }
+        }
+        
+        // IDTレジスタ
+        #[repr(C, packed)]
+        pub struct IdtRegister {
+            limit: u16,
+            base: u64,
+        }
+        
+        impl IdtRegister {
+            pub fn new(idt: &[IdtEntry; 256]) -> Self {
+                Self {
+                    limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
+                    base: idt.as_ptr() as u64,
+                }
+            }
+            
+            pub unsafe fn load(&self) {
+                asm!("lidt [{}]", in(reg) self, options(readonly, nostack, preserves_flags));
+            }
+        }
+    }
+    
+    // システムコール
+    pub mod syscall {
+        use super::*;
+        
+        #[repr(u64)]
+        pub enum SyscallNumber {
+            Read = 0,
+            Write = 1,
+            Open = 2,
+            Close = 3,
+            Exit = 60,
+        }
+        
+        pub fn syscall_handler(number: u64, arg1: u64, arg2: u64, arg3: u64) -> u64 {
+            match SyscallNumber::from(number) {
+                SyscallNumber::Write => sys_write(arg1, arg2, arg3),
+                SyscallNumber::Exit => sys_exit(arg1),
+                _ => 0, // エラー
+            }
+        }
+        
+        fn sys_write(fd: u64, buf: u64, count: u64) -> u64 {
+            // 簡単なコンソール出力実装
+            if fd == 1 { // stdout
+                unsafe {
+                    let bytes = core::slice::from_raw_parts(buf as *const u8, count as usize);
+                    for &byte in bytes {
+                        console_putchar(byte);
+                    }
+                }
+                count
+            } else {
+                0
+            }
+        }
+        
+        fn sys_exit(code: u64) -> u64 {
+            // システム終了
+            super::hw::halt();
+        }
+        
+        unsafe fn console_putchar(ch: u8) {
+            // VGAテキストモードでの文字出力
+            const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
+            static mut CURSOR_POS: usize = 0;
+            
+            if ch == b'\n' {
+                CURSOR_POS = (CURSOR_POS / 160 + 1) * 160;
+            } else {
+                let offset = CURSOR_POS;
+                core::ptr::write_volatile(VGA_BUFFER.add(offset), ch);
+                core::ptr::write_volatile(VGA_BUFFER.add(offset + 1), 0x07); // 白文字
+                CURSOR_POS += 2;
+            }
+            
+            if CURSOR_POS >= 80 * 25 * 2 {
+                CURSOR_POS = 0;
+            }
+        }
+        
+        impl From<u64> for SyscallNumber {
+            fn from(n: u64) -> Self {
+                match n {
+                    0 => SyscallNumber::Read,
+                    1 => SyscallNumber::Write,
+                    2 => SyscallNumber::Open,
+                    3 => SyscallNumber::Close,
+                    60 => SyscallNumber::Exit,
+                    _ => SyscallNumber::Exit, // デフォルト
+                }
+            }
+        }
+    }
+}

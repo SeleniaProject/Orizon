@@ -1,0 +1,6 @@
+// Test simple expressions with member access
+func test() {
+    let x = obj.field;
+    let y = a.b.c;
+    return x + y;
+}

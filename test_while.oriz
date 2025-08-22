@@ -1,0 +1,7 @@
+func main() {
+    let mut count = 0;
+    while count < 5 {
+        println("Count: {}", count);
+        count = count + 1;
+    }
+}
