@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/orizon-lang/orizon/internal/cli"
 )
 
 type testAttempt struct {
@@ -69,19 +71,47 @@ func readCoverageSummary(path string) (string, error) {
 
 func main() {
 	var (
-		junitPath string
-		statsList string
-		outPath   string
-		title     string
-		coverPath string
+		junitPath   string
+		statsList   string
+		outPath     string
+		title       string
+		coverPath   string
+		showVersion bool
+		showHelp    bool
+		jsonOutput  bool
 	)
 
 	flag.StringVar(&junitPath, "junit-summary", "", "path to junit_summary.json")
 	flag.StringVar(&statsList, "stats", "", "comma-separated paths to fuzz stats JSON files")
 	flag.StringVar(&outPath, "out", "", "optional output markdown path")
-	flag.StringVar(&title, "title", "Orizon Smoke Summary", "summary title")
+	flag.StringVar(&title, "title", "Orizon Project Summary", "summary title")
 	flag.StringVar(&coverPath, "cover", "", "optional path to coverage summary (cover.txt)")
+	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.BoolVar(&showHelp, "help", false, "show help information")
+	flag.BoolVar(&jsonOutput, "json", false, "output version in JSON format")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Generate comprehensive project summaries including test results, coverage, and fuzz statistics.\n\n")
+		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nEXAMPLES:\n")
+		fmt.Fprintf(os.Stderr, "  %s --junit-summary tests.json         # Test summary only\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --cover coverage.txt --out sum.md  # Coverage to markdown\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --stats fuzz1.json,fuzz2.json     # Multiple fuzz results\n", os.Args[0])
+	}
+
 	flag.Parse()
+
+	if showHelp {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if showVersion {
+		cli.PrintVersion("Orizon Project Summary", jsonOutput)
+		os.Exit(0)
+	}
 
 	var sb strings.Builder
 

@@ -6,22 +6,16 @@ import (
 	"fmt"
 )
 
-// SourceLocation represents a location in source code (for demo).
-type SourceLocation struct {
+// sourceLocation represents a location in source code (for demo).
+type sourceLocation struct {
 	File   string
 	Line   int
 	Column int
 }
 
-// String returns the string representation of SourceLocation.
-func (sl *SourceLocation) String() string {
+// String returns the string representation of sourceLocation.
+func (sl *sourceLocation) String() string {
 	return fmt.Sprintf("%s:%d:%d", sl.File, sl.Line, sl.Column)
-}
-
-// Type represents a type in the system (minimal for demo).
-type Type struct {
-	Name string
-	Kind string
 }
 
 // EffectKind represents different categories of side effects.
@@ -52,40 +46,16 @@ const (
 
 // String returns the string representation of an EffectKind.
 func (ek EffectKind) String() string {
-	switch ek {
-	case EffectPure:
-		return "Pure"
-	case EffectIO:
-		return "IO"
-	case EffectFileRead:
-		return "FileRead"
-	case EffectFileWrite:
-		return "FileWrite"
-	case EffectNetworkRead:
-		return "NetworkRead"
-	case EffectNetworkWrite:
-		return "NetworkWrite"
-	case EffectMemoryRead:
-		return "MemoryRead"
-	case EffectMemoryWrite:
-		return "MemoryWrite"
-	case EffectMemoryAlloc:
-		return "MemoryAlloc"
-	case EffectMemoryFree:
-		return "MemoryFree"
-	case EffectThrow:
-		return "Throw"
-	case EffectCatch:
-		return "Catch"
-	case EffectSystemCall:
-		return "SystemCall"
-	case EffectRandom:
-		return "Random"
-	case EffectTime:
-		return "Time"
-	default:
-		return fmt.Sprintf("Unknown(%d)", int(ek))
+	names := []string{
+		"Pure", "IO", "FileRead", "FileWrite",
+		"NetworkRead", "NetworkWrite", "MemoryRead", "MemoryWrite",
+		"MemoryAlloc", "MemoryFree", "Throw", "Catch",
+		"SystemCall", "Random", "Time",
 	}
+	if int(ek) < len(names) {
+		return names[ek]
+	}
+	return fmt.Sprintf("Unknown(%d)", int(ek))
 }
 
 // EffectLevel represents the severity/impact level of an effect.
@@ -117,41 +87,41 @@ func (el EffectLevel) String() string {
 	}
 }
 
-// SideEffect represents a single side effect with its properties.
-type SideEffect struct {
-	Location    *SourceLocation
+// sideEffect represents a single side effect with its properties.
+type sideEffect struct {
+	Location    *sourceLocation
 	Description string
 	Kind        EffectKind
 	Level       EffectLevel
 }
 
-// NewSideEffect creates a new SideEffect with the given kind and level.
-func NewSideEffect(kind EffectKind, level EffectLevel) *SideEffect {
-	return &SideEffect{
+// newSideEffect creates a new sideEffect with the given kind and level.
+func newSideEffect(kind EffectKind, level EffectLevel) *sideEffect {
+	return &sideEffect{
 		Kind:  kind,
 		Level: level,
 	}
 }
 
 // String returns the string representation of a SideEffect.
-func (e *SideEffect) String() string {
+func (e *sideEffect) String() string {
 	return fmt.Sprintf("%s[%s]", e.Kind.String(), e.Level.String())
 }
 
-// EffectSet represents a collection of side effects.
-type EffectSet struct {
-	effects map[EffectKind]*SideEffect
+// effectSet represents a collection of side effects.
+type effectSet struct {
+	effects map[EffectKind]*sideEffect
 }
 
-// NewEffectSet creates a new empty EffectSet.
-func NewEffectSet() *EffectSet {
-	return &EffectSet{
-		effects: make(map[EffectKind]*SideEffect),
+// newEffectSet creates a new empty effectSet.
+func newEffectSet() *effectSet {
+	return &effectSet{
+		effects: make(map[EffectKind]*sideEffect),
 	}
 }
 
 // Add adds a side effect to the set.
-func (es *EffectSet) Add(effect *SideEffect) {
+func (es *effectSet) Add(effect *sideEffect) {
 	if existing, exists := es.effects[effect.Kind]; exists {
 		// Keep the higher level.
 		if effect.Level > existing.Level {
@@ -163,24 +133,24 @@ func (es *EffectSet) Add(effect *SideEffect) {
 }
 
 // Contains checks if the set contains an effect of the given kind.
-func (es *EffectSet) Contains(kind EffectKind) bool {
+func (es *effectSet) Contains(kind EffectKind) bool {
 	_, exists := es.effects[kind]
 
 	return exists
 }
 
 // Size returns the number of effects in the set.
-func (es *EffectSet) Size() int {
+func (es *effectSet) Size() int {
 	return len(es.effects)
 }
 
 // IsEmpty checks if the effect set is empty.
-func (es *EffectSet) IsEmpty() bool {
+func (es *effectSet) IsEmpty() bool {
 	return len(es.effects) == 0
 }
 
-// String returns the string representation of the EffectSet.
-func (es *EffectSet) String() string {
+// String returns the string representation of the effectSet.
+func (es *effectSet) String() string {
 	if es.IsEmpty() {
 		return "Pure"
 	}
@@ -193,9 +163,9 @@ func (es *EffectSet) String() string {
 	return "{" + fmt.Sprintf("%v", effects) + "}"
 }
 
-// Union creates a new EffectSet containing effects from both sets.
-func (es *EffectSet) Union(other *EffectSet) *EffectSet {
-	result := NewEffectSet()
+// Union creates a new effectSet containing effects from both sets.
+func (es *effectSet) Union(other *effectSet) *effectSet {
+	result := newEffectSet()
 
 	for _, effect := range es.effects {
 		result.Add(effect)
@@ -210,14 +180,14 @@ func (es *EffectSet) Union(other *EffectSet) *EffectSet {
 
 // EffectSignature represents the complete effect signature of a function.
 type EffectSignature struct {
-	Effects *EffectSet
+	Effects *effectSet
 	Pure    bool
 }
 
 // NewEffectSignature creates a new EffectSignature.
 func NewEffectSignature() *EffectSignature {
 	return &EffectSignature{
-		Effects: NewEffectSet(),
+		Effects: newEffectSet(),
 		Pure:    false,
 	}
 }
@@ -243,9 +213,9 @@ func main() {
 	// Demo 1: Basic Effect Creation and Management.
 	fmt.Println("\n📍 Demo 1: Basic Effect Creation")
 
-	fileReadEffect := NewSideEffect(EffectFileRead, EffectLevelMedium)
-	memoryWriteEffect := NewSideEffect(EffectMemoryWrite, EffectLevelLow)
-	networkEffect := NewSideEffect(EffectNetworkRead, EffectLevelHigh)
+	fileReadEffect := newSideEffect(EffectFileRead, EffectLevelMedium)
+	memoryWriteEffect := newSideEffect(EffectMemoryWrite, EffectLevelLow)
+	networkEffect := newSideEffect(EffectNetworkRead, EffectLevelHigh)
 
 	fmt.Printf("File Read Effect: %s\n", fileReadEffect)
 	fmt.Printf("Memory Write Effect: %s\n", memoryWriteEffect)
@@ -254,13 +224,13 @@ func main() {
 	// Demo 2: Effect Set Operations.
 	fmt.Println("\n📍 Demo 2: Effect Set Operations")
 
-	effectSet1 := NewEffectSet()
+	effectSet1 := newEffectSet()
 	effectSet1.Add(fileReadEffect)
 	effectSet1.Add(memoryWriteEffect)
 
-	effectSet2 := NewEffectSet()
+	effectSet2 := newEffectSet()
 	effectSet2.Add(networkEffect)
-	effectSet2.Add(NewSideEffect(EffectThrow, EffectLevelCritical))
+	effectSet2.Add(newSideEffect(EffectThrow, EffectLevelCritical))
 
 	fmt.Printf("Effect Set 1: %s\n", effectSet1)
 	fmt.Printf("Effect Set 2: %s\n", effectSet2)
@@ -287,16 +257,16 @@ func main() {
 
 	// Scenario 1: File processing function.
 	fileProcessing := NewEffectSignature()
-	fileProcessing.Effects.Add(NewSideEffect(EffectFileRead, EffectLevelMedium))
-	fileProcessing.Effects.Add(NewSideEffect(EffectFileWrite, EffectLevelMedium))
-	fileProcessing.Effects.Add(NewSideEffect(EffectMemoryAlloc, EffectLevelLow))
+	fileProcessing.Effects.Add(newSideEffect(EffectFileRead, EffectLevelMedium))
+	fileProcessing.Effects.Add(newSideEffect(EffectFileWrite, EffectLevelMedium))
+	fileProcessing.Effects.Add(newSideEffect(EffectMemoryAlloc, EffectLevelLow))
 	fmt.Printf("File Processing Function: %s\n", fileProcessing)
 
 	// Scenario 2: Network API call.
 	networkAPI := NewEffectSignature()
-	networkAPI.Effects.Add(NewSideEffect(EffectNetworkRead, EffectLevelHigh))
-	networkAPI.Effects.Add(NewSideEffect(EffectNetworkWrite, EffectLevelHigh))
-	networkAPI.Effects.Add(NewSideEffect(EffectThrow, EffectLevelMedium)) // May throw network exceptions
+	networkAPI.Effects.Add(newSideEffect(EffectNetworkRead, EffectLevelHigh))
+	networkAPI.Effects.Add(newSideEffect(EffectNetworkWrite, EffectLevelHigh))
+	networkAPI.Effects.Add(newSideEffect(EffectThrow, EffectLevelMedium)) // May throw network exceptions
 	fmt.Printf("Network API Function: %s\n", networkAPI)
 
 	// Scenario 3: Mathematical computation (pure).
@@ -326,7 +296,7 @@ func main() {
 
 		// Check for specific effect categories.
 		if sig.Effects.Contains(EffectFileRead) || sig.Effects.Contains(EffectFileWrite) {
-			fmt.Printf("  ⚠️  Contains file I/O operations\n")
+			fmt.Printf("  ⚠�E�E Contains file I/O operations\n")
 		}
 
 		if sig.Effects.Contains(EffectNetworkRead) || sig.Effects.Contains(EffectNetworkWrite) {
@@ -367,16 +337,16 @@ func main() {
 			}
 
 			if !allowed {
-				fmt.Printf("  ❌ Prohibited effect: %s\n", effect)
+				fmt.Printf("  ❁EProhibited effect: %s\n", effect)
 
 				safe = false
 			}
 		}
 
 		if safe {
-			fmt.Printf("  ✅ Function is safe for given constraints\n")
+			fmt.Printf("  ✁EFunction is safe for given constraints\n")
 		} else {
-			fmt.Printf("  ❌ Function violates safety constraints\n")
+			fmt.Printf("  ❁EFunction violates safety constraints\n")
 		}
 	}
 
@@ -392,9 +362,9 @@ func main() {
 	fmt.Println("\n🎉 Effect Type System Demo Completed!")
 	fmt.Println("=====================================")
 	fmt.Println("The effect system successfully demonstrates:")
-	fmt.Println("✅ Static effect tracking and classification")
-	fmt.Println("✅ Effect composition and union operations")
-	fmt.Println("✅ Effect signature management")
-	fmt.Println("✅ Safety verification and constraint checking")
-	fmt.Println("✅ Real-world scenario modeling")
+	fmt.Println("✁EStatic effect tracking and classification")
+	fmt.Println("✁EEffect composition and union operations")
+	fmt.Println("✁EEffect signature management")
+	fmt.Println("✁ESafety verification and constraint checking")
+	fmt.Println("✁EReal-world scenario modeling")
 }

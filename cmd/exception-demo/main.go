@@ -68,13 +68,13 @@ const (
 	RecoveryRetry
 	RecoveryFallback
 	RecoveryPropagate
-	RecoveryTerminate
-	RecoveryIgnore
+	RecoveryAbort
 	RecoveryLog
+	RecoveryTerminate
 )
 
 func (er ExceptionRecovery) String() string {
-	names := []string{"None", "Retry", "Fallback", "Propagate", "Terminate", "Ignore", "Log"}
+	names := []string{"None", "Retry", "Fallback", "Propagate", "Abort", "Log", "Terminate"}
 	if int(er) < len(names) {
 		return names[er]
 	}
@@ -82,11 +82,12 @@ func (er ExceptionRecovery) String() string {
 	return fmt.Sprintf("Unknown(%d)", int(er))
 }
 
-// ExceptionSafety represents exception safety levels.
+// ExceptionSafety represents the safety level of exception handling.
 type ExceptionSafety int
 
 const (
-	SafetyNone ExceptionSafety = iota
+	SafetyUnsafe ExceptionSafety = iota
+	SafetyNone
 	SafetyBasic
 	SafetyStrong
 	SafetyNoThrow
@@ -94,7 +95,7 @@ const (
 )
 
 func (es ExceptionSafety) String() string {
-	names := []string{"None", "Basic", "Strong", "NoThrow", "NoFail"}
+	names := []string{"Unsafe", "None", "Basic", "Strong", "NoThrow", "NoFail"}
 	if int(es) < len(names) {
 		return names[es]
 	}
