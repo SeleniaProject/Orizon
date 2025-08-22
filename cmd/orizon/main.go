@@ -17,6 +17,7 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/orizon-lang/orizon/internal/cli"
 	pm "github.com/orizon-lang/orizon/internal/packagemanager"
 )
 
@@ -33,8 +34,15 @@ func main() {
 	case "help", "-h", "--help":
 		usage()
 	case "version", "-v", "--version":
-		fmt.Println("Orizon unified CLI (cargo-like)")
-		fmt.Println("Go:", runtime.Version())
+		// Check for JSON output flag
+		jsonOutput := false
+		for _, arg := range args {
+			if arg == "--json" || arg == "-j" {
+				jsonOutput = true
+				break
+			}
+		}
+		cli.PrintVersion("Orizon CLI", jsonOutput)
 		os.Exit(0)
 	case "build":
 		must(runToolOrRun("orizon-compiler", args...))
@@ -54,6 +62,12 @@ func main() {
 		must(runToolOrRun("orizon-summary", args...))
 	case "lsp":
 		must(runToolOrRun("orizon-lsp", args...))
+	case "repl":
+		must(runToolOrRun("orizon-repl", args...))
+	case "doc":
+		must(runToolOrRun("orizon-doc", args...))
+	case "profile":
+		must(runToolOrRun("orizon-profile", args...))
 	case "run":
 		fs := flag.NewFlagSet("run", flag.ExitOnError)
 		timeout := fs.Duration("timeout", 0, "optional timeout (e.g., 30s)")
@@ -86,22 +100,58 @@ func main() {
 }
 
 func usage() {
-	fmt.Println("orizon - cargo-like unified CLI for Orizon")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println("  orizon <command> [args]")
-	fmt.Println()
-	fmt.Println("  build       Build Orizon sources (delegates to orizon-compiler)")
-	fmt.Println("  run         Compile and run a source: orizon run file.oriz [-- args]")
-	fmt.Println("  test        Run tests (oriz or fallback to go test ./...)")
-	fmt.Println("  fmt         Format sources (delegates to orizon-fmt)")
-	fmt.Println("  lsp         Start language server (orizon-lsp)")
-	fmt.Println("  fuzz        Run fuzzer (orizon-fuzz)")
-	fmt.Println("  mockgen     Generate mocks (orizon-mockgen)")
-	fmt.Println("  summary     Print project summary (orizon-summary)")
-	fmt.Println("  pkg         Package ops: init/publish/add/resolve/lock/verify/list/fetch | update/remove/graph[--dot|--output]/why[--verbose|--cid]/outdated | vendor | sign/verify-sig/audit | serve[--token|--tls-cert --tls-key] | auth login")
-	fmt.Println("  version     Print version info")
-	fmt.Println("  help        Show this help")
+	commands := []cli.CommandInfo{
+		{
+			Name:        "build",
+			Description: "Build Orizon sources",
+		},
+		{
+			Name:        "run",
+			Description: "Compile and run a source file",
+		},
+		{
+			Name:        "test",
+			Description: "Run tests",
+		},
+		{
+			Name:        "fmt",
+			Description: "Format source code",
+		},
+		{
+			Name:        "lsp",
+			Description: "Start language server",
+		},
+		{
+			Name:        "fuzz",
+			Description: "Run fuzzer",
+		},
+		{
+			Name:        "mockgen",
+			Description: "Generate mocks",
+		},
+		{
+			Name:        "summary",
+			Description: "Print project summary",
+		},
+		{
+			Name:        "repl",
+			Description: "Start interactive REPL",
+		},
+		{
+			Name:        "doc",
+			Description: "Generate documentation",
+		},
+		{
+			Name:        "profile",
+			Description: "Performance profiling",
+		},
+		{
+			Name:        "pkg",
+			Description: "Package operations (init, publish, add, etc.)",
+		},
+	}
+
+	cli.PrintUsage("orizon", commands)
 }
 
 type manifest struct {

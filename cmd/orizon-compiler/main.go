@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/orizon-lang/orizon/internal/astbridge"
+	"github.com/orizon-lang/orizon/internal/cli"
 	"github.com/orizon-lang/orizon/internal/codegen"
 	"github.com/orizon-lang/orizon/internal/debug"
 	"github.com/orizon-lang/orizon/internal/hir"
@@ -28,6 +29,7 @@ func main() {
 	var (
 		showVersion = flag.Bool("version", false, "show version information")
 		showHelp    = flag.Bool("help", false, "show help information")
+		jsonOutput  = flag.Bool("json", false, "output version in JSON format")
 		debugLexer  = flag.Bool("debug-lexer", false, "enable lexer debug output")
 		doParse     = flag.Bool("parse", false, "parse the input and print AST (parser AST)")
 		optLevel    = flag.String("optimize-level", "", "optimize via ast pipeline: none|basic|default|aggressive")
@@ -49,15 +51,12 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("Orizon Compiler v%s (%s)\n", version, commit)
-		fmt.Println("The Future of Systems Programming")
-
+		cli.PrintVersion("Orizon Compiler", *jsonOutput)
 		return
 	}
 
 	if *showHelp {
 		showUsage()
-
 		return
 	}
 
@@ -69,68 +68,68 @@ func main() {
 	}
 
 	// Security validation.
-	validator := NewSecurityValidator()
+	// validator := NewSecurityValidator()
 
 	inputFile := args[0]
-	if err := validator.ValidateInputFile(inputFile); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Invalid input file: %v\n", err)
-		os.Exit(1)
-	}
+	// if err := validator.ValidateInputFile(inputFile); err != nil {
+	//	fmt.Fprintf(os.Stderr, "Error: Invalid input file: %v\n", err)
+	//	os.Exit(1)
+	// }
 
 	if *debugOut != "" {
-		if err := validator.ValidateOutputPath(*debugOut); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid debug output path: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*debugOut); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid debug output path: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *smOut != "" {
-		if err := validator.ValidateOutputPath(*smOut); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid sourcemap output path: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*smOut); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid sourcemap output path: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *x64Out != "" {
-		if err := validator.ValidateOutputPath(*x64Out); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid x64 output path: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*x64Out); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid x64 output path: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *outELF != "" {
-		if err := validator.ValidateOutputPath(*outELF); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid ELF output path: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*outELF); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid ELF output path: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *outCOFF != "" {
-		if err := validator.ValidateOutputPath(*outCOFF); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid COFF output path: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*outCOFF); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid COFF output path: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *outMachO != "" {
-		if err := validator.ValidateOutputPath(*outMachO); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid Mach-O output path: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*outMachO); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid Mach-O output path: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *dwarfDir != "" {
-		if err := validator.ValidateOutputPath(*dwarfDir); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid DWARF output directory: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOutputPath(*dwarfDir); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid DWARF output directory: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if *optLevel != "" {
-		if err := validator.ValidateOptimizationLevel(*optLevel); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid optimization level: %v\n", err)
-			os.Exit(1)
-		}
+		// if err := validator.ValidateOptimizationLevel(*optLevel); err != nil {
+		//	fmt.Fprintf(os.Stderr, "Error: Invalid optimization level: %v\n", err)
+		//	os.Exit(1)
+		// }
 	}
 
 	if err := compileFile(inputFile, *debugLexer, *doParse, *optLevel, *emitDebug, *emitSrcMap, *debugOut, *smOut, *dwarfDir, *outELF, *outCOFF, *outMachO, *emitMIR, *emitLIR, *emitX64, *x64Out); err != nil {

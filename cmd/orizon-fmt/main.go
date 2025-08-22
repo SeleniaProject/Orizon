@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/orizon-lang/orizon/internal/cli"
 	orifmt "github.com/orizon-lang/orizon/internal/format"
 )
 
@@ -34,6 +35,9 @@ func main() {
 		useAST       bool
 		showDiff     bool
 		diffMode     string
+		showVersion  bool
+		showHelp     bool
+		jsonOutput   bool
 	)
 	flag.BoolVar(&writeInPlace, "w", false, "write result to (source) file instead of stdout")
 	flag.BoolVar(&listOnly, "l", false, "list files whose formatting differs from orizon-fmt output")
@@ -41,7 +45,37 @@ func main() {
 	flag.BoolVar(&useAST, "ast", false, "use AST-based formatting (enhanced mode)")
 	flag.BoolVar(&showDiff, "diff", false, "show diff output instead of formatted code")
 	flag.StringVar(&diffMode, "mode", "unified", "diff mode: unified, context, side-by-side")
+	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.BoolVar(&showHelp, "help", false, "show help information")
+	flag.BoolVar(&jsonOutput, "json", false, "output version in JSON format")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] [FILES...]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Orizon source code formatter.\n\n")
+		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nMODES:\n")
+		fmt.Fprintf(os.Stderr, "  Basic mode: trims trailing spaces/tabs per line, ensures exactly one trailing newline\n")
+		fmt.Fprintf(os.Stderr, "  AST mode (-ast): provides comprehensive AST-based formatting with proper indentation\n")
+		fmt.Fprintf(os.Stderr, "\nEXAMPLES:\n")
+		fmt.Fprintf(os.Stderr, "  %s file.oriz              # Format and output to stdout\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -w file.oriz           # Format in place\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -ast -w *.oriz         # AST-based formatting in place\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -stdin < file.oriz     # Format from stdin\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -diff file.oriz        # Show diff instead of formatted output\n", os.Args[0])
+	}
+
 	flag.Parse()
+
+	if showHelp {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if showVersion {
+		cli.PrintVersion("Orizon Code Formatter", jsonOutput)
+		os.Exit(0)
+	}
 
 	if fromStdin {
 		in, err := io.ReadAll(os.Stdin)
