@@ -55,6 +55,13 @@ const (
 	IntrinsicRdtsc
 	IntrinsicCpuid
 	IntrinsicPrefetch
+
+	// Kernel and system programming.
+	IntrinsicKernelCall
+	IntrinsicSystemCall
+	IntrinsicPortIO
+	IntrinsicMemoryMap
+	IntrinsicInterrupt
 )
 
 // IntrinsicInfo describes an intrinsic function.
@@ -113,6 +120,9 @@ const (
 	CategoryCompilerMagic
 	CategorySIMD
 	CategoryArchSpecific
+	CategorySystem
+	CategoryIO
+	CategoryKernel
 )
 
 // PlatformSupport indicates platform availability.
